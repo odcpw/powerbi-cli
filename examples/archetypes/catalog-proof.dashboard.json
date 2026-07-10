@@ -1,0 +1,101 @@
+{
+  "schema": "powerbi-cli.dashboard.v1",
+  "report": {
+    "name": "VisualCatalogProof",
+    "displayName": "Visual Catalog Proof",
+    "locale": "en-US",
+    "audience": "visual compatibility reviewer",
+    "questions": [
+      "Do the generated visual families render their expected field wells?",
+      "Does the known-good line chart still render as a control?"
+    ]
+  },
+  "pages": [
+    {
+      "id": "pie_proof",
+      "displayName": "Pie Proof",
+      "size": { "width": 800, "height": 500 },
+      "visuals": [
+        {
+          "id": "category_share_pie",
+          "type": "pieChart",
+          "title": "Pie Category Share",
+          "bindings": [
+            { "role": "Category", "field": "CatalogFacts[Category]" },
+            { "role": "Y", "field": "CatalogFacts[Total Amount]" }
+          ],
+          "layout": { "x": 40, "y": 40, "width": 720, "height": 400 }
+        }
+      ]
+    },
+    {
+      "id": "donut_proof",
+      "displayName": "Donut Proof",
+      "size": { "width": 800, "height": 500 },
+      "visuals": [
+        {
+          "id": "category_share_donut",
+          "type": "donut",
+          "title": "Donut Category Share",
+          "bindings": [
+            { "role": "Category", "field": "CatalogFacts[Category]" },
+            { "role": "Y", "field": "CatalogFacts[Total Amount]" }
+          ],
+          "layout": { "x": 40, "y": 40, "width": 720, "height": 400 }
+        }
+      ]
+    },
+    {
+      "id": "matrix_proof",
+      "displayName": "Matrix Proof",
+      "size": { "width": 800, "height": 500 },
+      "visuals": [
+        {
+          "id": "rows_columns_values_matrix",
+          "type": "matrix",
+          "title": "Matrix Rows Columns Values",
+          "bindings": [
+            { "role": "Rows", "field": "CatalogFacts[Category]" },
+            { "role": "Columns", "field": "CatalogFacts[Year]" },
+            { "role": "Values", "field": "CatalogFacts[Total Amount]" }
+          ],
+          "layout": { "x": 40, "y": 40, "width": 720, "height": 400 }
+        }
+      ]
+    },
+    {
+      "id": "slicer_proof",
+      "displayName": "Slicer Proof",
+      "size": { "width": 800, "height": 500 },
+      "visuals": [
+        {
+          "id": "basic_category_slicer",
+          "type": "slicer",
+          "mode": "basic",
+          "title": "Basic Category Slicer",
+          "bindings": [
+            { "role": "Values", "field": "CatalogFacts[Category]" }
+          ],
+          "layout": { "x": 40, "y": 40, "width": 360, "height": 240 }
+        }
+      ]
+    },
+    {
+      "id": "line_control",
+      "displayName": "Line Control",
+      "size": { "width": 800, "height": 500 },
+      "visuals": [
+        {
+          "id": "known_good_line_control",
+          "type": "lineChart",
+          "title": "Known-Good Line Control",
+          "bindings": [
+            { "role": "Category", "field": "CatalogFacts[Year]" },
+            { "role": "Y", "field": "CatalogFacts[Total Amount]" }
+          ],
+          "layout": { "x": 40, "y": 40, "width": 720, "height": 400 }
+        }
+      ]
+    }
+  ]
+}

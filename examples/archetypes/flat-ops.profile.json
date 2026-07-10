@@ -1,0 +1,143 @@
+{
+  "candidates": {
+    "categoryColumns": [
+      {
+        "column": "Team",
+        "dataType": "string",
+        "field": "WorkItems[Team]",
+        "table": "WorkItems"
+      },
+      {
+        "column": "Priority",
+        "dataType": "string",
+        "field": "WorkItems[Priority]",
+        "table": "WorkItems"
+      }
+    ],
+    "dateColumns": [
+      {
+        "column": "WorkDate",
+        "dataType": "date",
+        "field": "WorkItems[WorkDate]",
+        "table": "WorkItems"
+      }
+    ],
+    "dimensionTables": [],
+    "factTables": [
+      "WorkItems"
+    ],
+    "numericColumns": [
+      {
+        "column": "Completed",
+        "dataType": "int64",
+        "field": "WorkItems[Completed]",
+        "table": "WorkItems"
+      },
+      {
+        "column": "Hours",
+        "dataType": "decimal",
+        "field": "WorkItems[Hours]",
+        "table": "WorkItems"
+      }
+    ]
+  },
+  "schema": "powerbi-cli.dataProfile.v1",
+  "source": {
+    "kind": "schema-embedded-dummy-rows",
+    "schemaPath": "examples/archetypes/flat-ops.schema.json"
+  },
+  "tables": [
+    {
+      "columns": [
+        {
+          "dataType": "date",
+          "distinctCount": 3,
+          "isKey": false,
+          "name": "WorkDate",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": false
+          },
+          "sampleValues": [
+            "2026-01-05",
+            "2026-01-06",
+            "2026-01-07"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 3,
+          "isKey": false,
+          "name": "Team",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Assembly",
+            "Packaging",
+            "Maintenance"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 2,
+          "isKey": false,
+          "name": "Priority",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "High",
+            "Normal"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 3,
+          "isKey": false,
+          "name": "Completed",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "12",
+            "18",
+            "7"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 3,
+          "isKey": false,
+          "name": "Hours",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "86.5",
+            "74.0",
+            "42.5"
+          ]
+        }
+      ],
+      "name": "WorkItems",
+      "role": "fact",
+      "rowCount": 3
+    }
+  ],
+  "warnings": []
+}

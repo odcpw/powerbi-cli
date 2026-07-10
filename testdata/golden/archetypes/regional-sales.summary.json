@@ -1,0 +1,734 @@
+{
+  "counts": {
+    "boundVisuals": 9,
+    "columns": 8,
+    "explicitInteractions": 0,
+    "jsonFilesChecked": 21,
+    "lintErrors": 0,
+    "lintInfo": 0,
+    "lintWarnings": 0,
+    "measures": 3,
+    "pages": 3,
+    "relationships": 1,
+    "staleInteractionVisualReferences": 0,
+    "tables": 2,
+    "unsupportedInteractions": 0,
+    "validationErrors": 0,
+    "validationWarnings": 0,
+    "visuals": 9
+  },
+  "exitCode": 0,
+  "fingerprint": "f161dbc95449c0c6",
+  "lint": {
+    "counts": {
+      "errors": 0,
+      "findings": 0,
+      "info": 0,
+      "warnings": 0
+    },
+    "findings": []
+  },
+  "model": {
+    "relationships": [
+      {
+        "crossFilteringBehavior": "oneDirection",
+        "from": "FactSales.CustomerKey",
+        "isActive": true,
+        "name": "relFactSalesCustomerKeyToDimCustomerCustomerKey8b7",
+        "to": "DimCustomer.CustomerKey"
+      }
+    ],
+    "tables": [
+      {
+        "columns": [
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": true,
+            "name": "CustomerKey",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Customer",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Segment",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Größenklasse",
+            "summarizeBy": "none"
+          }
+        ],
+        "measures": [],
+        "name": "DimCustomer",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "DimCustomer",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      },
+      {
+        "columns": [
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "CustomerKey",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Year",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "$#,##0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Revenue",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "int64",
+            "formatString": "#,##0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Units",
+            "summarizeBy": "sum"
+          }
+        ],
+        "measures": [
+          {
+            "displayFolder": null,
+            "expression": "SUM('FactSales'[Revenue])",
+            "formatString": "$#,##0",
+            "name": "Total Revenue"
+          },
+          {
+            "displayFolder": null,
+            "expression": "SUM('FactSales'[Units])",
+            "formatString": "#,##0",
+            "name": "Total Units"
+          },
+          {
+            "displayFolder": null,
+            "expression": "AVERAGE('FactSales'[Revenue])",
+            "formatString": "$#,##0",
+            "name": "Umsatz Übersicht"
+          }
+        ],
+        "name": "FactSales",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "FactSales",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      }
+    ]
+  },
+  "next": [
+    "Review this summary before committing it as a golden fixture.",
+    "Run `powerbi-cli fixture verify <project> --expected <summary.json> --json` in CI.",
+    "Run `powerbi-cli desktop open-check <project> --json` on an opt-in Windows Desktop oracle machine."
+  ],
+  "ok": true,
+  "pbir": {
+    "filters": {
+      "counts": {
+        "literals": 46,
+        "page": 2,
+        "report": 0,
+        "total": 4,
+        "unsupported": 0,
+        "visual": 2
+      },
+      "items": [
+        {
+          "categoricalVersion": null,
+          "conditionSummary": "Categorical filter on DimCustomer[Customer]",
+          "desktopSafeName": true,
+          "filterType": "Categorical",
+          "fromCount": 0,
+          "literalCount": 0,
+          "name": "DrillthroughFilter_c599bf441163",
+          "ordinal": 0,
+          "owner": {
+            "displayName": "Customer Detail",
+            "handle": "page:ReportSectionCustomerDetail",
+            "kind": "page",
+            "name": "ReportSectionCustomerDetail",
+            "ordinal": 1
+          },
+          "scope": "page",
+          "target": {
+            "column": "Customer",
+            "field": "Customer",
+            "kind": "column",
+            "measure": null,
+            "table": "DimCustomer"
+          },
+          "unsupported": false,
+          "whereCount": 0,
+          "whereUsesSourceAlias": false
+        },
+        {
+          "categoricalVersion": null,
+          "conditionSummary": "Categorical filter on DimCustomer[Segment]",
+          "desktopSafeName": true,
+          "filterType": "Categorical",
+          "fromCount": 0,
+          "literalCount": 0,
+          "name": "DrillthroughFilter_792c80cb38a3",
+          "ordinal": 0,
+          "owner": {
+            "displayName": "Segment Detail",
+            "handle": "page:ReportSectionSegmentDetail",
+            "kind": "page",
+            "name": "ReportSectionSegmentDetail",
+            "ordinal": 2
+          },
+          "scope": "page",
+          "target": {
+            "column": "Segment",
+            "field": "Segment",
+            "kind": "column",
+            "measure": null,
+            "table": "DimCustomer"
+          },
+          "unsupported": false,
+          "whereCount": 0,
+          "whereUsesSourceAlias": false
+        },
+        {
+          "categoricalVersion": 2,
+          "conditionSummary": "TopN filter on DimCustomer[Customer] with persisted filter definition",
+          "desktopSafeName": true,
+          "filterType": "TopN",
+          "fromCount": 2,
+          "literalCount": 23,
+          "name": "PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+          "ordinal": 0,
+          "owner": {
+            "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+            "kind": "visual",
+            "name": "VisualContainerCustomerDetailTable",
+            "page": {
+              "displayName": "Customer Detail",
+              "handle": "page:ReportSectionCustomerDetail",
+              "name": "ReportSectionCustomerDetail",
+              "ordinal": 1
+            },
+            "title": "Customer Detail",
+            "visualType": "tableEx"
+          },
+          "scope": "visual",
+          "target": {
+            "column": "Customer",
+            "field": "Customer",
+            "kind": "column",
+            "measure": null,
+            "table": "DimCustomer"
+          },
+          "unsupported": false,
+          "whereCount": 1,
+          "whereUsesSourceAlias": true
+        },
+        {
+          "categoricalVersion": 2,
+          "conditionSummary": "TopN filter on DimCustomer[Segment] with persisted filter definition",
+          "desktopSafeName": true,
+          "filterType": "TopN",
+          "fromCount": 2,
+          "literalCount": 23,
+          "name": "PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+          "ordinal": 0,
+          "owner": {
+            "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+            "kind": "visual",
+            "name": "VisualContainerSegmentDetailTable",
+            "page": {
+              "displayName": "Segment Detail",
+              "handle": "page:ReportSectionSegmentDetail",
+              "name": "ReportSectionSegmentDetail",
+              "ordinal": 2
+            },
+            "title": "Segment Detail",
+            "visualType": "tableEx"
+          },
+          "scope": "visual",
+          "target": {
+            "column": "Segment",
+            "field": "Segment",
+            "kind": "column",
+            "measure": null,
+            "table": "DimCustomer"
+          },
+          "unsupported": false,
+          "whereCount": 1,
+          "whereUsesSourceAlias": true
+        }
+      ]
+    },
+    "reportDefinitionVersion": "2.0.0"
+  },
+  "project": {
+    "name": "RegionalSales",
+    "pbipName": "RegionalSales.pbip"
+  },
+  "report": {
+    "interactionSemantics": {
+      "missingRowsMean": "When a source/target visual pair is absent from visualInteractions, Power BI uses the target visual's default interaction behavior.",
+      "mode": "explicit-overrides",
+      "supportedTypes": [
+        "Default",
+        "DataFilter",
+        "HighlightFilter",
+        "NoFilter"
+      ]
+    },
+    "pages": [
+      {
+        "displayName": "Overview",
+        "displayOption": "FitToPage",
+        "height": 720.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": true,
+        "name": "ReportSectionOverview",
+        "ordinal": 0,
+        "visuals": [
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": "Größenklasse",
+                "field": "Größenklasse",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "DimCustomer"
+              }
+            ],
+            "fingerprints": {
+              "objects": "eee1faca4c0bfcf6",
+              "position": "8043e93a17fb1cd5",
+              "queryState": "c4d18200705a0952",
+              "visual": "913476ec20c08dc4",
+              "visualJson": "a8fde81ed29057ba"
+            },
+            "name": "VisualContainerGroessenklasseSlicer",
+            "ordinal": 0,
+            "position": {
+              "height": 240.0,
+              "tabOrder": 4,
+              "width": 280.0,
+              "x": 664.0,
+              "y": 184.0,
+              "z": 4
+            },
+            "title": "Größenklasse",
+            "visualType": "slicer"
+          },
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Year",
+                "field": "Year",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "FactSales"
+              },
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Y",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "2d205164c0878209",
+              "position": "b55212f456dbd467",
+              "queryState": "ebea89072fd928b7",
+              "visual": "dca5504344c80f84",
+              "visualJson": "c3347e77e7582c4f"
+            },
+            "name": "VisualContainerRevenueByYearLine",
+            "ordinal": 1,
+            "position": {
+              "height": 320.0,
+              "tabOrder": 3,
+              "width": 600.0,
+              "x": 32.0,
+              "y": 184.0,
+              "z": 3
+            },
+            "title": "Revenue by Year",
+            "visualType": "lineChart"
+          },
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "52431ab168b96a71",
+              "position": "9433cc521c94d855",
+              "queryState": "2c299f7e7fbeb884",
+              "visual": "27d782bdaeb7b761",
+              "visualJson": "a9d2e7d0d7716d20"
+            },
+            "name": "VisualContainerTotalRevenueCard",
+            "ordinal": 2,
+            "position": {
+              "height": 120.0,
+              "tabOrder": 0,
+              "width": 220.0,
+              "x": 32.0,
+              "y": 32.0,
+              "z": 0
+            },
+            "title": "Total Revenue",
+            "visualType": "card"
+          },
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": null,
+                "field": "Total Units",
+                "kind": "measure",
+                "measure": "Total Units",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "40efd98054cdb982",
+              "position": "95982d99a50893bf",
+              "queryState": "48b4afbeecd54f33",
+              "visual": "4caf719af69d56da",
+              "visualJson": "95df58bb962f3293"
+            },
+            "name": "VisualContainerTotalUnitsCard",
+            "ordinal": 3,
+            "position": {
+              "height": 120.0,
+              "tabOrder": 1,
+              "width": 220.0,
+              "x": 276.0,
+              "y": 32.0,
+              "z": 1
+            },
+            "title": "Total Units",
+            "visualType": "card"
+          },
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": null,
+                "field": "Umsatz Übersicht",
+                "kind": "measure",
+                "measure": "Umsatz Übersicht",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "5d1de043f86252ba",
+              "position": "b913113a12b2cb3f",
+              "queryState": "2648467c358ff79b",
+              "visual": "2ec6889551e5b99a",
+              "visualJson": "cde1187127394830"
+            },
+            "name": "VisualContainerUmsatzUebersichtCard",
+            "ordinal": 4,
+            "position": {
+              "height": 120.0,
+              "tabOrder": 2,
+              "width": 220.0,
+              "x": 520.0,
+              "y": 32.0,
+              "z": 2
+            },
+            "title": "Umsatz Übersicht",
+            "visualType": "card"
+          }
+        ],
+        "width": 1280.0
+      },
+      {
+        "displayName": "Customer Detail",
+        "displayOption": "FitToPage",
+        "drillthrough": {
+          "binding": {
+            "acceptsFilterContext": "Default",
+            "name": "DrillthroughBinding_c599bf441163",
+            "parameters": [
+              {
+                "boundFilter": "DrillthroughFilter_c599bf441163",
+                "name": "DrillthroughParameter_c599bf441163",
+                "target": {
+                  "column": "Customer",
+                  "kind": "column",
+                  "table": "DimCustomer"
+                }
+              }
+            ],
+            "referenceScope": "Default",
+            "type": "Drillthrough"
+          },
+          "enabled": true,
+          "pageType": "Drillthrough",
+          "visibility": "HiddenInViewMode"
+        },
+        "height": 720.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionCustomerDetail",
+        "ordinal": 1,
+        "visuals": [
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Customer",
+                "field": "Customer",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "DimCustomer"
+              },
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "ae3065c278122f5e",
+              "position": "61715a28915bc0f7",
+              "queryState": "d651b09c7b2de50f",
+              "visual": "95b02d8cdd12ea5f",
+              "visualJson": "0bc5b7a5a596587d"
+            },
+            "name": "VisualContainerCustomerDetailTable",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 700.0,
+              "x": 32.0,
+              "y": 32.0,
+              "z": 0
+            },
+            "title": "Customer Detail",
+            "visualType": "tableEx"
+          },
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": "Segment",
+                "field": "Segment",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "DimCustomer"
+              }
+            ],
+            "fingerprints": {
+              "objects": "16289523c4b690f1",
+              "position": "e0a629f31ff8ff9c",
+              "queryState": "cefa3e06ae2c1855",
+              "visual": "37e10f99471c0829",
+              "visualJson": "5da308498f54a03f"
+            },
+            "name": "VisualContainerSegmentSlicer",
+            "ordinal": 1,
+            "position": {
+              "height": 240.0,
+              "tabOrder": 1,
+              "width": 280.0,
+              "x": 764.0,
+              "y": 32.0,
+              "z": 1
+            },
+            "title": "Segment",
+            "visualType": "slicer"
+          }
+        ],
+        "width": 1280.0
+      },
+      {
+        "displayName": "Segment Detail",
+        "displayOption": "FitToPage",
+        "drillthrough": {
+          "binding": {
+            "acceptsFilterContext": "Default",
+            "name": "DrillthroughBinding_792c80cb38a3",
+            "parameters": [
+              {
+                "boundFilter": "DrillthroughFilter_792c80cb38a3",
+                "name": "DrillthroughParameter_792c80cb38a3",
+                "target": {
+                  "column": "Segment",
+                  "kind": "column",
+                  "table": "DimCustomer"
+                }
+              }
+            ],
+            "referenceScope": "Default",
+            "type": "Drillthrough"
+          },
+          "enabled": true,
+          "pageType": "Drillthrough",
+          "visibility": "HiddenInViewMode"
+        },
+        "height": 720.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionSegmentDetail",
+        "ordinal": 2,
+        "visuals": [
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Segment",
+                "field": "Segment",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "DimCustomer"
+              },
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "fb6f85349f43bac7",
+              "position": "61715a28915bc0f7",
+              "queryState": "46dd3e070e597db8",
+              "visual": "515f382c93e10902",
+              "visualJson": "c4fb684e77d4c282"
+            },
+            "name": "VisualContainerSegmentDetailTable",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 700.0,
+              "x": 32.0,
+              "y": 32.0,
+              "z": 0
+            },
+            "title": "Segment Detail",
+            "visualType": "tableEx"
+          },
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
+            "fingerprints": {
+              "objects": "52431ab168b96a71",
+              "position": "7c557bc06b3bac33",
+              "queryState": "2c299f7e7fbeb884",
+              "visual": "27d782bdaeb7b761",
+              "visualJson": "db93458d85a1a847"
+            },
+            "name": "VisualContainerSegmentTotalCard",
+            "ordinal": 1,
+            "position": {
+              "height": 120.0,
+              "tabOrder": 1,
+              "width": 220.0,
+              "x": 764.0,
+              "y": 32.0,
+              "z": 1
+            },
+            "title": "Total Revenue",
+            "visualType": "card"
+          }
+        ],
+        "width": 1280.0
+      }
+    ]
+  },
+  "schema": "powerbi-cli.fixture.summary.v1",
+  "summaryVersion": 2,
+  "validation": {
+    "errors": [],
+    "warnings": []
+  },
+  "verification": {
+    "actualWritten": null,
+    "differences": [],
+    "expected": null,
+    "mode": "normalize",
+    "same": null
+  }
+}

@@ -1,0 +1,19 @@
+# Build outputs
+/target
+/build
+
+# Test artifacts
+*.actual
+
+# Power BI binary artifacts
+*.pbix
+*.pbit
+
+# Local environment and database files
+.env
+.env.*
+*.sqlite
+*.db
+
+# Internal source-data working files
+datastructure*

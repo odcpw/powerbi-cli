@@ -1,0 +1,237 @@
+{
+  "candidates": {
+    "categoryColumns": [
+      {
+        "column": "Customer",
+        "dataType": "string",
+        "field": "DimCustomer[Customer]",
+        "table": "DimCustomer"
+      },
+      {
+        "column": "Segment",
+        "dataType": "string",
+        "field": "DimCustomer[Segment]",
+        "table": "DimCustomer"
+      },
+      {
+        "column": "Größenklasse",
+        "dataType": "string",
+        "field": "DimCustomer[Größenklasse]",
+        "table": "DimCustomer"
+      }
+    ],
+    "dateColumns": [
+      {
+        "column": "Year",
+        "dataType": "int64",
+        "field": "FactSales[Year]",
+        "table": "FactSales"
+      }
+    ],
+    "dimensionTables": [
+      "DimCustomer"
+    ],
+    "factTables": [
+      "FactSales"
+    ],
+    "numericColumns": [
+      {
+        "column": "CustomerKey",
+        "dataType": "int64",
+        "field": "DimCustomer[CustomerKey]",
+        "table": "DimCustomer"
+      },
+      {
+        "column": "CustomerKey",
+        "dataType": "int64",
+        "field": "FactSales[CustomerKey]",
+        "table": "FactSales"
+      },
+      {
+        "column": "Year",
+        "dataType": "int64",
+        "field": "FactSales[Year]",
+        "table": "FactSales"
+      },
+      {
+        "column": "Revenue",
+        "dataType": "decimal",
+        "field": "FactSales[Revenue]",
+        "table": "FactSales"
+      },
+      {
+        "column": "Units",
+        "dataType": "int64",
+        "field": "FactSales[Units]",
+        "table": "FactSales"
+      }
+    ]
+  },
+  "schema": "powerbi-cli.dataProfile.v1",
+  "source": {
+    "kind": "schema-embedded-dummy-rows",
+    "schemaPath": "examples/archetypes/regional-sales.schema.json"
+  },
+  "tables": [
+    {
+      "columns": [
+        {
+          "dataType": "int64",
+          "distinctCount": 6,
+          "isKey": true,
+          "name": "CustomerKey",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 6,
+          "isKey": false,
+          "name": "Customer",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Blue Harbor Traders",
+            "Falcon Ridge Supply",
+            "Silverline Goods",
+            "Copper Valley Foods",
+            "Northwind Fixtures"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 3,
+          "isKey": false,
+          "name": "Segment",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Enterprise",
+            "Mid-Market",
+            "SMB"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 3,
+          "isKey": false,
+          "name": "Größenklasse",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Groß",
+            "Mittel",
+            "Klein"
+          ]
+        }
+      ],
+      "name": "DimCustomer",
+      "role": "dimension",
+      "rowCount": 6
+    },
+    {
+      "columns": [
+        {
+          "dataType": "int64",
+          "distinctCount": 6,
+          "isKey": false,
+          "name": "CustomerKey",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 2,
+          "isKey": false,
+          "name": "Year",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": true
+          },
+          "sampleValues": [
+            "2025",
+            "2026"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 12,
+          "isKey": false,
+          "name": "Revenue",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "40000.0",
+            "45000.0",
+            "22000.0",
+            "24000.0",
+            "61000.0"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 7,
+          "isKey": false,
+          "name": "Units",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "120",
+            "130",
+            "70",
+            "150",
+            "30"
+          ]
+        }
+      ],
+      "name": "FactSales",
+      "role": "fact",
+      "rowCount": 12
+    }
+  ],
+  "warnings": []
+}

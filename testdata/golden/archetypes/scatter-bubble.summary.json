@@ -1,0 +1,306 @@
+{
+  "counts": {
+    "boundVisuals": 2,
+    "columns": 5,
+    "explicitInteractions": 0,
+    "jsonFilesChecked": 12,
+    "lintErrors": 0,
+    "lintInfo": 0,
+    "lintWarnings": 0,
+    "measures": 3,
+    "pages": 1,
+    "relationships": 0,
+    "staleInteractionVisualReferences": 0,
+    "tables": 1,
+    "unsupportedInteractions": 0,
+    "validationErrors": 0,
+    "validationWarnings": 0,
+    "visuals": 2
+  },
+  "exitCode": 0,
+  "fingerprint": "ecd19ccdea590231",
+  "lint": {
+    "counts": {
+      "errors": 0,
+      "findings": 0,
+      "info": 0,
+      "warnings": 0
+    },
+    "findings": []
+  },
+  "model": {
+    "relationships": [],
+    "tables": [
+      {
+        "columns": [
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Facility",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Region",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "0.0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "RiskScore",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "0.0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "IncidentRate",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "#,##0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "ExposureHours",
+            "summarizeBy": "sum"
+          }
+        ],
+        "measures": [
+          {
+            "displayFolder": null,
+            "expression": "AVERAGE('Facilities'[RiskScore])",
+            "formatString": "0.0",
+            "name": "Average Risk Score"
+          },
+          {
+            "displayFolder": null,
+            "expression": "AVERAGE('Facilities'[IncidentRate])",
+            "formatString": "0.0",
+            "name": "Average Incident Rate"
+          },
+          {
+            "displayFolder": null,
+            "expression": "SUM('Facilities'[ExposureHours])",
+            "formatString": "#,##0",
+            "name": "Total Exposure Hours"
+          }
+        ],
+        "name": "Facilities",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "Facilities",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      }
+    ]
+  },
+  "next": [
+    "Review this summary before committing it as a golden fixture.",
+    "Run `powerbi-cli fixture verify <project> --expected <summary.json> --json` in CI.",
+    "Run `powerbi-cli desktop open-check <project> --json` on an opt-in Windows Desktop oracle machine."
+  ],
+  "ok": true,
+  "pbir": {
+    "filters": {
+      "counts": {
+        "literals": 0,
+        "page": 0,
+        "report": 0,
+        "total": 0,
+        "unsupported": 0,
+        "visual": 0
+      },
+      "items": []
+    },
+    "reportDefinitionVersion": "2.0.0"
+  },
+  "project": {
+    "name": "FacilityPortfolio",
+    "pbipName": "FacilityPortfolio.pbip"
+  },
+  "report": {
+    "interactionSemantics": {
+      "missingRowsMean": "When a source/target visual pair is absent from visualInteractions, Power BI uses the target visual's default interaction behavior.",
+      "mode": "explicit-overrides",
+      "supportedTypes": [
+        "Default",
+        "DataFilter",
+        "HighlightFilter",
+        "NoFilter"
+      ]
+    },
+    "pages": [
+      {
+        "displayName": "Portfolio",
+        "displayOption": "FitToPage",
+        "height": 720.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": true,
+        "name": "ReportSectionPortfolio",
+        "ordinal": 0,
+        "visuals": [
+          {
+            "bindingCount": 5,
+            "bindings": [
+              {
+                "column": "Facility",
+                "field": "Facility",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "Facilities"
+              },
+              {
+                "column": "Region",
+                "field": "Region",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "Facilities"
+              },
+              {
+                "column": null,
+                "field": "Average Risk Score",
+                "kind": "measure",
+                "measure": "Average Risk Score",
+                "role": "Values",
+                "table": "Facilities"
+              },
+              {
+                "column": null,
+                "field": "Average Incident Rate",
+                "kind": "measure",
+                "measure": "Average Incident Rate",
+                "role": "Values",
+                "table": "Facilities"
+              },
+              {
+                "column": null,
+                "field": "Total Exposure Hours",
+                "kind": "measure",
+                "measure": "Total Exposure Hours",
+                "role": "Values",
+                "table": "Facilities"
+              }
+            ],
+            "fingerprints": {
+              "objects": "8f64fe385d4955e5",
+              "position": "fa04ff5f77aa9e64",
+              "queryState": "3c63a09f4b16f86a",
+              "visual": "c6badb661b4ae774",
+              "visualJson": "88e7f4ca08c0fb6f"
+            },
+            "name": "VisualContainerFacilityTable",
+            "ordinal": 0,
+            "position": {
+              "height": 440.0,
+              "tabOrder": 1,
+              "width": 480.0,
+              "x": 760.0,
+              "y": 32.0,
+              "z": 1
+            },
+            "title": "Facility Detail",
+            "visualType": "tableEx"
+          },
+          {
+            "bindingCount": 5,
+            "bindings": [
+              {
+                "column": "Facility",
+                "field": "Facility",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "Facilities"
+              },
+              {
+                "column": "Region",
+                "field": "Region",
+                "kind": "column",
+                "measure": null,
+                "role": "Legend",
+                "table": "Facilities"
+              },
+              {
+                "column": null,
+                "field": "Total Exposure Hours",
+                "kind": "measure",
+                "measure": "Total Exposure Hours",
+                "role": "Size",
+                "table": "Facilities"
+              },
+              {
+                "column": null,
+                "field": "Average Risk Score",
+                "kind": "measure",
+                "measure": "Average Risk Score",
+                "role": "X",
+                "table": "Facilities"
+              },
+              {
+                "column": null,
+                "field": "Average Incident Rate",
+                "kind": "measure",
+                "measure": "Average Incident Rate",
+                "role": "Y",
+                "table": "Facilities"
+              }
+            ],
+            "fingerprints": {
+              "objects": "7beb70fe026d0691",
+              "position": "f04f5c9706a7f823",
+              "queryState": "5f20b6c3071cc479",
+              "visual": "5333c38a5bd942e6",
+              "visualJson": "a62201e81e2651d1"
+            },
+            "name": "VisualContainerPortfolioBubble",
+            "ordinal": 1,
+            "position": {
+              "height": 440.0,
+              "tabOrder": 0,
+              "width": 700.0,
+              "x": 32.0,
+              "y": 32.0,
+              "z": 0
+            },
+            "title": "Risk vs Incident Rate",
+            "visualType": "scatterChart"
+          }
+        ],
+        "width": 1280.0
+      }
+    ]
+  },
+  "schema": "powerbi-cli.fixture.summary.v1",
+  "summaryVersion": 2,
+  "validation": {
+    "errors": [],
+    "warnings": []
+  },
+  "verification": {
+    "actualWritten": null,
+    "differences": [],
+    "expected": null,
+    "mode": "normalize",
+    "same": null
+  }
+}

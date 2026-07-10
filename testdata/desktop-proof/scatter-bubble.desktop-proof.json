@@ -1,0 +1,77 @@
+{
+  "schema": "powerbi-cli.desktop.manualProof.v1",
+  "fixture": "archetypes/scatter-bubble",
+  "date": "2026-06-23",
+  "project": "build/archetypes/scatter-bubble",
+  "pbip": "build/archetypes/scatter-bubble/FacilityPortfolio.pbip",
+  "desktop": {
+    "app": "Power BI Desktop",
+    "observedVersionFromPath": "2.155.756.0",
+    "storeInstall": true
+  },
+  "commands": [
+    "powerbi-cli report build --schema examples/archetypes/scatter-bubble.schema.json --profile examples/archetypes/scatter-bubble.profile.json --spec examples/archetypes/scatter-bubble.dashboard.json --out-dir build/archetypes/scatter-bubble --force --json",
+    "powerbi-cli validate --strict build/archetypes/scatter-bubble --json",
+    "powerbi-cli handoff check build/archetypes/scatter-bubble --json",
+    "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check build/archetypes/scatter-bubble --json"
+  ],
+  "openCheck": {
+    "level": "desktop-launch",
+    "claimedCompatibility": false,
+    "reason": "CLI open-check currently proves launch only; the canvas and refresh observations below were made with Windows UI automation."
+  },
+  "manualOracle": {
+    "windowObserved": true,
+    "titleMatched": true,
+    "title": "FacilityPortfolio",
+    "issueBannerBeforeRefresh": "Some of the tables have incomplete or no data.",
+    "refreshAction": "Clicked Refresh now in Power BI Desktop.",
+    "issueBannerAfterRefreshObserved": false,
+    "canvasRendered": true,
+    "refreshCompleted": true,
+    "blankCanvasRejected": true,
+    "observedVisuals": [
+      {
+        "title": "Average Risk Score, Average Incident Rate and Total Exposure Hours by Facility",
+        "type": "scatterChart",
+        "xAxis": "Average Risk Score",
+        "yAxis": "Average Incident Rate",
+        "pointsVisible": true
+      },
+      {
+        "title": "Facility Portfolio",
+        "type": "tableEx",
+        "observedRows": [
+          "Central Hub Central 6.2 91.0 15,100",
+          "East Depot East 4.8 68.0 9,400",
+          "North Plant North 7.4 112.0 18,200",
+          "West Yard West 8.1 130.0 12,100",
+          "Total 6.6 100.3 54,800"
+        ]
+      }
+    ],
+    "accessibilityCaveat": "The Power BI accessibility tree retained some 'Visuals are loading...' groups even though the screenshot showed rendered bubbles and populated table rows after refresh."
+  },
+  "cleanup": {
+    "preExistingPowerBiProcesses": 0,
+    "processesObservedDuringProof": [
+      {
+        "processName": "PBIDesktop",
+        "processId": 10148,
+        "windowTitle": "FacilityPortfolio"
+      },
+      {
+        "processName": "msmdsrv",
+        "processId": 9676
+      }
+    ],
+    "postProofCleanupRequired": true,
+    "postProofProcessesRemaining": 0,
+    "postProofCleanupVerified": true
+  },
+  "limitations": [
+    "This is a committed manual oracle record, not a deterministic CI check.",
+    "Power BI Desktop canvas/refresh proof is not yet automated by powerbi-cli itself.",
+    "Screenshots are not committed; the proof is based on UI Automation accessibility text plus visible snapshot observation."
+  ]
+}

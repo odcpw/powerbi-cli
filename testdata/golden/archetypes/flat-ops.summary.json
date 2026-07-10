@@ -1,0 +1,300 @@
+{
+  "counts": {
+    "boundVisuals": 3,
+    "columns": 5,
+    "explicitInteractions": 0,
+    "jsonFilesChecked": 13,
+    "lintErrors": 0,
+    "lintInfo": 0,
+    "lintWarnings": 0,
+    "measures": 2,
+    "pages": 1,
+    "relationships": 0,
+    "staleInteractionVisualReferences": 0,
+    "tables": 1,
+    "unsupportedInteractions": 0,
+    "validationErrors": 0,
+    "validationWarnings": 0,
+    "visuals": 3
+  },
+  "exitCode": 0,
+  "fingerprint": "55caa854cc147309",
+  "lint": {
+    "counts": {
+      "errors": 0,
+      "findings": 0,
+      "info": 0,
+      "warnings": 0
+    },
+    "findings": []
+  },
+  "model": {
+    "relationships": [],
+    "tables": [
+      {
+        "columns": [
+          {
+            "dataType": "dateTime",
+            "formatString": "Short Date",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "WorkDate",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Team",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Priority",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "int64",
+            "formatString": "#,##0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Completed",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "#,##0.0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Hours",
+            "summarizeBy": "sum"
+          }
+        ],
+        "measures": [
+          {
+            "displayFolder": null,
+            "expression": "SUM('WorkItems'[Completed])",
+            "formatString": "#,##0",
+            "name": "Completed Items"
+          },
+          {
+            "displayFolder": null,
+            "expression": "SUM('WorkItems'[Hours])",
+            "formatString": "#,##0.0",
+            "name": "Total Hours"
+          }
+        ],
+        "name": "WorkItems",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "WorkItems",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      }
+    ]
+  },
+  "next": [
+    "Review this summary before committing it as a golden fixture.",
+    "Run `powerbi-cli fixture verify <project> --expected <summary.json> --json` in CI.",
+    "Run `powerbi-cli desktop open-check <project> --json` on an opt-in Windows Desktop oracle machine."
+  ],
+  "ok": true,
+  "pbir": {
+    "filters": {
+      "counts": {
+        "literals": 0,
+        "page": 0,
+        "report": 0,
+        "total": 0,
+        "unsupported": 0,
+        "visual": 0
+      },
+      "items": []
+    },
+    "reportDefinitionVersion": "2.0.0"
+  },
+  "project": {
+    "name": "WorkshopOperations",
+    "pbipName": "WorkshopOperations.pbip"
+  },
+  "report": {
+    "interactionSemantics": {
+      "missingRowsMean": "When a source/target visual pair is absent from visualInteractions, Power BI uses the target visual's default interaction behavior.",
+      "mode": "explicit-overrides",
+      "supportedTypes": [
+        "Default",
+        "DataFilter",
+        "HighlightFilter",
+        "NoFilter"
+      ]
+    },
+    "pages": [
+      {
+        "displayName": "Overview",
+        "displayOption": "FitToPage",
+        "height": 720.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": true,
+        "name": "ReportSectionOverview",
+        "ordinal": 0,
+        "visuals": [
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": null,
+                "field": "Completed Items",
+                "kind": "measure",
+                "measure": "Completed Items",
+                "role": "Values",
+                "table": "WorkItems"
+              }
+            ],
+            "fingerprints": {
+              "objects": "73552fb5610fa1a2",
+              "position": "dec796711fd9b3bf",
+              "queryState": "90ce0e83ccc57369",
+              "visual": "0f7af12ec52767c8",
+              "visualJson": "75bcdeb0554a29d7"
+            },
+            "name": "VisualContainerCompletedCard",
+            "ordinal": 0,
+            "position": {
+              "height": 120.0,
+              "tabOrder": 0,
+              "width": 280.0,
+              "x": 32.0,
+              "y": 32.0,
+              "z": 0
+            },
+            "title": "Completed Items",
+            "visualType": "card"
+          },
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Team",
+                "field": "Team",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "WorkItems"
+              },
+              {
+                "column": null,
+                "field": "Total Hours",
+                "kind": "measure",
+                "measure": "Total Hours",
+                "role": "Y",
+                "table": "WorkItems"
+              }
+            ],
+            "fingerprints": {
+              "objects": "f3de7a4b3cf05cb6",
+              "position": "ffff729ece655f4f",
+              "queryState": "c5527737b36e134c",
+              "visual": "8258cdc80b38cac9",
+              "visualJson": "3a1db830547d79bc"
+            },
+            "name": "VisualContainerHoursByTeam",
+            "ordinal": 1,
+            "position": {
+              "height": 320.0,
+              "tabOrder": 1,
+              "width": 600.0,
+              "x": 32.0,
+              "y": 184.0,
+              "z": 1
+            },
+            "title": "Hours by Team",
+            "visualType": "clusteredBarChart"
+          },
+          {
+            "bindingCount": 4,
+            "bindings": [
+              {
+                "column": "WorkDate",
+                "field": "WorkDate",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "WorkItems"
+              },
+              {
+                "column": "Team",
+                "field": "Team",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "WorkItems"
+              },
+              {
+                "column": "Priority",
+                "field": "Priority",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "WorkItems"
+              },
+              {
+                "column": null,
+                "field": "Total Hours",
+                "kind": "measure",
+                "measure": "Total Hours",
+                "role": "Values",
+                "table": "WorkItems"
+              }
+            ],
+            "fingerprints": {
+              "objects": "8015e919175773bd",
+              "position": "b601e0e0aa548821",
+              "queryState": "efb4635e84426cd0",
+              "visual": "7ea3a1e3016c947c",
+              "visualJson": "add955012d40fc13"
+            },
+            "name": "VisualContainerWorkDetail",
+            "ordinal": 2,
+            "position": {
+              "height": 320.0,
+              "tabOrder": 2,
+              "width": 560.0,
+              "x": 664.0,
+              "y": 184.0,
+              "z": 2
+            },
+            "title": "Work Detail",
+            "visualType": "tableEx"
+          }
+        ],
+        "width": 1280.0
+      }
+    ]
+  },
+  "schema": "powerbi-cli.fixture.summary.v1",
+  "summaryVersion": 2,
+  "validation": {
+    "errors": [],
+    "warnings": []
+  },
+  "verification": {
+    "actualWritten": null,
+    "differences": [],
+    "expected": null,
+    "mode": "normalize",
+    "same": null
+  }
+}

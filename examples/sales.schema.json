@@ -1,0 +1,103 @@
+{
+  "name": "SalesOperations",
+  "displayName": "Sales Operations",
+  "description": "Offline-safe dashboard shell from schema and dummy rows only.",
+  "locale": "en-US",
+  "tables": [
+    {
+      "name": "DimDate",
+      "columns": [
+        { "name": "DateKey", "dataType": "int64", "isKey": true },
+        { "name": "Date", "dataType": "date", "formatString": "Short Date" },
+        { "name": "Month", "dataType": "string" },
+        { "name": "FiscalYear", "dataType": "int64" }
+      ],
+      "rows": [
+        { "DateKey": 20260101, "Date": "2026-01-01", "Month": "Jan", "FiscalYear": 2026 }
+      ]
+    },
+    {
+      "name": "DimCustomer",
+      "columns": [
+        { "name": "CustomerKey", "dataType": "int64", "isKey": true },
+        { "name": "CustomerName", "dataType": "string" },
+        { "name": "Segment", "dataType": "string" }
+      ],
+      "rows": [
+        { "CustomerKey": 1, "CustomerName": "Sample Customer", "Segment": "Enterprise" }
+      ]
+    },
+    {
+      "name": "FactSales",
+      "columns": [
+        { "name": "DateKey", "dataType": "int64" },
+        { "name": "CustomerKey", "dataType": "int64" },
+        { "name": "Revenue", "dataType": "decimal", "formatString": "$#,##0" },
+        { "name": "Units", "dataType": "int64", "formatString": "#,##0" }
+      ],
+      "measures": [
+        {
+          "name": "Total Revenue",
+          "expression": "SUM('FactSales'[Revenue])",
+          "formatString": "$#,##0"
+        },
+        {
+          "name": "Total Units",
+          "expression": "SUM('FactSales'[Units])",
+          "formatString": "#,##0"
+        }
+      ],
+      "rows": [
+        { "DateKey": 20260101, "CustomerKey": 1, "Revenue": 12500.0, "Units": 42 }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "fromTable": "FactSales",
+      "fromColumn": "DateKey",
+      "toTable": "DimDate",
+      "toColumn": "DateKey"
+    },
+    {
+      "fromTable": "FactSales",
+      "fromColumn": "CustomerKey",
+      "toTable": "DimCustomer",
+      "toColumn": "CustomerKey"
+    }
+  ],
+  "pages": [
+    {
+      "name": "ReportSectionOverview",
+      "displayName": "Overview",
+      "width": 1280,
+      "height": 720,
+      "visuals": [
+        {
+          "title": "Revenue",
+          "visualType": "card",
+          "x": 32,
+          "y": 32,
+          "width": 280,
+          "height": 120
+        },
+        {
+          "title": "Revenue Trend",
+          "visualType": "lineChart",
+          "x": 32,
+          "y": 184,
+          "width": 600,
+          "height": 320
+        },
+        {
+          "title": "Customer Detail",
+          "visualType": "tableEx",
+          "x": 664,
+          "y": 184,
+          "width": 560,
+          "height": 320
+        }
+      ]
+    }
+  ]
+}

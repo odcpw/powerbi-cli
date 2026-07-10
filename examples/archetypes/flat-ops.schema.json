@@ -1,0 +1,36 @@
+{
+  "name": "WorkshopOperations",
+  "displayName": "Workshop Operations",
+  "description": "Single-table operational workload dashboard fixture.",
+  "locale": "en-US",
+  "tables": [
+    {
+      "name": "WorkItems",
+      "columns": [
+        { "name": "WorkDate", "dataType": "date", "formatString": "Short Date" },
+        { "name": "Team", "dataType": "string" },
+        { "name": "Priority", "dataType": "string" },
+        { "name": "Completed", "dataType": "int64", "formatString": "#,##0" },
+        { "name": "Hours", "dataType": "decimal", "formatString": "#,##0.0" }
+      ],
+      "measures": [
+        {
+          "name": "Completed Items",
+          "expression": "SUM('WorkItems'[Completed])",
+          "formatString": "#,##0"
+        },
+        {
+          "name": "Total Hours",
+          "expression": "SUM('WorkItems'[Hours])",
+          "formatString": "#,##0.0"
+        }
+      ],
+      "rows": [
+        { "WorkDate": "2026-01-05", "Team": "Assembly", "Priority": "High", "Completed": 12, "Hours": 86.5 },
+        { "WorkDate": "2026-01-06", "Team": "Packaging", "Priority": "Normal", "Completed": 18, "Hours": 74.0 },
+        { "WorkDate": "2026-01-07", "Team": "Maintenance", "Priority": "High", "Completed": 7, "Hours": 42.5 }
+      ]
+    }
+  ],
+  "pages": []
+}

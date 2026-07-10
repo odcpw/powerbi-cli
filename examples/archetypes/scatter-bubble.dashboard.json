@@ -1,0 +1,48 @@
+{
+  "schema": "powerbi-cli.dashboard.v1",
+  "report": {
+    "name": "FacilityPortfolio",
+    "displayName": "Facility Portfolio",
+    "locale": "en-US",
+    "audience": "portfolio manager",
+    "questions": [
+      "Which facilities combine high risk and high incident rates?",
+      "How does exposure size change the comparison?"
+    ]
+  },
+  "pages": [
+    {
+      "id": "portfolio",
+      "displayName": "Portfolio",
+      "size": { "width": 1280, "height": 720 },
+      "visuals": [
+        {
+          "id": "portfolio_bubble",
+          "type": "scatter",
+          "title": "Risk vs Incident Rate",
+          "bindings": [
+            { "role": "Category", "field": "Facilities[Facility]" },
+            { "role": "X", "field": "Facilities[Average Risk Score]" },
+            { "role": "Y", "field": "Facilities[Average Incident Rate]" },
+            { "role": "Size", "field": "Facilities[Total Exposure Hours]" },
+            { "role": "Legend", "field": "Facilities[Region]" }
+          ],
+          "layout": { "x": 32, "y": 32, "width": 700, "height": 440 }
+        },
+        {
+          "id": "facility_table",
+          "type": "tableEx",
+          "title": "Facility Detail",
+          "bindings": [
+            { "role": "Values", "field": "Facilities[Facility]" },
+            { "role": "Values", "field": "Facilities[Region]" },
+            { "role": "Values", "field": "Facilities[Average Risk Score]" },
+            { "role": "Values", "field": "Facilities[Average Incident Rate]" },
+            { "role": "Values", "field": "Facilities[Total Exposure Hours]" }
+          ],
+          "layout": { "x": 760, "y": 32, "width": 480, "height": 440 }
+        }
+      ]
+    }
+  ]
+}

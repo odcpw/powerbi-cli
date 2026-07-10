@@ -1,0 +1,30 @@
+{
+  "name": "VisualCatalogProof",
+  "displayName": "Visual Catalog Proof",
+  "description": "Neutral generated-visual fixture for pie, donut, matrix, slicer, and line-chart control proof.",
+  "locale": "en-US",
+  "tables": [
+    {
+      "name": "CatalogFacts",
+      "columns": [
+        { "name": "Category", "dataType": "string" },
+        { "name": "Year", "dataType": "int64", "formatString": "0" },
+        { "name": "Amount", "dataType": "decimal", "formatString": "#,##0.00" }
+      ],
+      "measures": [
+        {
+          "name": "Total Amount",
+          "expression": "SUM('CatalogFacts'[Amount])",
+          "formatString": "#,##0.00"
+        }
+      ],
+      "rows": [
+        { "Category": "Alpha", "Year": 2025, "Amount": 10.0 },
+        { "Category": "Alpha", "Year": 2026, "Amount": 15.0 },
+        { "Category": "Beta", "Year": 2025, "Amount": 20.0 },
+        { "Category": "Beta", "Year": 2026, "Amount": 25.0 }
+      ]
+    }
+  ],
+  "pages": []
+}

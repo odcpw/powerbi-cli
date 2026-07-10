@@ -1,0 +1,49 @@
+{
+  "schema": "powerbi-cli.desktop-proof.manual.v1",
+  "date": "2026-06-24",
+  "desktop": {
+    "app": "Power BI Desktop",
+    "observedProcessPath": "C:\\Program Files\\WindowsApps\\Microsoft.MicrosoftPowerBIDesktop_2.155.756.0_x64__8wekyb3d8bbwe\\bin\\PBIDesktop.exe",
+    "observedWindowTitles": [
+      "FacilityPortfolio"
+    ]
+  },
+  "failureFound": {
+    "project": "a private-repo accident-domain acceptance project (evidence retained in a private repository)",
+    "desktopMessage": "Your report has issues that could not be resolved",
+    "issue": "An additional property 'objects' was included in the root property of visuals/<visual>/visual.json.",
+    "affectedGeneratedVisuals": 8,
+    "rootCause": "Generated altText was written to root-level visual container objects instead of visual.objects.general."
+  },
+  "fixValidated": {
+    "rule": "Enhanced PBIR visual formatting must be written under /visual/objects. Root-level /objects is read-only/incompatible for generated output.",
+    "changedCode": [
+      "src/pbir_visual_factory.rs",
+      "src/report_visual_formatting_text.rs",
+      "src/report_visual_formatting_bundle.rs",
+      "src/report_style.rs",
+      "src/lint.rs"
+    ],
+    "regressionTest": "tests/cli_smoke.rs asserts generated visual.json has no root-level objects and has altText under /visual/objects/general."
+  },
+  "desktopAcceptedProjects": [
+    {
+      "project": "build\\desktop-acceptance-scatter\\FacilityPortfolio.pbip",
+      "openedWithoutUnresolvedIssuesModal": true,
+      "refreshClicked": true,
+      "pagesObserved": [
+        {
+          "name": "Portfolio",
+          "renderedEvidence": [
+            "Scatter chart Average Risk Score, Average Incident Rate and Total Exposure Hours by Facility rendered points (7.4,112), (6.2,91), (8.1,130), (4.8,68)",
+            "Facilities table rendered rows Central Hub, East Depot, North Plant, West Yard",
+            "Total Exposure Hours rendered total 54,800"
+          ]
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "pbidesktopProcessesClosedAfterRun": true
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "schema": "powerbi-cli.dashboard.v1",
+  "report": {
+    "name": "RegionalSales",
+    "displayName": "Regional Sales",
+    "locale": "en-US",
+    "audience": "sales operations reviewer",
+    "questions": [
+      "Which customers and segments drive revenue?",
+      "Can an agent chain drillthrough, TopN, and multi-page slicers on non-ASCII fields?"
+    ]
+  },
+  "pages": [
+    {
+      "id": "overview",
+      "displayName": "Overview",
+      "size": { "width": 1280, "height": 720 },
+      "visuals": [
+        {
+          "id": "total_revenue_card",
+          "type": "card",
+          "title": "Total Revenue",
+          "bindings": [
+            { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 32, "y": 32, "width": 220, "height": 120 }
+        },
+        {
+          "id": "total_units_card",
+          "type": "card",
+          "title": "Total Units",
+          "bindings": [
+            { "role": "Values", "field": "FactSales[Total Units]" }
+          ],
+          "layout": { "x": 276, "y": 32, "width": 220, "height": 120 }
+        },
+        {
+          "id": "umsatz_uebersicht_card",
+          "type": "card",
+          "title": "Umsatz Übersicht",
+          "bindings": [
+            { "role": "Values", "field": "FactSales[Umsatz Übersicht]" }
+          ],
+          "layout": { "x": 520, "y": 32, "width": 220, "height": 120 }
+        },
+        {
+          "id": "revenue_by_year_line",
+          "type": "lineChart",
+          "title": "Revenue by Year",
+          "bindings": [
+            { "role": "Category", "field": "FactSales[Year]" },
+            { "role": "Y", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 32, "y": 184, "width": 600, "height": 320 }
+        },
+        {
+          "id": "groessenklasse_slicer",
+          "type": "slicer",
+          "mode": "basic",
+          "title": "Größenklasse",
+          "bindings": [
+            { "role": "Values", "field": "DimCustomer[Größenklasse]" }
+          ],
+          "layout": { "x": 664, "y": 184, "width": 280, "height": 240 }
+        }
+      ]
+    },
+    {
+      "id": "customer_detail",
+      "displayName": "Customer Detail",
+      "size": { "width": 1280, "height": 720 },
+      "visuals": [
+        {
+          "id": "customer_detail_table",
+          "type": "tableEx",
+          "title": "Customer Detail",
+          "bindings": [
+            { "role": "Values", "field": "DimCustomer[Customer]" },
+            { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 32, "y": 32, "width": 700, "height": 400 }
+        },
+        {
+          "id": "segment_slicer",
+          "type": "slicer",
+          "mode": "basic",
+          "title": "Segment",
+          "bindings": [
+            { "role": "Values", "field": "DimCustomer[Segment]" }
+          ],
+          "layout": { "x": 764, "y": 32, "width": 280, "height": 240 }
+        }
+      ]
+    },
+    {
+      "id": "segment_detail",
+      "displayName": "Segment Detail",
+      "size": { "width": 1280, "height": 720 },
+      "visuals": [
+        {
+          "id": "segment_detail_table",
+          "type": "tableEx",
+          "title": "Segment Detail",
+          "bindings": [
+            { "role": "Values", "field": "DimCustomer[Segment]" },
+            { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 32, "y": 32, "width": 700, "height": 400 }
+        },
+        {
+          "id": "segment_total_card",
+          "type": "card",
+          "title": "Total Revenue",
+          "bindings": [
+            { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 764, "y": 32, "width": 220, "height": 120 }
+        }
+      ]
+    }
+  ]
+}

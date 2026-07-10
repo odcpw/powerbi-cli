@@ -1,0 +1,53 @@
+{
+  "schema": "powerbi-cli.dashboard.v1",
+  "report": {
+    "name": "WorkshopOperations",
+    "displayName": "Workshop Operations",
+    "locale": "en-US",
+    "audience": "operations lead",
+    "questions": [
+      "How much work was completed?",
+      "Which teams carry the most hours?"
+    ]
+  },
+  "pages": [
+    {
+      "id": "overview",
+      "displayName": "Overview",
+      "size": { "width": 1280, "height": 720 },
+      "visuals": [
+        {
+          "id": "completed_card",
+          "type": "card",
+          "title": "Completed Items",
+          "bindings": [
+            { "role": "Values", "field": "WorkItems[Completed Items]" }
+          ],
+          "layout": { "x": 32, "y": 32, "width": 280, "height": 120 }
+        },
+        {
+          "id": "hours_by_team",
+          "type": "clusteredBarChart",
+          "title": "Hours by Team",
+          "bindings": [
+            { "role": "Category", "field": "WorkItems[Team]" },
+            { "role": "Y", "field": "WorkItems[Total Hours]" }
+          ],
+          "layout": { "x": 32, "y": 184, "width": 600, "height": 320 }
+        },
+        {
+          "id": "work_detail",
+          "type": "tableEx",
+          "title": "Work Detail",
+          "bindings": [
+            { "role": "Values", "field": "WorkItems[WorkDate]" },
+            { "role": "Values", "field": "WorkItems[Team]" },
+            { "role": "Values", "field": "WorkItems[Priority]" },
+            { "role": "Values", "field": "WorkItems[Total Hours]" }
+          ],
+          "layout": { "x": 664, "y": 184, "width": 560, "height": 320 }
+        }
+      ]
+    }
+  ]
+}

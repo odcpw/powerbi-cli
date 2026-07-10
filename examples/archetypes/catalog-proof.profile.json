@@ -1,0 +1,96 @@
+{
+  "candidates": {
+    "categoryColumns": [
+      {
+        "column": "Category",
+        "dataType": "string",
+        "field": "CatalogFacts[Category]",
+        "table": "CatalogFacts"
+      }
+    ],
+    "dateColumns": [],
+    "dimensionTables": [],
+    "factTables": [
+      "CatalogFacts"
+    ],
+    "numericColumns": [
+      {
+        "column": "Year",
+        "dataType": "int64",
+        "field": "CatalogFacts[Year]",
+        "table": "CatalogFacts"
+      },
+      {
+        "column": "Amount",
+        "dataType": "decimal",
+        "field": "CatalogFacts[Amount]",
+        "table": "CatalogFacts"
+      }
+    ]
+  },
+  "schema": "powerbi-cli.dataProfile.v1",
+  "source": {
+    "kind": "schema-embedded-dummy-rows",
+    "schemaPath": "examples/archetypes/catalog-proof.schema.json"
+  },
+  "tables": [
+    {
+      "columns": [
+        {
+          "dataType": "string",
+          "distinctCount": 2,
+          "isKey": false,
+          "name": "Category",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Alpha",
+            "Beta"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 2,
+          "isKey": false,
+          "name": "Year",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "2025",
+            "2026"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 4,
+          "isKey": false,
+          "name": "Amount",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "10.0",
+            "15.0",
+            "20.0",
+            "25.0"
+          ]
+        }
+      ],
+      "name": "CatalogFacts",
+      "role": "fact",
+      "rowCount": 4
+    }
+  ],
+  "warnings": []
+}

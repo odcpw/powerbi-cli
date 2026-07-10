@@ -1,0 +1,77 @@
+{
+  "schema": "powerbi-cli.desktop.manualProof.v1",
+  "fixture": "archetypes/flat-ops",
+  "date": "2026-06-23",
+  "project": "build/archetypes/flat-ops",
+  "pbip": "build/archetypes/flat-ops/WorkshopOperations.pbip",
+  "desktop": {
+    "app": "Power BI Desktop",
+    "observedVersionFromPath": "2.155.756.0",
+    "storeInstall": true
+  },
+  "commands": [
+    "powerbi-cli report build --schema examples/archetypes/flat-ops.schema.json --profile examples/archetypes/flat-ops.profile.json --spec examples/archetypes/flat-ops.dashboard.json --out-dir build/archetypes/flat-ops --force --json",
+    "powerbi-cli validate --strict build/archetypes/flat-ops --json",
+    "powerbi-cli handoff check build/archetypes/flat-ops --json",
+    "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check build/archetypes/flat-ops --json"
+  ],
+  "openCheck": {
+    "level": "desktop-launch",
+    "claimedCompatibility": false,
+    "reason": "CLI open-check currently proves launch only; the canvas and refresh observations below were made with Windows UI automation."
+  },
+  "manualOracle": {
+    "windowObserved": true,
+    "titleMatched": true,
+    "title": "WorkshopOperations",
+    "issueBannerBeforeRefresh": "Some of the tables have incomplete or no data.",
+    "refreshAction": "Clicked Refresh now in Power BI Desktop.",
+    "issueBannerAfterRefreshObserved": false,
+    "canvasRendered": true,
+    "refreshCompleted": true,
+    "blankCanvasRejected": true,
+    "observedVisuals": [
+      {
+        "title": "Completed Items",
+        "type": "card",
+        "observedValue": "37"
+      },
+      {
+        "title": "Total Hours by Team",
+        "type": "clusteredBarChart",
+        "observedCategories": ["Assembly", "Maintenance", "Packaging"]
+      },
+      {
+        "title": "Work Detail",
+        "type": "tableEx",
+        "observedRows": [
+          "1/5/2026 Assembly High 86.5",
+          "1/6/2026 Packaging Normal 74.0",
+          "1/7/2026 Maintenance High 42.5"
+        ]
+      }
+    ]
+  },
+  "cleanup": {
+    "preExistingPowerBiProcesses": 0,
+    "processesObservedDuringProof": [
+      {
+        "processName": "PBIDesktop",
+        "processId": 32116,
+        "windowTitle": "WorkshopOperations"
+      },
+      {
+        "processName": "msmdsrv",
+        "processId": 51640
+      }
+    ],
+    "postProofCleanupRequired": true,
+    "postProofProcessesRemaining": 0,
+    "postProofCleanupVerified": true
+  },
+  "limitations": [
+    "This is a committed manual oracle record, not a deterministic CI check.",
+    "Power BI Desktop canvas/refresh proof is not yet automated by powerbi-cli itself.",
+    "Screenshots are not committed; the proof is based on UI Automation accessibility text plus visible snapshot observation."
+  ]
+}

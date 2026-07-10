@@ -1,0 +1,42 @@
+{
+  "name": "FacilityPortfolio",
+  "displayName": "Facility Portfolio",
+  "description": "Scatter/bubble dashboard fixture for portfolio-style comparisons.",
+  "locale": "en-US",
+  "tables": [
+    {
+      "name": "Facilities",
+      "columns": [
+        { "name": "Facility", "dataType": "string" },
+        { "name": "Region", "dataType": "string" },
+        { "name": "RiskScore", "dataType": "decimal", "formatString": "0.0" },
+        { "name": "IncidentRate", "dataType": "decimal", "formatString": "0.0" },
+        { "name": "ExposureHours", "dataType": "decimal", "formatString": "#,##0" }
+      ],
+      "measures": [
+        {
+          "name": "Average Risk Score",
+          "expression": "AVERAGE('Facilities'[RiskScore])",
+          "formatString": "0.0"
+        },
+        {
+          "name": "Average Incident Rate",
+          "expression": "AVERAGE('Facilities'[IncidentRate])",
+          "formatString": "0.0"
+        },
+        {
+          "name": "Total Exposure Hours",
+          "expression": "SUM('Facilities'[ExposureHours])",
+          "formatString": "#,##0"
+        }
+      ],
+      "rows": [
+        { "Facility": "North Plant", "Region": "North", "RiskScore": 7.4, "IncidentRate": 112.0, "ExposureHours": 18200.0 },
+        { "Facility": "East Depot", "Region": "East", "RiskScore": 4.8, "IncidentRate": 68.0, "ExposureHours": 9400.0 },
+        { "Facility": "Central Hub", "Region": "Central", "RiskScore": 6.2, "IncidentRate": 91.0, "ExposureHours": 15100.0 },
+        { "Facility": "West Yard", "Region": "West", "RiskScore": 8.1, "IncidentRate": 130.0, "ExposureHours": 12100.0 }
+      ]
+    }
+  ],
+  "pages": []
+}

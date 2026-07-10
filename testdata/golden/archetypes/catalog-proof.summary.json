@@ -1,0 +1,400 @@
+{
+  "counts": {
+    "boundVisuals": 5,
+    "columns": 3,
+    "explicitInteractions": 0,
+    "jsonFilesChecked": 19,
+    "lintErrors": 0,
+    "lintInfo": 0,
+    "lintWarnings": 0,
+    "measures": 1,
+    "pages": 5,
+    "relationships": 0,
+    "staleInteractionVisualReferences": 0,
+    "tables": 1,
+    "unsupportedInteractions": 0,
+    "validationErrors": 0,
+    "validationWarnings": 0,
+    "visuals": 5
+  },
+  "exitCode": 0,
+  "fingerprint": "1ebb77577e9da341",
+  "lint": {
+    "counts": {
+      "errors": 0,
+      "findings": 0,
+      "info": 0,
+      "warnings": 0
+    },
+    "findings": []
+  },
+  "model": {
+    "relationships": [],
+    "tables": [
+      {
+        "columns": [
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Category",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "int64",
+            "formatString": "0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Year",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "#,##0.00",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Amount",
+            "summarizeBy": "sum"
+          }
+        ],
+        "measures": [
+          {
+            "displayFolder": null,
+            "expression": "SUM('CatalogFacts'[Amount])",
+            "formatString": "#,##0.00",
+            "name": "Total Amount"
+          }
+        ],
+        "name": "CatalogFacts",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "CatalogFacts",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      }
+    ]
+  },
+  "next": [
+    "Review this summary before committing it as a golden fixture.",
+    "Run `powerbi-cli fixture verify <project> --expected <summary.json> --json` in CI.",
+    "Run `powerbi-cli desktop open-check <project> --json` on an opt-in Windows Desktop oracle machine."
+  ],
+  "ok": true,
+  "pbir": {
+    "filters": {
+      "counts": {
+        "literals": 0,
+        "page": 0,
+        "report": 0,
+        "total": 0,
+        "unsupported": 0,
+        "visual": 0
+      },
+      "items": []
+    },
+    "reportDefinitionVersion": "2.0.0"
+  },
+  "project": {
+    "name": "VisualCatalogProof",
+    "pbipName": "VisualCatalogProof.pbip"
+  },
+  "report": {
+    "interactionSemantics": {
+      "missingRowsMean": "When a source/target visual pair is absent from visualInteractions, Power BI uses the target visual's default interaction behavior.",
+      "mode": "explicit-overrides",
+      "supportedTypes": [
+        "Default",
+        "DataFilter",
+        "HighlightFilter",
+        "NoFilter"
+      ]
+    },
+    "pages": [
+      {
+        "displayName": "Pie Proof",
+        "displayOption": "FitToPage",
+        "height": 500.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": true,
+        "name": "ReportSectionPieProof",
+        "ordinal": 0,
+        "visuals": [
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Category",
+                "field": "Category",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": null,
+                "field": "Total Amount",
+                "kind": "measure",
+                "measure": "Total Amount",
+                "role": "Y",
+                "table": "CatalogFacts"
+              }
+            ],
+            "fingerprints": {
+              "objects": "ec8ee91b20484a6c",
+              "position": "62c4d6e9597b0503",
+              "queryState": "b10b3d82a602c27a",
+              "visual": "7ca308149bd322be",
+              "visualJson": "c08dcd4553c32c51"
+            },
+            "name": "VisualContainerCategorySharePie",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 720.0,
+              "x": 40.0,
+              "y": 40.0,
+              "z": 0
+            },
+            "title": "Pie Category Share",
+            "visualType": "pieChart"
+          }
+        ],
+        "width": 800.0
+      },
+      {
+        "displayName": "Donut Proof",
+        "displayOption": "FitToPage",
+        "height": 500.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionDonutProof",
+        "ordinal": 1,
+        "visuals": [
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Category",
+                "field": "Category",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": null,
+                "field": "Total Amount",
+                "kind": "measure",
+                "measure": "Total Amount",
+                "role": "Y",
+                "table": "CatalogFacts"
+              }
+            ],
+            "fingerprints": {
+              "objects": "9c9bf65f812b0ffa",
+              "position": "62c4d6e9597b0503",
+              "queryState": "b10b3d82a602c27a",
+              "visual": "f90f51acf414cf24",
+              "visualJson": "d271f238f8384403"
+            },
+            "name": "VisualContainerCategoryShareDonut",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 720.0,
+              "x": 40.0,
+              "y": 40.0,
+              "z": 0
+            },
+            "title": "Donut Category Share",
+            "visualType": "donutChart"
+          }
+        ],
+        "width": 800.0
+      },
+      {
+        "displayName": "Matrix Proof",
+        "displayOption": "FitToPage",
+        "height": 500.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionMatrixProof",
+        "ordinal": 2,
+        "visuals": [
+          {
+            "bindingCount": 3,
+            "bindings": [
+              {
+                "column": "Year",
+                "field": "Year",
+                "kind": "column",
+                "measure": null,
+                "role": "Columns",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": "Category",
+                "field": "Category",
+                "kind": "column",
+                "measure": null,
+                "role": "Rows",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": null,
+                "field": "Total Amount",
+                "kind": "measure",
+                "measure": "Total Amount",
+                "role": "Values",
+                "table": "CatalogFacts"
+              }
+            ],
+            "fingerprints": {
+              "objects": "99ac8110cf81455c",
+              "position": "62c4d6e9597b0503",
+              "queryState": "475cdcd8f9fcff83",
+              "visual": "1abc7dfa5a3493e0",
+              "visualJson": "356a96ce441c4b7d"
+            },
+            "name": "VisualContainerRowsColumnsValuesMatrix",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 720.0,
+              "x": 40.0,
+              "y": 40.0,
+              "z": 0
+            },
+            "title": "Matrix Rows Columns Values",
+            "visualType": "pivotTable"
+          }
+        ],
+        "width": 800.0
+      },
+      {
+        "displayName": "Slicer Proof",
+        "displayOption": "FitToPage",
+        "height": 500.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionSlicerProof",
+        "ordinal": 3,
+        "visuals": [
+          {
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": "Category",
+                "field": "Category",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "CatalogFacts"
+              }
+            ],
+            "fingerprints": {
+              "objects": "1769af448b022c26",
+              "position": "f7d3c15e6f16eb11",
+              "queryState": "dc039ae7e1b89f7c",
+              "visual": "489d9428ae45212a",
+              "visualJson": "28650099d5dbe0b3"
+            },
+            "name": "VisualContainerBasicCategorySlicer",
+            "ordinal": 0,
+            "position": {
+              "height": 240.0,
+              "tabOrder": 0,
+              "width": 360.0,
+              "x": 40.0,
+              "y": 40.0,
+              "z": 0
+            },
+            "title": "Basic Category Slicer",
+            "visualType": "slicer"
+          }
+        ],
+        "width": 800.0
+      },
+      {
+        "displayName": "Line Control",
+        "displayOption": "FitToPage",
+        "height": 500.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionLineControl",
+        "ordinal": 4,
+        "visuals": [
+          {
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "Year",
+                "field": "Year",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": null,
+                "field": "Total Amount",
+                "kind": "measure",
+                "measure": "Total Amount",
+                "role": "Y",
+                "table": "CatalogFacts"
+              }
+            ],
+            "fingerprints": {
+              "objects": "e5ac6162567dc055",
+              "position": "62c4d6e9597b0503",
+              "queryState": "cae5c379b6600e55",
+              "visual": "6ef9bd68ce42f494",
+              "visualJson": "4c941036e5a1e20e"
+            },
+            "name": "VisualContainerKnownGoodLineControl",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 720.0,
+              "x": 40.0,
+              "y": 40.0,
+              "z": 0
+            },
+            "title": "Known-Good Line Control",
+            "visualType": "lineChart"
+          }
+        ],
+        "width": 800.0
+      }
+    ]
+  },
+  "schema": "powerbi-cli.fixture.summary.v1",
+  "summaryVersion": 2,
+  "validation": {
+    "errors": [],
+    "warnings": []
+  },
+  "verification": {
+    "actualWritten": null,
+    "differences": [],
+    "expected": null,
+    "mode": "normalize",
+    "same": null
+  }
+}

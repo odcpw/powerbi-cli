@@ -1,0 +1,52 @@
+{
+  "schema": "powerbi-cli.dashboard.v1",
+  "report": {
+    "name": "SalesOperations",
+    "displayName": "Sales Operations",
+    "locale": "en-US",
+    "audience": "operations manager",
+    "questions": [
+      "How is revenue trending?",
+      "Which customers and segments drive revenue?"
+    ]
+  },
+  "pages": [
+    {
+      "id": "overview",
+      "displayName": "Overview",
+      "size": { "width": 1280, "height": 720 },
+      "visuals": [
+        {
+          "id": "revenue_card",
+          "type": "card",
+          "title": "Revenue",
+          "bindings": [
+            { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 32, "y": 32, "width": 280, "height": 120 }
+        },
+        {
+          "id": "revenue_trend",
+          "type": "lineChart",
+          "title": "Revenue Trend",
+          "bindings": [
+            { "role": "Category", "field": "DimDate[Date]" },
+            { "role": "Y", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 32, "y": 184, "width": 600, "height": 320 }
+        },
+        {
+          "id": "customer_detail",
+          "type": "tableEx",
+          "title": "Customer Detail",
+          "bindings": [
+            { "role": "Values", "field": "DimCustomer[CustomerName]" },
+            { "role": "Values", "field": "DimCustomer[Segment]" },
+            { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "layout": { "x": 664, "y": 184, "width": 560, "height": 320 }
+        }
+      ]
+    }
+  ]
+}

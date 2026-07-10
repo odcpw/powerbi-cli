@@ -1,0 +1,301 @@
+{
+  "candidates": {
+    "categoryColumns": [
+      {
+        "column": "Month",
+        "dataType": "string",
+        "field": "DimDate[Month]",
+        "table": "DimDate"
+      },
+      {
+        "column": "CustomerName",
+        "dataType": "string",
+        "field": "DimCustomer[CustomerName]",
+        "table": "DimCustomer"
+      },
+      {
+        "column": "Segment",
+        "dataType": "string",
+        "field": "DimCustomer[Segment]",
+        "table": "DimCustomer"
+      }
+    ],
+    "dateColumns": [
+      {
+        "column": "DateKey",
+        "dataType": "int64",
+        "field": "DimDate[DateKey]",
+        "table": "DimDate"
+      },
+      {
+        "column": "Date",
+        "dataType": "date",
+        "field": "DimDate[Date]",
+        "table": "DimDate"
+      },
+      {
+        "column": "Month",
+        "dataType": "string",
+        "field": "DimDate[Month]",
+        "table": "DimDate"
+      },
+      {
+        "column": "FiscalYear",
+        "dataType": "int64",
+        "field": "DimDate[FiscalYear]",
+        "table": "DimDate"
+      },
+      {
+        "column": "DateKey",
+        "dataType": "int64",
+        "field": "FactSales[DateKey]",
+        "table": "FactSales"
+      }
+    ],
+    "dimensionTables": [
+      "DimDate",
+      "DimCustomer"
+    ],
+    "factTables": [
+      "FactSales"
+    ],
+    "numericColumns": [
+      {
+        "column": "DateKey",
+        "dataType": "int64",
+        "field": "DimDate[DateKey]",
+        "table": "DimDate"
+      },
+      {
+        "column": "FiscalYear",
+        "dataType": "int64",
+        "field": "DimDate[FiscalYear]",
+        "table": "DimDate"
+      },
+      {
+        "column": "CustomerKey",
+        "dataType": "int64",
+        "field": "DimCustomer[CustomerKey]",
+        "table": "DimCustomer"
+      },
+      {
+        "column": "DateKey",
+        "dataType": "int64",
+        "field": "FactSales[DateKey]",
+        "table": "FactSales"
+      },
+      {
+        "column": "CustomerKey",
+        "dataType": "int64",
+        "field": "FactSales[CustomerKey]",
+        "table": "FactSales"
+      },
+      {
+        "column": "Revenue",
+        "dataType": "decimal",
+        "field": "FactSales[Revenue]",
+        "table": "FactSales"
+      },
+      {
+        "column": "Units",
+        "dataType": "int64",
+        "field": "FactSales[Units]",
+        "table": "FactSales"
+      }
+    ]
+  },
+  "schema": "powerbi-cli.dataProfile.v1",
+  "source": {
+    "kind": "schema-embedded-dummy-rows",
+    "schemaPath": "examples/sales.schema.json"
+  },
+  "tables": [
+    {
+      "columns": [
+        {
+          "dataType": "int64",
+          "distinctCount": 1,
+          "isKey": true,
+          "name": "DateKey",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": true
+          },
+          "sampleValues": [
+            "20260101"
+          ]
+        },
+        {
+          "dataType": "date",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "Date",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": false
+          },
+          "sampleValues": [
+            "2026-01-01"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "Month",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": true,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Jan"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "FiscalYear",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": true
+          },
+          "sampleValues": [
+            "2026"
+          ]
+        }
+      ],
+      "name": "DimDate",
+      "role": "dimension",
+      "rowCount": 1
+    },
+    {
+      "columns": [
+        {
+          "dataType": "int64",
+          "distinctCount": 1,
+          "isKey": true,
+          "name": "CustomerKey",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "1"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "CustomerName",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Sample Customer"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "Segment",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "Enterprise"
+          ]
+        }
+      ],
+      "name": "DimCustomer",
+      "role": "dimension",
+      "rowCount": 1
+    },
+    {
+      "columns": [
+        {
+          "dataType": "int64",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "DateKey",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": true
+          },
+          "sampleValues": [
+            "20260101"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "CustomerKey",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "1"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "Revenue",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "12500.0"
+          ]
+        },
+        {
+          "dataType": "int64",
+          "distinctCount": 1,
+          "isKey": false,
+          "name": "Units",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "42"
+          ]
+        }
+      ],
+      "name": "FactSales",
+      "role": "fact",
+      "rowCount": 1
+    }
+  ],
+  "warnings": []
+}

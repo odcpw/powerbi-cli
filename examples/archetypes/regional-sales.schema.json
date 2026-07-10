@@ -1,0 +1,74 @@
+{
+  "name": "RegionalSales",
+  "displayName": "Regional Sales",
+  "description": "Neutral multi-page sales fixture proving drillthrough chains, TopN-by-measure filters, multi-page slicers, and non-ASCII column/measure escaping.",
+  "locale": "en-US",
+  "tables": [
+    {
+      "name": "DimCustomer",
+      "columns": [
+        { "name": "CustomerKey", "dataType": "int64", "isKey": true },
+        { "name": "Customer", "dataType": "string" },
+        { "name": "Segment", "dataType": "string" },
+        { "name": "Größenklasse", "dataType": "string" }
+      ],
+      "rows": [
+        { "CustomerKey": 1, "Customer": "Blue Harbor Traders", "Segment": "Enterprise", "Größenklasse": "Groß" },
+        { "CustomerKey": 2, "Customer": "Falcon Ridge Supply", "Segment": "Mid-Market", "Größenklasse": "Mittel" },
+        { "CustomerKey": 3, "Customer": "Silverline Goods", "Segment": "Enterprise", "Größenklasse": "Groß" },
+        { "CustomerKey": 4, "Customer": "Copper Valley Foods", "Segment": "SMB", "Größenklasse": "Klein" },
+        { "CustomerKey": 5, "Customer": "Northwind Fixtures", "Segment": "Mid-Market", "Größenklasse": "Mittel" },
+        { "CustomerKey": 6, "Customer": "Amber Grove Retail", "Segment": "SMB", "Größenklasse": "Klein" }
+      ]
+    },
+    {
+      "name": "FactSales",
+      "columns": [
+        { "name": "CustomerKey", "dataType": "int64" },
+        { "name": "Year", "dataType": "int64" },
+        { "name": "Revenue", "dataType": "decimal", "formatString": "$#,##0" },
+        { "name": "Units", "dataType": "int64", "formatString": "#,##0" }
+      ],
+      "measures": [
+        {
+          "name": "Total Revenue",
+          "expression": "SUM('FactSales'[Revenue])",
+          "formatString": "$#,##0"
+        },
+        {
+          "name": "Total Units",
+          "expression": "SUM('FactSales'[Units])",
+          "formatString": "#,##0"
+        },
+        {
+          "name": "Umsatz Übersicht",
+          "expression": "AVERAGE('FactSales'[Revenue])",
+          "formatString": "$#,##0"
+        }
+      ],
+      "rows": [
+        { "CustomerKey": 1, "Year": 2025, "Revenue": 40000.0, "Units": 120 },
+        { "CustomerKey": 1, "Year": 2026, "Revenue": 45000.0, "Units": 130 },
+        { "CustomerKey": 2, "Year": 2025, "Revenue": 22000.0, "Units": 70 },
+        { "CustomerKey": 2, "Year": 2026, "Revenue": 24000.0, "Units": 70 },
+        { "CustomerKey": 3, "Year": 2025, "Revenue": 61000.0, "Units": 150 },
+        { "CustomerKey": 3, "Year": 2026, "Revenue": 65000.0, "Units": 150 },
+        { "CustomerKey": 4, "Year": 2025, "Revenue": 9000.0, "Units": 30 },
+        { "CustomerKey": 4, "Year": 2026, "Revenue": 9500.0, "Units": 30 },
+        { "CustomerKey": 5, "Year": 2025, "Revenue": 30000.0, "Units": 90 },
+        { "CustomerKey": 5, "Year": 2026, "Revenue": 31000.0, "Units": 90 },
+        { "CustomerKey": 6, "Year": 2025, "Revenue": 12000.0, "Units": 35 },
+        { "CustomerKey": 6, "Year": 2026, "Revenue": 12500.0, "Units": 35 }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "fromTable": "FactSales",
+      "fromColumn": "CustomerKey",
+      "toTable": "DimCustomer",
+      "toColumn": "CustomerKey"
+    }
+  ],
+  "pages": []
+}

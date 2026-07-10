@@ -1,0 +1,148 @@
+{
+  "candidates": {
+    "categoryColumns": [
+      {
+        "column": "Facility",
+        "dataType": "string",
+        "field": "Facilities[Facility]",
+        "table": "Facilities"
+      },
+      {
+        "column": "Region",
+        "dataType": "string",
+        "field": "Facilities[Region]",
+        "table": "Facilities"
+      }
+    ],
+    "dateColumns": [],
+    "dimensionTables": [],
+    "factTables": [
+      "Facilities"
+    ],
+    "numericColumns": [
+      {
+        "column": "RiskScore",
+        "dataType": "decimal",
+        "field": "Facilities[RiskScore]",
+        "table": "Facilities"
+      },
+      {
+        "column": "IncidentRate",
+        "dataType": "decimal",
+        "field": "Facilities[IncidentRate]",
+        "table": "Facilities"
+      },
+      {
+        "column": "ExposureHours",
+        "dataType": "decimal",
+        "field": "Facilities[ExposureHours]",
+        "table": "Facilities"
+      }
+    ]
+  },
+  "schema": "powerbi-cli.dataProfile.v1",
+  "source": {
+    "kind": "schema-embedded-dummy-rows",
+    "schemaPath": "examples/archetypes/scatter-bubble.schema.json"
+  },
+  "tables": [
+    {
+      "columns": [
+        {
+          "dataType": "string",
+          "distinctCount": 4,
+          "isKey": false,
+          "name": "Facility",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "North Plant",
+            "East Depot",
+            "Central Hub",
+            "West Yard"
+          ]
+        },
+        {
+          "dataType": "string",
+          "distinctCount": 4,
+          "isKey": false,
+          "name": "Region",
+          "nullCount": 0,
+          "roles": {
+            "categorical": true,
+            "dateLike": false,
+            "numeric": false
+          },
+          "sampleValues": [
+            "North",
+            "East",
+            "Central",
+            "West"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 4,
+          "isKey": false,
+          "name": "RiskScore",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "7.4",
+            "4.8",
+            "6.2",
+            "8.1"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 4,
+          "isKey": false,
+          "name": "IncidentRate",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "112.0",
+            "68.0",
+            "91.0",
+            "130.0"
+          ]
+        },
+        {
+          "dataType": "decimal",
+          "distinctCount": 4,
+          "isKey": false,
+          "name": "ExposureHours",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": false,
+            "numeric": true
+          },
+          "sampleValues": [
+            "18200.0",
+            "9400.0",
+            "15100.0",
+            "12100.0"
+          ]
+        }
+      ],
+      "name": "Facilities",
+      "role": "fact",
+      "rowCount": 4
+    }
+  ],
+  "warnings": []
+}

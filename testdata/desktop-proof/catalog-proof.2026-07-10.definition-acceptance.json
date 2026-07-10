@@ -1,0 +1,45 @@
+{
+  "schema": "powerbi-cli.desktop.manualProof.v1",
+  "artifact": "catalog-proof definition acceptance",
+  "date": "2026-07-10",
+  "observer": "orchestrating agent (Claude) via powerbi-cli desktop screenshot oracle; screenshots reviewed visually, retained outside the repo",
+  "desktop": {
+    "edition": "Microsoft Store",
+    "version": "2.155.756.0",
+    "launchMethod": "windows-file-association"
+  },
+  "project": {
+    "archetype": "catalog-proof",
+    "builtWith": "report build --schema examples/archetypes/catalog-proof.schema.json --profile examples/archetypes/catalog-proof.profile.json --spec examples/archetypes/catalog-proof.dashboard.json --out-dir build/catalog-proof --force",
+    "pages": 5,
+    "visuals": 5
+  },
+  "method": [
+    "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop screenshot build/catalog-proof --out <png> --timeout-ms 180000",
+    "report pages set-active --in-place per page between oracle runs (no UI interaction used)",
+    "each run: windowObserved=true, titleMatched=true (VisualCatalogProof), screenshot captured, cleanup closed=true, zero remaining PBIDesktop/msmdsrv processes"
+  ],
+  "observations": {
+    "projectOpened": true,
+    "allFivePageTabsPresent": true,
+    "issueDialogs": "none; only the standard 'Some of the tables have incomplete or no data' pre-refresh banner",
+    "pieProof": "healthy titled visual placeholder 'Total Amount by Category'; no unknown-visual or repair placeholder",
+    "donutProof": "healthy titled visual placeholder; no error placeholder",
+    "matrixProof": "pivotTable renders structural skeleton pre-refresh: Category/Total column headers and Total row visible",
+    "slicerProof": "slicer renders with 'Category' header, empty list, no persisted selections",
+    "lineControl": "not individually screenshotted; page tab present (family already Desktop-proven in prior archetypes)"
+  },
+  "provenLevel": "desktop-definition-acceptance: Desktop opens the project and instantiates pieChart, donutChart, pivotTable, and slicer visual containers without rejection dialogs or unknown-visual placeholders, pre-refresh",
+  "claimedCompatibility": false,
+  "unproven": [
+    "canvas rendering with data (requires manual dummy-partition refresh; screen-control was declined this session)",
+    "pie/donut slice values and descending sort with data",
+    "matrix populated cells and hierarchy expansion",
+    "slicer item list and selection behavior",
+    "save/close/reopen round-trip after refresh"
+  ],
+  "next": [
+    "After a manual (or approved automated) 'Refresh now' + Save in Desktop, re-run the screenshot oracle per page and verify the expected values (Alpha=25/Beta=45 pie slices, 2025/2026 matrix columns, Alpha/Beta slicer items, line 2025=30/2026=40)",
+    "Then and only then advance feature_catalog proof levels beyond desktop-golden-pending"
+  ]
+}

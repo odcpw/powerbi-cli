@@ -1,0 +1,354 @@
+{
+  "counts": {
+    "boundVisuals": 0,
+    "columns": 11,
+    "explicitInteractions": 0,
+    "jsonFilesChecked": 13,
+    "lintErrors": 0,
+    "lintInfo": 3,
+    "lintWarnings": 0,
+    "measures": 2,
+    "pages": 1,
+    "relationships": 2,
+    "staleInteractionVisualReferences": 0,
+    "tables": 3,
+    "unsupportedInteractions": 0,
+    "validationErrors": 0,
+    "validationWarnings": 0,
+    "visuals": 3
+  },
+  "exitCode": 0,
+  "fingerprint": "f83114e8a4f32c4f",
+  "lint": {
+    "counts": {
+      "errors": 0,
+      "findings": 3,
+      "info": 3,
+      "warnings": 0
+    },
+    "findings": [
+      {
+        "code": "report.visual_unbound",
+        "handle": "visual:ReportSectionOverview:VisualContainerCustomerDetail6665af72a7",
+        "severity": "info"
+      },
+      {
+        "code": "report.visual_unbound",
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenue83556a914d",
+        "severity": "info"
+      },
+      {
+        "code": "report.visual_unbound",
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenueTrendf33e67f559",
+        "severity": "info"
+      }
+    ]
+  },
+  "model": {
+    "relationships": [
+      {
+        "crossFilteringBehavior": "oneDirection",
+        "from": "FactSales.CustomerKey",
+        "isActive": true,
+        "name": "relFactSalesCustomerKeyToDimCustomerCustomerKey8b7",
+        "to": "DimCustomer.CustomerKey"
+      },
+      {
+        "crossFilteringBehavior": "oneDirection",
+        "from": "FactSales.DateKey",
+        "isActive": true,
+        "name": "relFactSalesDateKeyToDimDateDateKey0f8a94a33b",
+        "to": "DimDate.DateKey"
+      }
+    ],
+    "tables": [
+      {
+        "columns": [
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": true,
+            "name": "CustomerKey",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "CustomerName",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Segment",
+            "summarizeBy": "none"
+          }
+        ],
+        "measures": [],
+        "name": "DimCustomer",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "DimCustomer",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      },
+      {
+        "columns": [
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": true,
+            "name": "DateKey",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "dateTime",
+            "formatString": "Short Date",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Date",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "string",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Month",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "FiscalYear",
+            "summarizeBy": "sum"
+          }
+        ],
+        "measures": [],
+        "name": "DimDate",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "DimDate",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      },
+      {
+        "columns": [
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "DateKey",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "int64",
+            "formatString": null,
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "CustomerKey",
+            "summarizeBy": "none"
+          },
+          {
+            "dataType": "decimal",
+            "formatString": "$#,##0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Revenue",
+            "summarizeBy": "sum"
+          },
+          {
+            "dataType": "int64",
+            "formatString": "#,##0",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "Units",
+            "summarizeBy": "sum"
+          }
+        ],
+        "measures": [
+          {
+            "displayFolder": null,
+            "expression": "SUM('FactSales'[Revenue])",
+            "formatString": "$#,##0",
+            "name": "Total Revenue"
+          },
+          {
+            "displayFolder": null,
+            "expression": "SUM('FactSales'[Units])",
+            "formatString": "#,##0",
+            "name": "Total Units"
+          }
+        ],
+        "name": "FactSales",
+        "partitions": [
+          {
+            "mode": "import",
+            "name": "FactSales",
+            "safeForHome": true,
+            "sourceKind": "dummyMTable"
+          }
+        ]
+      }
+    ]
+  },
+  "next": [
+    "Review this summary before committing it as a golden fixture.",
+    "Run `powerbi-cli fixture verify <project> --expected <summary.json> --json` in CI.",
+    "Run `powerbi-cli desktop open-check <project> --json` on an opt-in Windows Desktop oracle machine."
+  ],
+  "ok": true,
+  "pbir": {
+    "filters": {
+      "counts": {
+        "literals": 0,
+        "page": 0,
+        "report": 0,
+        "total": 0,
+        "unsupported": 0,
+        "visual": 0
+      },
+      "items": []
+    },
+    "reportDefinitionVersion": "2.0.0"
+  },
+  "project": {
+    "name": "SalesOperations",
+    "pbipName": "SalesOperations.pbip"
+  },
+  "report": {
+    "interactionSemantics": {
+      "missingRowsMean": "When a source/target visual pair is absent from visualInteractions, Power BI uses the target visual's default interaction behavior.",
+      "mode": "explicit-overrides",
+      "supportedTypes": [
+        "Default",
+        "DataFilter",
+        "HighlightFilter",
+        "NoFilter"
+      ]
+    },
+    "pages": [
+      {
+        "displayName": "Overview",
+        "displayOption": "FitToPage",
+        "height": 720.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": true,
+        "name": "ReportSectionOverview",
+        "ordinal": 0,
+        "visuals": [
+          {
+            "bindingCount": 0,
+            "bindings": [],
+            "fingerprints": {
+              "objects": "ae3065c278122f5e",
+              "position": "b601e0e0aa548821",
+              "queryState": "5b9bc4ba528108e4",
+              "visual": "d2e33c43f5179526",
+              "visualJson": "0afa439923530a41"
+            },
+            "name": "VisualContainerCustomerDetail6665af72a7",
+            "ordinal": 0,
+            "position": {
+              "height": 320.0,
+              "tabOrder": 2,
+              "width": 560.0,
+              "x": 664.0,
+              "y": 184.0,
+              "z": 2
+            },
+            "title": "Customer Detail",
+            "visualType": "tableEx"
+          },
+          {
+            "bindingCount": 0,
+            "bindings": [],
+            "fingerprints": {
+              "objects": "b044065363c0b053",
+              "position": "dec796711fd9b3bf",
+              "queryState": "5b9bc4ba528108e4",
+              "visual": "7c7099497e730071",
+              "visualJson": "f97ee04c31b58c2f"
+            },
+            "name": "VisualContainerRevenue83556a914d",
+            "ordinal": 1,
+            "position": {
+              "height": 120.0,
+              "tabOrder": 0,
+              "width": 280.0,
+              "x": 32.0,
+              "y": 32.0,
+              "z": 0
+            },
+            "title": "Revenue",
+            "visualType": "card"
+          },
+          {
+            "bindingCount": 0,
+            "bindings": [],
+            "fingerprints": {
+              "objects": "31110711e5ef121c",
+              "position": "ffff729ece655f4f",
+              "queryState": "5b9bc4ba528108e4",
+              "visual": "6ff723bf9d416055",
+              "visualJson": "e3747eecbffa6dfe"
+            },
+            "name": "VisualContainerRevenueTrendf33e67f559",
+            "ordinal": 2,
+            "position": {
+              "height": 320.0,
+              "tabOrder": 1,
+              "width": 600.0,
+              "x": 32.0,
+              "y": 184.0,
+              "z": 1
+            },
+            "title": "Revenue Trend",
+            "visualType": "lineChart"
+          }
+        ],
+        "width": 1280.0
+      }
+    ]
+  },
+  "schema": "powerbi-cli.fixture.summary.v1",
+  "summaryVersion": 2,
+  "validation": {
+    "errors": [],
+    "warnings": []
+  },
+  "verification": {
+    "actualWritten": null,
+    "differences": [],
+    "expected": null,
+    "mode": "normalize",
+    "same": null
+  }
+}
