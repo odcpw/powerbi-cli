@@ -74,15 +74,7 @@ pub(crate) fn delete_visual(args: &[String]) -> CliResult<Value> {
     let target = visual_detail(&visual);
     let dry_run = matches!(mode, MutationMode::DryRun);
     if !dry_run {
-        fs::remove_file(visual_path).map_err(|err| {
-            CliError::unexpected(format!(
-                "remove visual file {}: {err}",
-                visual_path.display()
-            ))
-        })?;
-        fs::remove_dir(&visual_dir).map_err(|err| {
-            CliError::unexpected(format!("remove visual dir {}: {err}", visual_dir.display()))
-        })?;
+        remove_visual_container(visual_path, &visual_dir)?;
     }
 
     mutation_response(
@@ -92,6 +84,95 @@ pub(crate) fn delete_visual(args: &[String]) -> CliResult<Value> {
         canonical_display(visual_path),
         &visual.page_handle,
     )
+}
+
+fn remove_visual_container(visual_path: &Path, visual_dir: &Path) -> CliResult<()> {
+    let original_visual = fs::read(visual_path).map_err(|err| {
+        CliError::unexpected(format!(
+            "read visual file before deletion {}: {err}",
+            visual_path.display()
+        ))
+    })?;
+    let original_permissions = prepare_visual_dir_for_removal(visual_dir)?;
+
+    if let Err(err) = fs::remove_file(visual_path) {
+        let restore_note = restore_visual_dir_permissions(visual_dir, original_permissions)
+            .err()
+            .map(|restore_err| {
+                format!("; restoring directory permissions also failed: {restore_err}")
+            })
+            .unwrap_or_default();
+        return Err(CliError::unexpected(format!(
+            "remove visual file {}: {err}{restore_note}",
+            visual_path.display()
+        )));
+    }
+
+    if let Err(err) = fs::remove_dir(visual_dir) {
+        let file_restore = fs::write(visual_path, &original_visual);
+        let permission_restore = restore_visual_dir_permissions(visual_dir, original_permissions);
+        let rollback_note = match (file_restore, permission_restore) {
+            (Ok(()), Ok(())) => "the visual file was restored".to_string(),
+            (file_result, permission_result) => {
+                let file_note = file_result
+                    .err()
+                    .map(|restore_err| format!("visual restore failed: {restore_err}"))
+                    .unwrap_or_else(|| "visual restored".to_string());
+                let permission_note = permission_result
+                    .err()
+                    .map(|restore_err| format!("permission restore failed: {restore_err}"))
+                    .unwrap_or_else(|| "permissions restored".to_string());
+                format!("rollback incomplete ({file_note}; {permission_note})")
+            }
+        };
+        return Err(CliError::unexpected(format!(
+            "remove visual dir {}: {err}; {rollback_note}",
+            visual_dir.display()
+        )));
+    }
+
+    Ok(())
+}
+
+fn prepare_visual_dir_for_removal(visual_dir: &Path) -> CliResult<fs::Permissions> {
+    let original_permissions = fs::metadata(visual_dir)
+        .map_err(|err| {
+            CliError::unexpected(format!(
+                "read visual dir permissions {}: {err}",
+                visual_dir.display()
+            ))
+        })?
+        .permissions();
+
+    #[cfg(windows)]
+    if original_permissions.readonly() {
+        let mut writable_permissions = original_permissions.clone();
+        writable_permissions.set_readonly(false);
+        fs::set_permissions(visual_dir, writable_permissions).map_err(|err| {
+            CliError::unexpected(format!(
+                "make visual dir removable {}: {err}",
+                visual_dir.display()
+            ))
+        })?;
+    }
+
+    Ok(original_permissions)
+}
+
+fn restore_visual_dir_permissions(
+    visual_dir: &Path,
+    original_permissions: fs::Permissions,
+) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        return fs::set_permissions(visual_dir, original_permissions);
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (visual_dir, original_permissions);
+        Ok(())
+    }
 }
 
 fn parse_delete_args(args: &[String]) -> CliResult<DeleteVisualOptions> {

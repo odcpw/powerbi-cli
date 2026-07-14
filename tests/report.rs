@@ -1851,6 +1851,14 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
             .iter()
             .any(|pointer| pointer == "/visual/objects/title/0/properties/text/expr/Literal/Value")
     );
+    assert!(dry_pointers.iter().any(|pointer| {
+        pointer == "/visual/visualContainerObjects/title/0/properties/text/expr/Literal/Value"
+    }));
+    assert!(
+        dry_pointers
+            .iter()
+            .any(|pointer| pointer == "/annotations/0/value")
+    );
     assert!(dry_pointers.iter().any(
         |pointer| pointer == "/visual/objects/general/0/properties/altText/expr/Literal/Value"
     ));
@@ -1905,6 +1913,20 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         styled_visual_json["visual"]["objects"]["title"][0]["properties"]["show"]["expr"]["Literal"]
             ["Value"],
         Value::from("false")
+    );
+    assert_eq!(
+        styled_visual_json["visual"]["visualContainerObjects"]["title"][0]["properties"]["text"]["expr"]
+            ["Literal"]["Value"],
+        Value::from("'Updated Revenue'")
+    );
+    assert_eq!(
+        styled_visual_json["visual"]["visualContainerObjects"]["title"][0]["properties"]["show"]["expr"]
+            ["Literal"]["Value"],
+        Value::from("false")
+    );
+    assert_eq!(
+        styled_visual_json["annotations"][0]["value"],
+        Value::from("Updated Revenue")
     );
     assert_eq!(
         styled_visual_json["visual"]["objects"]["general"][0]["properties"]["altText"]["expr"]["Literal"]
@@ -2033,12 +2055,19 @@ fn report_visuals_formatting_set_text_creates_missing_cards_with_page_visual_sel
         serde_json::from_str(&fs::read_to_string(visual_path).expect("updated visual json"))
             .expect("parse updated visual json");
     assert_eq!(
-        visual_json["visual"]["objects"]["title"][0]["properties"]["text"]["expr"]["Literal"]["Value"],
+        visual_json["visual"]["visualContainerObjects"]["title"][0]["properties"]["text"]["expr"]["Literal"]
+            ["Value"],
         Value::from("'Generated Title'")
     );
     assert_eq!(
-        visual_json["visual"]["objects"]["title"][0]["properties"]["show"]["expr"]["Literal"]["Value"],
+        visual_json["visual"]["visualContainerObjects"]["title"][0]["properties"]["show"]["expr"]["Literal"]
+            ["Value"],
         Value::from("true")
+    );
+    assert!(visual_json["visual"]["objects"].get("title").is_none());
+    assert_eq!(
+        visual_json["annotations"][0]["value"],
+        Value::from("Generated Title")
     );
     assert_eq!(
         visual_json["visual"]["objects"]["general"][0]["properties"]["altText"]["expr"]["Literal"]
@@ -9988,6 +10017,59 @@ fn report_visual_delete_round_trips_through_out_dir() {
     assert_eq!(
         stdout_json(&validate)["counts"]["visuals"],
         Value::from(visual_count - 1)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn report_visual_delete_handles_read_only_visual_directories_on_windows() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let visuals = run_powerbi(&[
+        "report",
+        "visuals",
+        "list",
+        "--project",
+        project_arg,
+        "--json",
+    ]);
+    assert_eq!(visuals.code, 0, "stderr: {}", visuals.stderr);
+    let visuals_json = stdout_json(&visuals);
+    let visual_handle = visuals_json["visuals"][0]["handle"]
+        .as_str()
+        .expect("visual handle")
+        .to_string();
+    let visual_path = PathBuf::from(
+        visuals_json["visuals"][0]["path"]
+            .as_str()
+            .expect("visual path"),
+    );
+    let visual_dir = visual_path.parent().expect("visual directory");
+    let mut permissions = fs::metadata(visual_dir)
+        .expect("visual directory metadata")
+        .permissions();
+    permissions.set_readonly(true);
+    fs::set_permissions(visual_dir, permissions).expect("mark visual directory read-only");
+
+    let delete = run_powerbi(&[
+        "report",
+        "visuals",
+        "delete",
+        "--project",
+        project_arg,
+        "--handle",
+        &visual_handle,
+        "--in-place",
+        "--confirm",
+        &visual_handle,
+        "--json",
+    ]);
+    assert_eq!(delete.code, 0, "stderr: {}", delete.stderr);
+    assert!(!visual_path.exists(), "deleted visual file still exists");
+    assert!(
+        !visual_dir.exists(),
+        "deleted visual directory still exists"
     );
 }
 

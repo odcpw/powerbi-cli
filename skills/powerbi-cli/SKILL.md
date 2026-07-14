@@ -168,6 +168,10 @@ supported.
 - Semantic-model handles percent-encode literal `%` and `:` inside table,
   measure, column, and partition components as `%25` and `%3A`. Always reuse
   returned handles instead of constructing them by hand.
+- Visual deletion handles Windows/OneDrive read-only directory attributes and
+  restores `visual.json` if the enclosing directory cannot be removed.
+- `report visuals formatting set-text` synchronizes existing PBIR title
+  containers and the generated `powerbi-cli.placeholderTitle` annotation.
 - Mutate with explicit output directories or `--dry-run` when the command
   provides it. Do not assume in-place edits are safe.
 - After any mutation, run generated follow-up commands such as

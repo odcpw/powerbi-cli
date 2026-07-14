@@ -156,22 +156,11 @@ pub(crate) fn set_text_formatting(args: &[String]) -> CliResult<Value> {
 
 fn apply_text_patch(visual_json: &mut Value, options: &TextOptions) -> CliResult<Vec<String>> {
     let mut pointers = Vec::new();
-    if let Some(title) = &options.title {
-        let properties = ensure_visual_object_properties(visual_json, "title")?;
-        properties.insert("text".to_string(), literal_text_expression(title));
-        pointers.push("/visual/objects/title/0/properties/text/expr/Literal/Value".to_string());
-        if options.show_title.is_none() {
-            properties.insert("show".to_string(), literal_bool_expression(true));
-            pointers.push("/visual/objects/title/0/properties/show/expr/Literal/Value".to_string());
-        }
+    if options.title.is_some() || options.show_title.is_some() {
+        patch_title_properties(visual_json, options, &mut pointers)?;
     }
-    if let Some(show_title) = options.show_title {
-        let properties = ensure_visual_object_properties(visual_json, "title")?;
-        properties.insert("show".to_string(), literal_bool_expression(show_title));
-        let pointer = "/visual/objects/title/0/properties/show/expr/Literal/Value";
-        if !pointers.iter().any(|item| item == pointer) {
-            pointers.push(pointer.to_string());
-        }
+    if let Some(title) = &options.title {
+        update_placeholder_title_annotation(visual_json, title, &mut pointers)?;
     }
     if let Some(alt_text) = &options.alt_text {
         let properties = ensure_visual_object_properties(visual_json, "general")?;
@@ -188,12 +177,94 @@ fn apply_text_patch(visual_json: &mut Value, options: &TextOptions) -> CliResult
     Ok(pointers)
 }
 
+fn patch_title_properties(
+    visual_json: &mut Value,
+    options: &TextOptions,
+    pointers: &mut Vec<String>,
+) -> CliResult<()> {
+    let has_container_title = visual_json
+        .pointer("/visual/visualContainerObjects/title")
+        .is_some();
+    let has_object_title = visual_json.pointer("/visual/objects/title").is_some();
+
+    if has_container_title || !has_object_title {
+        let properties = ensure_visual_container_object_properties(visual_json, "title")?;
+        patch_one_title_properties(
+            properties,
+            options,
+            "/visual/visualContainerObjects/title/0/properties",
+            pointers,
+        );
+    }
+    if has_object_title {
+        let properties = ensure_visual_object_properties(visual_json, "title")?;
+        patch_one_title_properties(
+            properties,
+            options,
+            "/visual/objects/title/0/properties",
+            pointers,
+        );
+    }
+    Ok(())
+}
+
+fn patch_one_title_properties(
+    properties: &mut Map<String, Value>,
+    options: &TextOptions,
+    pointer_prefix: &str,
+    pointers: &mut Vec<String>,
+) {
+    if let Some(title) = &options.title {
+        properties.insert("text".to_string(), literal_text_expression(title));
+        pointers.push(format!("{pointer_prefix}/text/expr/Literal/Value"));
+        if options.show_title.is_none() {
+            properties.insert("show".to_string(), literal_bool_expression(true));
+            pointers.push(format!("{pointer_prefix}/show/expr/Literal/Value"));
+        }
+    }
+    if let Some(show_title) = options.show_title {
+        properties.insert("show".to_string(), literal_bool_expression(show_title));
+        let pointer = format!("{pointer_prefix}/show/expr/Literal/Value");
+        if !pointers.iter().any(|item| item == &pointer) {
+            pointers.push(pointer);
+        }
+    }
+}
+
+fn update_placeholder_title_annotation(
+    visual_json: &mut Value,
+    title: &str,
+    pointers: &mut Vec<String>,
+) -> CliResult<()> {
+    let root = json_object_mut(visual_json, "visual.json root")?;
+    let Some(annotations) = root.get_mut("annotations") else {
+        return Ok(());
+    };
+    let annotations = annotations.as_array_mut().ok_or_else(|| {
+        CliError::validation_failed("/annotations must be an array before set-text can patch it")
+    })?;
+    if let Some((index, annotation)) = annotations.iter_mut().enumerate().find(|(_, item)| {
+        item.get("name").and_then(Value::as_str) == Some("powerbi-cli.placeholderTitle")
+    }) {
+        let annotation = json_object_mut(annotation, "title annotation")?;
+        annotation.insert("value".to_string(), Value::String(title.to_string()));
+        pointers.push(format!("/annotations/{index}/value"));
+    }
+    Ok(())
+}
+
 fn visual_text_state(visual_json: &Value, include_raw: bool) -> Value {
     let title_literal = visual_json
-        .pointer("/visual/objects/title/0/properties/text/expr/Literal/Value")
+        .pointer("/visual/visualContainerObjects/title/0/properties/text/expr/Literal/Value")
+        .or_else(|| {
+            visual_json.pointer("/visual/objects/title/0/properties/text/expr/Literal/Value")
+        })
         .and_then(Value::as_str);
     let show_literal = visual_json
-        .pointer("/visual/objects/title/0/properties/show/expr/Literal/Value")
+        .pointer("/visual/visualContainerObjects/title/0/properties/show/expr/Literal/Value")
+        .or_else(|| {
+            visual_json.pointer("/visual/objects/title/0/properties/show/expr/Literal/Value")
+        })
         .and_then(Value::as_str);
     let alt_literal = visual_json
         .pointer("/visual/objects/general/0/properties/altText/expr/Literal/Value")
@@ -205,7 +276,8 @@ fn visual_text_state(visual_json: &Value, include_raw: bool) -> Value {
     });
     if include_raw {
         state["raw"] = json!({
-            "title": visual_json.pointer("/visual/objects/title/0").cloned().unwrap_or(Value::Null),
+            "visualContainerTitle": visual_json.pointer("/visual/visualContainerObjects/title/0").cloned().unwrap_or(Value::Null),
+            "visualObjectTitle": visual_json.pointer("/visual/objects/title/0").cloned().unwrap_or(Value::Null),
             "general": visual_json.pointer("/visual/objects/general/0").cloned().unwrap_or(Value::Null)
         });
     }
@@ -226,6 +298,22 @@ fn ensure_visual_object_properties<'a>(
         .or_insert_with(|| json!({}));
     let objects = json_object_mut(objects, "/visual/objects")?;
     ensure_object_properties(objects, object_name, "/visual/objects")
+}
+
+fn ensure_visual_container_object_properties<'a>(
+    visual_json: &'a mut Value,
+    object_name: &str,
+) -> CliResult<&'a mut Map<String, Value>> {
+    let root = json_object_mut(visual_json, "visual.json root")?;
+    let visual = root
+        .entry("visual".to_string())
+        .or_insert_with(|| json!({}));
+    let visual = json_object_mut(visual, "visual.json visual")?;
+    let objects = visual
+        .entry("visualContainerObjects".to_string())
+        .or_insert_with(|| json!({}));
+    let objects = json_object_mut(objects, "/visual/visualContainerObjects")?;
+    ensure_object_properties(objects, object_name, "/visual/visualContainerObjects")
 }
 
 fn existing_visual_object_properties<'a>(

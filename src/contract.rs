@@ -2429,7 +2429,7 @@ fn command_catalog() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-handle>", "--title <text>", "--show-title true|false", "--alt-text <text>", "--clear-alt-text", "--include-raw", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals formatting set-text --project build/sales --handle <visual-handle> --title \"Revenue Overview\" --alt-text \"Revenue KPI card\" --dry-run --json", "powerbi-cli report visuals format title --project build/sales --handle <visual-handle> --show-title false --out-dir build/sales-no-title --json"],
             "followUpFields": ["dryRun", "mode", "target.handle", "textPlan.requested", "textPlan.before", "textPlan.after", "changes[].jsonPointers", "changes[].before", "changes[].after", "readbackCommand", "rawReviewCommand", "visualReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
-            "limitations": ["Patches only /visual/objects/title/0 properties and /visual/objects/general/0 altText. Other typed formatting properties remain bundle- or Desktop-fixture gated."]
+            "limitations": ["Patches title properties in the existing /visual/visualContainerObjects/title and /visual/objects/title containers, keeps an existing powerbi-cli.placeholderTitle annotation synchronized, and patches /visual/objects/general/0 altText. Other typed formatting properties remain bundle- or Desktop-fixture gated."]
         }),
         json!({
             "path": "report visuals formatting set-color",

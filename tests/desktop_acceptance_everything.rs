@@ -530,6 +530,25 @@ fn everything_acceptance_invokes_every_catalog_command() {
     );
 
     h.ok(
+        "model tables add-static",
+        &svec([
+            "model",
+            "tables",
+            "add-static",
+            "--project",
+            &project_arg,
+            "--table",
+            "Metric",
+            "--column",
+            "Metric",
+            "--values-json",
+            "[\"Count\",\"Cost\"]",
+            "--in-place",
+            "--json",
+        ]),
+    );
+
+    h.ok(
         "model calculated-columns list",
         &svec([
             "model",

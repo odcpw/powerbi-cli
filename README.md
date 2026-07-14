@@ -383,7 +383,11 @@ three pages.
   visual clone copies only a proven simple `visual.json` container and patches
   the cloned name/position/annotations;
   visual delete removes only a proven `visuals/<name>/visual.json` container
-  and requires exact `--confirm <visual-handle>` for in-place deletion.
+  and requires exact `--confirm <visual-handle>` for in-place deletion. On
+  Windows it safely clears a read-only visual-directory attribute (including
+  OneDrive-backed folders), and restores the visual if directory removal fails.
+  Typed title edits synchronize both supported PBIR title containers and an
+  existing `powerbi-cli.placeholderTitle` annotation.
   Mutations return readback, wireframe, inspect, and validate commands. Every
   report mutation with `--out-dir` first runs the complete plan against the
   source project, so an invalid handle or unsupported plan does not populate the
