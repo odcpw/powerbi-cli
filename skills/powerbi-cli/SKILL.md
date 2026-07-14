@@ -109,6 +109,7 @@ pbi --json capabilities --for theme
 pbi --json capabilities --for style
 pbi --json capabilities --for wireframe
 pbi --json capabilities --for semantic-model
+pbi --json capabilities --for add-static
 pbi --json capabilities --for report
 pbi --json capabilities --for handoff
 ```
@@ -353,6 +354,24 @@ refresh when opened at work. Input type `date` is normalized to TMDL `dateTime`
 and receives `formatString: "Short Date"` unless an explicit format string is
 provided. Colon-bearing table and column names round-trip through percent-encoded
 handles returned by the CLI.
+
+### Add A Small Disconnected Selector Table
+
+Use the guarded static-table command for report controls such as a metric toggle:
+
+```bash
+pbi --json capabilities --for add-static
+pbi --json model tables add-static --project build/sales --table Metric --column Metric --values-json '["Count","Cost"]' --dry-run
+pbi --json model tables add-static --project build/sales --table Metric --column Metric --values-json '["Count","Cost"]' --in-place
+pbi --json model partitions show --project build/sales --handle "partition:Metric:Metric"
+pbi --json validate --strict build/sales
+```
+
+This first slice creates only a new disconnected table with one string column
+and 1-100 unique short labels. It is for selector state, not business-data
+ingestion. It refuses replacement, credentials, multiline values, and arbitrary
+fact/dimension shapes. Use a DAX `SELECTEDVALUE`/`SWITCH` measure to connect the
+selector to report behavior; Desktop remains the DAX and interaction oracle.
 
 ### Inspect Partitions And Handoff Safety
 

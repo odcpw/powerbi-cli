@@ -31,6 +31,7 @@ fn capabilities_advertise_scaffold_and_validate() {
         .collect::<Vec<_>>();
     assert!(paths.contains(&"scaffold"));
     assert!(paths.contains(&"diff"));
+    assert!(paths.contains(&"model tables add-static"));
     assert!(paths.contains(&"model calculated-columns add"));
     assert!(paths.contains(&"report visuals catalog"));
     assert!(paths.contains(&"report spec fields"));

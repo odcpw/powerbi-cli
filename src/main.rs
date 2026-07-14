@@ -69,6 +69,7 @@ mod safety_scan;
 mod schema;
 mod source_template;
 mod source_templates;
+mod static_tables;
 mod tmdl;
 mod visual_catalog;
 

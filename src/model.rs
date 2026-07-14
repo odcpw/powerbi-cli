@@ -4,13 +4,14 @@ use crate::model_advanced::advanced_model_command;
 use crate::model_dax::dax_command;
 use crate::partitions::partitions_command;
 use crate::relationships::relationships_command;
+use crate::static_tables::static_tables_command;
 use crate::{CliError, CliResult};
 use serde_json::Value;
 
 pub(crate) fn model_command(args: &[String]) -> CliResult<Value> {
     let Some((family, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "model requires a subcommand: measures, calculated-columns, relationships, partitions",
+            "model requires a subcommand: measures, calculated-columns, relationships, partitions, tables",
         )
         .with_hint("Run `powerbi-cli model measures list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -41,6 +42,7 @@ pub(crate) fn model_command(args: &[String]) -> CliResult<Value> {
         "measure" | "measures" => measures_command(rest),
         "partition" | "partitions" => partitions_command(rest),
         "relationship" | "relationships" => relationships_command(rest),
+        "table" | "tables" => static_tables_command(rest),
         _ => Err(CliError::invalid_args(format!("unknown model command family: {family}"))
             .with_hint("Run `powerbi-cli --json capabilities --for model` for supported model commands.")
             .with_suggested_command("powerbi-cli --json capabilities --for model")),
