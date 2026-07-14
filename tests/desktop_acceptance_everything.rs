@@ -407,6 +407,23 @@ fn everything_acceptance_invokes_every_catalog_command() {
         ]),
     );
     h.ok(
+        "source-template apply",
+        &svec([
+            "source-template",
+            "apply",
+            "--project",
+            &project_arg,
+            "--handle",
+            "source-template:FactIncidents:CorpSqlIncidents",
+            "--server",
+            "sql.example.internal",
+            "--database",
+            "Incidents",
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    h.ok(
         "handoff rebind-plan",
         &svec([
             "handoff",

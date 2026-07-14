@@ -516,6 +516,7 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
     assert!(source_paths.contains(&"source-template list"));
     assert!(source_paths.contains(&"source-template show"));
     assert!(source_paths.contains(&"source-template add"));
+    assert!(source_paths.contains(&"source-template apply"));
     let add_contract = source_json["commands"]
         .as_array()
         .expect("source commands")
@@ -718,6 +719,166 @@ fn source_template_add_out_dir_feeds_rebind_plan_without_breaking_handoff_check(
     let check_json = stdout_json(&check);
     assert_eq!(check_json["ok"], Value::Bool(true));
     assert_eq!(check_json["counts"]["sourceTemplates"], Value::from(1));
+}
+
+#[test]
+fn source_template_apply_materializes_a_live_connection_without_credentials() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let add = run_powerbi(&[
+        "source-template",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--kind",
+        "postgres",
+        "--server",
+        "<WORK_POSTGRES_HOST:PORT>",
+        "--database",
+        "<WORK_DATABASE>",
+        "--schema",
+        "public",
+        "--object",
+        "fact_accidents",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+    let before = fs::read_to_string(fact_sales_tmdl(&project)).expect("TMDL before apply");
+
+    let missing_override = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--server",
+        "postgres.example.internal:55117",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(missing_override.code, 2);
+    assert!(
+        stderr_json(&missing_override)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("concrete --database")
+    );
+
+    let dry_run = run_powerbi(&[
+        "source-template",
+        "materialize",
+        "--project",
+        project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--server",
+        "postgres.example.internal:55117",
+        "--database",
+        "safety_analytics",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(dry_run.code, 0, "stderr: {}", dry_run.stderr);
+    let dry_json = stdout_json(&dry_run);
+    assert_eq!(
+        dry_json["schema"],
+        Value::from("powerbi-cli.source-template.apply.v1")
+    );
+    assert_eq!(dry_json["projectModified"], Value::Bool(false));
+    assert_eq!(dry_json["credentialsEmbedded"], Value::Bool(false));
+    assert_eq!(dry_json["requiresDesktopAuthentication"], Value::Bool(true));
+    assert!(
+        dry_json["changes"][0]["afterSource"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(
+                "PostgreSQL.Database(\"postgres.example.internal:55117\", \"safety_analytics\")"
+            )
+    );
+    assert_eq!(
+        fs::read_to_string(fact_sales_tmdl(&project)).expect("TMDL after dry run"),
+        before
+    );
+
+    let live_project = temp.path().join("sales_live");
+    let live_arg = live_project.to_str().expect("live output path");
+    let apply = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--server",
+        "postgres.example.internal:55117",
+        "--database",
+        "safety_analytics",
+        "--out-dir",
+        live_arg,
+        "--json",
+    ]);
+    assert_eq!(apply.code, 0, "stderr: {}", apply.stderr);
+    let apply_json = stdout_json(&apply);
+    assert_eq!(apply_json["projectModified"], Value::Bool(true));
+    assert_eq!(apply_json["connection"]["kind"], "postgres");
+    assert_eq!(
+        apply_json["connection"]["parameters"]["server"],
+        "postgres.example.internal:55117"
+    );
+    assert_eq!(
+        fs::read_to_string(fact_sales_tmdl(&project)).expect("source project remains dummy"),
+        before,
+        "--out-dir must leave the source project unchanged"
+    );
+    let live_text = fs::read_to_string(fact_sales_tmdl(&live_project)).expect("live TMDL");
+    assert!(live_text.contains(
+        "PostgreSQL.Database(\"postgres.example.internal:55117\", \"safety_analytics\")"
+    ));
+    assert!(!live_text.contains("<WORK_POSTGRES_HOST:PORT>"));
+    assert!(!live_text.to_ascii_lowercase().contains("password"));
+
+    let partition = run_powerbi(&[
+        "model",
+        "partitions",
+        "show",
+        "--project",
+        live_arg,
+        "--handle",
+        "partition:FactSales:FactSales",
+        "--json",
+    ]);
+    assert_eq!(partition.code, 0, "stderr: {}", partition.stderr);
+    assert_eq!(
+        stdout_json(&partition)["partition"]["sourceKind"],
+        "postgresqlDatabase"
+    );
+
+    let refused_overwrite = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        live_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--server",
+        "postgres.example.internal:55117",
+        "--database",
+        "safety_analytics",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(refused_overwrite.code, 2);
+    assert!(
+        stderr_json(&refused_overwrite)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("only replaces a safe generated dummy partition")
+    );
 }
 
 #[test]

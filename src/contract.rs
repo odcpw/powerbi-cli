@@ -40,8 +40,9 @@ Usage:
   powerbi-cli version --json
   powerbi-cli --json capabilities [--for <filter>]
   powerbi-cli features list [--for <feature-filter>] --json
-  powerbi-cli package inspect <file.pbix|file.pbit> --json
-  powerbi-cli package extract <file.pbix|file.pbit> --out-dir <dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json
+  powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json
+  powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json
+  powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> --json
   powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json
   powerbi-cli package export-plan --project <project-dir-or.pbip> --json
   powerbi-cli robot-docs guide [--json]
@@ -84,6 +85,7 @@ Usage:
   powerbi-cli source-template list --project <project-dir-or.pbip> --json
   powerbi-cli source-template show --project <project-dir-or.pbip> --handle <source-template-handle> --json
   powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc> --dry-run --json
+  powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json
   powerbi-cli report design-plan --project <project-dir-or.pbip> --json
   powerbi-cli report tree --project <project-dir-or.pbip> --json
   powerbi-cli report find --project <project-dir-or.pbip> --kind <kind> --json
@@ -267,7 +269,8 @@ Rules for agents:
 - Use `model advanced inventory`, `model roles list/show`, `model perspectives list/show`, `model cultures list/show`, and `model expressions list/show` for advanced TMDL readback. Mutations remain fixture-gated.
 - Use `model relationships list/show/add/update/delete` for model relationships. Endpoint rewiring is delete+add in this alpha surface; `update` changes active state and cross-filtering behavior.
 - Use `model partitions list/show` to inspect generated dummy M partitions and their offline safety classification.
-- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, or ODBC work-machine rebind metadata as sidecar JSON; it does not replace dummy partitions at home.
+- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, or ODBC work-machine rebind metadata as sidecar JSON.
+- On the work machine, use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free connection; unresolved placeholders, embedded credentials, and existing live partitions are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
 - Use `desktop open-check` and `desktop screenshot` only on an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
@@ -339,6 +342,7 @@ pub(crate) fn robot_triage() -> Value {
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
             "sourceTemplateList": "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
+            "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
             "reportDesignPlan": "powerbi-cli report design-plan --project <project-dir-or.pbip> --json",
             "reportTree": "powerbi-cli report tree --project <project-dir-or.pbip> --json",
             "reportFind": "powerbi-cli report find --project <project-dir-or.pbip> --kind visual --json",
@@ -510,7 +514,7 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "package inspect",
             "aliases": ["package info", "packages inspect"],
-            "usage": "powerbi-cli package inspect <file.pbix|file.pbit> --json",
+            "usage": "powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json",
             "summary": "Inspect a PBIX/PBIT ZIP-like package and classify source/metadata/cache entries without extracting opaque data caches",
             "tags": ["package", "pbix", "pbit", "inspect", "metadata", "no-fallback", "agent"],
             "readOnly": true,
@@ -519,14 +523,14 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.package.inspect.v1",
-            "flags": ["<file.pbix|file.pbit>", "--json", "--format json"],
+            "flags": ["<file.pbix|file.pbit|file.zip>", "--json", "--format json"],
             "examples": ["powerbi-cli package inspect template.pbit --json"],
             "followUpFields": ["package", "packageKind", "packageClass", "archive.entries", "sourceRoots", "support.canExtractSafeMetadata", "support.canImportSourceProject", "support.canWriteBinaryPackage", "entries[].category", "next"]
         }),
         json!({
             "path": "package extract",
             "aliases": ["package unpack"],
-            "usage": "powerbi-cli package extract <file.pbix|file.pbit> --out-dir <dir> [--include-unknown] [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json",
+            "usage": "powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--include-unknown] [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json",
             "summary": "Extract selected source/metadata entries with streaming archive-bomb budgets and clean partial-output rollback",
             "tags": ["package", "pbix", "pbit", "extract", "metadata", "safe", "agent"],
             "readOnly": false,
@@ -536,14 +540,14 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.package.extract.v1",
-            "flags": ["<file.pbix|file.pbit>", "--out-dir <dir>", "--include-unknown", "--include-unsafe", "--max-entries <n>", "--max-entry-bytes <n>", "--max-total-bytes <n>", "--max-compression-ratio <n>", "--json", "--format json"],
+            "flags": ["<file.pbix|file.pbit|file.zip>", "--out-dir <dir>", "--include-unknown", "--include-unsafe", "--max-entries <n>", "--max-entry-bytes <n>", "--max-total-bytes <n>", "--max-compression-ratio <n>", "--json", "--format json"],
             "examples": ["powerbi-cli package extract template.pbit --out-dir extracted-template --json"],
             "limitations": ["Does not convert opaque PBIX internals into a PBIP project.", "Skips unsafe cache/binary/data-model entries by default.", "Defaults: 10000 entries, 256 MiB per entry, 2 GiB total uncompressed, and 200:1 compression ratio; overrides require explicit flags."],
             "followUpFields": ["package", "outDir", "policy.limits", "extracted[].name", "skipped[].skipReason", "next"]
         }),
         json!({
             "path": "package import",
-            "usage": "powerbi-cli package import <file.pbix|file.pbit> --out-dir <project-dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json",
+            "usage": "powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json",
             "summary": "Import PBIP/PBIR/TMDL source entries only when they are actually present inside a package archive",
             "tags": ["package", "pbix", "pbit", "pbip", "import", "metadata", "agent"],
             "readOnly": false,
@@ -553,8 +557,8 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.package.import.v1",
-            "flags": ["<file.pbix|file.pbit>", "--out-dir <project-dir>", "--source-root <archive-folder>", "--max-entries <n>", "--max-entry-bytes <n>", "--max-total-bytes <n>", "--max-compression-ratio <n>", "--json", "--format json"],
-            "examples": ["powerbi-cli package import source-bearing-template.pbit --out-dir imported-project --json"],
+            "flags": ["<file.pbix|file.pbit|file.zip>", "--out-dir <project-dir>", "--source-root <archive-folder>", "--max-entries <n>", "--max-entry-bytes <n>", "--max-total-bytes <n>", "--max-compression-ratio <n>", "--json", "--format json"],
+            "examples": ["powerbi-cli package import source-bearing-template.pbit --out-dir imported-project --json", "powerbi-cli package import report-source.zip --out-dir imported-project --json"],
             "limitations": ["Fails honestly when the package does not contain PBIP/PBIR/TMDL source files.", "Does not reverse-engineer opaque DataModel binaries."],
             "followUpFields": ["ok", "packageClass", "sourceRoot", "outDir", "validation", "next"]
         }),
@@ -1371,6 +1375,28 @@ fn command_catalog() -> Vec<Value> {
             ],
             "limitations": ["ODBC --dsn accepts only a bare DSN name; semicolon/equal connection attributes and embedded credentials are refused."],
             "followUpFields": ["dryRun", "changes[].before", "changes[].after", "readbackCommand", "rebindPlanCommand", "handoffCheckCommand", "validateCommand"]
+        }),
+        json!({
+            "path": "source-template apply",
+            "aliases": ["source-template materialize", "source-templates apply", "sourceTemplate apply"],
+            "usage": "powerbi-cli source-template apply --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) [--server <server> | --dsn <dsn>] [--database <database>] [--schema <schema>] [--object <table-or-view>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Materialize one credential-free source template into a safe generated dummy partition on the work machine",
+            "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "work-machine", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.source-template.apply.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--server <server>", "--dsn <dsn>", "--database <database>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --dry-run --json",
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server pg.example.internal:5432 --database Sales --out-dir build/sales-live --json",
+                "powerbi-cli source-template materialize --project build/sales --handle source-template:DimCustomer:DimCustomer --dsn CorpWarehouse --database Sales --in-place --json"
+            ],
+            "limitations": ["Applies one template per command.", "Only a safe generated dummyMTable partition can be replaced; live or manually edited partitions are refused.", "Credentials cannot be supplied or embedded; Power BI Desktop performs authentication after the PBIP opens."],
+            "followUpFields": ["projectModified", "credentialsEmbedded", "requiresDesktopAuthentication", "connection.parameters", "changes[].afterSource", "readbackCommand", "validateCommand", "instructions"]
         }),
         json!({
             "path": "report build",

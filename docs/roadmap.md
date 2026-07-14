@@ -340,10 +340,11 @@ frozen until proven.
 - Implemented first slice: `handoff check` rejects Power BI caches/binaries,
   local settings, embedded data files, real connector partitions, and
   credential-like partition source text.
-- Implemented second slice: `source-template list/show/add` stores
+- Implemented second slice: `source-template list/show/add/apply` stores
   credential-free SQL rebind metadata as sidecar JSON, and `handoff rebind-plan`
-  maps dummy partitions to those templates without making home-authored TMDL
-  executable against corporate sources.
+  maps dummy partitions to those templates, while `source-template apply`
+  materializes one guarded live connection on the work machine without credentials.
+  Home-authored TMDL remains offline-safe until that explicit work-machine step.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
   applies raw report-level theme bundles from `themeCollection` and already
   present registered theme JSON resources. Per-visual raw formatting bundle

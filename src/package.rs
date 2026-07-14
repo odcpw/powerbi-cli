@@ -93,7 +93,7 @@ pub(crate) fn package_command(args: &[String]) -> CliResult<Value> {
             "package requires a subcommand: inspect, extract, import, source-pack, or export-plan",
         )
         .with_hint("Use package commands for archive metadata doors; PBIX/PBIT opaque Desktop binary export is not guessed.")
-        .with_suggested_command("powerbi-cli package inspect <file.pbix|file.pbit> --json"));
+        .with_suggested_command("powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json"));
     };
 
     match action.as_str() {
@@ -162,7 +162,7 @@ fn extract_package(args: &[String], require_importable: bool) -> CliResult<Value
     let out_dir = options.out_dir.as_ref().ok_or_else(|| {
         CliError::invalid_args("package extract/import requires --out-dir <empty-dir>")
             .with_hint("Choose an empty output directory; package extraction refuses to merge into existing files.")
-            .with_suggested_command("powerbi-cli package extract <file.pbix|file.pbit> --out-dir <empty-dir> --json")
+            .with_suggested_command("powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <empty-dir> --json")
     })?;
     reject_nonempty_out_dir(out_dir)?;
 
@@ -608,7 +608,7 @@ fn open_archive(path: &Path) -> CliResult<ZipArchive<File>> {
 fn zip_error(err: zip::result::ZipError) -> CliError {
     CliError::validation_failed(format!("package is not a readable ZIP archive: {err}"))
         .with_hint("PBIX/PBIT inspection currently supports ZIP-readable packages with visible metadata entries.")
-        .with_suggested_command("powerbi-cli package inspect <file.pbix|file.pbit> --json")
+        .with_suggested_command("powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json")
 }
 
 fn classify_entry(name: &str) -> EntryCategory {
@@ -798,7 +798,9 @@ fn selected_source_root(
             "requested source root was not found or is incomplete: {requested}"
         ))
         .with_hint("Use `package inspect` to list sourceRoots, then pass one with `--source-root`.")
-        .with_suggested_command("powerbi-cli package inspect <file.pbix|file.pbit> --json"));
+        .with_suggested_command(
+            "powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json",
+        ));
     }
     let roots = package_source_roots(entries);
     if roots.len() > 1 {
@@ -807,7 +809,7 @@ fn selected_source_root(
             roots.join(", ")
         ))
         .with_hint("Pass --source-root <root> so import strips the intended wrapper directory.")
-        .with_suggested_command("powerbi-cli package import <file.pbix|file.pbit> --source-root <root> --out-dir <empty-dir> --json"));
+        .with_suggested_command("powerbi-cli package import <file.pbix|file.pbit|file.zip> --source-root <root> --out-dir <empty-dir> --json"));
     }
     if let Some(root) = roots.first()
         && source_root_has_pbip_source(entries, Some(root))
@@ -1271,7 +1273,7 @@ fn reject_nonempty_out_dir(out_dir: &Path) -> CliResult<()> {
         ))
         .with_hint("Choose an empty extraction directory so package import is deterministic.")
         .with_suggested_command(
-            "powerbi-cli package extract <file.pbix|file.pbit> --out-dir <empty-dir> --json",
+            "powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <empty-dir> --json",
         ));
     }
     Ok(())
@@ -1331,10 +1333,10 @@ fn parse_package_args(command: &str, args: &[String]) -> CliResult<PackageOption
                         "{command} accepts exactly one package path"
                     ))
                     .with_hint(format!(
-                        "Run `powerbi-cli {command} <file.pbix|file.pbit> --json`"
+                        "Run `powerbi-cli {command} <file.pbix|file.pbit|file.zip> --json`"
                     ))
                     .with_suggested_command(format!(
-                        "powerbi-cli {command} <file.pbix|file.pbit> --json"
+                        "powerbi-cli {command} <file.pbix|file.pbit|file.zip> --json"
                     )));
                 }
                 options.package = Some(PathBuf::from(other));
@@ -1353,7 +1355,7 @@ fn require_extraction_limit_flag(command: &str, flag: &str) -> CliResult<()> {
         "{flag} applies to package extract/import, not package inspect"
     ))
     .with_suggested_command(
-        "powerbi-cli package extract <file.pbix|file.pbit> --out-dir <empty-dir> --json",
+        "powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <empty-dir> --json",
     ))
 }
 
@@ -1451,10 +1453,10 @@ fn parse_source_pack_args(args: &[String]) -> CliResult<PackageOptions> {
 
 fn required_package(package: Option<PathBuf>, command: &str) -> CliResult<PathBuf> {
     package.ok_or_else(|| {
-        CliError::invalid_args(format!("{command} requires <file.pbix|file.pbit>"))
+        CliError::invalid_args(format!("{command} requires <file.pbix|file.pbit|file.zip>"))
             .with_hint("Pass the package file path explicitly.")
             .with_suggested_command(format!(
-                "powerbi-cli {command} <file.pbix|file.pbit> --json"
+                "powerbi-cli {command} <file.pbix|file.pbit|file.zip> --json"
             ))
     })
 }

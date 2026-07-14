@@ -18,11 +18,19 @@ End-to-end exercise: inspect spreadsheet source metadata, model a PostgreSQL dim
 - Fix: emit date-only ISO values in datetime columns as `#datetime(year, month, day, 0, 0, 0)`.
 - Proof: unit coverage for date-only and timestamp inputs, plus a clean Power BI Desktop refresh of the regenerated proof-of-concept report.
 
+### Rebind templates could not be applied by the CLI
+
+- Symptom: `source-template add` and `handoff rebind-plan` could describe a live PostgreSQL connection, but an agent or bootstrap script still had to edit TMDL manually.
+- Impact: a work-computer install could not safely turn the credential-free source archive into a ready-to-authenticate PBIP before first open.
+- Fix: add `source-template apply` (alias `materialize`) with typed SQL Server, PostgreSQL, and ODBC parameters, placeholder resolution, atomic validation/rollback, and a guard that only permits replacement of a safe generated dummy partition.
+- Proof: dry-run, out-directory, concrete-parameter, no-credential, source-preservation, live-partition classification, overwrite-refusal, catalog, and full acceptance-harness coverage. A private proof-of-concept artifact was materialized locally, then its no-CLI installer completed two download/unzip/swap simulations; the live and `.previous` projects contained no synthetic design rows.
+
 ## Remaining friction / useful follow-ups
 
 1. `capabilities --for <exact command>` still returns the full heavyweight agent contract around the matching command. A compact mode that returns only `path`, `usage`, `flags`, `examples`, proof level, and output fields would reduce parsing and output noise.
 2. `report wireframe export` returns useful structured JSON but cannot write an SVG/HTML/PNG preview. A deterministic visual artifact would make layout QA possible without launching Desktop.
 3. First-open Desktop verification required two separate `Refresh now` actions: calculated objects, then table data. A CLI oracle option that performs refresh, captures table/row errors, and returns the exact failing table/column would tighten the repair loop.
 4. `desktop open-check` is intentionally honest about its proof boundary, but an explicit `--refresh --capture <dir>` workflow would turn the currently manual canvas/refresh review into repeatable evidence.
+5. `package source-pack` correctly refuses live external connectors, but there is no separate `package work-pack` command for a credential-free PBIP whose source identifiers are intentionally materialized for a private work-only repository. The proof of concept currently creates that Power-BI-only ZIP with PowerShell after local materialization.
 
 The repo skill did not cause repeated command-usage loss in this run, so no skill workflow change was necessary. The friction was in command output volume and missing proof artifacts rather than forgotten syntax.

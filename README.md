@@ -139,6 +139,7 @@ cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --h
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
+cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
 cargo run --bin powerbi-cli -- fixture normalize .\build\sales --out .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- fixture verify .\build\sales --expected .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- desktop open-check .\build\sales --json
@@ -349,12 +350,14 @@ three pages.
   list/show` for TMDL metadata already present in a project. Mutating those
   advanced surfaces remains blocked until object-specific writers and fixtures
   exist.
-- Source-template authoring covers `source-template list/show/add` for
+- Source-template authoring covers `source-template list/show/add/apply` for
   credential-free SQL Server, PostgreSQL, and ODBC rebind metadata stored only as
   sidecar JSON. PostgreSQL templates record current Npgsql compatibility guidance;
   ODBC templates accept only a bare DSN name (no `;`/`=` attributes) and record
-  that the named DSN must already exist there. It does not
-  replace executable dummy partitions at home; `handoff rebind-plan` maps
+  that the named DSN must already exist there. `source-template apply` is the
+  explicit work-machine step that replaces one safe generated dummy partition;
+  it refuses unresolved placeholders, credential-like values, and existing live
+  connections. `handoff rebind-plan` maps
   templates to partitions and can write a self-contained Markdown runbook with
   `--out <file.md>` (existing files require `--force`). Credential detection
   redacts JSON/Markdown excerpts and suppresses runbook creation. Excel, CSV,

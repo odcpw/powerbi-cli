@@ -479,6 +479,59 @@ pub(crate) fn delete_measure_plan(
     })
 }
 
+pub(crate) fn replace_partition_source_plan(
+    docs: &[TableDocument],
+    selector: &PartitionSelector,
+    source: &str,
+) -> CliResult<MutationPlan> {
+    let existing = find_partition(docs, selector)?;
+    let source_start = existing.source_start_line.ok_or_else(|| {
+        CliError::unsupported_feature(format!(
+            "partition has no replaceable source block: {}",
+            existing.handle()
+        ))
+        .with_hint("Only TMDL partitions with an existing `source =` block can be materialized.")
+        .with_suggested_command(format!(
+            "powerbi-cli model partitions show --project <project-dir-or.pbip> --handle {} --json",
+            shell_arg(&existing.handle())
+        ))
+    })?;
+    let source_end = existing.source_end_line.ok_or_else(|| {
+        CliError::unsupported_feature(format!(
+            "partition source range is incomplete: {}",
+            existing.handle()
+        ))
+    })?;
+    let normalized = source
+        .trim_start_matches('\u{feff}')
+        .trim_matches(['\r', '\n']);
+    if normalized.trim().is_empty() {
+        return Err(CliError::invalid_args(
+            "partition source expression must not be empty",
+        ));
+    }
+
+    let doc = find_table(docs, &existing.table)?;
+    let mut after_lines = vec!["        source =".to_string()];
+    for line in normalized.replace("\r\n", "\n").replace('\r', "\n").lines() {
+        after_lines.push(format!("            {}", line.trim_end()));
+    }
+    let after_block = render_lines(&after_lines, &doc.newline, true);
+    let before_block = render_lines(&doc.lines[source_start..source_end], &doc.newline, true);
+    let mut lines = doc.lines.clone();
+    lines.splice(source_start..source_end, after_lines);
+
+    Ok(MutationPlan {
+        table: doc.table.clone(),
+        name: existing.name.clone(),
+        handle: existing.handle(),
+        path: doc.path.clone(),
+        before_block: Some(before_block),
+        after_block: Some(after_block),
+        new_text: render_lines(&lines, &doc.newline, doc.had_final_newline),
+    })
+}
+
 pub(crate) fn selector_parts(selector: &MeasureSelector) -> CliResult<(String, String)> {
     if let Some(handle) = &selector.handle {
         return parse_measure_handle(handle);

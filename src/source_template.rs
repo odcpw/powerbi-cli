@@ -1,4 +1,4 @@
-use crate::project_io::copy_project_dir;
+use crate::project_io::{copy_project_dir, write_text_atomic_validated};
 use crate::source_templates::{
     OdbcSourceTemplateInput, PostgresSourceTemplateInput, SourceTemplateRecord,
     SqlSourceTemplateInput, find_template, load_source_template_store, odbc_source_template,
@@ -7,19 +7,21 @@ use crate::source_templates::{
     upsert_template,
 };
 use crate::tmdl::{
-    PartitionSelector, find_partition, load_table_documents, partition_selector_parts, same_name,
+    PartitionSelector, find_partition, load_table_documents, partition_selector_parts,
+    replace_partition_source_plan, same_name,
 };
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
     resolve_project, validate_project,
 };
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 pub(crate) fn source_template_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "source-template requires a subcommand: list, show, add",
+            "source-template requires a subcommand: list, show, add, apply",
         )
         .with_hint("Run `powerbi-cli source-template list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -31,6 +33,7 @@ pub(crate) fn source_template_command(args: &[String]) -> CliResult<Value> {
         "list" => list_source_templates(rest),
         "show" => show_source_template(rest),
         "add" => add_source_template(rest),
+        "apply" | "materialize" => apply_source_template(rest),
         _ => Err(CliError::invalid_args(format!(
             "unknown source-template command: {action}"
         ))
@@ -74,6 +77,19 @@ struct AddOptions {
     sql_schema: Option<String>,
     object: Option<String>,
     description: Option<String>,
+    mode: Option<MutationMode>,
+}
+
+#[derive(Debug, Default)]
+struct ApplyOptions {
+    project: Option<PathBuf>,
+    handle: Option<String>,
+    name: Option<String>,
+    server: Option<String>,
+    dsn: Option<String>,
+    database: Option<String>,
+    sql_schema: Option<String>,
+    object: Option<String>,
     mode: Option<MutationMode>,
 }
 
@@ -329,6 +345,156 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
     }))
 }
 
+fn apply_source_template(args: &[String]) -> CliResult<Value> {
+    let options = parse_apply_args(args)?;
+    let source_project = required_project(options.project.clone(), "source-template apply")?;
+    let source_resolved = resolve_project(&source_project)?;
+    let mode = options.mode.as_ref().ok_or_else(|| {
+        CliError::invalid_args(
+            "source-template apply requires --dry-run, --in-place, or --out-dir <dir>",
+        )
+        .with_hint("Start with `--dry-run`; use `--out-dir` for a work-machine staging install.")
+        .with_suggested_command("powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json")
+    })?;
+
+    let source_store = load_source_template_store(&source_resolved)?;
+    let selector = ShowOptions {
+        project: None,
+        handle: options.handle.clone(),
+        name: options.name.clone(),
+    };
+    let record = find_template_by_show_options(&source_store.templates, &selector)?.clone();
+    if template_has_errors(&record) {
+        return Err(CliError::invalid_args(
+            "source-template apply refuses an unsafe or credential-bearing template",
+        )
+        .with_hint("Remove credentials from the source-template store; credentials belong only in Power BI Desktop.")
+        .with_suggested_command(format!(
+            "powerbi-cli source-template show --project {} --handle {} --json",
+            command_arg(&source_resolved.project_dir),
+            shell_arg(&record.handle)
+        )));
+    }
+    let (m_source, parameters) = materialize_template(&record, &options)?;
+
+    let source_docs = load_table_documents(&source_resolved)?;
+    let partition_selector = PartitionSelector {
+        handle: Some(record.partition_handle.clone()),
+        table: None,
+        name: None,
+    };
+    let source_partition = find_partition(&source_docs, &partition_selector)?;
+    if source_partition.source_kind != "dummyMTable" || source_partition.safety.status != "safe" {
+        return Err(CliError::invalid_args(format!(
+            "source-template apply only replaces a safe generated dummy partition; {} is {} ({})",
+            source_partition.handle(),
+            source_partition.source_kind,
+            source_partition.safety.status
+        ))
+        .with_hint("Apply templates to a fresh credential-free source package. This guard prevents overwriting an existing live or manually edited connection.")
+        .with_suggested_command(format!(
+            "powerbi-cli model partitions show --project {} --handle {} --json",
+            command_arg(&source_resolved.project_dir),
+            shell_arg(&source_partition.handle())
+        )));
+    }
+
+    let target_resolved = match mode {
+        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
+        MutationMode::OutDir(out_dir) => {
+            copy_project_dir(&source_resolved.project_dir, out_dir)?;
+            resolve_project(out_dir)?
+        }
+    };
+    let docs = load_table_documents(&target_resolved)?;
+    let plan = replace_partition_source_plan(&docs, &partition_selector, &m_source)?;
+    let dry_run = matches!(mode, MutationMode::DryRun);
+    let (validation, project_modified) = if dry_run {
+        (None, false)
+    } else {
+        let (validation, project_modified) = write_text_atomic_validated(
+            &plan.path,
+            &plan.new_text,
+            || validate_project(&target_resolved),
+            |report| report.errors.is_empty(),
+        )?;
+        (Some(validation), project_modified)
+    };
+    let validation_ok = validation
+        .as_ref()
+        .map(|report| report.errors.is_empty())
+        .unwrap_or(true);
+    let exit_code = if validation_ok {
+        EXIT_SUCCESS
+    } else {
+        EXIT_VALIDATION_FAILED
+    };
+    let project_arg = command_arg(&target_resolved.project_dir);
+    let readback = format!(
+        "powerbi-cli model partitions show --project {} --handle {} --json",
+        project_arg,
+        shell_arg(&plan.handle)
+    );
+    let validate = format!("powerbi-cli validate --strict {} --json", project_arg);
+
+    Ok(json!({
+        "schema": "powerbi-cli.source-template.apply.v1",
+        "ok": validation_ok,
+        "exitCode": exit_code,
+        "action": "apply",
+        "dryRun": dry_run,
+        "mode": mode_name(mode),
+        "projectModified": project_modified,
+        "credentialsEmbedded": false,
+        "requiresDesktopAuthentication": true,
+        "projectDir": canonical_display(&target_resolved.project_dir),
+        "pbip": canonical_display(&target_resolved.pbip_path),
+        "target": {
+            "templateHandle": record.handle,
+            "partitionHandle": plan.handle,
+            "table": plan.table,
+            "partition": plan.name,
+            "path": canonical_display(&plan.path)
+        },
+        "connection": {
+            "kind": record.kind,
+            "parameters": parameters
+        },
+        "changes": [{
+            "kind": "tmdl.partition.source",
+            "action": "replace-dummy-with-live-connection",
+            "path": canonical_display(&plan.path),
+            "beforeSourceKind": source_partition.source_kind,
+            "afterSource": m_source
+        }],
+        "validation": validation.map(|report| json!({
+            "ok": report.errors.is_empty(),
+            "warnings": report.warnings,
+            "errors": report.errors,
+            "counts": {
+                "tables": report.tables,
+                "relationships": report.relationships,
+                "measures": report.measures,
+                "pages": report.pages,
+                "visuals": report.visuals
+            }
+        })),
+        "rollback": (!dry_run && !validation_ok).then(|| json!({
+            "performed": true,
+            "projectModified": false,
+            "reason": "post-mutation validation failed; the original TMDL file was restored"
+        })),
+        "readbackCommand": readback,
+        "validateCommand": validate,
+        "instructions": [
+            "Open the PBIP in Power BI Desktop on the work machine.",
+            "When prompted, choose Database authentication and enter the PostgreSQL username and password.",
+            "Refresh the semantic model. Credentials are not stored in the PBIP project."
+        ],
+        "next": [readback, validate]
+    }))
+}
+
 fn parse_list_args(args: &[String]) -> CliResult<ListOptions> {
     let mut options = ListOptions::default();
     let mut i = 0;
@@ -478,6 +644,185 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
     }
     let _ = partition_selector_parts(&options.selector)?;
     Ok(options)
+}
+
+fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
+    let mut options = ApplyOptions::default();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--project" | "-p" => {
+                options.project = Some(PathBuf::from(take_value(args, &mut i, "--project")?));
+            }
+            "--handle" => options.handle = Some(take_value(args, &mut i, "--handle")?),
+            "--name" => options.name = Some(take_value(args, &mut i, "--name")?),
+            "--server" => options.server = Some(take_value(args, &mut i, "--server")?),
+            "--dsn" => options.dsn = Some(take_value(args, &mut i, "--dsn")?),
+            "--database" => options.database = Some(take_value(args, &mut i, "--database")?),
+            "--schema" | "--sql-schema" => {
+                options.sql_schema = Some(take_value(args, &mut i, "--schema")?)
+            }
+            "--object" => options.object = Some(take_value(args, &mut i, "--object")?),
+            "--dry-run" => {
+                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                i += 1;
+            }
+            "--in-place" => {
+                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                i += 1;
+            }
+            "--out-dir" | "--out" => {
+                let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
+                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+            }
+            other => {
+                return Err(CliError::invalid_args(format!(
+                    "unknown source-template apply flag: {other}"
+                ))
+                .with_hint(
+                    "Run `powerbi-cli --json capabilities --for source-template` for exact flags.",
+                )
+                .with_suggested_command("powerbi-cli --json capabilities --for source-template"));
+            }
+        }
+    }
+    if options.handle.is_none() && options.name.is_none() {
+        return Err(
+            CliError::invalid_args("source-template apply requires --handle or --name")
+                .with_hint("Use `source-template list` to get stable source-template handles.")
+                .with_suggested_command(
+                    "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
+                ),
+        );
+    }
+    Ok(options)
+}
+
+fn materialize_template(
+    record: &SourceTemplateRecord,
+    options: &ApplyOptions,
+) -> CliResult<(String, BTreeMap<String, String>)> {
+    let kind = normalize_kind(Some(&record.kind))?;
+    let mut parameters = BTreeMap::new();
+    let source = match kind.as_str() {
+        "sql" | "postgres" => {
+            reject_apply_flag_for_kind(&options.dsn, "--dsn", &kind, "--server")?;
+            let server = concrete_parameter(record, "server", options.server.as_deref())?;
+            let database = concrete_parameter(record, "database", options.database.as_deref())?;
+            let schema = concrete_parameter(record, "schema", options.sql_schema.as_deref())?;
+            let object = concrete_parameter(record, "object", options.object.as_deref())?;
+            validate_template_parameters(&[
+                ("server", &server),
+                ("database", &database),
+                ("schema", &schema),
+                ("object", &object),
+            ])?;
+            parameters.insert("server".to_string(), server.clone());
+            parameters.insert("database".to_string(), database.clone());
+            parameters.insert("schema".to_string(), schema.clone());
+            parameters.insert("object".to_string(), object.clone());
+            if kind == "sql" {
+                sql_source_template(SqlSourceTemplateInput {
+                    table: record.table.clone(),
+                    partition: record.partition.clone(),
+                    name: record.name.clone(),
+                    server,
+                    database,
+                    schema,
+                    object,
+                    description: record.description.clone(),
+                })
+                .m_template
+            } else {
+                postgres_source_template(PostgresSourceTemplateInput {
+                    table: record.table.clone(),
+                    partition: record.partition.clone(),
+                    name: record.name.clone(),
+                    server,
+                    database,
+                    schema,
+                    object,
+                    description: record.description.clone(),
+                })
+                .m_template
+            }
+        }
+        "odbc" => {
+            reject_apply_flag_for_kind(&options.server, "--server", "odbc", "--dsn")?;
+            let dsn = concrete_parameter(record, "dsn", options.dsn.as_deref())?;
+            let database = concrete_parameter(record, "database", options.database.as_deref())?;
+            let schema = concrete_parameter(record, "schema", options.sql_schema.as_deref())?;
+            let object = concrete_parameter(record, "object", options.object.as_deref())?;
+            validate_template_parameters(&[
+                ("dsn", &dsn),
+                ("database", &database),
+                ("schema", &schema),
+                ("object", &object),
+            ])?;
+            validate_bare_odbc_dsn(&dsn)?;
+            parameters.insert("dsn".to_string(), dsn.clone());
+            parameters.insert("database".to_string(), database.clone());
+            parameters.insert("schema".to_string(), schema.clone());
+            parameters.insert("object".to_string(), object.clone());
+            odbc_source_template(OdbcSourceTemplateInput {
+                table: record.table.clone(),
+                partition: record.partition.clone(),
+                name: record.name.clone(),
+                dsn,
+                database,
+                schema,
+                object,
+                description: record.description.clone(),
+            })
+            .m_template
+        }
+        _ => return Err(unsupported_kind_error(&kind)),
+    };
+    Ok((source, parameters))
+}
+
+fn concrete_parameter(
+    record: &SourceTemplateRecord,
+    name: &str,
+    override_value: Option<&str>,
+) -> CliResult<String> {
+    let value = override_value
+        .map(ToOwned::to_owned)
+        .or_else(|| record.parameters.get(name).cloned())
+        .ok_or_else(|| {
+            CliError::validation_failed(format!(
+                "source template {} is missing parameter {name}",
+                record.handle
+            ))
+        })?;
+    if value.contains('<') && value.contains('>') {
+        return Err(CliError::invalid_args(format!(
+            "source-template apply requires a concrete --{name} value; the template still contains {value}"
+        ))
+        .with_hint("Pass only non-secret source identifiers. Power BI Desktop will request credentials separately.")
+        .with_suggested_command(format!(
+            "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle {} --server <server> --database <database> --dry-run --json",
+            shell_arg(&record.handle)
+        )));
+    }
+    Ok(value)
+}
+
+fn reject_apply_flag_for_kind(
+    value: &Option<String>,
+    flag: &str,
+    kind: &str,
+    replacement: &str,
+) -> CliResult<()> {
+    if value.is_none() {
+        return Ok(());
+    }
+    Err(CliError::invalid_args(format!(
+        "{flag} is not valid when applying source-template kind {kind}"
+    ))
+    .with_hint(format!(
+        "Use {replacement} with source-template kind {kind}."
+    )))
 }
 
 fn find_template_by_show_options<'a>(
@@ -663,9 +1008,7 @@ fn set_mode(current: &mut Option<MutationMode>, next: MutationMode) -> CliResult
             "choose exactly one output mode: --dry-run, --in-place, or --out-dir <dir>",
         )
         .with_hint("Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.")
-        .with_suggested_command(
-            "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
-        ));
+        .with_suggested_command("powerbi-cli --json capabilities --for source-template"));
     }
     *current = Some(next);
     Ok(())

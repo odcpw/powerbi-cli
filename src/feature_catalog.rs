@@ -396,10 +396,11 @@ const FEATURE_CATALOG: &[Feature] = &[
             "source-template list",
             "source-template show",
             "source-template add",
+            "source-template apply",
             "handoff rebind-plan",
         ],
         refusal_code: None,
-        reason: "Credential-free SQL Server, PostgreSQL, and ODBC M templates are stored in sidecar metadata and rendered into a manual work-machine rebind runbook; executable dummy partitions are never replaced at home.",
+        reason: "Credential-free SQL Server, PostgreSQL, and ODBC M templates are stored in sidecar metadata, rendered into a rebind runbook, and can explicitly replace safe generated dummy partitions on the work machine without embedding credentials.",
         next_proof: &[
             "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, and ODBC/DSN projects in Power BI Desktop at work",
         ],
