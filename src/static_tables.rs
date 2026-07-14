@@ -406,7 +406,7 @@ fn static_table_tmdl(table: &str, column: &str, values: &[String]) -> String {
     out.push_str("                    }\n");
     out.push_str("                )\n");
     out.push_str("            in\n");
-    out.push_str("                Source\n\n");
+    out.push_str("                Source\n");
     out
 }
 
@@ -505,6 +505,7 @@ mod tests {
         assert!(tmdl.contains("type table [Kennzahl = text]"));
         assert!(tmdl.contains("{\"Anzahl Unfälle\"}"));
         assert!(tmdl.contains("{\"Kosten \"\"CHF\"\"\"}"));
+        assert!(!tmdl.ends_with("\n\n"));
         assert_eq!(
             tmdl,
             static_table_tmdl(
