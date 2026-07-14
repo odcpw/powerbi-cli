@@ -488,7 +488,7 @@ fn scaffolded_multiline_measure_round_trips_through_tmdl_reader() {
         .join("Facts.tmdl");
     let tmdl = fs::read_to_string(table).expect("Facts.tmdl");
     assert!(tmdl.contains(
-        "    measure 'Multiline Measure' =\n        VAR x = 1\n        RETURN x\n        lineageTag:"
+        "    measure 'Multiline Measure' =\n            VAR x = 1\n            RETURN x\n        lineageTag:"
     ));
 
     let show = run_powerbi(&[

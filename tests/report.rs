@@ -800,7 +800,7 @@ fn install_visual_formatting_fixture(project: &Path) {
             }],
             "dataPoint": [{
                 "selector": {
-                    "data": [{ "dataViewWildcard": { "matchingOption": "InstancesAndTotals" } }]
+                    "data": [{ "dataViewWildcard": { "matchingOption": 0 } }]
                 },
                 "properties": {
                     "fill": {
@@ -2348,6 +2348,67 @@ fn report_visuals_formatting_set_color_creates_missing_title_card_with_page_visu
         visual_json["visual"]["objects"]["title"][0]["properties"]["fontColor"]["solid"]["color"]["expr"]
             ["Literal"]["Value"],
         Value::from("'#445566'")
+    );
+}
+
+#[test]
+fn report_visuals_formatting_set_color_creates_numeric_data_view_wildcard() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+
+    let visuals = run_powerbi(&[
+        "report",
+        "visuals",
+        "list",
+        "--project",
+        project_arg,
+        "--json",
+    ]);
+    assert_eq!(visuals.code, 0, "stderr: {}", visuals.stderr);
+    let handle = stdout_json(&visuals)["visuals"]
+        .as_array()
+        .expect("visuals")
+        .iter()
+        .find(|visual| visual["visualType"] == "card")
+        .expect("card visual")["handle"]
+        .as_str()
+        .expect("card handle")
+        .to_string();
+
+    let output = temp.path().join("numeric_wildcard");
+    let output_arg = output.to_str().expect("output path");
+    let update = run_powerbi(&[
+        "report",
+        "visuals",
+        "formatting",
+        "set-color",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--slot",
+        "dataPoint.fill",
+        "--color",
+        "#AABBCC",
+        "--out-dir",
+        output_arg,
+        "--json",
+    ]);
+    assert_eq!(update.code, 0, "stderr: {}", update.stderr);
+    let update_json = stdout_json(&update);
+    let visual_path = PathBuf::from(
+        update_json["target"]["path"]
+            .as_str()
+            .expect("updated visual path"),
+    );
+    let visual_json: Value =
+        serde_json::from_str(&fs::read_to_string(visual_path).expect("updated visual json"))
+            .expect("parse updated visual json");
+    assert_eq!(
+        visual_json["visual"]["objects"]["dataPoint"][0]["selector"]["data"][0]["dataViewWildcard"]
+            ["matchingOption"],
+        Value::from(0)
     );
 }
 

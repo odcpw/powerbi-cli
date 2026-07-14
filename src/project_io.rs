@@ -23,7 +23,10 @@ pub(crate) fn copy_project_dir(source: &Path, out_dir: &Path) -> CliResult<()> {
 
     fs::create_dir_all(out_dir)
         .map_err(|err| CliError::unexpected(format!("create {}: {err}", out_dir.display())))?;
-    for entry in WalkDir::new(source) {
+    for entry in WalkDir::new(source)
+        .into_iter()
+        .filter_entry(|entry| entry.file_name() != ".git")
+    {
         let entry = walkdir_entry(source, entry, "walk project copy source")?;
         let from = entry.path();
         let relative = from
@@ -386,6 +389,29 @@ mod tests {
             entries.len(),
             1,
             "successful replace must remove its backup"
+        );
+    }
+
+    #[test]
+    fn project_copy_skips_git_repository_internals() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = temp.path().join("source");
+        let output = temp.path().join("output");
+        fs::create_dir_all(source.join(".git").join("objects")).expect("git objects");
+        fs::write(source.join("Report.pbip"), "{}\n").expect("project file");
+        fs::write(source.join(".git").join("HEAD"), "ref: refs/heads/main\n").expect("git head");
+        fs::write(
+            source.join(".git").join("objects").join("object"),
+            "repository data",
+        )
+        .expect("git object");
+
+        copy_project_dir(&source, &output).expect("copy project");
+
+        assert!(output.join("Report.pbip").is_file());
+        assert!(
+            !output.join(".git").exists(),
+            "project copies must never embed repository internals"
         );
     }
 

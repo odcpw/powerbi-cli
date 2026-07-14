@@ -85,7 +85,7 @@ Usage:
   powerbi-cli model expressions list --project <project-dir-or.pbip> --json
   powerbi-cli source-template list --project <project-dir-or.pbip> --json
   powerbi-cli source-template show --project <project-dir-or.pbip> --handle <source-template-handle> --json
-  powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc> --dry-run --json
+  powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel> --dry-run --json
   powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json
   powerbi-cli report design-plan --project <project-dir-or.pbip> --json
   powerbi-cli report tree --project <project-dir-or.pbip> --json
@@ -270,8 +270,8 @@ Rules for agents:
 - Use `model advanced inventory`, `model roles list/show`, `model perspectives list/show`, `model cultures list/show`, and `model expressions list/show` for advanced TMDL readback. Mutations remain fixture-gated.
 - Use `model relationships list/show/add/update/delete` for model relationships. Endpoint rewiring is delete+add in this alpha surface; `update` changes active state and cross-filtering behavior.
 - Use `model partitions list/show` to inspect generated dummy M partitions and their offline safety classification.
-- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, or ODBC work-machine rebind metadata as sidecar JSON.
-- On the work machine, use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free connection; unresolved placeholders, embedded credentials, and existing live partitions are refused.
+- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, ODBC, or Excel rebind metadata as sidecar JSON.
+- Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
 - Use `desktop open-check` and `desktop screenshot` only on an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
@@ -1346,7 +1346,7 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "source-template list",
             "aliases": ["source-templates list", "sourceTemplate list", "sourceTemplates list", "source-template ls"],
-            "usage": "powerbi-cli source-template list --project <project-dir-or.pbip> [--table <table>] [--kind <sql|postgres|odbc>] --json",
+            "usage": "powerbi-cli source-template list --project <project-dir-or.pbip> [--table <table>] [--kind <sql|postgres|odbc|excel>] --json",
             "summary": "List credential-free sidecar source templates used by handoff rebind plans",
             "tags": ["source-template", "source", "handoff", "rebind", "partition", "agent"],
             "readOnly": true,
@@ -1354,7 +1354,7 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.source-template.list.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--kind <sql|postgres|odbc>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--kind <sql|postgres|odbc|excel>", "--json", "--format json"],
             "examples": ["powerbi-cli source-template list --project build/sales --json"],
             "followUpFields": ["templates[].handle", "templates[].partitionHandle", "templates[].mTemplate", "templates[].safety", "next"]
         }),
@@ -1376,8 +1376,8 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "source-template add",
             "aliases": ["source-templates add", "sourceTemplate add", "source-template create"],
-            "usage": "powerbi-cli source-template add --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> [--partition <partition-name>]) [--name <template-name>] --kind <sql|postgres|odbc> [--server <placeholder> | --dsn <placeholder>] [--database <placeholder>] [--schema <schema>] [--object <table-or-view>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Add or replace a credential-free SQL Server, PostgreSQL, or ODBC source template sidecar without changing executable dummy partitions",
+            "usage": "powerbi-cli source-template add --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> [--partition <partition-name>]) [--name <template-name>] --kind <sql|postgres|odbc|excel> [--server <placeholder> | --dsn <placeholder> | --file <workbook-or-placeholder>] [--database <placeholder>] [--schema <schema>] [--object <table-or-view>] [--item <sheet-or-table>] [--item-kind <Sheet|Table>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Add or replace a credential-free SQL Server, PostgreSQL, ODBC, or Excel source template sidecar without changing executable partitions",
             "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1386,20 +1386,21 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.source-template.mutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <partition-handle>", "--table <table>", "--partition <partition-name-or-handle>", "--name <template-name>", "--kind <sql|postgres|odbc>", "--server <placeholder>", "--dsn <placeholder>", "--database <placeholder>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--handle <partition-handle>", "--table <table>", "--partition <partition-name-or-handle>", "--name <template-name>", "--kind <sql|postgres|odbc|excel>", "--server <placeholder>", "--dsn <placeholder>", "--database <placeholder>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <workbook-or-placeholder>", "--path <workbook-or-placeholder>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": [
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind sql --server <server> --database <database> --schema dbo --object FactSales --dry-run --json",
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind postgres --server <server> --database <database> --schema public --object <object> --dry-run --json",
-                "powerbi-cli source-template add --project build/sales --table FactSales --kind odbc --dsn <dsn> --database <database> --schema <schema> --object <object> --dry-run --json"
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind odbc --dsn <dsn> --database <database> --schema <schema> --object <object> --dry-run --json",
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind excel --file <workbook.xlsx> --sheet FactSales --dry-run --json"
             ],
-            "limitations": ["ODBC --dsn accepts only a bare DSN name; semicolon/equal connection attributes and embedded credentials are refused."],
+            "limitations": ["ODBC --dsn accepts only a bare DSN name; semicolon/equal connection attributes and embedded credentials are refused.", "Excel apply materializes an absolute workbook path; move-safe packages should reapply or patch that path on the target machine."],
             "followUpFields": ["dryRun", "changes[].before", "changes[].after", "readbackCommand", "rebindPlanCommand", "handoffCheckCommand", "validateCommand"]
         }),
         json!({
             "path": "source-template apply",
             "aliases": ["source-template materialize", "source-templates apply", "sourceTemplate apply"],
-            "usage": "powerbi-cli source-template apply --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) [--server <server> | --dsn <dsn>] [--database <database>] [--schema <schema>] [--object <table-or-view>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Materialize one credential-free source template into a safe generated dummy partition on the work machine",
+            "usage": "powerbi-cli source-template apply --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) [--server <server> | --dsn <dsn> | --file <workbook.xlsx>] [--database <database>] [--schema <schema>] [--object <table-or-view>] [--item <sheet-or-table>] [--item-kind <Sheet|Table>] [--replace-existing --confirm <partition-handle>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Materialize one credential-free source template into a generated dummy partition, or explicitly retarget a confirmed existing credential-free partition",
             "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "work-machine", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1408,13 +1409,14 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.source-template.apply.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--server <server>", "--dsn <dsn>", "--database <database>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--server <server>", "--dsn <dsn>", "--database <database>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <workbook.xlsx>", "--path <workbook.xlsx>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--replace-existing", "--confirm <partition-handle>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": [
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --dry-run --json",
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server pg.example.internal:5432 --database Sales --out-dir build/sales-live --json",
-                "powerbi-cli source-template materialize --project build/sales --handle source-template:DimCustomer:DimCustomer --dsn CorpWarehouse --database Sales --in-place --json"
+                "powerbi-cli source-template materialize --project build/sales --handle source-template:DimCustomer:DimCustomer --dsn CorpWarehouse --database Sales --in-place --json",
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --file C:\\\\data\\\\sales.xlsx --sheet FactSales --replace-existing --confirm partition:FactSales:FactSales --dry-run --json"
             ],
-            "limitations": ["Applies one template per command.", "Only a safe generated dummyMTable partition can be replaced; live or manually edited partitions are refused.", "Credentials cannot be supplied or embedded; Power BI Desktop performs authentication after the PBIP opens."],
+            "limitations": ["Applies one template per command.", "Existing source replacement requires --replace-existing plus the exact --confirm partition handle and is limited to recognized credential-free SQL, PostgreSQL, ODBC, and external-file sources.", "Unknown, web, and credential-bearing sources are refused.", "Credentials cannot be supplied or embedded; Power BI Desktop performs database authentication after the PBIP opens."],
             "followUpFields": ["projectModified", "credentialsEmbedded", "requiresDesktopAuthentication", "connection.parameters", "changes[].afterSource", "readbackCommand", "validateCommand", "instructions"]
         }),
         json!({
@@ -2661,7 +2663,7 @@ fn schema_manifest() -> Value {
         "modelAdvancedInventoryFields": ["families[].family", "families[].count", "families[].records[].handle", "families[].records[].summary", "validation", "next"],
         "packageInspectFields": ["package", "packageKind", "packageClass", "archive.kind", "archive.entries", "archive.byCategory", "sourceRoots", "support.canExtractSafeMetadata", "support.canImportSourceProject", "support.canWriteBinaryPackage", "entries[].name", "entries[].category", "entries[].safeForMetadataExtract", "next"],
         "sourceTemplateFields": ["handle", "name", "partitionHandle", "table", "partition", "kind", "parameters", "mTemplate", "description", "safety"],
-        "sourceTemplateKinds": ["sql", "postgres", "odbc"],
+        "sourceTemplateKinds": ["sql", "postgres", "odbc", "excel"],
         "rebindPlanFields": ["handle", "partitionHandle", "table", "partition", "currentSourceKind", "sourceRange", "template", "mTemplate", "manualSteps"],
         "profileFields": ["schema", "source", "tables", "tables[].role", "tables[].rowCount", "tables[].columns", "tables[].columns[].roles", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "warnings"],
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],

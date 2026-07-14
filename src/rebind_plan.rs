@@ -388,7 +388,16 @@ fn rebind_plan_markdown(
             "- Every ODBC DSN named by a template must already exist on the work machine.\n",
         );
     }
-    out.push_str("- The work machine can reach the required corporate data sources.\n\n");
+    if plans.iter().any(|plan| {
+        plan["template"]["kind"]
+            .as_str()
+            .is_some_and(|kind| kind == "excel")
+    }) {
+        out.push_str(
+            "- Every Excel workbook named by a template exists at the configured path on the machine that refreshes the project.\n",
+        );
+    }
+    out.push_str("- The machine can reach every configured data source.\n\n");
 
     out.push_str("## Rebind procedure\n\n");
     out.push_str("1. Open the `.pbip` project in Power BI Desktop at work.\n");
@@ -397,7 +406,7 @@ fn rebind_plan_markdown(
     );
     out.push_str("3. Replace its dummy `#table(...)` query with the corresponding M snippet.\n");
     out.push_str(
-        "4. Enter source credentials only in Power BI Desktop when prompted, then apply the query changes.\n\n",
+        "4. If prompted, enter source credentials only in Power BI Desktop, then apply the query changes.\n\n",
     );
 
     if !findings.is_empty() {

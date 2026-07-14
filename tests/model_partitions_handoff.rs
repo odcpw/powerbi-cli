@@ -527,7 +527,7 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
         add_contract["usage"]
             .as_str()
             .unwrap_or_default()
-            .contains("sql|postgres|odbc")
+            .contains("sql|postgres|odbc|excel")
     );
     assert!(
         add_contract["flags"]
@@ -543,7 +543,7 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
     assert_eq!(source_feature_json["matchedFeatures"], Value::from(1));
     assert_eq!(
         source_feature_json["features"][0]["supportedKinds"],
-        json!(["sql", "postgres", "odbc"])
+        json!(["sql", "postgres", "odbc", "excel"])
     );
 
     let empty = run_powerbi(&["capabilities", "--json", "--for", "does-not-exist"]);
@@ -1020,6 +1020,172 @@ in
             .expect("odbc requirements")
             .iter()
             .any(|requirement| requirement.as_str().unwrap_or_default().contains("DSN"))
+    );
+}
+
+#[test]
+fn excel_source_template_materializes_and_guardedly_retargets_an_existing_source() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let excel_m = r#"let
+    Source = Excel.Workbook(File.Contents("<file>"), null, true),
+    Navigation = Source{[Item="AccidentData",Kind="Sheet"]}[Data],
+    PromotedHeaders = Table.PromoteHeaders(Navigation, [PromoteAllScalars = true])
+in
+    PromotedHeaders"#;
+
+    let dry_run = run_powerbi(&[
+        "source-template",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--kind",
+        "excel",
+        "--sheet",
+        "AccidentData",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(dry_run.code, 0, "stderr: {}", dry_run.stderr);
+    let dry_json = stdout_json(&dry_run);
+    assert_eq!(dry_json["changes"][0]["after"]["kind"], "excel");
+    assert_eq!(dry_json["changes"][0]["after"]["mTemplate"], excel_m);
+
+    let add = run_powerbi(&[
+        "source-template",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--kind",
+        "xlsx",
+        "--sheet",
+        "AccidentData",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+
+    let excel_project = temp.path().join("sales_excel");
+    let excel_project_arg = excel_project.to_str().expect("excel project path");
+    let apply = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--file",
+        r"C:\data\synthetic.xlsx",
+        "--out-dir",
+        excel_project_arg,
+        "--json",
+    ]);
+    assert_eq!(apply.code, 0, "stderr: {}", apply.stderr);
+    let apply_json = stdout_json(&apply);
+    assert_eq!(apply_json["connection"]["kind"], "excel");
+    assert_eq!(apply_json["replacementMode"], "generated-dummy");
+    assert_eq!(
+        apply_json["requiresDesktopAuthentication"],
+        Value::Bool(false)
+    );
+    assert_eq!(
+        apply_json["connection"]["parameters"]["item"],
+        "AccidentData"
+    );
+    let excel_tmdl = fs::read_to_string(fact_sales_tmdl(&excel_project)).expect("Excel TMDL");
+    assert!(excel_tmdl.contains(r#"Excel.Workbook(File.Contents("C:\data\synthetic.xlsx")"#));
+    assert!(excel_tmdl.contains(
+        r#"Table.TransformColumnTypes(PromotedHeaders, {{"DateKey", Int64.Type}, {"CustomerKey", Int64.Type}, {"Revenue", Decimal.Type}, {"Units", Int64.Type}}, "en-US")"#
+    ));
+
+    let partition = run_powerbi(&[
+        "model",
+        "partitions",
+        "show",
+        "--project",
+        excel_project_arg,
+        "--handle",
+        "partition:FactSales:FactSales",
+        "--json",
+    ]);
+    assert_eq!(partition.code, 0, "stderr: {}", partition.stderr);
+    assert_eq!(
+        stdout_json(&partition)["partition"]["sourceKind"],
+        "externalFile"
+    );
+
+    let refused = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        excel_project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--file",
+        r"D:\data\synthetic.xlsx",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(refused.code, 2);
+    assert!(
+        stderr_json(&refused)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("by default")
+    );
+
+    let wrong_confirmation = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        excel_project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--file",
+        r"D:\data\synthetic.xlsx",
+        "--replace-existing",
+        "--confirm",
+        "partition:FactSales:Wrong",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(wrong_confirmation.code, 2);
+    assert!(
+        stderr_json(&wrong_confirmation)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("partition:FactSales:FactSales")
+    );
+
+    let retarget = run_powerbi(&[
+        "source-template",
+        "apply",
+        "--project",
+        excel_project_arg,
+        "--handle",
+        "source-template:FactSales:FactSales",
+        "--file",
+        r"D:\data\synthetic.xlsx",
+        "--replace-existing",
+        "--confirm",
+        "partition:FactSales:FactSales",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(retarget.code, 0, "stderr: {}", retarget.stderr);
+    assert_eq!(
+        stdout_json(&retarget)["replacementMode"],
+        "confirmed-existing"
+    );
+    assert!(
+        fs::read_to_string(fact_sales_tmdl(&excel_project))
+            .expect("retargeted Excel TMDL")
+            .contains(r#"File.Contents("D:\data\synthetic.xlsx")"#)
     );
 }
 

@@ -202,7 +202,7 @@ fn apply_color_patch(visual_json: &mut Value, options: &ColorOptions) -> CliResu
                 "dataPoint",
                 json!({
                     "selector": {
-                        "data": [{ "dataViewWildcard": { "matchingOption": "InstancesAndTotals" } }]
+                        "data": [{ "dataViewWildcard": { "matchingOption": 0 } }]
                     },
                     "properties": {}
                 }),

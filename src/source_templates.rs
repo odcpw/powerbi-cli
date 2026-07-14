@@ -81,6 +81,17 @@ pub(crate) struct OdbcSourceTemplateInput {
     pub(crate) description: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ExcelSourceTemplateInput {
+    pub(crate) table: String,
+    pub(crate) partition: String,
+    pub(crate) name: Option<String>,
+    pub(crate) file: String,
+    pub(crate) item: String,
+    pub(crate) item_kind: String,
+    pub(crate) description: Option<String>,
+}
+
 impl Default for SourceTemplateStore {
     fn default() -> Self {
         Self {
@@ -265,6 +276,31 @@ pub(crate) fn odbc_source_template(input: OdbcSourceTemplateInput) -> SourceTemp
     }
 }
 
+pub(crate) fn excel_source_template(input: ExcelSourceTemplateInput) -> SourceTemplateRecord {
+    let mut parameters = BTreeMap::new();
+    parameters.insert("file".to_string(), input.file.clone());
+    parameters.insert("item".to_string(), input.item.clone());
+    parameters.insert("itemKind".to_string(), input.item_kind.clone());
+    SourceTemplateRecord {
+        handle: source_template_handle(
+            &input.table,
+            input.name.as_deref().unwrap_or(&input.partition),
+        ),
+        name: input.name,
+        partition_handle: crate::tmdl::partition_handle(&input.table, &input.partition),
+        table: input.table,
+        partition: input.partition,
+        kind: "excel".to_string(),
+        parameters,
+        m_template: render_excel_m_template(&input.file, &input.item, &input.item_kind),
+        description: input.description,
+        requirements: vec![
+            "The Excel workbook must exist at the configured path on the machine that refreshes the project."
+                .to_string(),
+        ],
+    }
+}
+
 pub(crate) fn source_template_json(record: &SourceTemplateRecord, path: &Path) -> Value {
     let safety = source_template_safety_json(record);
     let redact = safety["credentialFree"] == Value::Bool(false);
@@ -442,6 +478,15 @@ fn render_odbc_m_template(dsn: &str, database: &str, schema: &str, object: &str)
         m_string(database),
         m_string(schema),
         m_string(object)
+    )
+}
+
+fn render_excel_m_template(file: &str, item: &str, item_kind: &str) -> String {
+    format!(
+        "let\n    Source = Excel.Workbook(File.Contents(\"{}\"), null, true),\n    Navigation = Source{{[Item=\"{}\",Kind=\"{}\"]}}[Data],\n    PromotedHeaders = Table.PromoteHeaders(Navigation, [PromoteAllScalars = true])\nin\n    PromotedHeaders",
+        m_string(file),
+        m_string(item),
+        m_string(item_kind)
     )
 }
 

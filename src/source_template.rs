@@ -1,14 +1,14 @@
 use crate::project_io::{copy_project_dir, write_text_atomic_validated};
 use crate::source_templates::{
-    OdbcSourceTemplateInput, PostgresSourceTemplateInput, SourceTemplateRecord,
-    SqlSourceTemplateInput, find_template, load_source_template_store, odbc_source_template,
-    postgres_source_template, save_source_template_store, source_template_findings,
-    source_template_json, source_templates_path, sql_source_template, template_has_errors,
-    upsert_template,
+    ExcelSourceTemplateInput, OdbcSourceTemplateInput, PostgresSourceTemplateInput,
+    SourceTemplateRecord, SqlSourceTemplateInput, excel_source_template, find_template,
+    load_source_template_store, odbc_source_template, postgres_source_template,
+    save_source_template_store, source_template_findings, source_template_json,
+    source_templates_path, sql_source_template, template_has_errors, upsert_template,
 };
 use crate::tmdl::{
-    PartitionSelector, find_partition, load_table_documents, partition_selector_parts,
-    replace_partition_source_plan, same_name,
+    ColumnRecord, PartitionSelector, find_partition, load_table_documents,
+    partition_selector_parts, replace_partition_source_plan, same_name,
 };
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -76,6 +76,9 @@ struct AddOptions {
     database: Option<String>,
     sql_schema: Option<String>,
     object: Option<String>,
+    file: Option<String>,
+    item: Option<String>,
+    item_kind: Option<String>,
     description: Option<String>,
     mode: Option<MutationMode>,
 }
@@ -90,6 +93,11 @@ struct ApplyOptions {
     database: Option<String>,
     sql_schema: Option<String>,
     object: Option<String>,
+    file: Option<String>,
+    item: Option<String>,
+    item_kind: Option<String>,
+    replace_existing: bool,
+    confirm: Option<String>,
     mode: Option<MutationMode>,
 }
 
@@ -192,6 +200,9 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
     let record = match kind.as_str() {
         "sql" => {
             reject_flag_for_kind(&options.dsn, "--dsn", "sql", "--server")?;
+            reject_flag_for_kind(&options.file, "--file", "sql", "--server")?;
+            reject_flag_for_kind(&options.item, "--item", "sql", "--object")?;
+            reject_flag_for_kind(&options.item_kind, "--item-kind", "sql", "--schema")?;
             let server = options.server.as_deref().unwrap_or("<server>");
             let database = options.database.as_deref().unwrap_or("<database>");
             let schema = options.sql_schema.as_deref().unwrap_or("dbo");
@@ -215,6 +226,9 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
         }
         "postgres" => {
             reject_flag_for_kind(&options.dsn, "--dsn", "postgres", "--server")?;
+            reject_flag_for_kind(&options.file, "--file", "postgres", "--server")?;
+            reject_flag_for_kind(&options.item, "--item", "postgres", "--object")?;
+            reject_flag_for_kind(&options.item_kind, "--item-kind", "postgres", "--schema")?;
             let server = options.server.as_deref().unwrap_or("<server>");
             let database = options.database.as_deref().unwrap_or("<database>");
             let schema = options.sql_schema.as_deref().unwrap_or("public");
@@ -238,6 +252,9 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
         }
         "odbc" => {
             reject_flag_for_kind(&options.server, "--server", "odbc", "--dsn")?;
+            reject_flag_for_kind(&options.file, "--file", "odbc", "--dsn")?;
+            reject_flag_for_kind(&options.item, "--item", "odbc", "--object")?;
+            reject_flag_for_kind(&options.item_kind, "--item-kind", "odbc", "--schema")?;
             let dsn = options.dsn.as_deref().unwrap_or("<dsn>");
             let database = options.database.as_deref().unwrap_or("<database>");
             let schema = options.sql_schema.as_deref().unwrap_or("<schema>");
@@ -259,6 +276,33 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
                 description: options.description.clone(),
             })
         }
+        "excel" => {
+            reject_flag_for_kind(&options.server, "--server", "excel", "--file")?;
+            reject_flag_for_kind(&options.dsn, "--dsn", "excel", "--file")?;
+            reject_flag_for_kind(&options.database, "--database", "excel", "--file")?;
+            reject_flag_for_kind(&options.sql_schema, "--schema", "excel", "--item-kind")?;
+            reject_flag_for_kind(&options.object, "--object", "excel", "--item")?;
+            let file = options.file.as_deref().unwrap_or("<file>");
+            let item = options.item.as_deref().unwrap_or(&partition.table);
+            let item_kind = normalize_excel_item_kind(options.item_kind.as_deref())?;
+            if !(file.contains('<') && file.contains('>')) {
+                validate_excel_file(file)?;
+            }
+            validate_template_parameters(&[
+                ("file", file),
+                ("item", item),
+                ("itemKind", &item_kind),
+            ])?;
+            excel_source_template(ExcelSourceTemplateInput {
+                table: partition.table.clone(),
+                partition: partition.name.clone(),
+                name: options.template_name.clone(),
+                file: file.to_string(),
+                item: item.to_string(),
+                item_kind,
+                description: options.description.clone(),
+            })
+        }
         _ => return Err(unsupported_kind_error(&kind)),
     };
     if template_has_errors(&record) {
@@ -266,7 +310,7 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
             "source-template add refuses to store credential-like template text",
         )
         .with_hint("Use placeholders such as `<server>` and configure credentials only inside Power BI Desktop at work.")
-        .with_suggested_command("powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc> --dry-run --json"));
+        .with_suggested_command("powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel> --dry-run --json"));
     }
 
     let mut store = load_source_template_store(&target_resolved)?;
@@ -375,7 +419,7 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
             shell_arg(&record.handle)
         )));
     }
-    let (m_source, parameters) = materialize_template(&record, &options)?;
+    let (mut m_source, parameters) = materialize_template(&record, &options)?;
 
     let source_docs = load_table_documents(&source_resolved)?;
     let partition_selector = PartitionSelector {
@@ -384,20 +428,67 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         name: None,
     };
     let source_partition = find_partition(&source_docs, &partition_selector)?;
-    if source_partition.source_kind != "dummyMTable" || source_partition.safety.status != "safe" {
-        return Err(CliError::invalid_args(format!(
-            "source-template apply only replaces a safe generated dummy partition; {} is {} ({})",
-            source_partition.handle(),
-            source_partition.source_kind,
-            source_partition.safety.status
-        ))
-        .with_hint("Apply templates to a fresh credential-free source package. This guard prevents overwriting an existing live or manually edited connection.")
-        .with_suggested_command(format!(
-            "powerbi-cli model partitions show --project {} --handle {} --json",
-            command_arg(&source_resolved.project_dir),
-            shell_arg(&source_partition.handle())
-        )));
+    if record.kind == "excel"
+        && let Some(table) = source_docs
+            .iter()
+            .find(|table| same_name(&table.table, &record.table))
+    {
+        m_source = add_excel_column_types(&m_source, &table.columns);
     }
+    let replacing_dummy =
+        source_partition.source_kind == "dummyMTable" && source_partition.safety.status == "safe";
+    let replacement_mode = if replacing_dummy {
+        "generated-dummy"
+    } else {
+        let handle = source_partition.handle();
+        if !options.replace_existing {
+            return Err(CliError::invalid_args(format!(
+                "source-template apply only replaces a safe generated dummy partition by default; {} is {} ({})",
+                handle, source_partition.source_kind, source_partition.safety.status
+            ))
+            .with_hint("To intentionally retarget a known credential-free SQL, PostgreSQL, ODBC, or external-file partition, pass --replace-existing and --confirm with the exact partition handle. Unknown, web, and credential-bearing sources remain refused.")
+            .with_suggested_command(format!(
+                "powerbi-cli source-template apply --project {} --handle {} --replace-existing --confirm {} --dry-run --json",
+                command_arg(&source_resolved.project_dir),
+                shell_arg(&record.handle),
+                shell_arg(&handle)
+            )));
+        }
+        if options.confirm.as_deref() != Some(handle.as_str()) {
+            return Err(CliError::invalid_args(format!(
+                "source-template apply --replace-existing requires --confirm {handle}"
+            ))
+            .with_hint("Use the exact partition handle returned by `model partitions show`; this confirmation prevents accidental connection replacement.")
+            .with_suggested_command(format!(
+                "powerbi-cli source-template apply --project {} --handle {} --replace-existing --confirm {} --dry-run --json",
+                command_arg(&source_resolved.project_dir),
+                shell_arg(&record.handle),
+                shell_arg(&handle)
+            )));
+        }
+        if !matches!(
+            source_partition.source_kind.as_str(),
+            "sqlDatabase" | "postgresqlDatabase" | "odbcDataSource" | "externalFile"
+        ) {
+            return Err(CliError::invalid_args(format!(
+                "source-template apply refuses confirmed replacement of source kind {}",
+                source_partition.source_kind
+            ))
+            .with_hint("Only recognized credential-free SQL, PostgreSQL, ODBC, and external-file sources can be retargeted. Rebuild unknown or web sources from a reviewed source package."));
+        }
+        if source_partition
+            .safety
+            .findings
+            .iter()
+            .any(|finding| finding.code == "partition.credential_like_text")
+        {
+            return Err(CliError::invalid_args(
+                "source-template apply refuses to replace a credential-bearing existing partition",
+            )
+            .with_hint("Remove credentials from the source text first; Power BI Desktop must own authentication."));
+        }
+        "confirmed-existing"
+    };
 
     let target_resolved = match mode {
         MutationMode::DryRun | MutationMode::InPlace => source_resolved,
@@ -436,6 +527,20 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         shell_arg(&plan.handle)
     );
     let validate = format!("powerbi-cli validate --strict {} --json", project_arg);
+    let requires_desktop_authentication = record.kind != "excel";
+    let instructions = if record.kind == "excel" {
+        vec![
+            "Ensure the configured Excel workbook exists at the materialized path.",
+            "Open the PBIP in Power BI Desktop and refresh the semantic model.",
+            "If the project moves, reapply the Excel source template with the workbook's new absolute path.",
+        ]
+    } else {
+        vec![
+            "Open the PBIP in Power BI Desktop on the work machine.",
+            "When prompted, choose the appropriate database authentication method and enter credentials in Power BI Desktop.",
+            "Refresh the semantic model. Credentials are not stored in the PBIP project.",
+        ]
+    };
 
     Ok(json!({
         "schema": "powerbi-cli.source-template.apply.v1",
@@ -444,9 +549,10 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         "action": "apply",
         "dryRun": dry_run,
         "mode": mode_name(mode),
+        "replacementMode": replacement_mode,
         "projectModified": project_modified,
         "credentialsEmbedded": false,
-        "requiresDesktopAuthentication": true,
+        "requiresDesktopAuthentication": requires_desktop_authentication,
         "projectDir": canonical_display(&target_resolved.project_dir),
         "pbip": canonical_display(&target_resolved.pbip_path),
         "target": {
@@ -462,7 +568,7 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         },
         "changes": [{
             "kind": "tmdl.partition.source",
-            "action": "replace-dummy-with-live-connection",
+            "action": if replacing_dummy { "replace-dummy-with-source" } else { "replace-confirmed-existing-source" },
             "path": canonical_display(&plan.path),
             "beforeSourceKind": source_partition.source_kind,
             "afterSource": m_source
@@ -486,11 +592,7 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         })),
         "readbackCommand": readback,
         "validateCommand": validate,
-        "instructions": [
-            "Open the PBIP in Power BI Desktop on the work machine.",
-            "When prompted, choose Database authentication and enter the PostgreSQL username and password.",
-            "Refresh the semantic model. Credentials are not stored in the PBIP project."
-        ],
+        "instructions": instructions,
         "next": [readback, validate]
     }))
 }
@@ -595,6 +697,9 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                 options.sql_schema = Some(take_value(args, &mut i, "--schema")?);
             }
             "--object" => options.object = Some(take_value(args, &mut i, "--object")?),
+            "--file" | "--path" => options.file = Some(take_value(args, &mut i, "--file")?),
+            "--item" | "--sheet" => options.item = Some(take_value(args, &mut i, "--item")?),
+            "--item-kind" => options.item_kind = Some(take_value(args, &mut i, "--item-kind")?),
             "--description" => {
                 options.description = Some(take_value(args, &mut i, "--description")?)
             }
@@ -637,7 +742,7 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
     }
     if options.kind.is_none() {
         return Err(CliError::invalid_args("source-template add requires --kind")
-            .with_hint("Supported kinds are `sql`, `postgres`, and `odbc`; Excel, CSV, and generic M templates are planned.")
+            .with_hint("Supported kinds are `sql`, `postgres`, `odbc`, and `excel`; CSV and generic M templates are planned.")
             .with_suggested_command(
                 "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             ));
@@ -663,6 +768,14 @@ fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
                 options.sql_schema = Some(take_value(args, &mut i, "--schema")?)
             }
             "--object" => options.object = Some(take_value(args, &mut i, "--object")?),
+            "--file" | "--path" => options.file = Some(take_value(args, &mut i, "--file")?),
+            "--item" | "--sheet" => options.item = Some(take_value(args, &mut i, "--item")?),
+            "--item-kind" => options.item_kind = Some(take_value(args, &mut i, "--item-kind")?),
+            "--replace-existing" => {
+                options.replace_existing = true;
+                i += 1;
+            }
+            "--confirm" => options.confirm = Some(take_value(args, &mut i, "--confirm")?),
             "--dry-run" => {
                 set_mode(&mut options.mode, MutationMode::DryRun)?;
                 i += 1;
@@ -707,6 +820,9 @@ fn materialize_template(
     let source = match kind.as_str() {
         "sql" | "postgres" => {
             reject_apply_flag_for_kind(&options.dsn, "--dsn", &kind, "--server")?;
+            reject_apply_flag_for_kind(&options.file, "--file", &kind, "--server")?;
+            reject_apply_flag_for_kind(&options.item, "--item", &kind, "--object")?;
+            reject_apply_flag_for_kind(&options.item_kind, "--item-kind", &kind, "--schema")?;
             let server = concrete_parameter(record, "server", options.server.as_deref())?;
             let database = concrete_parameter(record, "database", options.database.as_deref())?;
             let schema = concrete_parameter(record, "schema", options.sql_schema.as_deref())?;
@@ -749,6 +865,9 @@ fn materialize_template(
         }
         "odbc" => {
             reject_apply_flag_for_kind(&options.server, "--server", "odbc", "--dsn")?;
+            reject_apply_flag_for_kind(&options.file, "--file", "odbc", "--dsn")?;
+            reject_apply_flag_for_kind(&options.item, "--item", "odbc", "--object")?;
+            reject_apply_flag_for_kind(&options.item_kind, "--item-kind", "odbc", "--schema")?;
             let dsn = concrete_parameter(record, "dsn", options.dsn.as_deref())?;
             let database = concrete_parameter(record, "database", options.database.as_deref())?;
             let schema = concrete_parameter(record, "schema", options.sql_schema.as_deref())?;
@@ -772,6 +891,40 @@ fn materialize_template(
                 database,
                 schema,
                 object,
+                description: record.description.clone(),
+            })
+            .m_template
+        }
+        "excel" => {
+            reject_apply_flag_for_kind(&options.server, "--server", "excel", "--file")?;
+            reject_apply_flag_for_kind(&options.dsn, "--dsn", "excel", "--file")?;
+            reject_apply_flag_for_kind(&options.database, "--database", "excel", "--file")?;
+            reject_apply_flag_for_kind(&options.sql_schema, "--schema", "excel", "--item-kind")?;
+            reject_apply_flag_for_kind(&options.object, "--object", "excel", "--item")?;
+            let file = concrete_parameter(record, "file", options.file.as_deref())?;
+            let item = concrete_parameter(record, "item", options.item.as_deref())?;
+            let item_kind = normalize_excel_item_kind(
+                options
+                    .item_kind
+                    .as_deref()
+                    .or_else(|| record.parameters.get("itemKind").map(String::as_str)),
+            )?;
+            validate_template_parameters(&[
+                ("file", &file),
+                ("item", &item),
+                ("itemKind", &item_kind),
+            ])?;
+            validate_excel_file(&file)?;
+            parameters.insert("file".to_string(), file.clone());
+            parameters.insert("item".to_string(), item.clone());
+            parameters.insert("itemKind".to_string(), item_kind.clone());
+            excel_source_template(ExcelSourceTemplateInput {
+                table: record.table.clone(),
+                partition: record.partition.clone(),
+                name: record.name.clone(),
+                file,
+                item,
+                item_kind,
                 description: record.description.clone(),
             })
             .m_template
@@ -806,6 +959,48 @@ fn concrete_parameter(
         )));
     }
     Ok(value)
+}
+
+fn add_excel_column_types(source: &str, columns: &[ColumnRecord]) -> String {
+    let transformations = columns
+        .iter()
+        .filter(|column| !column.is_calculated())
+        .filter_map(|column| {
+            let data_type = excel_m_type(column.data_type.as_deref()?)?;
+            let source_column = column.source_column.as_deref().unwrap_or(&column.name);
+            Some(format!(
+                "{{\"{}\", {data_type}}}",
+                source_column.replace('"', "\"\"")
+            ))
+        })
+        .collect::<Vec<_>>();
+    if transformations.is_empty() {
+        return source.to_string();
+    }
+
+    let marker = "\nin\n    PromotedHeaders";
+    let replacement = format!(
+        ",\n    TypedColumns = Table.TransformColumnTypes(PromotedHeaders, {{{}}}, \"en-US\")\nin\n    TypedColumns",
+        transformations.join(", ")
+    );
+    source.replacen(marker, &replacement, 1)
+}
+
+fn excel_m_type(data_type: &str) -> Option<&'static str> {
+    match data_type.trim().to_ascii_lowercase().as_str() {
+        "int64" => Some("Int64.Type"),
+        "double" => Some("type number"),
+        "decimal" => Some("Decimal.Type"),
+        "currency" => Some("Currency.Type"),
+        "datetime" => Some("type datetime"),
+        "datetimezone" => Some("type datetimezone"),
+        "date" => Some("type date"),
+        "time" => Some("type time"),
+        "boolean" => Some("type logical"),
+        "string" => Some("type text"),
+        "binary" => Some("type binary"),
+        _ => None,
+    }
 }
 
 fn reject_apply_flag_for_kind(
@@ -942,6 +1137,37 @@ fn validate_bare_odbc_dsn(dsn: &str) -> CliResult<()> {
     ))
 }
 
+fn validate_excel_file(file: &str) -> CliResult<()> {
+    let normalized = file.to_ascii_lowercase();
+    if [".xlsx", ".xlsm", ".xlsb", ".xls"]
+        .iter()
+        .any(|extension| normalized.ends_with(extension))
+    {
+        return Ok(());
+    }
+    Err(CliError::invalid_args(
+        "source-template --file must name an Excel workbook (.xlsx, .xlsm, .xlsb, or .xls)",
+    )
+    .with_hint("Use a workbook path only. CSV sources remain a separate planned template kind.")
+    .with_suggested_command(
+        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind excel --file <workbook.xlsx> --sheet <sheet> --dry-run --json",
+    ))
+}
+
+fn normalize_excel_item_kind(value: Option<&str>) -> CliResult<String> {
+    match value.unwrap_or("Sheet").trim().to_ascii_lowercase().as_str() {
+        "sheet" | "worksheet" => Ok("Sheet".to_string()),
+        "table" => Ok("Table".to_string()),
+        other => Err(CliError::invalid_args(format!(
+            "source-template --item-kind must be Sheet or Table; got {other}"
+        ))
+        .with_hint("Use `--sheet <name>` for a worksheet, or `--item <name> --item-kind Table` for an Excel table.")
+        .with_suggested_command(
+            "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind excel --file <workbook.xlsx> --sheet <sheet> --dry-run --json",
+        )),
+    }
+}
+
 fn reject_flag_for_kind(
     value: &Option<String>,
     flag: &str,
@@ -962,13 +1188,13 @@ fn reject_flag_for_kind(
 
 fn unsupported_kind_error(kind: &str) -> CliError {
     CliError::invalid_args(format!(
-        "source-template add supports kinds sql, postgres, and odbc; got {kind}"
+        "source-template add supports kinds sql, postgres, odbc, and excel; got {kind}"
     ))
     .with_hint(
-        "Use `--kind sql`, `--kind postgres`, or `--kind odbc`; Excel, CSV, and generic M templates are planned.",
+        "Use `--kind sql`, `--kind postgres`, `--kind odbc`, or `--kind excel`; CSV and generic M templates are planned.",
     )
     .with_suggested_command(
-        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc> --dry-run --json",
+        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel> --dry-run --json",
     )
 }
 
@@ -997,6 +1223,7 @@ fn normalize_kind_arg(value: &str) -> String {
     match value.trim().to_ascii_lowercase().as_str() {
         "sql" | "sql-server" | "sqlserver" => "sql".to_string(),
         "postgres" | "postgresql" => "postgres".to_string(),
+        "excel" | "xlsx" | "xls" => "excel".to_string(),
         "generic-m" | "genericm" | "m" => "generic-m".to_string(),
         other => other.to_string(),
     }

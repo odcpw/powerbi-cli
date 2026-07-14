@@ -180,7 +180,7 @@ fn feature_json(feature: &Feature) -> Value {
 
 fn supported_kinds(feature: &Feature) -> &'static [&'static str] {
     match feature.id {
-        "model.source-templates" => &["sql", "postgres", "odbc"],
+        "model.source-templates" => &["sql", "postgres", "odbc", "excel"],
         _ => &[],
     }
 }
@@ -414,7 +414,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         title: "Credential-free source templates and rebind runbooks",
         category: "model",
         status: "supported",
-        support: "sidecar-sql-postgres-odbc",
+        support: "sidecar-sql-postgres-odbc-excel",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &[
@@ -425,9 +425,9 @@ const FEATURE_CATALOG: &[Feature] = &[
             "handoff rebind-plan",
         ],
         refusal_code: None,
-        reason: "Credential-free SQL Server, PostgreSQL, and ODBC M templates are stored in sidecar metadata, rendered into a rebind runbook, and can explicitly replace safe generated dummy partitions on the work machine without embedding credentials.",
+        reason: "Credential-free SQL Server, PostgreSQL, ODBC, and Excel M templates are stored in sidecar metadata and can replace safe generated dummy partitions. An exact-handle confirmation gate also permits intentional retargeting of recognized credential-free existing sources without embedding credentials.",
         next_proof: &[
-            "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, and ODBC/DSN projects in Power BI Desktop at work",
+            "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, ODBC/DSN, and Excel projects in Power BI Desktop",
         ],
         reference_signals: &[],
         tags: &[
@@ -435,6 +435,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "source-template",
             "postgres",
             "odbc",
+            "excel",
             "handoff",
             "rebind",
         ],

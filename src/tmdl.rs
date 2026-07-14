@@ -997,7 +997,7 @@ pub(crate) fn measure_block_lines(table: &str, definition: &MeasureDefinition) -
     if expression.contains('\n') || expression.contains('\r') {
         lines.push(format!("    measure {name} ="));
         for line in expression.replace("\r\n", "\n").replace('\r', "\n").lines() {
-            lines.push(format!("        {}", line.trim_end()));
+            lines.push(format!("            {}", line.trim_end()));
         }
     } else {
         lines.push(format!("    measure {name} = {}", expression.trim()));
@@ -1039,7 +1039,7 @@ fn calculated_column_block_lines(
     if expression.contains('\n') || expression.contains('\r') {
         lines.push(format!("    column {name} ="));
         for line in expression.replace("\r\n", "\n").replace('\r', "\n").lines() {
-            lines.push(format!("        {}", line.trim_end()));
+            lines.push(format!("            {}", line.trim_end()));
         }
     } else {
         lines.push(format!("    column {name} = {}", expression.trim()));
@@ -1232,7 +1232,8 @@ fn push_tmdl_description(lines: &mut Vec<String>, indent: &str, description: Opt
 }
 
 fn strip_expression_indent(line: &str) -> String {
-    line.strip_prefix("        ")
+    line.strip_prefix("            ")
+        .or_else(|| line.strip_prefix("        "))
         .or_else(|| line.strip_prefix("    "))
         .unwrap_or(line)
         .to_string()

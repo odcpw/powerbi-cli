@@ -137,6 +137,7 @@ cargo run --bin powerbi-cli -- model partitions list --project .\build\sales --j
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --include-source --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
@@ -362,17 +363,22 @@ three pages.
   advanced surfaces remains blocked until object-specific writers and fixtures
   exist.
 - Source-template authoring covers `source-template list/show/add/apply` for
-  credential-free SQL Server, PostgreSQL, and ODBC rebind metadata stored only as
-  sidecar JSON. PostgreSQL templates record current Npgsql compatibility guidance;
+  credential-free SQL Server, PostgreSQL, ODBC, and Excel rebind metadata stored
+  as sidecar JSON. PostgreSQL templates record current Npgsql compatibility guidance;
   ODBC templates accept only a bare DSN name (no `;`/`=` attributes) and record
   that the named DSN must already exist there. `source-template apply` is the
-  explicit work-machine step that replaces one safe generated dummy partition;
-  it refuses unresolved placeholders, credential-like values, and existing live
-  connections. `handoff rebind-plan` maps
+  explicit materialization step that replaces one safe generated dummy partition.
+  With `--replace-existing` and an exact `--confirm <partition-handle>`, it can also
+  intentionally retarget a recognized credential-free SQL, PostgreSQL, ODBC, or
+  external-file partition; unknown, web, credential-bearing, and unconfirmed
+  sources remain refused. Excel templates use `Excel.Workbook(File.Contents(...))`,
+  promote the selected sheet/table headers, explicitly convert imported columns to
+  their TMDL model types, and require an absolute workbook path when applied.
+  `handoff rebind-plan` maps
   templates to partitions and can write a self-contained Markdown runbook with
   `--out <file.md>` (existing files require `--force`). Credential detection
-  redacts JSON/Markdown excerpts and suppresses runbook creation. Excel, CSV,
-  and generic M template kinds remain planned and refused.
+  redacts JSON/Markdown excerpts and suppresses runbook creation. CSV and
+  generic M template kinds remain planned and refused.
 - Programmatic report layout authoring covers `report pages
   list/show/add/update/reorder/set-active/delete-empty`, `report visuals
   list/show/add/clone/delete`, guarded `report visuals set-position`, and guarded

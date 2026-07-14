@@ -124,8 +124,8 @@ measure list/show/add/update/delete, static DAX dependencies/lint,
 advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
-partition list/show, source-template list/show/add for SQL Server, PostgreSQL,
-and ODBC rebind metadata,
+partition list/show, source-template list/show/add/apply for SQL Server,
+PostgreSQL, ODBC, and Excel rebind metadata,
 handoff rebind-plan, fixture normalize/verify, desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
@@ -138,8 +138,8 @@ formatting list/show/extract/apply bundles, visual formatting set-text for
 title/alt-text patches, conditional-formatting readback list/show, handoff
 check, lint, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
-Treat planned Excel/CSV/generic-M source templates, executable partition source
-replacement, filter sort and arbitrary expression updates, bookmark state capture/create/update/grouping,
+Treat planned CSV/generic-M source templates, filter sort and arbitrary expression
+updates, bookmark state capture/create/update/grouping,
 slicer selection/sync mutation, interaction Default/reset semantics, unsupported
 slicer modes, style
 drift lint, conditional formatting authoring,
@@ -408,16 +408,24 @@ pbi --json capabilities --for source-template
 pbi --json source-template add --project build/sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind odbc --dsn "<dsn>" --database "<database>" --schema "<schema>" --object "<object>" --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --out-dir build/sales-rebind
 pbi --json source-template list --project build/sales-rebind
 pbi --json handoff rebind-plan build/sales-rebind --out build/sales-rebind/work-machine-rebind.md
 pbi --json handoff check build/sales-rebind
 ```
 
-Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`;
-they do not replace dummy `#table(...)` partition sources. Use placeholders for
-source identifiers at home and configure credentials only in Power BI Desktop
-at work. Current Power BI Desktop releases include the Npgsql provider; only
+Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`.
+`source-template apply` materializes one template into a generated dummy partition.
+For an intentional source-to-source retarget, `--replace-existing` also requires
+the exact `--confirm <partition-handle>` and accepts only recognized credential-free
+SQL, PostgreSQL, ODBC, or external-file sources. Unknown, web, credential-bearing,
+and unconfirmed sources are refused. Excel templates select one worksheet or Excel
+table, promote its headers, add explicit Power Query conversions from the model's
+TMDL column types, and materialize an absolute workbook path; reapply or patch the
+path after moving the project. Use placeholders for source identifiers at
+home and configure database credentials only in Power BI Desktop at work. Current
+Power BI Desktop releases include the Npgsql provider; only
 Desktop releases before December 2019 or on-premises data gateway releases
 before June 2025 require a separate Npgsql installation;
 ODBC templates require a bare DSN name without `;`/`=` attributes and require the
@@ -679,7 +687,7 @@ pbi --json fixture verify build/sales --expected testdata/golden/sales-desktop-f
 ```
 
 Use `source-template add` before the final rebind plan when you know a
-credential-free SQL Server, PostgreSQL, or ODBC mapping. Missing templates
+credential-free SQL Server, PostgreSQL, ODBC, or Excel mapping. Missing templates
 produce structured findings and suggested commands; `--allow-unmapped` is useful
 while drafting. Write the final work-machine instructions with
 `handoff rebind-plan <project> --out <file.md>` and keep every credential in

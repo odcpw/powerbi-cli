@@ -25,6 +25,13 @@ End-to-end exercise: inspect spreadsheet source metadata, model a PostgreSQL dim
 - Fix: add `source-template apply` (alias `materialize`) with typed SQL Server, PostgreSQL, and ODBC parameters, placeholder resolution, atomic validation/rollback, and a guard that only permits replacement of a safe generated dummy partition.
 - Proof: dry-run, out-directory, concrete-parameter, no-credential, source-preservation, live-partition classification, overwrite-refusal, catalog, and full acceptance-harness coverage. A private proof-of-concept artifact was materialized locally, then its no-CLI installer completed two download/unzip/swap simulations; the live and `.previous` projects contained no synthetic design rows.
 
+### The same report could not be retargeted to a local Excel workbook
+
+- Symptom: `source-template` had no Excel kind, and `apply` refused every existing PostgreSQL partition even when the source text was credential-free and the intended output was a separate home copy.
+- Impact: making a locally refreshable synthetic version required raw TMDL editing or rebuilding the report from scratch, which made the work and home variants drift.
+- Fix: add typed Excel workbook sources (`--file`, `--sheet`/`--item`, `--item-kind`) and a guarded `--replace-existing --confirm <partition-handle>` path. Applying an Excel template now emits explicit Power Query column conversions from the table's TMDL types; otherwise Excel values can enter the model as strings and break numeric DAX. The retarget gate accepts only recognized credential-free SQL, PostgreSQL, ODBC, or external-file sources; unknown, web, credential-bearing, and unconfirmed sources remain refused.
+- Proof: focused integration coverage verifies Excel M rendering, header promotion, TMDL-derived type conversions, external-file classification, no-auth metadata, default overwrite refusal, wrong-handle refusal, and exact-handle retargeting. Desktop refresh proof on a synthetic accident report verified both count and cost aggregations.
+
 ## Remaining friction / useful follow-ups
 
 1. `capabilities --for <exact command>` still returns the full heavyweight agent contract around the matching command. A compact mode that returns only `path`, `usage`, `flags`, `examples`, proof level, and output fields would reduce parsing and output noise.
@@ -33,4 +40,4 @@ End-to-end exercise: inspect spreadsheet source metadata, model a PostgreSQL dim
 4. `desktop open-check` is intentionally honest about its proof boundary, but an explicit `--refresh --capture <dir>` workflow would turn the currently manual canvas/refresh review into repeatable evidence.
 5. `package source-pack` correctly refuses live external connectors, but there is no separate `package work-pack` command for a credential-free PBIP whose source identifiers are intentionally materialized for a private work-only repository. The proof of concept currently creates that Power-BI-only ZIP with PowerShell after local materialization.
 
-The repo skill did not cause repeated command-usage loss in this run, so no skill workflow change was necessary. The friction was in command output volume and missing proof artifacts rather than forgotten syntax.
+The repo skill now documents Excel templates, absolute-path portability, and the exact-handle retarget gate so later agents do not fall back to raw TMDL edits for this workflow.
