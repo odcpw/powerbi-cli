@@ -351,7 +351,7 @@ three pages.
   exist.
 - Source-template authoring covers `source-template list/show/add` for
   credential-free SQL Server, PostgreSQL, and ODBC rebind metadata stored only as
-  sidecar JSON. PostgreSQL templates record the Npgsql work-machine requirement;
+  sidecar JSON. PostgreSQL templates record current Npgsql compatibility guidance;
   ODBC templates accept only a bare DSN name (no `;`/`=` attributes) and record
   that the named DSN must already exist there. It does not
   replace executable dummy partitions at home; `handoff rebind-plan` maps

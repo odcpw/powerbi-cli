@@ -1488,6 +1488,16 @@ fn m_date_literal(text: &str) -> Option<String> {
 
 fn m_datetime_literal(text: &str) -> Option<String> {
     let normalized = text.trim_end_matches('Z').replace('T', " ");
+    if !normalized.contains(' ') {
+        let date_parts = normalized.split('-').collect::<Vec<_>>();
+        if date_parts.len() == 3 {
+            let year = date_parts[0].parse::<i32>().ok()?;
+            let month = date_parts[1].parse::<u32>().ok()?;
+            let day = date_parts[2].parse::<u32>().ok()?;
+            return Some(format!("#datetime({year}, {month}, {day}, 0, 0, 0)"));
+        }
+        return None;
+    }
     let (date, time) = normalized.split_once(' ')?;
     let date_parts = date.split('-').collect::<Vec<_>>();
     let time_parts = time.split(':').collect::<Vec<_>>();
@@ -1507,6 +1517,27 @@ fn m_datetime_literal(text: &str) -> Option<String> {
         ));
     }
     None
+}
+
+#[cfg(test)]
+mod m_literal_tests {
+    use super::*;
+
+    #[test]
+    fn datetime_literal_accepts_a_date_only_iso_value() {
+        assert_eq!(
+            m_datetime_literal("2015-01-23").as_deref(),
+            Some("#datetime(2015, 1, 23, 0, 0, 0)")
+        );
+    }
+
+    #[test]
+    fn datetime_literal_preserves_an_iso_timestamp() {
+        assert_eq!(
+            m_datetime_literal("2015-01-23T14:05:09Z").as_deref(),
+            Some("#datetime(2015, 1, 23, 14, 5, 9)")
+        );
+    }
 }
 
 fn m_identifier(name: &str) -> String {

@@ -258,6 +258,32 @@ fn package_source_pack_import_round_trips_scaffolded_source_project() {
     let imported = temp.path().join("imported_sales");
     let imported_arg = imported.to_str().expect("imported path");
 
+    let source_template = run_powerbi(&[
+        "source-template",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--kind",
+        "postgres",
+        "--server",
+        "<server>",
+        "--database",
+        "<database>",
+        "--schema",
+        "public",
+        "--object",
+        "fact_sales",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(
+        source_template.code, 0,
+        "stderr: {}",
+        source_template.stderr
+    );
+
     let source_pack = run_powerbi(&[
         "package",
         "source-pack",
@@ -312,6 +338,12 @@ fn package_source_pack_import_round_trips_scaffolded_source_project() {
     );
     assert_eq!(import_json["sourceRoot"], Value::Null);
     assert_eq!(import_json["validation"]["ok"], Value::Bool(true));
+    assert!(
+        imported
+            .join(".powerbi-cli")
+            .join("source-templates.json")
+            .is_file()
+    );
 
     let validate = run_powerbi(&["validate", "--strict", imported_arg, "--json"]);
     assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);

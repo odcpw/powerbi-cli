@@ -376,7 +376,7 @@ fn rebind_plan_markdown(
             .is_some_and(|kind| kind == "postgres")
     }) {
         out.push_str(
-            "- PostgreSQL templates require the Npgsql driver for the Power BI PostgreSQL connector to be installed on the work machine.\n",
+            "- Current Power BI Desktop releases include the Npgsql provider. Install Npgsql separately only for Power BI Desktop releases before December 2019 or on-premises data gateway releases before June 2025.\n",
         );
     }
     if plans.iter().any(|plan| {

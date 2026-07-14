@@ -229,7 +229,7 @@ pub(crate) fn postgres_source_template(input: PostgresSourceTemplateInput) -> So
         ),
         description: input.description,
         requirements: vec![
-            "The work machine needs the Npgsql driver installed for the Power BI PostgreSQL connector."
+            "Current Power BI Desktop releases include the Npgsql provider. Install Npgsql separately only for Power BI Desktop releases before December 2019 or on-premises data gateway releases before June 2025."
                 .to_string(),
         ],
     }

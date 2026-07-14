@@ -933,6 +933,9 @@ fn source_pack_file_category(relative_name: &str) -> Option<EntryCategory> {
     {
         return None;
     }
+    if normalized.eq_ignore_ascii_case(".powerbi-cli/source-templates.json") {
+        return Some(EntryCategory::MetadataJson);
+    }
     let parts = normalized.split('/').collect::<Vec<_>>();
     if parts
         .iter()
@@ -997,6 +1000,9 @@ fn source_pack_project_file_category(
 ) -> Option<EntryCategory> {
     let category = source_pack_file_category(relative_name)?;
     let normalized = relative_name.replace('\\', "/");
+    if normalized.eq_ignore_ascii_case(".powerbi-cli/source-templates.json") {
+        return Some(category);
+    }
     let root = normalized.split('/').next()?;
     match category {
         EntryCategory::Pbip => resolved

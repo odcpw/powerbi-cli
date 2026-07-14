@@ -394,7 +394,9 @@ pbi --json handoff check build/sales-rebind
 Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`;
 they do not replace dummy `#table(...)` partition sources. Use placeholders for
 source identifiers at home and configure credentials only in Power BI Desktop
-at work. PostgreSQL templates require the Npgsql driver on the work machine;
+at work. Current Power BI Desktop releases include the Npgsql provider; only
+Desktop releases before December 2019 or on-premises data gateway releases
+before June 2025 require a separate Npgsql installation;
 ODBC templates require a bare DSN name without `;`/`=` attributes and require the
 named DSN there. The rebind runbook includes these prerequisites and post-refresh
 checks. `--out` refuses to overwrite an existing runbook unless `--force` is

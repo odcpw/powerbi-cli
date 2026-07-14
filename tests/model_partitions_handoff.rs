@@ -916,7 +916,8 @@ fn handoff_rebind_plan_is_complete_and_deterministic_when_all_templates_exist() 
     let markdown = plan_json["instructionsMarkdown"]
         .as_str()
         .expect("instructions markdown");
-    assert!(markdown.contains("Npgsql driver"));
+    assert!(markdown.contains("Current Power BI Desktop releases include the Npgsql provider"));
+    assert!(markdown.contains("on-premises data gateway releases before June 2025"));
     assert!(markdown.contains("ODBC DSN"));
     assert!(markdown.contains("Refresh completes successfully"));
     assert!(markdown.contains("Every report page canvas renders"));
