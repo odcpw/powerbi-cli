@@ -877,8 +877,8 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "model tables add-static",
             "aliases": ["model tables add-selector"],
-            "usage": "powerbi-cli model tables add-static --project <project-dir-or.pbip> --table <table> --column <column> --values-json <json-array-of-strings> [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Add a small disconnected single-string-column control table for slicers and metric selectors",
+            "usage": "powerbi-cli model tables add-static --project <project-dir-or.pbip> --table <table> ((--column <column> --values-json <json-array-of-strings>) | (--columns-json <json-array-of-column-names> --rows-json <json-array-of-string-arrays>)) [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Add a small static selector table or multi-column lookup dimension backed by an inline M table",
             "tags": ["tmdl", "semantic-model", "table", "static-table", "selector", "parameter", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -887,10 +887,10 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.model.tables.staticMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--column <column>", "--values-json <json-array-of-strings>", "--include-raw", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
-            "examples": ["powerbi-cli model tables add-static --project build/sales --table Metric --column Metric --values-json '[\"Count\",\"Cost\"]' --dry-run --json"],
-            "limitations": ["Creates only a new disconnected table with one string column and 1-100 unique short values.", "Refuses replacement, relationships, credentials, multiline values, and arbitrary fact/dimension data."],
-            "followUpFields": ["dryRun", "projectModified", "target.handle", "tablePlan.rowCount", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--column <column>", "--values-json <json-array-of-strings>", "--columns-json <json-array-of-column-names>", "--rows-json <json-array-of-string-arrays>", "--include-raw", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli model tables add-static --project build/sales --table Metric --column Metric --values-json '[\"Count\",\"Cost\"]' --dry-run --json", "powerbi-cli model tables add-static --project build/sales --table DimSegment --columns-json '[\"Code\",\"Label\"]' --rows-json '[[\"A\",\"Alpha\"],[\"B\",\"Beta\"]]' --dry-run --json"],
+            "limitations": ["Creates only a new table with 1-10 string columns and 1-100 short rows; the first column must be unique.", "Does not create relationships automatically; add the reviewed relationship separately with model relationships add.", "Refuses replacement, credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table ingestion."],
+            "followUpFields": ["dryRun", "projectModified", "target.handle", "target.columns", "tablePlan.columnCount", "tablePlan.rowCount", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "model calculated-columns list",
@@ -2658,7 +2658,7 @@ fn schema_manifest() -> Value {
         "partitionFields": ["handle", "table", "name", "expressionKind", "mode", "sourceKind", "offlineSafety", "sourcePreview", "source", "sourceIncluded"],
         "partitionSourceKinds": ["dummyMTable", "sqlDatabase", "postgresqlDatabase", "odbcDataSource", "webContents", "externalFile", "unknown", "missing"],
         "modelDaxBridgePlanFields": ["ok", "projectDir", "counts.measures", "counts.calculatedColumns", "daxInventory.measures[].handle", "daxInventory.measures[].expression", "daxInventory.calculatedColumns[].handle", "daxInventory.calculatedColumns[].expression", "bridge.required", "bridge.supportedEngines", "bridge.noFakeFallbacks", "validationBridge.offlineDaxParser.available", "next"],
-        "modelStaticTableMutationFields": ["ok", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "tablePlan.kind", "tablePlan.dataType", "tablePlan.rowCount", "tablePlan.relationshipCount", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
+        "modelStaticTableMutationFields": ["ok", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.columns", "tablePlan.kind", "tablePlan.dataType", "tablePlan.dataTypes", "tablePlan.columnCount", "tablePlan.rowCount", "tablePlan.uniqueFirstColumn", "tablePlan.relationshipCount", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "modelDaxDependenciesFields": ["analysisBoundary.daxEngineValidated", "counts", "expressions[].handle", "expressions[].tableColumns", "expressions[].measureReferences", "graph.edges", "findings", "validation", "next"],
         "modelAdvancedInventoryFields": ["families[].family", "families[].count", "families[].records[].handle", "families[].records[].summary", "validation", "next"],
         "packageInspectFields": ["package", "packageKind", "packageClass", "archive.kind", "archive.entries", "archive.byCategory", "sourceRoots", "support.canExtractSafeMetadata", "support.canImportSourceProject", "support.canWriteBinaryPackage", "entries[].name", "entries[].category", "entries[].safeForMetadataExtract", "next"],

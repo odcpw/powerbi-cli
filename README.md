@@ -236,11 +236,13 @@ Generated table partitions use Power Query M `#table(...)` expressions. Those
 dummy partitions are there to preserve model shape and field names while the
 project is away from the corporate data environment.
 
-For small report controls, `model tables add-static` adds a new disconnected
-single-string-column table with 1-100 reviewed selector labels. It is intended
-for slicers such as `Count` versus `Cost`, not for importing business data. The
-command refuses replacement, credentials, multiline values, and arbitrary
-fact/dimension table shapes, and validates the project after every write.
+For small report controls and compact reference dimensions, `model tables
+add-static` adds either a disconnected single-string-column selector or a
+1-10-column string lookup table backed by a generated inline M `#table`
+partition. Lookup keys in the first column are unique; relationships are added
+separately with `model relationships add`. The command refuses replacement,
+credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table
+ingestion, and validates the project after every write.
 
 The `regional-sales` archetype is deliberately dummy data, but keeps the
 column names and shape close enough to exercise a non-ASCII column
@@ -334,11 +336,12 @@ three pages.
   DAX. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
   instead of silently dropping it; Power BI Desktop or an explicit engine bridge
   remains the compatibility oracle.
-- Programmatic static control-table authoring covers `model tables add-static`
-  for a new disconnected single-string-column TMDL table backed by a generated
-  inline `#table` partition. Values are bounded, unique, short, and screened for
-  credential-like text. Broader table/column CRUD, relationships, and arbitrary
-  imported rows remain outside this guarded first slice.
+- Programmatic static-table authoring covers `model tables add-static` for a
+  new disconnected single-string-column selector or a small 1-10-column string
+  lookup dimension backed by a generated inline `#table` partition. Cells are
+  bounded, short, and screened for credential-like text; the first column is a
+  unique key. Broader table/column CRUD, automatic relationships, and arbitrary
+  fact-table ingestion remain outside this guarded surface.
 - Programmatic DAX calculated column authoring covers `model calculated-columns
   list/show/add/update/delete` with explicit data types, guarded output modes,
   readback commands, and `diff --scope model.calculatedColumns`. Updates refuse

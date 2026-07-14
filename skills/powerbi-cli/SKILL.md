@@ -180,6 +180,12 @@ supported.
 - Validate before moving a project between home and work machines.
 - Do not claim Power BI Desktop compatibility from local validation alone. Use
   Desktop open/save proof when the claim matters.
+- Separate Desktop refresh proof from accepting a Desktop save round-trip.
+  Saving can normalize many otherwise unchanged PBIP files, add automatic date
+  tables, cultures, diagram metadata, and local `.pbi` caches. After a proof
+  session, review the full diff, remove unintended generated sidecars and model
+  additions, then rerun strict validation before committing. Never commit the
+  noisy save merely because refresh succeeded.
 - Do not add real data, credentials, caches, `.pbix`, or `.pbit` files to a
   home-authored project.
 - Do not use package extraction as a way to smuggle imported data caches into a
@@ -359,23 +365,31 @@ and receives `formatString: "Short Date"` unless an explicit format string is
 provided. Colon-bearing table and column names round-trip through percent-encoded
 handles returned by the CLI.
 
-### Add A Small Disconnected Selector Table
+### Add A Small Selector Or Lookup Table
 
-Use the guarded static-table command for report controls such as a metric toggle:
+Use the guarded static-table command for report controls such as a metric toggle
+or for a compact non-sensitive lookup dimension:
 
 ```bash
 pbi --json capabilities --for add-static
 pbi --json model tables add-static --project build/sales --table Metric --column Metric --values-json '["Count","Cost"]' --dry-run
 pbi --json model tables add-static --project build/sales --table Metric --column Metric --values-json '["Count","Cost"]' --in-place
+pbi --json model tables add-static --project build/sales --table DimSegment --columns-json '["Code","Label"]' --rows-json '[["A","Alpha"],["B","Beta"]]' --dry-run
+pbi --json model tables add-static --project build/sales --table DimSegment --columns-json '["Code","Label"]' --rows-json '[["A","Alpha"],["B","Beta"]]' --in-place
+pbi --json model relationships add --project build/sales --from-table FactSales --from-column SegmentCode --to-table DimSegment --to-column Code --cross-filtering-behavior oneDirection --dry-run
 pbi --json model partitions show --project build/sales --handle "partition:Metric:Metric"
 pbi --json validate --strict build/sales
 ```
 
-This first slice creates only a new disconnected table with one string column
-and 1-100 unique short labels. It is for selector state, not business-data
-ingestion. It refuses replacement, credentials, multiline values, and arbitrary
-fact/dimension shapes. Use a DAX `SELECTEDVALUE`/`SWITCH` measure to connect the
-selector to report behavior; Desktop remains the DAX and interaction oracle.
+The selector form creates one disconnected string column with 1-100 unique
+short labels. The lookup form creates 1-10 string columns and 1-100 short rows;
+the first column is a unique key. It is intended for compact, non-sensitive
+reference dimensions, not fact-data ingestion. It refuses replacement,
+credentials, multiline cells, duplicate keys/rows, and arbitrary fact tables.
+Relationships are deliberately separate: dry-run and add one with `model
+relationships add`. Use a DAX `SELECTEDVALUE`/`SWITCH` measure to connect a
+disconnected selector to report behavior; Desktop remains the DAX and
+interaction oracle.
 
 ### Inspect Partitions And Handoff Safety
 

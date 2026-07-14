@@ -136,3 +136,60 @@ fn add_static_table_rejects_credentials_and_duplicate_labels() {
         assert!(!output.stderr.trim().is_empty());
     }
 }
+
+#[test]
+fn add_static_lookup_table_dry_run_then_in_place_and_validate() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let args = [
+        "model",
+        "tables",
+        "add-static",
+        "--project",
+        project_arg,
+        "--table",
+        "DimSegment",
+        "--columns-json",
+        "[\"Code\",\"Label\",\"Display\"]",
+        "--rows-json",
+        "[[\"A\",\"Alpha\",\"A - Alpha\"],[\"B\",\"Beta\",\"B - Beta\"]]",
+    ];
+
+    let mut dry_args = args.to_vec();
+    dry_args.extend(["--dry-run", "--include-raw", "--json"]);
+    let dry = run_powerbi(&dry_args);
+    assert_eq!(dry.code, 0, "stderr: {}", dry.stderr);
+    let dry_json = stdout_json(&dry);
+    assert_eq!(dry_json["tablePlan"]["kind"], "staticLookupTable");
+    assert_eq!(dry_json["tablePlan"]["columnCount"], 3);
+    assert_eq!(dry_json["tablePlan"]["rowCount"], 2);
+    assert_eq!(dry_json["tablePlan"]["uniqueFirstColumn"], true);
+    assert!(
+        dry_json["tablePlan"]["tmdl"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("type table [Code = text, Label = text, Display = text]")
+    );
+
+    let mut apply_args = args.to_vec();
+    apply_args.extend(["--in-place", "--json"]);
+    let apply = run_powerbi(&apply_args);
+    assert_eq!(apply.code, 0, "stderr: {}", apply.stderr);
+    let apply_json = stdout_json(&apply);
+    assert_eq!(apply_json["validation"]["ok"], true);
+
+    let table_path = project
+        .join("SalesOperations.SemanticModel")
+        .join("definition")
+        .join("tables")
+        .join("DimSegment.tmdl");
+    let text = fs::read_to_string(&table_path).expect("lookup table TMDL");
+    assert!(text.contains("column Code"));
+    assert!(text.contains("column Label"));
+    assert!(text.contains("column Display"));
+    assert!(text.contains("{\"A\", \"Alpha\", \"A - Alpha\"}"));
+
+    let validate = run_powerbi(&["validate", "--strict", project_arg, "--json"]);
+    assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
+}

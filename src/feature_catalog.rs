@@ -258,15 +258,15 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "model.static-control-tables",
-        title: "Static disconnected control tables",
+        title: "Small static selector and lookup tables",
         category: "model",
         status: "supported",
-        support: "add-single-string-column",
+        support: "add-bounded-string-table",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &["model tables add-static"],
         refusal_code: None,
-        reason: "The CLI can add a new small disconnected TMDL table backed by an inline generated #table partition for slicers and metric selectors, with guarded output and post-write validation.",
+        reason: "The CLI can add a new small TMDL table backed by an inline generated #table partition: either a disconnected one-column selector or a 1-10 column lookup dimension with a unique first-column key. Relationships remain a separate reviewed mutation.",
         next_proof: &[
             "Desktop refresh and selector-slicer interaction fixture",
             "Separate typed table/column CRUD only after broader TMDL fixtures exist",

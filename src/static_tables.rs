@@ -9,7 +9,8 @@ use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-const MAX_VALUES: usize = 100;
+const MAX_COLUMNS: usize = 10;
+const MAX_ROWS: usize = 100;
 const MAX_VALUE_CHARS: usize = 200;
 
 pub(crate) fn static_tables_command(args: &[String]) -> CliResult<Value> {
@@ -46,10 +47,17 @@ enum MutationMode {
 struct AddOptions {
     project: Option<PathBuf>,
     table: Option<String>,
-    column: Option<String>,
-    values: Option<Vec<String>>,
+    columns: Option<Vec<String>>,
+    rows: Option<Vec<Vec<String>>>,
+    input_kind: Option<StaticInputKind>,
     mode: Option<MutationMode>,
     include_raw: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StaticInputKind {
+    Selector,
+    Lookup,
 }
 
 fn add_static_table(args: &[String]) -> CliResult<Value> {
@@ -66,8 +74,8 @@ fn add_static_table(args: &[String]) -> CliResult<Value> {
     };
 
     let table = options.table.as_deref().expect("validated table");
-    let column = options.column.as_deref().expect("validated column");
-    let values = options.values.as_ref().expect("validated values");
+    let columns = options.columns.as_ref().expect("validated columns");
+    let rows = options.rows.as_ref().expect("validated rows");
     let docs = load_table_documents(&target_resolved)?;
     if docs.iter().any(|doc| same_name(&doc.table, table)) {
         return Err(CliError::invalid_args(format!(
@@ -94,7 +102,7 @@ fn add_static_table(args: &[String]) -> CliResult<Value> {
         .with_hint("The command never overwrites a table file."));
     }
 
-    let tmdl = static_table_tmdl(table, column, values);
+    let tmdl = static_table_tmdl(table, columns, rows);
     let dry_run = matches!(mode, MutationMode::DryRun);
     let (validation, project_modified) = if dry_run {
         (None, false)
@@ -143,16 +151,21 @@ fn add_static_table(args: &[String]) -> CliResult<Value> {
         "target": {
             "handle": format!("table:{table}"),
             "table": table,
-            "column": column,
+            "column": (columns.len() == 1).then(|| columns[0].clone()),
+            "columns": columns,
             "path": canonical_display(&path)
         },
         "tablePlan": {
-            "kind": "staticDisconnectedControlTable",
-            "dataType": "string",
-            "rowCount": values.len(),
-            "uniqueValues": true,
+            "kind": if columns.len() == 1 { "staticDisconnectedControlTable" } else { "staticLookupTable" },
+            "dataType": (columns.len() == 1).then_some("string"),
+            "dataTypes": columns.iter().map(|_| "string").collect::<Vec<_>>(),
+            "columnCount": columns.len(),
+            "rowCount": rows.len(),
+            "uniqueValues": (columns.len() == 1).then_some(true),
+            "uniqueFirstColumn": true,
             "relationshipCount": 0,
-            "values": options.include_raw.then(|| values.clone()),
+            "values": (options.include_raw && columns.len() == 1).then(|| rows.iter().map(|row| row[0].clone()).collect::<Vec<_>>()),
+            "rows": options.include_raw.then(|| rows.clone()),
             "tmdl": options.include_raw.then(|| tmdl.clone())
         },
         "changes": [{
@@ -160,7 +173,7 @@ fn add_static_table(args: &[String]) -> CliResult<Value> {
             "action": "add",
             "path": canonical_display(&path),
             "before": Value::Null,
-            "after": options.include_raw.then(|| tmdl.clone()).unwrap_or_else(|| format!("static string table {table}[{column}] with {} rows", values.len()))
+            "after": options.include_raw.then(|| tmdl.clone()).unwrap_or_else(|| format!("static string table {table} with {} columns and {} rows", columns.len(), rows.len()))
         }],
         "validation": validation.map(|report| json!({
             "ok": report.errors.is_empty(),
@@ -195,10 +208,15 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                 i += 2;
             }
             "--column" => {
-                options.column = Some(required_value(args, i, "--column")?.to_string());
+                set_input_kind(&mut options.input_kind, StaticInputKind::Selector)?;
+                if options.columns.is_some() {
+                    return Err(CliError::invalid_args("pass --column only once"));
+                }
+                options.columns = Some(vec![required_value(args, i, "--column")?.to_string()]);
                 i += 2;
             }
             "--values-json" => {
+                set_input_kind(&mut options.input_kind, StaticInputKind::Selector)?;
                 let raw = required_value(args, i, "--values-json")?;
                 let value: Value = serde_json::from_str(raw).map_err(|err| {
                     CliError::invalid_args(format!("--values-json is not valid JSON: {err}"))
@@ -212,9 +230,67 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                     let text = item.as_str().ok_or_else(|| {
                         CliError::invalid_args("--values-json must contain only strings")
                     })?;
-                    values.push(text.to_string());
+                    values.push(vec![text.to_string()]);
                 }
-                options.values = Some(values);
+                if options.rows.is_some() {
+                    return Err(CliError::invalid_args("pass --values-json only once"));
+                }
+                options.rows = Some(values);
+                i += 2;
+            }
+            "--columns-json" => {
+                set_input_kind(&mut options.input_kind, StaticInputKind::Lookup)?;
+                let raw = required_value(args, i, "--columns-json")?;
+                let value: Value = serde_json::from_str(raw).map_err(|err| {
+                    CliError::invalid_args(format!("--columns-json is not valid JSON: {err}"))
+                        .with_hint("Pass a JSON array of column names, for example '[\"Code\",\"Label\"]'.")
+                })?;
+                let array = value.as_array().ok_or_else(|| {
+                    CliError::invalid_args("--columns-json must be a JSON array of strings")
+                })?;
+                let columns = array
+                    .iter()
+                    .map(|item| {
+                        item.as_str().map(str::to_string).ok_or_else(|| {
+                            CliError::invalid_args("--columns-json must contain only strings")
+                        })
+                    })
+                    .collect::<CliResult<Vec<_>>>()?;
+                if options.columns.is_some() {
+                    return Err(CliError::invalid_args("pass --columns-json only once"));
+                }
+                options.columns = Some(columns);
+                i += 2;
+            }
+            "--rows-json" => {
+                set_input_kind(&mut options.input_kind, StaticInputKind::Lookup)?;
+                let raw = required_value(args, i, "--rows-json")?;
+                let value: Value = serde_json::from_str(raw).map_err(|err| {
+                    CliError::invalid_args(format!("--rows-json is not valid JSON: {err}"))
+                        .with_hint("Pass a JSON array of string rows, for example '[[\"A\",\"Alpha\"],[\"B\",\"Beta\"]]'.")
+                })?;
+                let array = value.as_array().ok_or_else(|| {
+                    CliError::invalid_args("--rows-json must be a JSON array of string arrays")
+                })?;
+                let rows = array
+                    .iter()
+                    .map(|item| {
+                        let row = item.as_array().ok_or_else(|| {
+                            CliError::invalid_args("--rows-json must contain only arrays")
+                        })?;
+                        row.iter()
+                            .map(|cell| {
+                                cell.as_str().map(str::to_string).ok_or_else(|| {
+                                    CliError::invalid_args("--rows-json cells must all be strings")
+                                })
+                            })
+                            .collect::<CliResult<Vec<_>>>()
+                    })
+                    .collect::<CliResult<Vec<_>>>()?;
+                if options.rows.is_some() {
+                    return Err(CliError::invalid_args("pass --rows-json only once"));
+                }
+                options.rows = Some(rows);
                 i += 2;
             }
             "--include-raw" => {
@@ -255,16 +331,13 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
         .as_deref()
         .ok_or_else(|| CliError::invalid_args("model tables add-static requires --table"))?;
     validate_table_file_name(table)?;
-    let column = options
-        .column
-        .as_deref()
-        .ok_or_else(|| CliError::invalid_args("model tables add-static requires --column"))?;
-    validate_object_name(column, "--column")?;
-    let values = options
-        .values
-        .as_ref()
-        .ok_or_else(|| CliError::invalid_args("model tables add-static requires --values-json"))?;
-    validate_values(values)?;
+    let columns = options.columns.as_ref().ok_or_else(|| {
+        CliError::invalid_args("model tables add-static requires --column or --columns-json")
+    })?;
+    let rows = options.rows.as_ref().ok_or_else(|| {
+        CliError::invalid_args("model tables add-static requires --values-json or --rows-json")
+    })?;
+    validate_static_data(columns, rows)?;
     if options.mode.is_none() {
         return Err(CliError::invalid_args(
             "model tables add-static requires --dry-run, --in-place, or --out-dir <dir>",
@@ -334,74 +407,121 @@ fn validate_object_name(value: &str, flag: &str) -> CliResult<()> {
     Ok(())
 }
 
-fn validate_values(values: &[String]) -> CliResult<()> {
-    if values.is_empty() || values.len() > MAX_VALUES {
+fn validate_static_data(columns: &[String], rows: &[Vec<String>]) -> CliResult<()> {
+    if columns.is_empty() || columns.len() > MAX_COLUMNS {
         return Err(CliError::invalid_args(format!(
-            "--values-json must contain between 1 and {MAX_VALUES} strings"
+            "static tables must contain between 1 and {MAX_COLUMNS} columns"
         )));
     }
-    let mut unique = BTreeSet::new();
-    for value in values {
-        let trimmed = value.trim();
-        if trimmed.is_empty()
-            || trimmed != value
-            || value.chars().count() > MAX_VALUE_CHARS
-            || value.contains(['\r', '\n'])
-        {
+    let mut unique_columns = BTreeSet::new();
+    for column in columns {
+        validate_object_name(column, "static table column")?;
+        if !unique_columns.insert(column.to_lowercase()) {
             return Err(CliError::invalid_args(format!(
-                "static control-table values must be non-empty, single-line strings of at most {MAX_VALUE_CHARS} characters without surrounding whitespace"
-            )));
-        }
-        if !unique.insert(value.to_lowercase()) {
-            return Err(CliError::invalid_args(format!(
-                "static control-table values must be unique (case-insensitive): {value}"
+                "static table column names must be unique (case-insensitive): {column}"
             )));
         }
     }
-    let joined = values.join("\n");
+    if rows.is_empty() || rows.len() > MAX_ROWS {
+        return Err(CliError::invalid_args(format!(
+            "static tables must contain between 1 and {MAX_ROWS} rows"
+        )));
+    }
+    let mut unique_rows = BTreeSet::new();
+    let mut unique_keys = BTreeSet::new();
+    let mut all_cells = Vec::new();
+    for (row_index, row) in rows.iter().enumerate() {
+        if row.len() != columns.len() {
+            return Err(CliError::invalid_args(format!(
+                "static table row {} has {} cells but {} columns were declared",
+                row_index + 1,
+                row.len(),
+                columns.len()
+            )));
+        }
+        for value in row {
+            let trimmed = value.trim();
+            if trimmed.is_empty()
+                || trimmed != value
+                || value.chars().count() > MAX_VALUE_CHARS
+                || value.contains(['\r', '\n'])
+            {
+                return Err(CliError::invalid_args(format!(
+                    "static table cells must be non-empty, single-line strings of at most {MAX_VALUE_CHARS} characters without surrounding whitespace"
+                )));
+            }
+            all_cells.push(value.clone());
+        }
+        let row_key = row
+            .iter()
+            .map(|value| value.to_lowercase())
+            .collect::<Vec<_>>()
+            .join("\u{1f}");
+        if !unique_rows.insert(row_key) {
+            return Err(CliError::invalid_args(format!(
+                "static table rows must be unique (case-insensitive): row {}",
+                row_index + 1
+            )));
+        }
+        if !unique_keys.insert(row[0].to_lowercase()) {
+            return Err(CliError::invalid_args(format!(
+                "static table first-column values must be unique (case-insensitive): {}",
+                row[0]
+            )));
+        }
+    }
+    let joined = all_cells.join("\n");
     if contains_credential_like_text_str(&joined) {
         return Err(CliError::invalid_args(
-            "static control-table values contain credential-like text",
+            "static table cells contain credential-like text",
         )
-        .with_hint("Keep credentials in Power BI Desktop; this command is only for short non-sensitive selector labels."));
+        .with_hint("Keep credentials in Power BI Desktop; this command is only for small non-sensitive selector or lookup data."));
     }
     Ok(())
 }
 
-fn static_table_tmdl(table: &str, column: &str, values: &[String]) -> String {
+fn static_table_tmdl(table: &str, columns: &[String], rows: &[Vec<String>]) -> String {
     let mut out = String::new();
     out.push_str(&format!("table {}\n", tmdl_object_name(table)));
     out.push_str(&format!(
         "    lineageTag: {}\n\n",
         stable_guid(&format!("table:{table}"))
     ));
-    out.push_str(&format!("    column {}\n", tmdl_object_name(column)));
-    out.push_str("        dataType: string\n");
-    out.push_str(&format!(
-        "        lineageTag: {}\n",
-        stable_guid(&format!("column:{table}:{column}"))
-    ));
-    out.push_str("        summarizeBy: none\n");
-    out.push_str(&format!(
-        "        sourceColumn: {}\n\n",
-        tmdl_object_name(column)
-    ));
+    for column in columns {
+        out.push_str(&format!("    column {}\n", tmdl_object_name(column)));
+        out.push_str("        dataType: string\n");
+        out.push_str(&format!(
+            "        lineageTag: {}\n",
+            stable_guid(&format!("column:{table}:{column}"))
+        ));
+        out.push_str("        summarizeBy: none\n");
+        out.push_str(&format!(
+            "        sourceColumn: {}\n\n",
+            tmdl_object_name(column)
+        ));
+    }
     out.push_str(&format!("    partition {} = m\n", tmdl_object_name(table)));
     out.push_str("        mode: import\n");
     out.push_str("        source =\n");
     out.push_str("            let\n");
     out.push_str("                Source = #table(\n");
+    let typed_columns = columns
+        .iter()
+        .map(|column| format!("{} = text", m_identifier(column)))
+        .collect::<Vec<_>>()
+        .join(", ");
     out.push_str(&format!(
-        "                    type table [{} = text],\n",
-        m_identifier(column)
+        "                    type table [{typed_columns}],\n"
     ));
     out.push_str("                    {\n");
-    for (index, value) in values.iter().enumerate() {
-        let suffix = if index + 1 == values.len() { "" } else { "," };
-        out.push_str(&format!(
-            "                        {{\"{}\"}}{suffix}\n",
-            m_escape_string(value)
-        ));
+    for (index, row) in rows.iter().enumerate() {
+        let suffix = if index + 1 == rows.len() { "" } else { "," };
+        let cells = row
+            .iter()
+            .map(|value| format!("\"{}\"", m_escape_string(value)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!("                        {{{cells}}}{suffix}\n"));
     }
     out.push_str("                    }\n");
     out.push_str("                )\n");
@@ -478,6 +598,22 @@ fn set_mode(target: &mut Option<MutationMode>, mode: MutationMode) -> CliResult<
     Ok(())
 }
 
+fn set_input_kind(
+    target: &mut Option<StaticInputKind>,
+    input_kind: StaticInputKind,
+) -> CliResult<()> {
+    if let Some(existing) = target {
+        if *existing != input_kind {
+            return Err(CliError::invalid_args(
+                "choose either --column with --values-json or --columns-json with --rows-json",
+            ));
+        }
+    } else {
+        *target = Some(input_kind);
+    }
+    Ok(())
+}
+
 fn mode_name(mode: &MutationMode) -> &'static str {
     match mode {
         MutationMode::DryRun => "dry-run",
@@ -498,8 +634,11 @@ mod tests {
     fn static_table_tmdl_is_deterministic_and_escapes_labels() {
         let tmdl = static_table_tmdl(
             "Kennzahl",
-            "Kennzahl",
-            &["Anzahl Unfälle".to_string(), "Kosten \"CHF\"".to_string()],
+            &["Kennzahl".to_string()],
+            &[
+                vec!["Anzahl Unfälle".to_string()],
+                vec!["Kosten \"CHF\"".to_string()],
+            ],
         );
         assert!(tmdl.contains("table Kennzahl"));
         assert!(tmdl.contains("type table [Kennzahl = text]"));
@@ -510,15 +649,47 @@ mod tests {
             tmdl,
             static_table_tmdl(
                 "Kennzahl",
-                "Kennzahl",
-                &["Anzahl Unfälle".to_string(), "Kosten \"CHF\"".to_string()]
+                &["Kennzahl".to_string()],
+                &[
+                    vec!["Anzahl Unfälle".to_string()],
+                    vec!["Kosten \"CHF\"".to_string()],
+                ]
             )
         );
     }
 
     #[test]
     fn static_values_reject_duplicates_and_credentials() {
-        assert!(validate_values(&["Count".to_string(), "count".to_string()]).is_err());
-        assert!(validate_values(&["password=secret".to_string()]).is_err());
+        assert!(
+            validate_static_data(
+                &["Metric".to_string()],
+                &[vec!["Count".to_string()], vec!["count".to_string()]]
+            )
+            .is_err()
+        );
+        assert!(
+            validate_static_data(
+                &["Metric".to_string()],
+                &[vec!["password=secret".to_string()]]
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn static_lookup_tmdl_emits_multiple_columns_and_rows() {
+        let tmdl = static_table_tmdl(
+            "DimSegment",
+            &["Code".to_string(), "Label".to_string()],
+            &[
+                vec!["A".to_string(), "Alpha".to_string()],
+                vec!["B".to_string(), "Beta".to_string()],
+            ],
+        );
+        assert!(tmdl.contains("column Code"));
+        assert!(tmdl.contains("column Label"));
+        assert!(tmdl.contains("type table [Code = text, Label = text]"));
+        assert!(tmdl.contains("{\"A\", \"Alpha\"}"));
+        assert!(tmdl.contains("{\"B\", \"Beta\"}"));
     }
 }
