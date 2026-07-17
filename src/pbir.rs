@@ -140,7 +140,7 @@ pub(crate) fn find_page<'a>(
 
 fn page_selector_suggestion(command: &str) -> String {
     match command {
-        "report visuals add" => "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --dry-run --json".to_string(),
+        "report visuals add" => "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --dry-run --json".to_string(),
         "report interactions set" => "powerbi-cli report interactions set --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --type DataFilter --dry-run --json".to_string(),
         "report interactions disable" => "powerbi-cli report interactions disable --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json".to_string(),
         "report pages add" => "powerbi-cli report pages add --project <project-dir-or.pbip> --display-name <name> --before <page-handle> --dry-run --json".to_string(),

@@ -69,7 +69,7 @@ pub(crate) fn extract_formatting(args: &[String]) -> CliResult<Value> {
                 )),
         );
     }
-    let summary = formatting_summary_from_visual_json(&visual_json, false);
+    let summary = formatting_summary_from_payload(&payload, false);
     let safety = payload_safety_json(&payload, &summary);
     let bundle = json!({
         "schema": VISUAL_FORMATTING_BUNDLE_SCHEMA,

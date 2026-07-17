@@ -3,7 +3,7 @@
     "boundVisuals": 5,
     "columns": 3,
     "explicitInteractions": 0,
-    "jsonFilesChecked": 19,
+    "jsonFilesChecked": 18,
     "lintErrors": 0,
     "lintInfo": 0,
     "lintWarnings": 0,
@@ -18,7 +18,7 @@
     "visuals": 5
   },
   "exitCode": 0,
-  "fingerprint": "1ebb77577e9da341",
+  "fingerprint": "fcab63c2b3b77ef5",
   "lint": {
     "counts": {
       "errors": 0,
@@ -148,11 +148,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "ec8ee91b20484a6c",
+              "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "b10b3d82a602c27a",
-              "visual": "7ca308149bd322be",
-              "visualJson": "c08dcd4553c32c51"
+              "visual": "35046225897533c4",
+              "visualContainerObjects": "08cc39cbe49d7218",
+              "visualJson": "11e76c2bfe2b9b43"
             },
             "name": "VisualContainerCategorySharePie",
             "ordinal": 0,
@@ -201,11 +202,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "9c9bf65f812b0ffa",
+              "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "b10b3d82a602c27a",
-              "visual": "f90f51acf414cf24",
-              "visualJson": "d271f238f8384403"
+              "visual": "14b89c4b4427d1c6",
+              "visualContainerObjects": "e884e7da81b78060",
+              "visualJson": "8d01ca2d2ebe4c19"
             },
             "name": "VisualContainerCategoryShareDonut",
             "ordinal": 0,
@@ -262,11 +264,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "99ac8110cf81455c",
+              "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "475cdcd8f9fcff83",
-              "visual": "1abc7dfa5a3493e0",
-              "visualJson": "356a96ce441c4b7d"
+              "visual": "e96252fc3cf0d328",
+              "visualContainerObjects": "78dee4d5116b4940",
+              "visualJson": "0728645f75e8d6e1"
             },
             "name": "VisualContainerRowsColumnsValuesMatrix",
             "ordinal": 0,
@@ -307,11 +310,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "1769af448b022c26",
+              "objects": "685364fcc43e03c4",
               "position": "f7d3c15e6f16eb11",
               "queryState": "dc039ae7e1b89f7c",
-              "visual": "489d9428ae45212a",
-              "visualJson": "28650099d5dbe0b3"
+              "visual": "39cca60eee44942c",
+              "visualContainerObjects": "d407d6f4f7e53c16",
+              "visualJson": "a798636d4e228859"
             },
             "name": "VisualContainerBasicCategorySlicer",
             "ordinal": 0,
@@ -360,11 +364,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "e5ac6162567dc055",
+              "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "cae5c379b6600e55",
-              "visual": "6ef9bd68ce42f494",
-              "visualJson": "4c941036e5a1e20e"
+              "visual": "0193c3e444722dd8",
+              "visualContainerObjects": "de4e98c367d26b2e",
+              "visualJson": "7421120f3d1e440e"
             },
             "name": "VisualContainerKnownGoodLineControl",
             "ordinal": 0,

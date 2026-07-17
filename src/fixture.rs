@@ -673,6 +673,7 @@ fn visual_raw_fingerprints(visual: &Value) -> CliResult<Value> {
         "visual": fingerprint_value(&raw["visual"])?,
         "queryState": fingerprint_value(&raw["visual"]["query"]["queryState"])?,
         "objects": fingerprint_value(&raw["visual"]["objects"])?,
+        "visualContainerObjects": fingerprint_value(&raw["visual"]["visualContainerObjects"])?,
         "position": fingerprint_value(&raw["position"])?
     }))
 }

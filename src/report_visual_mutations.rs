@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 const DEFAULT_WIDTH: f64 = 320.0;
 const DEFAULT_HEIGHT: f64 = 180.0;
-const ADD_DRY_RUN_COMMAND: &str = "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --dry-run --json";
+const ADD_DRY_RUN_COMMAND: &str = "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --dry-run --json";
 const REQUIRE_MODE_HINT: &str =
     "Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.";
 const SET_MODE_HINT: &str =
@@ -66,17 +66,13 @@ pub(crate) fn add_visual(args: &[String]) -> CliResult<Value> {
     let page_selector = options.page.as_ref().ok_or_else(|| {
         CliError::invalid_args("report visuals add requires --page <page-name-or-handle>")
             .with_hint("Use `report pages list` to get stable page handles.")
-            .with_suggested_command(
-                "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --dry-run --json",
-            )
+            .with_suggested_command(ADD_DRY_RUN_COMMAND)
     })?;
     let page_selector = selector_from_page(page_selector);
     let title = options.title.as_deref().ok_or_else(|| {
         CliError::invalid_args("report visuals add requires --title")
             .with_hint("Agents should give every created visual a readable title.")
-            .with_suggested_command(
-                "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --dry-run --json",
-            )
+            .with_suggested_command(ADD_DRY_RUN_COMMAND)
     })?;
     validate_nonempty_text(title, "--title")?;
     let visual_type = options
@@ -145,7 +141,7 @@ pub(crate) fn add_visual(args: &[String]) -> CliResult<Value> {
         height,
         tab_order,
     };
-    let visual_json = visual_container_json(&build_spec);
+    let visual_json = visual_container_json(&build_spec)?;
     let visual_dir = page_visuals_dir(&page)?.join(&visual_name);
     let visual_path = visual_dir.join("visual.json");
     ensure_child_path(&visual_dir, &page_visuals_dir(&page)?)?;
@@ -374,16 +370,6 @@ pub(crate) fn validate_binding_cardinality(
     bindings: &[VisualBindingResolved],
 ) -> CliResult<()> {
     let family = binding_family(visual_type)?;
-    if bindings.is_empty()
-        && !matches!(
-            family,
-            VisualBindingFamily::CategoryShare
-                | VisualBindingFamily::RowsColumnsValues
-                | VisualBindingFamily::SlicerField
-        )
-    {
-        return Ok(());
-    }
     match family {
         VisualBindingFamily::SingleValue => {
             if bindings.len() == 1 && bindings[0].role == "Values" {
@@ -398,7 +384,7 @@ pub(crate) fn validate_binding_cardinality(
             ))
         }
         VisualBindingFamily::ValuesList => {
-            if bindings.iter().all(|binding| binding.role == "Values") {
+            if !bindings.is_empty() && bindings.iter().all(|binding| binding.role == "Values") {
                 return Ok(());
             }
             Err(
@@ -574,9 +560,7 @@ fn validate_new_visual_name(name: &str, page: &PageRecord) -> CliResult<String> 
             page.handle
         ))
         .with_hint("Choose a unique internal --name or omit it so powerbi-cli can generate one.")
-        .with_suggested_command(
-            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --dry-run --json",
-        ));
+        .with_suggested_command(ADD_DRY_RUN_COMMAND));
     }
     Ok(name.to_string())
 }
@@ -590,11 +574,11 @@ fn validate_visual_name(name: &str) -> CliResult<()> {
             .chars()
             .any(|ch| ch == '/' || ch == '\\' || ch == ':' || ch.is_control())
     {
-        return Err(CliError::invalid_args(format!("unsafe visual name: {name}"))
-            .with_hint("Use a simple internal visual name without path separators.")
-            .with_suggested_command(
-                "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --dry-run --json",
-            ));
+        return Err(
+            CliError::invalid_args(format!("unsafe visual name: {name}"))
+                .with_hint("Use a simple internal visual name without path separators.")
+                .with_suggested_command(ADD_DRY_RUN_COMMAND),
+        );
     }
     Ok(())
 }
@@ -657,7 +641,7 @@ fn validate_position_bounds(
         )
         .with_hint("Use --allow-outside-page only for page overflow, not negative coordinates.")
         .with_suggested_command(
-            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --x 0 --y 0 --dry-run --json",
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --x 0 --y 0 --dry-run --json",
         ));
     }
     if width <= 0.0 || height <= 0.0 {
@@ -666,7 +650,7 @@ fn validate_position_bounds(
         )
         .with_hint("Pass positive --width and --height values.")
         .with_suggested_command(
-            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --width 320 --height 180 --dry-run --json",
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --width 320 --height 180 --dry-run --json",
         ));
     }
     if !allow_outside_page
@@ -678,7 +662,7 @@ fn validate_position_bounds(
         )
         .with_hint("Keep the visual inside the page or pass --allow-outside-page deliberately.")
         .with_suggested_command(
-            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --allow-outside-page --dry-run --json",
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --allow-outside-page --dry-run --json",
         ));
     }
     Ok(())

@@ -32,7 +32,7 @@ All four use `$schema: .../visualContainer/2.4.0/schema.json` — same version p
 ## visual container titles
 - Every archived fixture has `/visual/visualContainerObjects/title`.
 - The slicer fixture proves a literal `text` expression and a literal `show` property; the other fixtures use measure-driven title text.
-- Generated literal titles therefore belong in `visualContainerObjects`, not root-level `objects`. `powerbi-cli` emits literal text with `show: true` and keeps `/visual/objects/general` for alt text.
+- Generated shared literal titles and alt text belong in `visual.visualContainerObjects`, not root-level `objects`; visual-specific formatting remains under `visual.objects`. `powerbi-cli` emits title `show: true` and canonical shared alt text under `/visual/visualContainerObjects/general`.
 
 ## Implications for powerbi-cli catalog work (WO-5/WO-6)
 1. Pie/donut slot into the existing visual factory with a new binding family (Category + Y, no Series);

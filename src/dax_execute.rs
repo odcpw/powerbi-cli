@@ -1,8 +1,11 @@
 use crate::cli_support::{required_project, take_value};
 use crate::{
-    CliError, CliResult, EXIT_ORACLE_FAILED, EXIT_ORACLE_UNAVAILABLE, EXIT_SUCCESS,
-    EXIT_VALIDATION_FAILED, canonical_display, resolve_project, validate_project,
+    CliError, CliResult, EXIT_ORACLE_UNAVAILABLE, EXIT_VALIDATION_FAILED, canonical_display,
+    resolve_project, validate_project,
 };
+#[cfg(windows)]
+use crate::{EXIT_ORACLE_FAILED, EXIT_SUCCESS};
+#[cfg(windows)]
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::fs;
@@ -53,6 +56,7 @@ impl Default for ExecuteOptions {
     }
 }
 
+#[cfg(windows)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BridgeColumn {
@@ -61,12 +65,14 @@ struct BridgeColumn {
     data_type: String,
 }
 
+#[cfg(windows)]
 #[derive(Debug, Deserialize)]
 struct BridgeRow {
     #[serde(default)]
     values: Vec<Value>,
 }
 
+#[cfg(windows)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BridgeResult {
@@ -129,14 +135,16 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
         "fingerprint": format!("fnv64:{}", fingerprint_hex(&query)),
         "textReturned": false
     });
+    let base = BasePayloadContext {
+        project_dir: &resolved.project_dir,
+        pbip_path: &resolved.pbip_path,
+        options: &options,
+        query_metadata: &query_metadata,
+        validation: &validation_json,
+    };
 
     if validation_json["ok"] != Value::Bool(true) {
-        return Ok(base_payload(
-            &resolved.project_dir,
-            &resolved.pbip_path,
-            &options,
-            query_metadata,
-            validation_json,
+        return Ok(base.render(
             false,
             EXIT_VALIDATION_FAILED,
             "project-validation",
@@ -148,12 +156,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
     }
 
     if !cfg!(windows) {
-        return Ok(base_payload(
-            &resolved.project_dir,
-            &resolved.pbip_path,
-            &options,
-            query_metadata,
-            validation_json,
+        return Ok(base.render(
             false,
             EXIT_ORACLE_UNAVAILABLE,
             "platform",
@@ -165,12 +168,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
     }
 
     if !oracle_enabled() {
-        return Ok(base_payload(
-            &resolved.project_dir,
-            &resolved.pbip_path,
-            &options,
-            query_metadata,
-            validation_json,
+        return Ok(base.render(
             false,
             EXIT_ORACLE_UNAVAILABLE,
             "oracle-opt-in",
@@ -187,8 +185,8 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
             &resolved.project_dir,
             &resolved.pbip_path,
             &query,
-            query_metadata,
-            validation_json,
+            &query_metadata,
+            &validation_json,
             &options,
         );
     }
@@ -199,48 +197,48 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
     ))
 }
 
-fn base_payload(
-    project_dir: &Path,
-    pbip_path: &Path,
-    options: &ExecuteOptions,
-    query_metadata: Value,
-    validation: Value,
-    ok: bool,
-    exit_code: i32,
-    stage: &str,
-    diagnostic: Value,
-) -> Value {
-    json!({
-        "schema": "powerbi-cli.model.dax.execute.v1",
-        "ok": ok,
-        "exitCode": exit_code,
-        "projectDir": canonical_display(project_dir),
-        "pbip": canonical_display(pbip_path),
-        "query": query_metadata,
-        "safety": {
-            "readOnlyQueryFormsOnly": true,
-            "allowDataRead": options.allow_data_read,
-            "desktopOracleEnabled": oracle_enabled(),
-            "exactOpenProjectMatchRequired": true,
-            "autoLaunch": false,
-            "modelWrites": false,
-            "queryTextReturned": false,
-            "resultDataMayBeSensitive": true
-        },
-        "limits": {
-            "maxRows": options.max_rows,
-            "maxCellChars": options.max_cell_chars,
-            "timeoutMs": options.timeout_ms,
-            "maxQueryBytes": MAX_QUERY_BYTES
-        },
-        "stage": stage,
-        "diagnostics": [diagnostic],
-        "validation": validation,
-        "next": [
-            "Keep the exact PBIP open in Power BI Desktop and rerun with both explicit opt-ins.",
-            "Use --max-rows, --max-cell-chars, and --timeout-ms to tighten result bounds."
-        ]
-    })
+struct BasePayloadContext<'a> {
+    project_dir: &'a Path,
+    pbip_path: &'a Path,
+    options: &'a ExecuteOptions,
+    query_metadata: &'a Value,
+    validation: &'a Value,
+}
+
+impl BasePayloadContext<'_> {
+    fn render(&self, ok: bool, exit_code: i32, stage: &str, diagnostic: Value) -> Value {
+        json!({
+            "schema": "powerbi-cli.model.dax.execute.v1",
+            "ok": ok,
+            "exitCode": exit_code,
+            "projectDir": canonical_display(self.project_dir),
+            "pbip": canonical_display(self.pbip_path),
+            "query": self.query_metadata,
+            "safety": {
+                "readOnlyQueryFormsOnly": true,
+                "allowDataRead": self.options.allow_data_read,
+                "desktopOracleEnabled": oracle_enabled(),
+                "exactOpenProjectMatchRequired": true,
+                "autoLaunch": false,
+                "modelWrites": false,
+                "queryTextReturned": false,
+                "resultDataMayBeSensitive": true
+            },
+            "limits": {
+                "maxRows": self.options.max_rows,
+                "maxCellChars": self.options.max_cell_chars,
+                "timeoutMs": self.options.timeout_ms,
+                "maxQueryBytes": MAX_QUERY_BYTES
+            },
+            "stage": stage,
+            "diagnostics": [diagnostic],
+            "validation": self.validation,
+            "next": [
+                "Keep the exact PBIP open in Power BI Desktop and rerun with both explicit opt-ins.",
+                "Use --max-rows, --max-cell-chars, and --timeout-ms to tighten result bounds."
+            ]
+        })
+    }
 }
 
 #[cfg(windows)]
@@ -248,10 +246,17 @@ fn execute_windows(
     project_dir: &Path,
     pbip_path: &Path,
     query: &str,
-    query_metadata: Value,
-    validation: Value,
+    query_metadata: &Value,
+    validation: &Value,
     options: &ExecuteOptions,
 ) -> CliResult<Value> {
+    let base = BasePayloadContext {
+        project_dir,
+        pbip_path,
+        options,
+        query_metadata,
+        validation,
+    };
     let mut runtime = RuntimeDir::create()?;
     let script_path = runtime.path.join("execute-dax.ps1");
     let query_path = runtime.path.join("query.dax");
@@ -334,17 +339,7 @@ fn execute_windows(
     let cleanup_succeeded = runtime.cleanup();
 
     if let Some(diagnostic) = process_diagnostic {
-        let mut payload = base_payload(
-            project_dir,
-            pbip_path,
-            options,
-            query_metadata,
-            validation,
-            false,
-            EXIT_ORACLE_FAILED,
-            "bridge-process",
-            diagnostic,
-        );
+        let mut payload = base.render(false, EXIT_ORACLE_FAILED, "bridge-process", diagnostic);
         payload["runtime"] = json!({"temporaryFilesRemoved": cleanup_succeeded});
         return Ok(payload);
     }
@@ -358,12 +353,7 @@ fn execute_windows(
         } else {
             EXIT_ORACLE_UNAVAILABLE
         };
-        let mut payload = base_payload(
-            project_dir,
-            pbip_path,
-            options,
-            query_metadata,
-            validation,
+        let mut payload = base.render(
             false,
             exit_code,
             &bridge.stage,

@@ -1116,7 +1116,7 @@ fn dashboard_spec_validate_enforces_visual_binding_contracts() {
         card_json["errors"][0]
             .as_str()
             .unwrap_or_default()
-            .contains("at most one Values")
+            .contains("exactly one Values")
     );
 
     let scatter_spec = temp.path().join("bad-scatter.dashboard.json");

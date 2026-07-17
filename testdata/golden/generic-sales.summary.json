@@ -3,7 +3,7 @@
     "boundVisuals": 3,
     "columns": 11,
     "explicitInteractions": 0,
-    "jsonFilesChecked": 13,
+    "jsonFilesChecked": 12,
     "lintErrors": 0,
     "lintInfo": 0,
     "lintWarnings": 0,
@@ -18,7 +18,7 @@
     "visuals": 3
   },
   "exitCode": 0,
-  "fingerprint": "3787f8f20500946d",
+  "fingerprint": "e59750e229782b86",
   "lint": {
     "counts": {
       "errors": 0,
@@ -277,11 +277,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "ae3065c278122f5e",
+              "objects": "5b9bc4ba528108e4",
               "position": "b601e0e0aa548821",
               "queryState": "c39d2fd75ea0d2bc",
-              "visual": "31efb20b9f29a61c",
-              "visualJson": "1bcd09030e01dc99"
+              "visual": "d02dbede734ddfdc",
+              "visualContainerObjects": "7e0105d6d76667bc",
+              "visualJson": "346025096bf05ad5"
             },
             "name": "VisualContainerCustomerDetail",
             "ordinal": 0,
@@ -309,11 +310,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "b044065363c0b053",
+              "objects": "5b9bc4ba528108e4",
               "position": "dec796711fd9b3bf",
               "queryState": "2c299f7e7fbeb884",
-              "visual": "9126f8dce65b0639",
-              "visualJson": "24585a2d75c6497e"
+              "visual": "ad2cbf401d85245b",
+              "visualContainerObjects": "a97d9735ae28d4c6",
+              "visualJson": "d52881c46b9dbbc8"
             },
             "name": "VisualContainerRevenueCard",
             "ordinal": 1,
@@ -349,11 +351,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "31110711e5ef121c",
+              "objects": "5b9bc4ba528108e4",
               "position": "ffff729ece655f4f",
               "queryState": "30a7c00d07ff162a",
-              "visual": "0f4dcace430d5155",
-              "visualJson": "d32162fa419d3850"
+              "visual": "365d8d7f16953f1d",
+              "visualContainerObjects": "1994580895b20130",
+              "visualJson": "e4c7b8a58c5e5d28"
             },
             "name": "VisualContainerRevenueTrend",
             "ordinal": 2,

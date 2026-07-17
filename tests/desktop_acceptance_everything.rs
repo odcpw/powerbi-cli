@@ -170,6 +170,41 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok("--robot-triage", &svec(["--robot-triage", "--json"]));
     h.ok("robot-triage", &svec(["robot-triage", "--json"]));
     h.ok("doctor", &svec(["doctor", "--json"]));
+    h.code(
+        "integrations status",
+        2,
+        &svec([
+            "integrations",
+            "status",
+            "--component",
+            "not-a-component",
+            "--json",
+        ]),
+    );
+    h.code(
+        "integrations install",
+        2,
+        &svec(["integrations", "install", "--json"]),
+    );
+    h.code(
+        "desktop bridge status",
+        2,
+        &svec(["desktop", "bridge", "status", "--unknown", "--json"]),
+    );
+    for command in ["reload", "screenshot-page", "screenshot-all"] {
+        h.code(
+            &format!("desktop bridge {command}"),
+            2,
+            &svec(["desktop", "bridge", command, "--json"]),
+        );
+    }
+    h.code("workflow plan", 2, &svec(["workflow", "plan", "--json"]));
+    h.code("workflow run", 2, &svec(["workflow", "run", "--json"]));
+    h.code(
+        "workflow verify",
+        2,
+        &svec(["workflow", "verify", "--json"]),
+    );
 
     h.ok(
         "schema validate",
@@ -292,14 +327,15 @@ fn everything_acceptance_invokes_every_catalog_command() {
         "handoff check",
         &svec(["handoff", "check", &project_arg, "--json"]),
     );
+    let desktop_oracle_exit = if cfg!(windows) { 30 } else { 2 };
     h.code(
         "desktop open-check",
-        30,
+        desktop_oracle_exit,
         &svec(["desktop", "open-check", &project_arg, "--json"]),
     );
     h.code(
         "desktop screenshot",
-        30,
+        desktop_oracle_exit,
         &svec([
             "desktop",
             "screenshot",
@@ -795,7 +831,14 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
-    assert_eq!(dax_execute["stage"], "oracle-opt-in");
+    assert_eq!(
+        dax_execute["stage"],
+        if cfg!(windows) {
+            "oracle-opt-in"
+        } else {
+            "platform"
+        }
+    );
     assert_eq!(dax_execute["query"]["textReturned"], Value::Bool(false));
     install_advanced_model_fixtures(&project);
     h.ok(
@@ -2663,7 +2706,13 @@ fn install_slicer_fixture(project: &Path, title: &str) {
         visual["visual"]["objects"] = json!({
             "general": [{
                 "properties": {
-                    "orientation": { "expr": { "Literal": { "Value": "'vertical'" } } },
+                    "orientation": { "expr": { "Literal": { "Value": "'vertical'" } } }
+                }
+            }]
+        });
+        visual["visual"]["visualContainerObjects"] = json!({
+            "general": [{
+                "properties": {
                     "altText": { "expr": { "Literal": { "Value": "'Branch slicer'" } } }
                 }
             }]

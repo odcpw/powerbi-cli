@@ -4,10 +4,16 @@ use std::path::Path;
 use std::process::Command;
 
 fn run_powerbi(args: &[&str]) -> (i32, Value, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary");
+    run_powerbi_in(args, None)
+}
+
+fn run_powerbi_in(args: &[&str], current_dir: Option<&Path>) -> (i32, Value, String) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"));
+    command.args(args);
+    if let Some(current_dir) = current_dir {
+        command.current_dir(current_dir);
+    }
+    let output = command.output().expect("run powerbi-cli binary");
     let code = output.status.code().unwrap_or(-1);
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -237,9 +243,11 @@ fn scaffold_generates_offline_safe_pbip_project() {
     );
     assert!(
         visual_json
-            .pointer("/visual/objects/general/0/properties/altText/expr/Literal/Value")
+            .pointer(
+                "/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value",
+            )
             .is_some(),
-        "generated alt text should live under /visual/objects/general"
+        "generated alt text should live under /visual/visualContainerObjects/general"
     );
 
     let (strict_code, strict_stdout, strict_stderr) =
@@ -259,7 +267,7 @@ fn scaffold_generates_offline_safe_pbip_project() {
     );
     assert_eq!(lint_stdout["schema"], Value::from("powerbi-cli.lint.v1"));
     assert!(
-        lint_stdout["findings"]
+        !lint_stdout["findings"]
             .as_array()
             .expect("lint findings")
             .iter()
@@ -365,6 +373,14 @@ fn scaffold_force_removes_only_artifacts_from_the_prior_manifest() {
         .retain(|relationship| {
             relationship["fromTable"] != "DimDate" && relationship["toTable"] != "DimDate"
         });
+    reduced_schema["pages"][0]["visuals"]
+        .as_array_mut()
+        .expect("visuals")
+        .retain(|visual| {
+            !visual["bindings"].as_array().is_some_and(|bindings| {
+                bindings.iter().any(|binding| binding["table"] == "DimDate")
+            })
+        });
     let reduced_path = temp.path().join("sales-reduced.schema.json");
     fs::write(
         &reduced_path,
@@ -404,6 +420,114 @@ fn scaffold_force_removes_only_artifacts_from_the_prior_manifest() {
 }
 
 #[test]
+fn root_relative_pbip_selects_only_its_referenced_artifacts() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("sales_project");
+    let schema = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/sales.schema.json");
+    let (scaffold_code, scaffold_stdout, scaffold_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        schema.to_str().expect("schema path"),
+        "--out-dir",
+        out_dir.to_str().expect("output path"),
+        "--json",
+    ]);
+    assert_eq!(
+        scaffold_code, 0,
+        "stdout: {scaffold_stdout:?}\nstderr: {scaffold_stderr}"
+    );
+
+    let unrelated = out_dir.join("nested-unrelated-project");
+    fs::create_dir_all(&unrelated).expect("create unrelated nested project");
+    fs::write(unrelated.join("invalid.json"), "{ definitely not JSON")
+        .expect("write unrelated invalid JSON");
+
+    let (code, stdout, stderr) = run_powerbi_in(
+        &["validate", "--strict", "SalesOperations.pbip", "--json"],
+        Some(&out_dir),
+    );
+    assert_eq!(code, 0, "stdout: {stdout:?}\nstderr: {stderr}");
+    assert_eq!(stdout["ok"], Value::Bool(true));
+}
+
+#[test]
+fn pbip_artifact_reference_cannot_escape_selected_project() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("sales_project");
+    let schema = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/sales.schema.json");
+    let (scaffold_code, _, scaffold_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        schema.to_str().expect("schema path"),
+        "--out-dir",
+        out_dir.to_str().expect("output path"),
+        "--json",
+    ]);
+    assert_eq!(scaffold_code, 0, "stderr: {scaffold_stderr}");
+
+    let pbip_path = out_dir.join("SalesOperations.pbip");
+    let mut pbip: Value =
+        serde_json::from_str(&fs::read_to_string(&pbip_path).expect("read generated PBIP"))
+            .expect("parse generated PBIP");
+    pbip["artifacts"][0]["report"]["path"] = Value::String("../outside.Report".to_string());
+    fs::write(
+        &pbip_path,
+        serde_json::to_string_pretty(&pbip).expect("serialize escaped PBIP"),
+    )
+    .expect("write escaped PBIP");
+
+    let (code, stdout, stderr) =
+        run_powerbi(&["validate", pbip_path.to_str().expect("PBIP path"), "--json"]);
+    assert_eq!(code, 10, "stdout: {stdout:?}\nstderr: {stderr}");
+    let error: Value = serde_json::from_str(stderr.trim()).expect("error envelope");
+    assert_eq!(error["error"]["code"], "validation_failed");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("escapes the selected PBIP project")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn linked_report_artifact_cannot_escape_selected_project() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("sales_project");
+    let schema = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/sales.schema.json");
+    let (scaffold_code, _, scaffold_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        schema.to_str().expect("schema path"),
+        "--out-dir",
+        out_dir.to_str().expect("output path"),
+        "--json",
+    ]);
+    assert_eq!(scaffold_code, 0, "stderr: {scaffold_stderr}");
+
+    let outside = temp.path().join("outside.Report");
+    fs::create_dir_all(&outside).expect("create outside report");
+    symlink(&outside, out_dir.join("linked.Report")).expect("link outside report");
+    let pbip_path = out_dir.join("SalesOperations.pbip");
+    let mut pbip: Value =
+        serde_json::from_str(&fs::read_to_string(&pbip_path).expect("read generated PBIP"))
+            .expect("parse generated PBIP");
+    pbip["artifacts"][0]["report"]["path"] = Value::String("linked.Report".to_string());
+    fs::write(
+        &pbip_path,
+        serde_json::to_string_pretty(&pbip).expect("serialize linked PBIP"),
+    )
+    .expect("write linked PBIP");
+
+    let (code, _, stderr) =
+        run_powerbi(&["validate", pbip_path.to_str().expect("PBIP path"), "--json"]);
+    assert_eq!(code, 10, "stderr: {stderr}");
+    assert!(stderr.contains("escapes the selected PBIP project"));
+}
+
+#[test]
 fn scaffold_force_refuses_unmarked_nonempty_directory() {
     let temp = tempfile::tempdir().expect("tempdir");
     let out_dir = temp.path().join("user_directory");
@@ -425,6 +549,63 @@ fn scaffold_force_refuses_unmarked_nonempty_directory() {
     assert!(
         user_file.is_file(),
         "refused cleanup must preserve user data"
+    );
+}
+
+#[test]
+fn scaffold_without_declared_pages_creates_one_empty_official_safe_page() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let schema_path = temp.path().join("empty-pages.schema.json");
+    fs::write(
+        &schema_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "name": "EmptyPageProject",
+            "tables": [{
+                "name": "Facts",
+                "columns": [{"name": "Value", "dataType": "int64"}],
+                "rows": [{"Value": 1}]
+            }],
+            "pages": []
+        }))
+        .expect("schema JSON"),
+    )
+    .expect("write schema");
+    let project = temp.path().join("empty-page-project");
+    let (scaffold_code, scaffold_json, scaffold_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        schema_path.to_str().expect("schema path"),
+        "--out-dir",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(
+        scaffold_code, 0,
+        "stdout: {scaffold_json:?}\nstderr: {scaffold_stderr}"
+    );
+
+    let (inspect_code, inspect_json, inspect_stderr) = run_powerbi(&[
+        "inspect",
+        "--deep",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(
+        inspect_code, 0,
+        "stdout: {inspect_json:?}\nstderr: {inspect_stderr}"
+    );
+    assert_eq!(inspect_json["counts"]["pages"], Value::from(1));
+    assert_eq!(inspect_json["counts"]["visuals"], Value::from(0));
+
+    let (validate_code, validate_json, validate_stderr) = run_powerbi(&[
+        "validate",
+        "--strict",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(
+        validate_code, 0,
+        "stdout: {validate_json:?}\nstderr: {validate_stderr}"
     );
 }
 

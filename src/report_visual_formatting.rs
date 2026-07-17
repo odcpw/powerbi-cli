@@ -188,6 +188,12 @@ pub(crate) fn formatting_summary_from_visual_json(visual_json: &Value, include_r
     let mut containers = Vec::new();
     append_object_summaries(
         &mut containers,
+        "visual.visualContainerObjects",
+        visual_json.pointer("/visual/visualContainerObjects"),
+        include_raw,
+    );
+    append_object_summaries(
+        &mut containers,
         "visual.objects",
         visual_json.pointer("/visual/objects"),
         include_raw,
@@ -243,7 +249,7 @@ pub(crate) fn formatting_summary_from_visual_json(visual_json: &Value, include_r
             "rawIncluded": include_raw,
             "dataValueRisk": "low",
             "mayContainLiteralTextOrColors": literal_value_count > 0,
-            "note": "Raw PBIR formatting objects can contain literal text, colors, and display strings; raw payloads are omitted unless --include-raw is passed."
+            "note": "Raw PBIR shared visual-container and visual-specific formatting objects can contain literal text, colors, and display strings; raw payloads are omitted unless --include-raw is passed."
         }
     })
 }

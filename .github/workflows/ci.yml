@@ -19,14 +19,33 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install supported Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Check formatting
         run: cargo fmt --check
 
       - name: Check
-        run: cargo check --all-targets
+        run: cargo check --locked --all-targets
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test --all-targets
+        run: cargo test --locked --all-targets --all-features
+
+      - name: Verify publishable crate
+        if: runner.os == 'Linux'
+        run: cargo package --locked
+
+      - name: Verify exact Microsoft integration toolchain
+        if: runner.os == 'Windows'
+        run: |
+          cargo run --locked -- integrations install --allow-network --json
+          cargo run --locked -- integrations status --deep --json
+          cargo test --locked --test microsoft_integrations exact_install_has_supported_ready_components_and_final_receipt_identity -- --ignored
+          cargo test --locked mcp::tests::exact_real_disposable_offline_workflow -- --ignored
+          cargo test --locked --test microsoft_report_exact -- --ignored
+          cargo test --locked workflow::tests::workflow_plan_run_verify_with_exact_installed_sidecars -- --ignored

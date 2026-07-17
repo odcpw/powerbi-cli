@@ -115,6 +115,7 @@ fn report_pages_json(project: &Path) -> PathBuf {
         .join("pages.json")
 }
 
+#[cfg(windows)]
 fn sales_report_version_json(project: &Path) -> PathBuf {
     project
         .join("SalesOperations.Report")
@@ -226,6 +227,11 @@ fn fixture_normalize_matches_committed_sales_golden() {
     );
 
     let actual = stdout_json(&first);
+    assert!(
+        actual["report"]["pages"][0]["visuals"][0]["fingerprints"]["visualContainerObjects"]
+            .is_string(),
+        "fixture summaries should fingerprint shared visual-container formatting separately"
+    );
     let expected: Value =
         serde_json::from_str(include_str!("../testdata/golden/sales.summary.json"))
             .expect("sales golden JSON");

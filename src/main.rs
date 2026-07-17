@@ -1,6 +1,8 @@
 #![recursion_limit = "512"]
 
+mod bridge;
 mod calculated_columns;
+mod child_process;
 mod cli;
 mod cli_support;
 mod contract;
@@ -13,7 +15,9 @@ mod fixture;
 mod handoff;
 mod inspect;
 mod lint;
+mod mcp;
 mod measures;
+mod microsoft;
 mod model;
 mod model_advanced;
 mod model_dax;
@@ -73,6 +77,7 @@ mod source_templates;
 mod static_tables;
 mod tmdl;
 mod visual_catalog;
+mod workflow;
 
 pub(crate) use doctor::doctor_json;
 
@@ -1037,30 +1042,9 @@ fn effective_pages(spec: &DashboardSpec) -> Vec<PageSpec> {
             display_name: Some("Overview".to_string()),
             width: Some(1280.0),
             height: Some(720.0),
-            visuals: vec![
-                VisualSpec {
-                    name: None,
-                    visual_type: Some("card".to_string()),
-                    title: Some("Primary KPI".to_string()),
-                    mode: None,
-                    bindings: Vec::new(),
-                    x: Some(40.0),
-                    y: Some(40.0),
-                    width: Some(280.0),
-                    height: Some(120.0),
-                },
-                VisualSpec {
-                    name: None,
-                    visual_type: Some("tableEx".to_string()),
-                    title: Some("Detail Table".to_string()),
-                    mode: None,
-                    bindings: Vec::new(),
-                    x: Some(40.0),
-                    y: Some(200.0),
-                    width: Some(560.0),
-                    height: Some(420.0),
-                },
-            ],
+            // A blank page is valid PBIR. Inventing data visuals without model bindings is not:
+            // Microsoft's consumed report surface rejects them with PBIR_QUERY_STATE_MISSING.
+            visuals: Vec::new(),
         }]
     } else {
         spec.pages.clone()
@@ -1122,8 +1106,9 @@ fn visual_json(visual: &VisualSpec, visual_index: usize) -> CliResult<Value> {
         .iter()
         .map(scaffold_visual_binding)
         .collect::<Vec<_>>();
+    report_visual_mutations::validate_binding_cardinality(&visual_type, &bindings)?;
     let slicer_mode = resolve_slicer_mode(&visual_type, visual.mode.as_deref())?;
-    Ok(visual_container_json(&VisualBuildSpec {
+    visual_container_json(&VisualBuildSpec {
         name: visual
             .name
             .clone()
@@ -1138,7 +1123,7 @@ fn visual_json(visual: &VisualSpec, visual_index: usize) -> CliResult<Value> {
         height: visual.height.unwrap_or(180.0),
         width: visual.width.unwrap_or(320.0),
         tab_order: visual_index as u64,
-    }))
+    })
 }
 
 fn scaffold_visual_binding(binding: &VisualBindingSpec) -> VisualBindingResolved {
@@ -1812,12 +1797,74 @@ fn parse_inspect_args(args: &[String]) -> CliResult<(PathBuf, bool)> {
 }
 
 pub(crate) fn validate_command(args: &[String]) -> CliResult<Value> {
-    let (path, strict) = parse_validate_args(args)?;
-    let resolved = resolve_project(&path)?;
-    let report = validate_project(&resolved)?;
+    let options = parse_validate_args(args)?;
+    if options.strict && options.backend == ValidationBackend::MicrosoftReport {
+        return Err(CliError::invalid_args(
+            "--strict is a native lint option and cannot be used with --backend microsoft-report",
+        )
+        .with_hint(
+            "Use --backend all to run strict native lint and the official validator together.",
+        )
+        .with_suggested_command(
+            "powerbi-cli validate <project-dir-or.pbip> --strict --backend all --json",
+        ));
+    }
+    let resolved = resolve_project(&options.path)?;
+    match options.backend {
+        ValidationBackend::Native => native_validation_output(&resolved, options.strict),
+        ValidationBackend::MicrosoftReport => {
+            let official = microsoft::validate_official_report(&resolved)?;
+            let ok = official["ok"].as_bool().unwrap_or(false);
+            Ok(json!({
+                "schema": "powerbi-cli.validate.microsoft-report.v1",
+                "ok": ok,
+                "exitCode": if ok { EXIT_SUCCESS } else { EXIT_VALIDATION_FAILED },
+                "strict": false,
+                "backend": "microsoft-report",
+                "projectDir": canonical_display(&resolved.project_dir),
+                "pbip": canonical_display(&resolved.pbip_path),
+                "reportDir": canonical_display(&resolved.report_dir),
+                "semanticModelDir": canonical_display(&resolved.semantic_model_dir),
+                "counts": official["counts"],
+                "warnings": official["warnings"],
+                "errors": official["errors"],
+                "validators": {
+                    "microsoftReport": official
+                }
+            }))
+        }
+        ValidationBackend::All => {
+            let mut output = native_validation_output(&resolved, options.strict)?;
+            let native_ok = output["ok"].as_bool().unwrap_or(false);
+            let official = microsoft::validate_official_report(&resolved)?;
+            let official_ok = official["ok"].as_bool().unwrap_or(false);
+            let overall_ok = native_ok && official_ok;
+            output["ok"] = Value::Bool(overall_ok);
+            output["exitCode"] = Value::from(if overall_ok {
+                EXIT_SUCCESS
+            } else {
+                EXIT_VALIDATION_FAILED
+            });
+            output["backend"] = Value::String("all".to_string());
+            output["schema"] = Value::String("powerbi-cli.validate.all.v1".to_string());
+            output["validators"] = json!({
+                "native": {
+                    "id": "native",
+                    "ok": native_ok,
+                    "strict": options.strict
+                },
+                "microsoftReport": official
+            });
+            Ok(output)
+        }
+    }
+}
+
+fn native_validation_output(resolved: &ResolvedProject, strict: bool) -> CliResult<Value> {
+    let report = validate_project(resolved)?;
     let ok = report.errors.is_empty();
     let lint = if strict && ok {
-        Some(lint::lint_project(&resolved, &report)?)
+        Some(lint::lint_project(resolved, &report)?)
     } else {
         None
     };
@@ -1849,15 +1896,76 @@ pub(crate) fn validate_command(args: &[String]) -> CliResult<Value> {
     if let Some(lint) = lint {
         output["lint"] = lint;
     }
+    output["backend"] = Value::String("native".to_string());
+    output["validators"] = json!({
+        "native": {
+            "id": "native",
+            "ok": overall_ok,
+            "strict": strict
+        }
+    });
     Ok(output)
 }
 
-fn parse_validate_args(args: &[String]) -> CliResult<(PathBuf, bool)> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ValidationBackend {
+    Native,
+    MicrosoftReport,
+    All,
+}
+
+impl ValidationBackend {
+    fn parse(value: &str) -> CliResult<Self> {
+        match value {
+            "native" => Ok(Self::Native),
+            "microsoft-report" => Ok(Self::MicrosoftReport),
+            "all" => Ok(Self::All),
+            _ => Err(
+                CliError::invalid_args(format!("unknown validation backend: {value}"))
+                    .with_hint("Use native, microsoft-report, or all.")
+                    .with_suggested_command(
+                        "powerbi-cli validate <project-dir-or.pbip> --backend all --json",
+                    ),
+            ),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ValidateOptions {
+    path: PathBuf,
+    strict: bool,
+    backend: ValidationBackend,
+}
+
+fn parse_validate_args(args: &[String]) -> CliResult<ValidateOptions> {
     let mut path = None;
     let mut strict = false;
-    for arg in args {
-        match arg.as_str() {
-            "--strict" => strict = true,
+    let mut backend = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--strict" => {
+                if strict {
+                    return Err(CliError::invalid_args(
+                        "--strict may be specified only once",
+                    ));
+                }
+                strict = true;
+                index += 1;
+            }
+            "--backend" => {
+                if backend.is_some() {
+                    return Err(CliError::invalid_args(
+                        "--backend may be specified only once",
+                    ));
+                }
+                let value = args
+                    .get(index + 1)
+                    .ok_or_else(|| CliError::invalid_args("--backend requires a value"))?;
+                backend = Some(ValidationBackend::parse(value)?);
+                index += 2;
+            }
             other if other.starts_with('-') => {
                 return Err(
                     CliError::invalid_args(format!("unknown validate flag: {other}"))
@@ -1878,10 +1986,16 @@ fn parse_validate_args(args: &[String]) -> CliResult<(PathBuf, bool)> {
                         ));
                 }
                 path = Some(PathBuf::from(other));
+                index += 1;
             }
         }
     }
-    path.map(|path| (path, strict)).ok_or_else(|| {
+    path.map(|path| ValidateOptions {
+        path,
+        strict,
+        backend: backend.unwrap_or(ValidationBackend::Native),
+    })
+    .ok_or_else(|| {
         CliError::invalid_args("validate requires a path")
             .with_hint("Run `powerbi-cli validate <project-dir-or.pbip> --json`.")
             .with_suggested_command("powerbi-cli validate <project-dir-or.pbip> --json")
@@ -1890,9 +2004,13 @@ fn parse_validate_args(args: &[String]) -> CliResult<(PathBuf, bool)> {
 
 pub(crate) fn resolve_project(path: &Path) -> CliResult<ResolvedProject> {
     if path.extension().and_then(|value| value.to_str()) == Some("pbip") {
+        // `Path::parent()` is an empty path for a root-level relative filename
+        // such as `Sales.pbip`. Treat that spelling as the current directory so
+        // every command accepts the same convenient project reference.
         let project_dir = path
             .parent()
-            .ok_or_else(|| CliError::invalid_args("pbip path must have a parent directory"))?
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."))
             .to_path_buf();
         return resolve_project_from_pbip(&project_dir, path);
     }
@@ -1948,7 +2066,8 @@ fn resolve_project_from_pbip(project_dir: &Path, pbip_path: &Path) -> CliResult<
                 pbip_path.display()
             ))
         })?;
-    let report_dir = project_dir.join(clean_relative_path(report_rel)?);
+    let report_dir =
+        resolve_project_reference(project_dir, project_dir, report_rel, "PBIP report artifact")?;
     let pbir = read_json_value(&report_dir.join("definition.pbir"))?;
     let semantic_rel = pbir["datasetReference"]["byPath"]["path"]
         .as_str()
@@ -1958,7 +2077,12 @@ fn resolve_project_from_pbip(project_dir: &Path, pbip_path: &Path) -> CliResult<
                 report_dir.join("definition.pbir").display()
             ))
         })?;
-    let semantic_model_dir = report_dir.join(clean_relative_path(semantic_rel)?);
+    let semantic_model_dir = resolve_project_reference(
+        project_dir,
+        &report_dir,
+        semantic_rel,
+        "PBIR semantic-model artifact",
+    )?;
     Ok(ResolvedProject {
         project_dir: project_dir.to_path_buf(),
         pbip_path: pbip_path.to_path_buf(),
@@ -1987,6 +2111,86 @@ fn clean_relative_path(value: &str) -> CliResult<PathBuf> {
         }
     }
     Ok(result)
+}
+
+fn resolve_project_reference(
+    project_root: &Path,
+    base: &Path,
+    value: &str,
+    label: &str,
+) -> CliResult<PathBuf> {
+    let relative = clean_relative_path(value)?;
+    let canonical_root = fs::canonicalize(project_root).map_err(|err| {
+        CliError::file_not_found(format!(
+            "resolve project root {}: {err}",
+            project_root.display()
+        ))
+    })?;
+    let canonical_base = fs::canonicalize(base).map_err(|err| {
+        CliError::file_not_found(format!("resolve {label} base {}: {err}", base.display()))
+    })?;
+    if !canonical_base.starts_with(&canonical_root) {
+        return Err(project_reference_escape(label, value));
+    }
+
+    let mut target = canonical_base;
+    for component in relative.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::Normal(component) => target.push(component),
+            std::path::Component::ParentDir => {
+                if !target.pop() || !target.starts_with(&canonical_root) {
+                    return Err(project_reference_escape(label, value));
+                }
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err(project_reference_escape(label, value));
+            }
+        }
+        if !target.starts_with(&canonical_root) {
+            return Err(project_reference_escape(label, value));
+        }
+    }
+
+    // Existing links must not redirect the selected artifact closure outside
+    // the PBIP project. For a missing final artifact, check its nearest
+    // existing ancestor so required-file validation can still report the
+    // missing in-project path as a normal structured failure.
+    let mut existing_ancestor = target.as_path();
+    while !existing_ancestor.exists() {
+        existing_ancestor = existing_ancestor
+            .parent()
+            .ok_or_else(|| project_reference_escape(label, value))?;
+    }
+    let canonical_ancestor = fs::canonicalize(existing_ancestor).map_err(|err| {
+        CliError::file_not_found(format!(
+            "resolve {label} ancestor {}: {err}",
+            existing_ancestor.display()
+        ))
+    })?;
+    if !canonical_ancestor.starts_with(&canonical_root) {
+        return Err(project_reference_escape(label, value));
+    }
+
+    if target.exists() {
+        let canonical_target = fs::canonicalize(&target).map_err(|err| {
+            CliError::file_not_found(format!("resolve {label} {}: {err}", target.display()))
+        })?;
+        if !canonical_target.starts_with(&canonical_root) {
+            return Err(project_reference_escape(label, value));
+        }
+        return Ok(canonical_target);
+    }
+    Ok(target)
+}
+
+fn project_reference_escape(label: &str, value: &str) -> CliError {
+    CliError::validation_failed(format!(
+        "{label} reference escapes the selected PBIP project: {value}"
+    ))
+    .with_hint(
+        "Keep report and semantic-model artifacts inside the selected PBIP project directory.",
+    )
 }
 
 pub(crate) fn validate_project(resolved: &ResolvedProject) -> CliResult<ValidationReport> {
@@ -2035,7 +2239,7 @@ pub(crate) fn validate_project(resolved: &ResolvedProject) -> CliResult<Validati
         &mut report,
     );
 
-    check_json_files(&resolved.project_dir, &mut report)?;
+    check_json_files(resolved, &mut report)?;
     check_report_theme(resolved, &mut report)?;
     check_report_pages(resolved, &mut report)?;
     check_report_filter_configs(resolved, &mut report)?;
@@ -2052,24 +2256,43 @@ fn required_file(path: &Path, report: &mut ValidationReport) {
     }
 }
 
-fn check_json_files(project_dir: &Path, report: &mut ValidationReport) -> CliResult<()> {
-    for entry in WalkDir::new(project_dir) {
-        let entry = walkdir_entry(project_dir, entry, "walk project JSON files")?;
+fn check_json_files(resolved: &ResolvedProject, report: &mut ValidationReport) -> CliResult<()> {
+    check_json_file(&resolved.pbip_path, report)?;
+    for artifact_dir in [&resolved.report_dir, &resolved.semantic_model_dir] {
+        check_json_files_in(artifact_dir, report)?;
+    }
+    Ok(())
+}
+
+fn check_json_files_in(artifact_dir: &Path, report: &mut ValidationReport) -> CliResult<()> {
+    // Required-file checks already report a missing artifact as structured
+    // validation output. Do not turn that expected validation failure into an
+    // exit-70 filesystem traversal error.
+    if !artifact_dir.is_dir() {
+        return Ok(());
+    }
+    for entry in WalkDir::new(artifact_dir) {
+        let entry = walkdir_entry(artifact_dir, entry, "walk selected artifact JSON files")?;
         if !entry.file_type().is_file() {
             continue;
         }
         let path = entry.path();
         if is_json_like(path) {
-            report.json_files_checked += 1;
-            if has_utf8_bom(path)? {
-                report
-                    .errors
-                    .push(format!("JSON-like file has UTF-8 BOM: {}", path.display()));
-            }
-            if let Err(err) = read_json_value(path) {
-                report.errors.push(err.message);
-            }
+            check_json_file(path, report)?;
         }
+    }
+    Ok(())
+}
+
+fn check_json_file(path: &Path, report: &mut ValidationReport) -> CliResult<()> {
+    report.json_files_checked += 1;
+    if has_utf8_bom(path)? {
+        report
+            .errors
+            .push(format!("JSON-like file has UTF-8 BOM: {}", path.display()));
+    }
+    if let Err(err) = read_json_value(path) {
+        report.errors.push(err.message);
     }
     Ok(())
 }
@@ -2168,6 +2391,12 @@ fn check_registered_theme_resource_package(
         .get("name")
         .and_then(Value::as_str)
         .unwrap_or_default();
+    if !theme_name.to_ascii_lowercase().ends_with(".json") {
+        report.errors.push(format!(
+            "{} RegisteredResources customTheme name `{theme_name}` must include the .json extension",
+            report_json_path.display()
+        ));
+    }
     let Some(packages) = report_json
         .get("resourcePackages")
         .and_then(Value::as_array)
@@ -2196,15 +2425,56 @@ fn check_registered_theme_resource_package(
         return;
     };
     let has_theme_item = items.iter().any(|item| {
-        item["type"].as_str() == Some("CustomTheme")
-            && (item["name"].as_str() == Some(theme_name)
-                || item["path"].as_str() == Some(theme_name))
+        item["type"].as_str() == Some("CustomTheme") && item["name"].as_str() == Some(theme_name)
     });
     if !has_theme_item {
         report.errors.push(format!(
             "{} RegisteredResources customTheme `{theme_name}` has no matching CustomTheme resource package item",
             report_json_path.display()
         ));
+        return;
+    }
+    let theme_item = items.iter().find(|item| {
+        item["type"].as_str() == Some("CustomTheme") && item["name"].as_str() == Some(theme_name)
+    });
+    let Some(theme_item) = theme_item else {
+        return;
+    };
+    let item_path = theme_item["path"].as_str().unwrap_or_default();
+    if item_path != theme_name || item_path.contains('/') || item_path.contains('\\') {
+        report.errors.push(format!(
+            "{} CustomTheme resource path `{item_path}` must be the same filename as `{theme_name}`",
+            report_json_path.display()
+        ));
+        return;
+    }
+    let Some(report_dir) = report_json_path.parent().and_then(Path::parent) else {
+        return;
+    };
+    let theme_path = report_dir
+        .join("StaticResources")
+        .join("RegisteredResources")
+        .join(item_path);
+    if !theme_path.is_file() {
+        report.errors.push(format!(
+            "{} references missing CustomTheme file {}",
+            report_json_path.display(),
+            theme_path.display()
+        ));
+        return;
+    }
+    match read_json_value(&theme_path) {
+        Ok(theme_json) if theme_json["name"].as_str() == Some(theme_name) => {}
+        Ok(theme_json) => report.errors.push(format!(
+            "{} theme name `{}` does not match report customTheme name `{theme_name}`",
+            theme_path.display(),
+            theme_json["name"].as_str().unwrap_or_default()
+        )),
+        Err(err) => report.errors.push(format!(
+            "{} could not be read for theme validation: {}",
+            theme_path.display(),
+            err.message
+        )),
     }
 }
 
@@ -2910,32 +3180,37 @@ fn check_offline_hazards(
     resolved: &ResolvedProject,
     report: &mut ValidationReport,
 ) -> CliResult<()> {
-    for entry in WalkDir::new(&resolved.project_dir) {
-        let entry = walkdir_entry(
-            &resolved.project_dir,
-            entry,
-            "walk project offline-safety inputs",
-        )?;
-        if !entry.file_type().is_file() {
+    for artifact_dir in [&resolved.report_dir, &resolved.semantic_model_dir] {
+        if !artifact_dir.is_dir() {
             continue;
         }
-        let path = entry.path();
-        let normalized = path
-            .strip_prefix(&resolved.project_dir)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .replace('\\', "/")
-            .to_ascii_lowercase();
-        if normalized.ends_with(".pbi/cache.abf")
-            || normalized.ends_with("cache.abf")
-            || normalized.ends_with("localsettings.json")
-            || normalized.ends_with(".pbix")
-            || normalized.ends_with(".pbit")
-        {
-            report.errors.push(format!(
-                "offline-unsafe data/cache/local file present: {}",
-                path.display()
-            ));
+        for entry in WalkDir::new(artifact_dir) {
+            let entry = walkdir_entry(
+                artifact_dir,
+                entry,
+                "walk selected artifact offline-safety inputs",
+            )?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            let normalized = path
+                .strip_prefix(artifact_dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace('\\', "/")
+                .to_ascii_lowercase();
+            if normalized.ends_with(".pbi/cache.abf")
+                || normalized.ends_with("cache.abf")
+                || normalized.ends_with("localsettings.json")
+                || normalized.ends_with(".pbix")
+                || normalized.ends_with(".pbit")
+            {
+                report.errors.push(format!(
+                    "offline-unsafe data/cache/local file present: {}",
+                    path.display()
+                ));
+            }
         }
     }
     Ok(())

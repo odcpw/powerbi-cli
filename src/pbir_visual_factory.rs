@@ -34,28 +34,31 @@ pub(crate) struct VisualBuildSpec {
     pub(crate) tab_order: u64,
 }
 
-pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> Value {
+pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> {
+    if spec.bindings.is_empty() {
+        return Err(CliError::invalid_args(format!(
+            "{} visual requires at least one field binding",
+            spec.visual_type
+        ))
+        .with_hint(
+            "Microsoft's consumed PBIR surface rejects unbound data visuals. Add the visual's required role bindings.",
+        )
+        .with_suggested_command(format!(
+            "powerbi-cli report visuals catalog --visual-type {} --json",
+            spec.visual_type
+        )));
+    }
     let mut visual_config = Map::new();
     visual_config.insert(
         "visualType".to_string(),
         Value::String(spec.visual_type.clone()),
     );
     visual_config.insert("drillFilterOtherVisuals".to_string(), Value::Bool(true));
-    if !spec.bindings.is_empty() {
-        visual_config.insert(
-            "query".to_string(),
-            visual_query_json(&spec.visual_type, &spec.bindings),
-        );
-    }
-    let mut objects = Map::new();
-    objects.insert(
-        "general".to_string(),
-        json!([{
-            "properties": {
-                "altText": literal_text_expression(&format!("{} visual", spec.title))
-            }
-        }]),
+    visual_config.insert(
+        "query".to_string(),
+        visual_query_json(&spec.visual_type, &spec.bindings),
     );
+    let mut objects = Map::new();
     if let Some(mode) = spec.slicer_mode {
         objects.insert(
             "data".to_string(),
@@ -66,13 +69,20 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> Value {
             }]),
         );
     }
-    visual_config.insert("objects".to_string(), Value::Object(objects));
+    if !objects.is_empty() {
+        visual_config.insert("objects".to_string(), Value::Object(objects));
+    }
     // Desktop-authored visualContainer/2.4.0 fixtures place visual chrome titles
     // under /visual/visualContainerObjects/title. The literal-text variant is
     // archived in docs/reference/desktop-authored-visuals/slicer.visual.json.
     visual_config.insert(
         "visualContainerObjects".to_string(),
         json!({
+            "general": [{
+                "properties": {
+                    "altText": literal_text_expression(&format!("{} visual", spec.title))
+                }
+            }],
             "title": [{
                 "properties": {
                     "text": literal_text_expression(&spec.title),
@@ -81,12 +91,7 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> Value {
             }]
         }),
     );
-    let binding_status = if spec.bindings.is_empty() {
-        "unbound"
-    } else {
-        "bound"
-    };
-    json!({
+    Ok(json!({
         "$schema": VISUAL_CONTAINER_SCHEMA,
         "name": spec.name,
         "position": {
@@ -98,7 +103,7 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> Value {
             "tabOrder": spec.tab_order
         },
         "visual": Value::Object(visual_config),
-        "howCreated": if spec.bindings.is_empty() { "Default" } else { "DraggedToFieldWell" },
+        "howCreated": "DraggedToFieldWell",
         "annotations": [
             {
                 "name": "powerbi-cli.placeholderTitle",
@@ -106,10 +111,10 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> Value {
             },
             {
                 "name": "powerbi-cli.bindingStatus",
-                "value": binding_status
+                "value": "bound"
             }
         ]
-    })
+    }))
 }
 
 pub(crate) fn resolve_slicer_mode(

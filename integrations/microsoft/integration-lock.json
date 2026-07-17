@@ -1,0 +1,80 @@
+{
+  "schema": "powerbi-cli.microsoft-integrations-lock.v1",
+  "lockId": "microsoft-powerbi-2026-07-17-v2",
+  "nodeFloor": 20,
+  "preview": true,
+  "components": [
+    {
+      "id": "modeling-mcp",
+      "package": "@microsoft/powerbi-modeling-mcp",
+      "version": "0.5.0-beta.11",
+      "license": "Microsoft",
+      "integrity": "sha512-a5aO6glpBFIlaHHe+8LRunNPExJqsbnskRHDW5y7Vb7Jac85KqMUUEvxRuL2IkwJDDng0FEhfZNUbqw3ehmQIw==",
+      "entrypoint": "index.js",
+      "transport": "stdio",
+      "protocolVersion": "2025-06-18",
+      "serverName": "powerbi-modeling-mcp",
+      "serverVersion": "0.5.0.0",
+      "toolsCount": 21,
+      "toolsListSha256": "sha256:f5e3e88621f210e798472278fccba9cd398522c2a18e7a08ee617a2ec9d6f78c",
+      "platforms": ["windows-x86_64", "windows-aarch64", "linux-x86_64", "linux-aarch64", "macos-aarch64"]
+    },
+    {
+      "id": "report-authoring",
+      "package": "@microsoft/powerbi-report-authoring-cli",
+      "version": "0.1.4",
+      "license": "MIT",
+      "integrity": "sha512-SibT9RCS7dQdqYGhU0/r1yixYZgxRsjlpKSF+a/wGczN0YRG6M9nRoFBe2d4hptwwUeqvnkjNxpo7NTUxXNIDQ==",
+      "entrypoint": "dist/cli.js",
+      "transport": "node",
+      "platforms": ["windows-x86_64", "windows-aarch64", "linux-x86_64", "linux-aarch64", "macos-x86_64", "macos-aarch64"]
+    },
+    {
+      "id": "desktop-bridge",
+      "package": "@microsoft/powerbi-desktop-bridge-cli",
+      "version": "0.1.2",
+      "license": "MIT",
+      "integrity": "sha512-N0nons2u+1W+PYQ59tmhPRMMR0ZrmPY4djOjHjpM9UyUDWySucu8S5H4fMO0ltxkykC4Ter/6Aqp4ZhMQm6ymw==",
+      "entrypoint": "dist/index.js",
+      "transport": "node",
+      "platforms": ["windows-x86_64", "windows-aarch64"]
+    }
+  ],
+  "platformArtifacts": [
+    {
+      "platform": "windows-x86_64",
+      "package": "@microsoft/powerbi-modeling-mcp-win32-x64",
+      "version": "0.5.0-beta.11",
+      "license": "Microsoft",
+      "integrity": "sha512-gZ8v/puPDEy49dLN1OXizm4dqJ/pXpVgQRUgag62fcVVBlJ/pul4Y/7WpbXGUAhL7pKBwxx6qjhKeVIj6o0ybA=="
+    },
+    {
+      "platform": "windows-aarch64",
+      "package": "@microsoft/powerbi-modeling-mcp-win32-arm64",
+      "version": "0.5.0-beta.11",
+      "license": "Microsoft",
+      "integrity": "sha512-3I2lqHNjvtHl8Jq1c7rCK4//O3INKPDyLqdWDwqR47QOCT8+BCQdXyclgkFOgt3q/fuBGtA1y2t0rnjiCOffng=="
+    },
+    {
+      "platform": "linux-x86_64",
+      "package": "@microsoft/powerbi-modeling-mcp-linux-x64",
+      "version": "0.5.0-beta.11",
+      "license": "Microsoft",
+      "integrity": "sha512-Is22tsjNNDVv/A3HxQVwvU+PnoO8VW6mPyYXF+qM5czRBCvIKS0ZLe99hrGA0LKwWMBlzlhfeYZiv4i85HplgA=="
+    },
+    {
+      "platform": "linux-aarch64",
+      "package": "@microsoft/powerbi-modeling-mcp-linux-arm64",
+      "version": "0.5.0-beta.11",
+      "license": "Microsoft",
+      "integrity": "sha512-3SpigdM5Nc2JbKDXGsoSxdNOjzTW6MDI8Xi7Mo9YcdK+mdtmCKlW64KgEDZrr2hZBE34uAYU90cgdDdeD/o/4A=="
+    },
+    {
+      "platform": "macos-aarch64",
+      "package": "@microsoft/powerbi-modeling-mcp-darwin-arm64",
+      "version": "0.5.0-beta.11",
+      "license": "Microsoft",
+      "integrity": "sha512-OqMO0LSTu0enkUuEWrcZt2hpOFiyyVctFj+6ESSR9wM8UqpZzSVfju1N9Stu8rULgPv1PlDK4/+rFFLqgq7ZnA=="
+    }
+  ]
+}

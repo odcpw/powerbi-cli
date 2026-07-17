@@ -121,7 +121,7 @@ fn list_visuals(args: &[String]) -> CliResult<Value> {
         "visuals": visuals,
         "next": [
             format!("powerbi-cli report visuals show --project {} --handle <visual-handle> --json", command_arg(&resolved.project_dir)),
-            format!("powerbi-cli report visuals add --project {} --page <page-handle> --visual-type card --title <title> --dry-run --json", command_arg(&resolved.project_dir)),
+            format!("powerbi-cli report visuals add --project {} --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --dry-run --json", command_arg(&resolved.project_dir)),
             format!("powerbi-cli report visuals clone --project {} --handle <visual-handle> --dry-run --json", command_arg(&resolved.project_dir)),
             format!("powerbi-cli report visuals delete --project {} --handle <visual-handle> --dry-run --json", command_arg(&resolved.project_dir)),
             format!("powerbi-cli report visuals set-position --project {} --handle <visual-handle> --x 40 --y 40 --dry-run --json", command_arg(&resolved.project_dir)),

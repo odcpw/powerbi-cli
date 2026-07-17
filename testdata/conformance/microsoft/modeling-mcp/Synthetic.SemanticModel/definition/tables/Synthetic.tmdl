@@ -1,0 +1,15 @@
+table Synthetic
+
+	column Value
+		dataType: int64
+		summarizeBy: sum
+		sourceColumn: Value
+
+	partition Synthetic = m
+		mode: import
+		source =
+			let
+				Source = #table(type table [Value = Int64.Type], {{1}})
+			in
+				Source
+		annotation PBI_NavigationStepName = Navigation

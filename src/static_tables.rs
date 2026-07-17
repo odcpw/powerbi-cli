@@ -173,7 +173,11 @@ fn add_static_table(args: &[String]) -> CliResult<Value> {
             "action": "add",
             "path": canonical_display(&path),
             "before": Value::Null,
-            "after": options.include_raw.then(|| tmdl.clone()).unwrap_or_else(|| format!("static string table {table} with {} columns and {} rows", columns.len(), rows.len()))
+            "after": if options.include_raw {
+                tmdl.clone()
+            } else {
+                format!("static string table {table} with {} columns and {} rows", columns.len(), rows.len())
+            }
         }],
         "validation": validation.map(|report| json!({
             "ok": report.errors.is_empty(),

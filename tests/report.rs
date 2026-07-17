@@ -790,9 +790,16 @@ fn install_slicer_fixture(project: &Path) {
 
 fn install_visual_formatting_fixture(project: &Path) {
     patch_json(&first_visual_json_by_type(project, "card"), |visual| {
+        visual["visual"]["visualContainerObjects"]
+            .as_object_mut()
+            .expect("visual container objects")
+            .remove("general");
         visual["visual"]["objects"] = json!({
             "general": [{
                 "properties": {
+                    "orientation": {
+                        "expr": { "Literal": { "Value": "'vertical'" } }
+                    },
                     "altText": {
                         "expr": { "Literal": { "Value": "'Executive revenue chart'" } }
                     }
@@ -1384,9 +1391,9 @@ fn report_visuals_formatting_list_and_show_summarize_objects_without_raw() {
     assert_eq!(list_json["counts"]["visualsWithFormatting"], Value::from(3));
     assert_eq!(
         list_json["counts"]["formatObjectContainers"],
-        Value::from(5)
+        Value::from(8)
     );
-    assert_eq!(list_json["counts"]["formatProperties"], Value::from(7));
+    assert_eq!(list_json["counts"]["formatProperties"], Value::from(14));
     assert_eq!(list_json["rawIncluded"], Value::Bool(false));
     assert!(
         !list.stdout.contains("#123456"),
@@ -1401,7 +1408,7 @@ fn report_visuals_formatting_list_and_show_summarize_objects_without_raw() {
         .as_array()
         .expect("visual rows")
         .iter()
-        .find(|visual| visual["formatting"]["formatObjectContainerCount"] == 3)
+        .find(|visual| visual["visualType"] == "card")
         .expect("formatted visual");
     let handle = formatted_visual["handle"].as_str().expect("visual handle");
     let object_names = formatted_visual["formatting"]["objectNames"]
@@ -1431,14 +1438,16 @@ fn report_visuals_formatting_list_and_show_summarize_objects_without_raw() {
     assert_eq!(show_json["visual"]["handle"], Value::from(handle));
     assert_eq!(
         show_json["formatting"]["formatPropertyCount"],
-        Value::from(5)
+        Value::from(8)
     );
     assert_eq!(show_json["formatting"]["rawIncluded"], Value::Bool(false));
     let title_container = show_json["formatting"]["containers"]
         .as_array()
         .expect("containers")
         .iter()
-        .find(|container| container["objectName"] == "title")
+        .find(|container| {
+            container["source"] == "visual.objects" && container["objectName"] == "title"
+        })
         .expect("title container");
     assert_eq!(title_container["propertyCount"], Value::from(3));
     assert!(title_container.get("raw").is_none());
@@ -1584,6 +1593,8 @@ fn report_visuals_formatting_extract_and_apply_round_trip_through_out_dir() {
         "Styled Target",
         "--visual-type",
         "card",
+        "--binding",
+        "role=Values,table=FactSales,measure=Total Revenue",
         "--out-dir",
         target_arg,
         "--json",
@@ -1736,7 +1747,7 @@ fn report_visuals_formatting_extract_and_apply_round_trip_through_out_dir() {
     let readback_json = stdout_json(&readback);
     assert_eq!(
         readback_json["formatting"]["formatObjectContainerCount"],
-        Value::from(3)
+        Value::from(5)
     );
     assert!(
         readback.stdout.contains("#123456"),
@@ -1803,6 +1814,17 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
     let source_path = PathBuf::from(source_visual["path"].as_str().expect("visual path"));
     let source_before = fs::read_to_string(&source_path).expect("source visual before");
 
+    let legacy_lint = run_powerbi(&["lint", project_arg, "--json"]);
+    assert_eq!(legacy_lint.code, 0, "stderr: {}", legacy_lint.stderr);
+    assert!(
+        stdout_json(&legacy_lint)["findings"]
+            .as_array()
+            .expect("lint findings")
+            .iter()
+            .any(|finding| finding["code"] == "pbir.visual_alt_text_legacy_location"),
+        "legacy alt text should produce an actionable lint finding"
+    );
+
     let dry_run = run_powerbi(&[
         "report",
         "visuals",
@@ -1843,6 +1865,14 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         dry_json["textPlan"]["after"]["altText"],
         Value::from("Updated executive KPI")
     );
+    assert_eq!(
+        dry_json["textPlan"]["before"]["altTextSource"],
+        Value::from("legacyVisualObjects")
+    );
+    assert_eq!(
+        dry_json["textPlan"]["after"]["altTextSource"],
+        Value::from("visualContainerObjects")
+    );
     let dry_pointers = dry_json["changes"][0]["jsonPointers"]
         .as_array()
         .expect("json pointers");
@@ -1859,9 +1889,14 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
             .iter()
             .any(|pointer| pointer == "/annotations/0/value")
     );
-    assert!(dry_pointers.iter().any(
-        |pointer| pointer == "/visual/objects/general/0/properties/altText/expr/Literal/Value"
-    ));
+    assert!(dry_pointers.iter().any(|pointer| {
+        pointer == "/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value"
+    }));
+    assert!(
+        dry_pointers
+            .iter()
+            .any(|pointer| pointer == "/visual/objects/general/0/properties/altText")
+    );
     assert_eq!(
         fs::read_to_string(&source_path).expect("source visual after dry-run"),
         source_before
@@ -1929,14 +1964,37 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         Value::from("Updated Revenue")
     );
     assert_eq!(
-        styled_visual_json["visual"]["objects"]["general"][0]["properties"]["altText"]["expr"]["Literal"]
-            ["Value"],
+        styled_visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]["altText"]
+            ["expr"]["Literal"]["Value"],
         Value::from("'Updated executive KPI'")
+    );
+    assert!(
+        styled_visual_json["visual"]["objects"]["general"][0]["properties"]
+            .get("altText")
+            .is_none(),
+        "an explicit mutation should migrate legacy alt text"
+    );
+    assert_eq!(
+        styled_visual_json["visual"]["objects"]["general"][0]["properties"]["orientation"]["expr"]
+            ["Literal"]["Value"],
+        Value::from("'vertical'"),
+        "migration must preserve sibling legacy properties"
     );
     assert_eq!(
         styled_visual_json["visual"]["objects"]["title"][0]["properties"]["fontColor"]["solid"]["color"]
             ["expr"]["Literal"]["Value"],
         Value::from("'#654321'")
+    );
+
+    let migrated_lint = run_powerbi(&["lint", styled_arg, "--json"]);
+    assert_eq!(migrated_lint.code, 0, "stderr: {}", migrated_lint.stderr);
+    assert!(
+        stdout_json(&migrated_lint)["findings"]
+            .as_array()
+            .expect("lint findings")
+            .iter()
+            .all(|finding| finding["code"] != "pbir.visual_alt_text_legacy_location"),
+        "the explicit alt-text mutation should clear the legacy lint finding"
     );
 
     let visual_show = run_powerbi(&[
@@ -1983,13 +2041,13 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
     )
     .expect("parse cleared visual json");
     assert!(
-        cleared_visual_json["visual"]["objects"]["general"][0]["properties"]
+        cleared_visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]
             .get("altText")
             .is_none()
     );
     assert_eq!(
-        styled_visual_json["visual"]["objects"]["general"][0]["properties"]["altText"]["expr"]["Literal"]
-            ["Value"],
+        styled_visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]["altText"]
+            ["expr"]["Literal"]["Value"],
         Value::from("'Updated executive KPI'"),
         "out-dir clear should not mutate the styled source project"
     );
@@ -2070,8 +2128,8 @@ fn report_visuals_formatting_set_text_creates_missing_cards_with_page_visual_sel
         Value::from("Generated Title")
     );
     assert_eq!(
-        visual_json["visual"]["objects"]["general"][0]["properties"]["altText"]["expr"]["Literal"]
-            ["Value"],
+        visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]["altText"]["expr"]
+            ["Literal"]["Value"],
         Value::from("'Generated alt text'")
     );
 }
@@ -8309,17 +8367,17 @@ fn report_visual_add_round_trips_through_out_dir() {
     assert_eq!(added_visuals.code, 0, "stderr: {}", added_visuals.stderr);
     let added_visuals_json = stdout_json(&added_visuals);
     assert_eq!(added_visuals_json["counts"]["visuals"], Value::from(4));
-    assert_eq!(added_visuals_json["counts"]["boundVisuals"], Value::from(1));
+    assert_eq!(added_visuals_json["counts"]["boundVisuals"], Value::from(4));
 
     let validate = run_powerbi(&["validate", "--strict", added_arg, "--json"]);
     assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
     let validate_json = stdout_json(&validate);
     assert_eq!(validate_json["counts"]["visuals"], Value::from(4));
-    assert_eq!(validate_json["counts"]["boundVisuals"], Value::from(1));
+    assert_eq!(validate_json["counts"]["boundVisuals"], Value::from(4));
 }
 
 #[test]
-fn report_visual_add_defaults_and_create_alias_are_readable() {
+fn report_visual_add_defaults_require_a_binding_and_create_alias_is_readable() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());
     let project_arg = project.to_str().expect("project path");
@@ -8349,6 +8407,8 @@ fn report_visual_add_defaults_and_create_alias_are_readable() {
         &page_handle,
         "--title",
         "Scratch Card",
+        "--binding",
+        "role=Values,table=FactSales,measure=Total Revenue",
         "--out-dir",
         created_arg,
         "--json",
@@ -8368,13 +8428,13 @@ fn report_visual_add_defaults_and_create_alias_are_readable() {
         create_json["target"]["position"]["height"],
         Value::from(180.0)
     );
-    assert_eq!(create_json["target"]["bindingCount"], Value::from(0));
+    assert_eq!(create_json["target"]["bindingCount"], Value::from(1));
     assert_eq!(
         create_json["target"]["bindings"]
             .as_array()
             .expect("bindings")
             .len(),
-        0
+        1
     );
 
     let readback = run_powerbi(&[
@@ -8635,7 +8695,7 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             "{} emitted forbidden root-level objects",
             case.slug
         );
-        assert!(raw["visual"]["objects"]["general"].is_array());
+        assert!(raw["visual"]["visualContainerObjects"]["general"].is_array());
         for role in case.roles {
             assert!(
                 raw["visual"]["query"]["queryState"][*role].is_object(),
@@ -9879,7 +9939,7 @@ fn report_visual_set_bindings_round_trips_through_out_dir() {
     let validate = run_powerbi(&["validate", "--strict", bound_arg, "--json"]);
     assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
     let validate_json = stdout_json(&validate);
-    assert_eq!(validate_json["counts"]["boundVisuals"], Value::from(1));
+    assert_eq!(validate_json["counts"]["boundVisuals"], Value::from(3));
 
     let cleared_project = temp.path().join("sales_project_cleared");
     let cleared_arg = cleared_project.to_str().expect("cleared project path");
@@ -10524,16 +10584,23 @@ fn report_themes_extract_and_apply_raw_bundle() {
     assert_eq!(readback_json["theme"]["state"], Value::from("referenced"));
     assert_eq!(
         readback_json["theme"]["registeredThemes"][0]["name"],
-        Value::from("Corporate Safety")
+        Value::from("CorpTheme.json")
     );
     let copied_theme = themed
         .join("SalesOperations.Report")
         .join("StaticResources")
         .join("RegisteredResources")
         .join("CorpTheme.json");
+    let copied_theme_json: Value =
+        serde_json::from_str(&fs::read_to_string(&copied_theme).expect("copied theme"))
+            .expect("copied theme json");
+    let source_theme_json: Value =
+        serde_json::from_str(&fs::read_to_string(&source_theme).expect("source theme"))
+            .expect("source theme json");
+    assert_eq!(copied_theme_json["name"], Value::from("CorpTheme.json"));
     assert_eq!(
-        fs::read_to_string(&copied_theme).expect("copied theme"),
-        fs::read_to_string(&source_theme).expect("source theme")
+        copied_theme_json["dataColors"], source_theme_json["dataColors"],
+        "theme application should normalize only the host-managed name"
     );
 }
 

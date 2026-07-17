@@ -1,11 +1,13 @@
 use crate::{
     EXIT_SUCCESS, PBIP_SCHEMA, REPORT_DEFINITION_SCHEMA, SEMANTIC_MODEL_DEFINITION_SCHEMA,
-    contract, desktop,
+    contract, desktop, microsoft,
 };
 use serde_json::{Value, json};
 
 pub(crate) fn doctor_json() -> Value {
     let desktop_detection = desktop::detect_power_bi_desktop(None);
+    let microsoft_integrations = microsoft::shallow_summary_json();
+    let microsoft_status = microsoft_integrations["status"].as_str().unwrap_or("warn");
     let desktop_status = if desktop_detection.found {
         "pass"
     } else {
@@ -82,8 +84,26 @@ pub(crate) fn doctor_json() -> Value {
                 "message": "Generated projects use dummy Power Query rows and do not write credentials or data caches.",
                 "dataCacheGenerated": false,
                 "credentialsGenerated": false
+            },
+            {
+                "id": "microsoftIntegrations",
+                "status": microsoft_status,
+                "severity": if microsoft_status == "pass" { "info" } else { "warning" },
+                "message": if microsoft_status == "pass" {
+                    "The exact optional Microsoft Power BI integration cache is ready."
+                } else {
+                    "Optional Microsoft Power BI integrations are not fully ready; offline PBIP/PBIR/TMDL authoring is unaffected."
+                },
+                "summary": microsoft_integrations,
+                "next": ["powerbi-cli integrations status --json"],
+                "instructions": if microsoft_status == "pass" {
+                    Vec::<&str>::new()
+                } else {
+                    vec!["Inspect shallow status first. Installation is explicit and requires --allow-network."]
+                }
             }
         ],
+        "microsoftIntegrations": microsoft_integrations,
         "powerBiDesktop": {
             "found": desktop_detection.found,
             "path": desktop_detection.path,
@@ -105,6 +125,7 @@ pub(crate) fn doctor_json() -> Value {
         },
         "next": [
             "powerbi-cli --json capabilities",
+            "powerbi-cli integrations status --json",
             "powerbi-cli validate --strict <project-dir-or.pbip> --json",
             "powerbi-cli desktop open-check <project-dir-or.pbip> --json",
             "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <evidence.png> --json"

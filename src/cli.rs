@@ -7,12 +7,14 @@ use crate::feature_catalog::features_command;
 use crate::fixture::fixture_command;
 use crate::handoff::handoff_command;
 use crate::lint::lint_command;
+use crate::microsoft::integrations_command;
 use crate::model::model_command;
 use crate::package::package_command;
 use crate::profile::profile_command;
 use crate::report::report_command;
 use crate::schema::schema_command;
 use crate::source_template::source_template_command;
+use crate::workflow::workflow_command;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, diff::diff_command, doctor_json,
     inspect_command, scaffold_command, validate_command,
@@ -125,6 +127,7 @@ fn run() -> CliResult<CliOutput> {
         "profile" => value_output(profile_command(&args[1..])?, flags.json),
         "inspect" => value_output(inspect_command(&args[1..])?, flags.json),
         "lint" => value_output(lint_command(&args[1..])?, flags.json),
+        "integrations" => value_output(integrations_command(&args[1..])?, flags.json),
         "model" => value_output(model_command(&args[1..])?, flags.json),
         "package" | "packages" => value_output(package_command(&args[1..])?, flags.json),
         "report" => value_output(report_command(&args[1..])?, flags.json),
@@ -132,6 +135,7 @@ fn run() -> CliResult<CliOutput> {
             value_output(source_template_command(&args[1..])?, flags.json)
         }
         "validate" => value_output(validate_command(&args[1..])?, flags.json),
+        "workflow" => value_output(workflow_command(&args[1..])?, flags.json),
         other => Err(unknown_command_error(other)),
     }
 }

@@ -3,7 +3,7 @@
     "boundVisuals": 3,
     "columns": 5,
     "explicitInteractions": 0,
-    "jsonFilesChecked": 13,
+    "jsonFilesChecked": 12,
     "lintErrors": 0,
     "lintInfo": 0,
     "lintWarnings": 0,
@@ -18,7 +18,7 @@
     "visuals": 3
   },
   "exitCode": 0,
-  "fingerprint": "55caa854cc147309",
+  "fingerprint": "97b4cc89d7c9b907",
   "lint": {
     "counts": {
       "errors": 0,
@@ -164,11 +164,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "73552fb5610fa1a2",
+              "objects": "5b9bc4ba528108e4",
               "position": "dec796711fd9b3bf",
               "queryState": "90ce0e83ccc57369",
-              "visual": "0f7af12ec52767c8",
-              "visualJson": "75bcdeb0554a29d7"
+              "visual": "2482b02c438a6b98",
+              "visualContainerObjects": "bb69072b2e1c93c8",
+              "visualJson": "a74683cc3b8af577"
             },
             "name": "VisualContainerCompletedCard",
             "ordinal": 0,
@@ -204,11 +205,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "f3de7a4b3cf05cb6",
+              "objects": "5b9bc4ba528108e4",
               "position": "ffff729ece655f4f",
               "queryState": "c5527737b36e134c",
-              "visual": "8258cdc80b38cac9",
-              "visualJson": "3a1db830547d79bc"
+              "visual": "9f4a0f1de72c7781",
+              "visualContainerObjects": "f4fc95826c11127c",
+              "visualJson": "5f6cf1453e0db114"
             },
             "name": "VisualContainerHoursByTeam",
             "ordinal": 1,
@@ -260,11 +262,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "8015e919175773bd",
+              "objects": "5b9bc4ba528108e4",
               "position": "b601e0e0aa548821",
               "queryState": "efb4635e84426cd0",
-              "visual": "7ea3a1e3016c947c",
-              "visualJson": "add955012d40fc13"
+              "visual": "74aed478957417c6",
+              "visualContainerObjects": "5faa20f7fe6e2596",
+              "visualJson": "32d3343ad65c2021"
             },
             "name": "VisualContainerWorkDetail",
             "ordinal": 2,

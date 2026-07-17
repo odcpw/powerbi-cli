@@ -158,10 +158,13 @@ pub(crate) struct MutationPlan {
 }
 
 pub(crate) fn load_table_documents(resolved: &ResolvedProject) -> CliResult<Vec<TableDocument>> {
-    let tables_dir = resolved
-        .semantic_model_dir
-        .join("definition")
-        .join("tables");
+    load_table_documents_from_semantic_model(&resolved.semantic_model_dir)
+}
+
+pub(crate) fn load_table_documents_from_semantic_model(
+    semantic_model_dir: &Path,
+) -> CliResult<Vec<TableDocument>> {
+    let tables_dir = semantic_model_dir.join("definition").join("tables");
     if !tables_dir.is_dir() {
         return Err(CliError::file_not_found(format!(
             "semantic model tables directory not found: {}",
@@ -933,8 +936,16 @@ fn parse_partition_block(
     let mut source_start = None;
     let mut source_end = None;
     let mut in_source = false;
+    let mut source_property_indent = None;
+    let mut source_seen = false;
     for (offset, line) in lines.iter().enumerate().skip(1) {
         let trimmed = line.trim_start();
+        if in_source
+            && !trimmed.is_empty()
+            && source_property_indent.is_some_and(|indent| tmdl_indent_width(line) <= indent)
+        {
+            in_source = false;
+        }
         if !in_source
             && let Some((key, value)) = trimmed.split_once(':')
             && key.trim() == "mode"
@@ -942,8 +953,13 @@ fn parse_partition_block(
             mode = Some(value.trim().to_string());
             continue;
         }
-        if !in_source && let Some(rest) = trimmed.strip_prefix("source =") {
+        if !source_seen
+            && !in_source
+            && let Some(rest) = trimmed.strip_prefix("source =")
+        {
             in_source = true;
+            source_seen = true;
+            source_property_indent = Some(tmdl_indent_width(line));
             source_start = Some(start_line + offset);
             if !rest.trim().is_empty() {
                 source_lines.push(rest.trim_start().to_string());
@@ -984,6 +1000,13 @@ fn parse_partition_block(
         source_end_line: source_end,
         block: render_lines(lines, newline, true),
     })
+}
+
+fn tmdl_indent_width(line: &str) -> usize {
+    line.chars()
+        .take_while(|character| matches!(character, ' ' | '\t'))
+        .map(|character| if character == '\t' { 4 } else { 1 })
+        .sum()
 }
 
 pub(crate) fn measure_block_lines(table: &str, definition: &MeasureDefinition) -> Vec<String> {
@@ -1164,23 +1187,31 @@ fn looks_like_tmdl_child_line(line: &str) -> bool {
 }
 
 fn is_column_start(line: &str) -> bool {
-    line.starts_with("    column ")
+    is_table_child_with_prefix(line, "column ")
 }
 
 fn is_measure_start(line: &str) -> bool {
-    line.starts_with("    measure ")
+    is_table_child_with_prefix(line, "measure ")
 }
 
 fn is_partition_start(line: &str) -> bool {
-    line.starts_with("    partition ")
+    is_table_child_with_prefix(line, "partition ")
 }
 
 fn is_table_child_start(line: &str) -> bool {
-    line.starts_with("    column ")
-        || line.starts_with("    measure ")
-        || line.starts_with("    partition ")
-        || line.starts_with("    hierarchy ")
-        || line.starts_with("    annotation ")
+    [
+        "column ",
+        "measure ",
+        "partition ",
+        "hierarchy ",
+        "annotation ",
+    ]
+    .iter()
+    .any(|prefix| is_table_child_with_prefix(line, prefix))
+}
+
+fn is_table_child_with_prefix(line: &str, prefix: &str) -> bool {
+    tmdl_indent_width(line) == 4 && line.trim_start().starts_with(prefix)
 }
 
 fn is_table_child_boundary(line: &str) -> bool {
@@ -1232,19 +1263,29 @@ fn push_tmdl_description(lines: &mut Vec<String>, indent: &str, description: Opt
 }
 
 fn strip_expression_indent(line: &str) -> String {
-    line.strip_prefix("            ")
-        .or_else(|| line.strip_prefix("        "))
-        .or_else(|| line.strip_prefix("    "))
-        .unwrap_or(line)
-        .to_string()
+    strip_tmdl_indent(line, 12)
 }
 
 fn strip_source_indent(line: &str) -> String {
-    line.strip_prefix("            ")
-        .or_else(|| line.strip_prefix("        "))
-        .or_else(|| line.strip_prefix("    "))
-        .unwrap_or(line)
-        .to_string()
+    strip_tmdl_indent(line, 12)
+}
+
+fn strip_tmdl_indent(line: &str, max_width: usize) -> String {
+    let mut width = 0_usize;
+    let mut end = 0_usize;
+    for (offset, character) in line.char_indices() {
+        let character_width = match character {
+            ' ' => 1,
+            '\t' => 4,
+            _ => break,
+        };
+        if width + character_width > max_width {
+            break;
+        }
+        width += character_width;
+        end = offset + character.len_utf8();
+    }
+    line[end..].to_string()
 }
 
 fn classify_partition_source(
@@ -1368,14 +1409,14 @@ fn partition_finding(code: &str, severity: &str, message: &str) -> PartitionSafe
 fn insertion_index(doc: &TableDocument) -> usize {
     doc.lines
         .iter()
-        .position(|line| line.starts_with("    partition "))
+        .position(|line| is_partition_start(line))
         .unwrap_or(doc.lines.len())
 }
 
 fn column_insertion_index(doc: &TableDocument) -> usize {
     doc.lines
         .iter()
-        .position(|line| line.starts_with("    measure ") || line.starts_with("    partition "))
+        .position(|line| is_measure_start(line) || is_partition_start(line))
         .unwrap_or(doc.lines.len())
 }
 
@@ -1550,4 +1591,79 @@ fn hash_hex(value: &str) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn microsoft_tab_indented_fixture_exposes_partition_and_complete_source() {
+        let semantic_model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata")
+            .join("conformance")
+            .join("microsoft")
+            .join("modeling-mcp")
+            .join("Synthetic.SemanticModel");
+        let docs = load_table_documents_from_semantic_model(&semantic_model).expect("documents");
+        let selector = PartitionSelector {
+            table: Some("Synthetic".to_string()),
+            name: Some("Synthetic".to_string()),
+            ..PartitionSelector::default()
+        };
+        let partition = find_partition(&docs, &selector).expect("partition");
+        assert_eq!(partition.expression_kind.as_deref(), Some("m"));
+        assert_eq!(partition.mode.as_deref(), Some("import"));
+        assert_eq!(
+            partition.source.as_deref(),
+            Some("let\n\tSource = #table(type table [Value = Int64.Type], {{1}})\nin\n\tSource")
+        );
+        assert!(
+            !partition
+                .source
+                .as_deref()
+                .expect("source")
+                .contains("annotation")
+        );
+    }
+
+    #[test]
+    fn partition_source_replacement_preserves_trailing_metadata_byte_for_byte() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let semantic_model = temp.path().join("Synthetic.SemanticModel");
+        let tables = semantic_model.join("definition").join("tables");
+        fs::create_dir_all(&tables).expect("tables");
+        let path = tables.join("Synthetic.tmdl");
+        let original = "table Synthetic\r\n\r\n    partition Synthetic = m\r\n        mode: import\r\n        source =\r\n            let\r\n                Source = #table(type table [Value = Int64.Type], {{1}})\r\n            in\r\n                Source\r\n        annotation PBI_NavigationStepName = Navigation\r\n        extendedProperty Persisted = value\r\n";
+        fs::write(&path, original).expect("TMDL");
+        let docs = load_table_documents_from_semantic_model(&semantic_model).expect("documents");
+        let selector = PartitionSelector {
+            table: Some("Synthetic".to_string()),
+            name: Some("Synthetic".to_string()),
+            ..PartitionSelector::default()
+        };
+        let plan = replace_partition_source_plan(
+            &docs,
+            &selector,
+            "let\n    Source = #table(type table [Value = Int64.Type], {{2}})\nin\n    Source",
+        )
+        .expect("replacement plan");
+        let before_source = plan.before_block.as_deref().expect("before source");
+        let after_source = plan.after_block.as_deref().expect("after source");
+        assert_eq!(
+            original.replacen(before_source, "<SOURCE>", 1),
+            plan.new_text.replacen(after_source, "<SOURCE>", 1),
+            "bytes outside the exact source range changed"
+        );
+        assert!(
+            plan.new_text
+                .contains("        annotation PBI_NavigationStepName = Navigation\r\n")
+        );
+        assert!(
+            plan.new_text
+                .contains("        extendedProperty Persisted = value\r\n")
+        );
+        assert!(!before_source.contains("annotation"));
+        assert!(!before_source.contains("extendedProperty"));
+    }
 }

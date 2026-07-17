@@ -23,15 +23,12 @@ The current manual Desktop proof records are:
 testdata/desktop-proof/flat-ops.desktop-proof.json
 testdata/desktop-proof/scatter-bubble.desktop-proof.json
 testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json
-testdata/desktop-proof/desktop-acceptance-2026-06-24.visual-objects.json
 ```
 
 Desktop proof observed, across these projects: cards, line charts, clustered
 bar charts, populated tables, and page/report filters visible in the filter
-pane, all rendering correctly after refresh. Earlier Desktop proof sessions
-that used a since-removed private fixture found the same categorical-filter
-and root-objects issues documented below; that evidence record is retained in
-a private repository.
+pane, all rendering correctly after refresh. Only checked-in, independently
+reviewable records count toward the public proof level.
 
 ## Current CLI Proof Contract
 
@@ -189,11 +186,11 @@ surfaces `boundFilter` and `fieldExpr`, and `clear` removes both the binding and
 Drillthrough-created filter entries.
 
 The Desktop-authored reference sets `visibility = "HiddenInViewMode"` but does
-not set root `type = "Drillthrough"`. The CLI retains that legacy root marker
-for output compatibility because Desktop 2.155 accepted it; the linked binding
-and filter are the Desktop-recognized behavior-bearing shape. The corrected
-output has now passed the manual end-to-end proof recorded below. Visual
-drillthrough action links and cross-report drillthrough remain golden-gated.
+not set root `type = "Drillthrough"`. The CLI retains that root marker to match
+the public Desktop-authored reference shape; the linked binding and filter are
+the behavior-bearing shape. The current same-report slice is schema-golden.
+Reproducible Desktop navigation proof, visual drillthrough action links, and
+cross-report drillthrough remain gated.
 
 ## Manual Canvas Proof Earned On 2026-07-10
 
@@ -202,12 +199,6 @@ Power BI Desktop Store 2.155.756.0 refreshed and rendered CLI-generated
 surfaces with exact expected values; slicer interaction was also exercised.
 The evidence is
 `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json`.
-The corrected same-report drillthrough binding separately passed well
-registration, level-correct context-menu discovery, filtered navigation, and
-carried-filter checks in a manual Desktop canvas/refresh session (2026-07-10,
-Desktop Store 2.155.756.0); that evidence record is retained in a private
-repository.
-
 These records establish `manual-desktop-canvas-refresh` evidence for the tested
 binding/canvas baselines. The current generator now adds a Desktop-authored
 title-container shape, so the changed complete visual bytes are
@@ -215,20 +206,16 @@ title-container shape, so the changed complete visual bytes are
 evidence, not an automated CLI oracle; implementing `desktop-canvas-refresh`
 remains the open P0.
 
-### Cartesian hierarchy projections do not require an active marker
+### Cartesian hierarchy projections omit an active marker
 
-A private-repo column chart used the CLI's cartesian projection grammar: three
-ordered `Category` projections at increasing granularity, none with
-`active: true`. In the 2026-07-10 Desktop Store 2.155.756.0 session,
-all three drill levels worked through the context menu and cross-filtered the
-line chart and matrix. That evidence record is retained in a private
-repository; the shape it validated is unchanged and still emitted here.
+The CLI's schema-golden cartesian projection grammar emits ordered `Category`
+projections at increasing granularity without `active: true`.
 
 The archived Desktop-authored pie, donut, matrix, and slicer fixtures do mark
 their first Category/Rows/Columns/Values projection active, but the reference
-directory contains no cartesian hierarchy fixture that contradicts the live
-result. Therefore cartesian Category projections deliberately remain without
-`active`; adding it would invent a shape despite working Desktop evidence.
+directory contains no cartesian hierarchy fixture requiring `active`.
+Reproducible Desktop hierarchy navigation proof remains open before this shape
+can claim a Desktop proof level.
 
 ## Sources Used
 

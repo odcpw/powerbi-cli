@@ -3,7 +3,7 @@
     "boundVisuals": 2,
     "columns": 5,
     "explicitInteractions": 0,
-    "jsonFilesChecked": 12,
+    "jsonFilesChecked": 11,
     "lintErrors": 0,
     "lintInfo": 0,
     "lintWarnings": 0,
@@ -18,7 +18,7 @@
     "visuals": 2
   },
   "exitCode": 0,
-  "fingerprint": "7ed236389896bd7c",
+  "fingerprint": "e19f793856294baa",
   "lint": {
     "counts": {
       "errors": 0,
@@ -202,11 +202,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "8f64fe385d4955e5",
+              "objects": "5b9bc4ba528108e4",
               "position": "fa04ff5f77aa9e64",
               "queryState": "3c63a09f4b16f86a",
-              "visual": "c6badb661b4ae774",
-              "visualJson": "88e7f4ca08c0fb6f"
+              "visual": "2b107ab758f67432",
+              "visualContainerObjects": "54c0fb503d714446",
+              "visualJson": "30aaa2c0c961a361"
             },
             "name": "VisualContainerFacilityTable",
             "ordinal": 0,
@@ -266,11 +267,12 @@
               }
             ],
             "fingerprints": {
-              "objects": "7beb70fe026d0691",
+              "objects": "5b9bc4ba528108e4",
               "position": "f04f5c9706a7f823",
               "queryState": "30e9990a61187465",
-              "visual": "bf0035dc6b654712",
-              "visualJson": "7aaf7bc717cb566d"
+              "visual": "17abcc09d5a346d6",
+              "visualContainerObjects": "fadcec75cfe8e9da",
+              "visualJson": "155414e7df203701"
             },
             "name": "VisualContainerPortfolioBubble",
             "ordinal": 1,

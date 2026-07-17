@@ -217,7 +217,7 @@ fn recommended_workflow(project_dir: &std::path::Path, opportunities: &[Value]) 
             "powerbi-cli report pages list --project {} --json",
             command_arg(project_dir)
         ),
-        format!("powerbi-cli report visuals catalog --json"),
+        "powerbi-cli report visuals catalog --json".to_string(),
     ];
     commands.extend(
         opportunities

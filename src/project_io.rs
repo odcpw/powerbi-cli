@@ -286,6 +286,59 @@ pub(crate) fn write_json_atomic(path: &Path, value: &Value) -> CliResult<()> {
     write_text_atomic(path, &text)
 }
 
+/// Atomically publishes a new JSON file without ever replacing an existing
+/// target.
+///
+/// The temporary file is created beside the target, written, and synced before
+/// `hard_link` performs the publication. Creating a hard link is an atomic
+/// create-only operation: it fails if another process wins the target-path
+/// race, while keeping the synced bytes on the same filesystem. The
+/// invocation-owned temporary name is removed after either outcome.
+pub(crate) fn write_json_new_atomic(path: &Path, value: &Value) -> CliResult<()> {
+    let text = serde_json::to_string_pretty(value).map_err(|err| {
+        CliError::unexpected(format!("serialize JSON for {}: {err}", path.display()))
+    })?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|err| CliError::unexpected(format!("create {}: {err}", parent.display())))?;
+    let file_name = atomic_file_name(path);
+    let tmp = unique_sibling_path(parent, &file_name, "new");
+    write_synced_temp(&tmp, &text)?;
+    publish_new_atomic_temp(path, &tmp)
+}
+
+fn publish_new_atomic_temp(path: &Path, tmp: &Path) -> CliResult<()> {
+    match fs::hard_link(tmp, path) {
+        Ok(()) => fs::remove_file(tmp).map_err(|err| {
+            CliError::unexpected(format!(
+                "published new file {}, but could not remove invocation-owned temporary file {}: {err}",
+                path.display(),
+                tmp.display()
+            ))
+        }),
+        Err(publish_error) => {
+            let target_exists = publish_error.kind() == std::io::ErrorKind::AlreadyExists
+                || fs::symlink_metadata(path).is_ok();
+            let cleanup_detail = cleanup_temp_after_error(tmp);
+            if target_exists {
+                Err(CliError::invalid_args(format!(
+                    "output file already exists and was not replaced: {}{cleanup_detail}",
+                    path.display()
+                )))
+            } else {
+                Err(CliError::unexpected(format!(
+                    "atomically publish new file {} from {}: {publish_error}{cleanup_detail}",
+                    path.display(),
+                    tmp.display()
+                )))
+            }
+        }
+    }
+}
+
 pub(crate) fn write_json_pretty(path: &Path, value: &Value) -> CliResult<()> {
     if path.exists() {
         return write_json_atomic(path, value);
@@ -389,6 +442,55 @@ mod tests {
             entries.len(),
             1,
             "successful replace must remove its backup"
+        );
+    }
+
+    #[test]
+    fn new_atomic_json_creates_parent_and_never_clobbers_existing_target() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("nested").join("plan.json");
+        let first = serde_json::json!({"winner": "first"});
+        let second = serde_json::json!({"winner": "second"});
+
+        write_json_new_atomic(&path, &first).expect("publish first JSON");
+        let original = fs::read(&path).expect("read first JSON bytes");
+        let error = write_json_new_atomic(&path, &second)
+            .expect_err("an existing target must never be replaced");
+
+        assert_eq!(error.code, "invalid_args");
+        assert_eq!(
+            fs::read(&path).expect("read winning JSON bytes"),
+            original,
+            "the losing publication must not alter the existing target"
+        );
+        let entries = fs::read_dir(path.parent().expect("target parent"))
+            .expect("read target parent")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("read entries");
+        assert_eq!(entries.len(), 1, "no invocation-owned temp may remain");
+    }
+
+    #[test]
+    fn new_atomic_publication_loses_target_race_without_altering_winner() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("receipt.json");
+        let tmp = temp.path().join(".receipt.json.racing.new");
+        write_synced_temp(&tmp, "candidate").expect("write synced candidate");
+
+        // Simulate another process publishing after our temporary file is
+        // synced but immediately before our atomic create-only publication.
+        fs::write(&path, "race winner").expect("publish race winner");
+        let error = publish_new_atomic_temp(&path, &tmp)
+            .expect_err("the racing publication must win without replacement");
+
+        assert_eq!(error.code, "invalid_args");
+        assert_eq!(
+            fs::read_to_string(&path).expect("read race winner"),
+            "race winner"
+        );
+        assert!(
+            !tmp.exists(),
+            "the losing invocation must remove its owned temporary file"
         );
     }
 

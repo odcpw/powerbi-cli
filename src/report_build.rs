@@ -581,14 +581,25 @@ fn validate_binding_contract(
     match family {
         VisualBindingFamily::SingleValue => {
             let values = count("Values");
-            if values > 1 {
+            if values != 1 {
                 return Err(CliError::invalid_args(format!(
-                    "{} card accepts at most one Values binding, got {values}",
+                    "{} card requires exactly one Values binding, got {values}",
                     visual_path()
                 )));
             }
         }
-        VisualBindingFamily::ValuesList => {}
+        VisualBindingFamily::ValuesList => {
+            let values = count("Values");
+            if values < 1 {
+                return Err(CliError::invalid_args(format!(
+                    "{} {visual_type} requires at least one Values binding",
+                    visual_path()
+                ))
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
+                )));
+            }
+        }
         VisualBindingFamily::CategoryY => {
             let categories = count("Category");
             let y = count("Y");

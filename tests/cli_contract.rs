@@ -21,6 +21,7 @@ fn run_powerbi(args: &[&str]) -> RunOutput {
     }
 }
 
+#[cfg(windows)]
 fn run_powerbi_without_oracle(args: &[&str]) -> RunOutput {
     let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
         .env_remove("POWERBI_DESKTOP_ORACLE")
@@ -825,18 +826,14 @@ fn feature_catalog_advertises_supported_drillthrough_slice() {
             .any(|command| command == "report drillthrough set")
     );
     assert_eq!(feature["runtimeFallback"], Value::Bool(false));
-    assert_eq!(
-        feature["proofLevel"],
-        Value::from("manual-desktop-canvas-refresh")
-    );
+    assert_eq!(feature["proofLevel"], Value::from("schema-golden"));
     assert!(
         feature["referenceSignals"]
             .as_array()
             .expect("reference signals")
             .iter()
             .filter_map(Value::as_str)
-            .any(|signal| signal.contains("2026-07-10")
-                && signal.contains("retained in a private repository"))
+            .any(|signal| signal.contains("pageBinding.type=Drillthrough"))
     );
 }
 
@@ -868,7 +865,7 @@ fn feature_catalog_does_not_leave_supported_visuals_in_planned_types() {
 }
 
 #[test]
-fn new_visual_feature_entries_are_manually_desktop_canvas_proven() {
+fn new_visual_feature_entries_preserve_manual_binding_proof_without_overclaiming_current_bytes() {
     for feature_id in [
         "report.visuals.category-share",
         "report.visuals.matrix",
@@ -881,7 +878,7 @@ fn new_visual_feature_entries_are_manually_desktop_canvas_proven() {
         let feature = &value["features"][0];
         assert_eq!(feature["id"], feature_id);
         assert_eq!(feature["status"], "supported");
-        assert_eq!(feature["proofLevel"], "manual-desktop-canvas-refresh");
+        assert_eq!(feature["proofLevel"], "desktop-golden-pending");
         assert_eq!(feature["emitsPbir"], Value::Bool(true));
         assert!(
             feature["reason"]
@@ -1390,4 +1387,37 @@ fn scaffold_classifies_unavailable_column_types_as_unsupported_features() {
         "unsupported column dataType: geography"
     );
     assert!(!out_dir.exists());
+}
+
+#[test]
+fn workflow_commands_are_first_class_and_fail_closed_before_writes() {
+    let capabilities = run_powerbi(&["capabilities", "--for", "workflow", "--json"]);
+    assert_eq!(capabilities.code, 0, "stderr: {}", capabilities.stderr);
+    let value = stdout_json(&capabilities);
+    let commands = value["commands"].as_array().expect("workflow commands");
+    assert_eq!(
+        command_paths(&value),
+        vec!["workflow plan", "workflow run", "workflow verify"]
+    );
+    assert_eq!(
+        command_by_path(commands, "workflow plan")["mutatesProject"],
+        false
+    );
+    assert_eq!(
+        command_by_path(commands, "workflow run")["confirmRequired"],
+        true
+    );
+    assert_eq!(
+        command_by_path(commands, "workflow verify")["readOnly"],
+        true
+    );
+
+    let missing_profile = run_powerbi(&["workflow", "plan", "--project", "missing.pbip", "--json"]);
+    assert_eq!(missing_profile.code, 2);
+    assert_error_envelope(&missing_profile, "invalid_args");
+
+    let missing_confirmation =
+        run_powerbi(&["workflow", "run", "--plan", "missing.plan.json", "--json"]);
+    assert_eq!(missing_confirmation.code, 2);
+    assert_error_envelope(&missing_confirmation, "invalid_args");
 }

@@ -141,13 +141,41 @@ fn design_plan_layout_and_theme_preset_are_agent_surfaces() {
         theme_json["source"]["preset"],
         Value::from("risk-dashboard")
     );
+    let theme_path = theme_out
+        .join("SalesOperations.Report")
+        .join("StaticResources")
+        .join("RegisteredResources")
+        .join("powerbi-cli-risk-dashboard.json");
+    assert!(theme_path.is_file());
+    let installed_theme: Value = serde_json::from_str(
+        &fs::read_to_string(&theme_path).expect("read installed built-in theme"),
+    )
+    .expect("parse installed built-in theme");
+    assert_eq!(
+        installed_theme["name"],
+        Value::from("powerbi-cli-risk-dashboard.json")
+    );
+    let strict = run_powerbi(&["validate", "--strict", theme_out_arg, "--json"]);
+    assert_eq!(strict.code, 0, "stderr: {}", strict.stderr);
+
+    let mut mismatched_theme = installed_theme;
+    mismatched_theme["name"] = Value::from("Mismatched Display Name");
+    fs::write(
+        &theme_path,
+        serde_json::to_string_pretty(&mismatched_theme).expect("theme json"),
+    )
+    .expect("write mismatched theme");
+    let rejected = run_powerbi(&["validate", "--strict", theme_out_arg, "--json"]);
+    assert_eq!(rejected.code, 10, "stderr: {}", rejected.stderr);
     assert!(
-        theme_out
-            .join("SalesOperations.Report")
-            .join("StaticResources")
-            .join("RegisteredResources")
-            .join("powerbi-cli-risk-dashboard.json")
-            .is_file()
+        stdout_json(&rejected)["errors"]
+            .as_array()
+            .expect("validation errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .unwrap_or_default()
+                .contains("does not match report customTheme name"))
     );
 }
 

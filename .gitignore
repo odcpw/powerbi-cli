@@ -17,3 +17,6 @@
 
 # Internal source-data working files
 datastructure*
+
+# bv (beads viewer) local config and caches
+.bv/

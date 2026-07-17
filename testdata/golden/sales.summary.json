@@ -1,11 +1,11 @@
 {
   "counts": {
-    "boundVisuals": 0,
+    "boundVisuals": 3,
     "columns": 11,
     "explicitInteractions": 0,
-    "jsonFilesChecked": 13,
+    "jsonFilesChecked": 12,
     "lintErrors": 0,
-    "lintInfo": 3,
+    "lintInfo": 0,
     "lintWarnings": 0,
     "measures": 2,
     "pages": 1,
@@ -18,31 +18,15 @@
     "visuals": 3
   },
   "exitCode": 0,
-  "fingerprint": "f83114e8a4f32c4f",
+  "fingerprint": "37779cd3d46cf884",
   "lint": {
     "counts": {
       "errors": 0,
-      "findings": 3,
-      "info": 3,
+      "findings": 0,
+      "info": 0,
       "warnings": 0
     },
-    "findings": [
-      {
-        "code": "report.visual_unbound",
-        "handle": "visual:ReportSectionOverview:VisualContainerCustomerDetail6665af72a7",
-        "severity": "info"
-      },
-      {
-        "code": "report.visual_unbound",
-        "handle": "visual:ReportSectionOverview:VisualContainerRevenue83556a914d",
-        "severity": "info"
-      },
-      {
-        "code": "report.visual_unbound",
-        "handle": "visual:ReportSectionOverview:VisualContainerRevenueTrendf33e67f559",
-        "severity": "info"
-      }
-    ]
+    "findings": []
   },
   "model": {
     "relationships": [
@@ -265,14 +249,32 @@
         "ordinal": 0,
         "visuals": [
           {
-            "bindingCount": 0,
-            "bindings": [],
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "CustomerName",
+                "field": "CustomerName",
+                "kind": "column",
+                "measure": null,
+                "role": "Values",
+                "table": "DimCustomer"
+              },
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
             "fingerprints": {
-              "objects": "ae3065c278122f5e",
+              "objects": "5b9bc4ba528108e4",
               "position": "b601e0e0aa548821",
-              "queryState": "5b9bc4ba528108e4",
-              "visual": "d2e33c43f5179526",
-              "visualJson": "0afa439923530a41"
+              "queryState": "235b2e5e60042760",
+              "visual": "706732a9cc22bbc4",
+              "visualContainerObjects": "7e0105d6d76667bc",
+              "visualJson": "d73c73e72e458dba"
             },
             "name": "VisualContainerCustomerDetail6665af72a7",
             "ordinal": 0,
@@ -288,14 +290,24 @@
             "visualType": "tableEx"
           },
           {
-            "bindingCount": 0,
-            "bindings": [],
+            "bindingCount": 1,
+            "bindings": [
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Values",
+                "table": "FactSales"
+              }
+            ],
             "fingerprints": {
-              "objects": "b044065363c0b053",
+              "objects": "5b9bc4ba528108e4",
               "position": "dec796711fd9b3bf",
-              "queryState": "5b9bc4ba528108e4",
-              "visual": "7c7099497e730071",
-              "visualJson": "f97ee04c31b58c2f"
+              "queryState": "2c299f7e7fbeb884",
+              "visual": "ad2cbf401d85245b",
+              "visualContainerObjects": "a97d9735ae28d4c6",
+              "visualJson": "95641f31444f5372"
             },
             "name": "VisualContainerRevenue83556a914d",
             "ordinal": 1,
@@ -311,14 +323,32 @@
             "visualType": "card"
           },
           {
-            "bindingCount": 0,
-            "bindings": [],
+            "bindingCount": 2,
+            "bindings": [
+              {
+                "column": "FiscalYear",
+                "field": "FiscalYear",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "DimDate"
+              },
+              {
+                "column": null,
+                "field": "Total Revenue",
+                "kind": "measure",
+                "measure": "Total Revenue",
+                "role": "Y",
+                "table": "FactSales"
+              }
+            ],
             "fingerprints": {
-              "objects": "31110711e5ef121c",
+              "objects": "5b9bc4ba528108e4",
               "position": "ffff729ece655f4f",
-              "queryState": "5b9bc4ba528108e4",
-              "visual": "6ff723bf9d416055",
-              "visualJson": "e3747eecbffa6dfe"
+              "queryState": "a0d05ac3b9d54099",
+              "visual": "c0d52d248e425538",
+              "visualContainerObjects": "1994580895b20130",
+              "visualJson": "ffcb528a3e9b7406"
             },
             "name": "VisualContainerRevenueTrendf33e67f559",
             "ordinal": 2,

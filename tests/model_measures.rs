@@ -203,7 +203,14 @@ fn model_dax_execute_requires_data_and_oracle_opt_ins_without_echoing_query() {
     assert_eq!(oracle_disabled.status.code(), Some(30));
     let stdout = String::from_utf8_lossy(&oracle_disabled.stdout);
     let value: Value = serde_json::from_str(stdout.trim()).expect("stdout JSON");
-    assert_eq!(value["stage"], "oracle-opt-in");
+    assert_eq!(
+        value["stage"],
+        if cfg!(windows) {
+            "oracle-opt-in"
+        } else {
+            "platform"
+        }
+    );
     assert_eq!(value["query"]["textReturned"], Value::Bool(false));
     assert!(!stdout.contains("PrivateLabel"));
 

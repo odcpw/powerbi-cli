@@ -1,0 +1,24 @@
+{
+  "schema": "powerbi-cli.microsoft-conformance-cases.v1",
+  "fixture": {
+    "kind": "generated-neutral",
+    "sourceSchema": "examples/sales.schema.json"
+  },
+  "cases": [
+    {
+      "id": "official-report-valid",
+      "mutation": null,
+      "expectedResult": "succeeded",
+      "expectedErrorCount": 0
+    },
+    {
+      "id": "official-report-legacy-alt-text",
+      "mutation": {
+        "kind": "addLegacyVisualAltText",
+        "pointer": "/visual/objects/general/0/properties/altText"
+      },
+      "expectedResult": "failed",
+      "expectedDiagnosticCode": "PBIR_FORMATTING_PROP_UNKNOWN"
+    }
+  ]
+}

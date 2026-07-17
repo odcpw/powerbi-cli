@@ -49,8 +49,17 @@ Usage:
   powerbi-cli --robot-triage
   powerbi-cli robot-triage
   powerbi-cli --json doctor
+  powerbi-cli integrations status [--deep] [--component modeling-mcp|report-authoring|desktop-bridge] --json
+  powerbi-cli integrations install --allow-network --json
+  powerbi-cli workflow plan --project <project-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json
+  powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
+  powerbi-cli workflow verify --plan <plan.json> --json
   powerbi-cli desktop open-check <project-dir-or.pbip> --json
   powerbi-cli desktop screenshot <project-dir-or.pbip> --out <evidence.png> --json
+  powerbi-cli desktop bridge status [--pid <pid>] --json
+  powerbi-cli desktop bridge reload --project <project-dir-or.pbip> --pid <pid> --json
+  powerbi-cli desktop bridge screenshot-page --project <project-dir-or.pbip> --pid <pid> --page <id> --out <new.png> --json
+  powerbi-cli desktop bridge screenshot-all --project <project-dir-or.pbip> --pid <pid> --out-dir <new-dir> --json
   powerbi-cli fixture normalize <project-dir-or.pbip> --json
   powerbi-cli fixture verify <project-dir-or.pbip> --expected <summary.json> --json
   powerbi-cli --json scaffold --schema <schema.json> --out-dir <project-dir> [--force]
@@ -145,7 +154,7 @@ Usage:
   powerbi-cli report visuals formatting apply --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json
   powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json
   powerbi-cli report visuals formatting set-color --project <project-dir-or.pbip> --handle <visual-handle> --slot title.fontColor --color <hex> --dry-run --json
-  powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --title <title> --dry-run --json
+  powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --title <title> --binding "role=Values,table=<table>,measure=<measure>" --dry-run --json
   powerbi-cli report visuals clone --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json
   powerbi-cli report visuals delete --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json
   powerbi-cli report visuals set-position --project <project-dir-or.pbip> --handle <visual-handle> --x <n> --y <n> --dry-run --json
@@ -156,7 +165,7 @@ Usage:
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
   powerbi-cli handoff check <project-dir-or.pbip> --json
   powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--out <file.md>] [--force] --json
-  powerbi-cli --json validate [--strict] <project-dir-or.pbip>
+  powerbi-cli --json validate [--strict] [--backend native|microsoft-report|all] <project-dir-or.pbip>
 
 Agent contract:
   --json and --format json are global and may appear before or after the command.
@@ -288,7 +297,7 @@ Rules for agents:
 - Run `handoff check <project>` before carrying a project between home and work; it fails on caches, Power BI binaries, embedded data files, real connectors, and credential-like partition text.
 - Start measure mutations with `--dry-run`; use `--in-place` or `--out-dir <dir>` only after the returned TMDL block looks right.
 - Keep real data, credentials, gateway names, `.pbix`, `.pbit`, `.pbi/cache.abf`, and `localSettings.json` out of offline projects.
-- Treat PBIR visual bindings as Desktop-proved only after a Desktop oracle proof record exists; a deterministic local golden alone is not Desktop proof. The pie, donut, matrix, and slicer binding families have manual-desktop-canvas-refresh evidence in testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json, but current title-bearing generated visual bytes are desktop-golden-pending until re-verified. Same-report drillthrough was proven by a manual Desktop canvas/refresh session (2026-07-10, Desktop Store 2.155.756.0); the evidence record is retained in a private repository. Automated desktop-canvas-refresh proof remains open.
+- Treat PBIR visual bindings as Desktop-proved only after a public Desktop oracle proof record exists; a deterministic local golden alone is not Desktop proof. The pie, donut, matrix, and slicer binding families have manual-desktop-canvas-refresh evidence in testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json, but current title-bearing generated visual bytes are desktop-golden-pending until re-verified. Same-report drillthrough currently has schema-golden proof; end-to-end Desktop interaction proof remains open.
 - Bind measures, not raw columns, to card Values, chart Y, matrix Values, and scatter X/Y/Size roles. Bare-column aggregation semantics and repeated use of one field per visual are unsupported_feature until Desktop-authored fixtures prove their PBIR shapes.
 - Do not grow a monolith: add new command families in focused modules.
 
@@ -389,7 +398,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportVisualFormattingApplyDryRun": "powerbi-cli report visuals formatting apply --project <target-project-or.pbip> --handle <target-visual-handle> --bundle visual-formatting-bundle.json --dry-run --json",
             "reportVisualFormattingSetTextDryRun": "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json",
             "reportVisualFormattingSetColorDryRun": "powerbi-cli report visuals formatting set-color --project <project-dir-or.pbip> --handle <visual-handle> --slot title.fontColor --color '#123456' --dry-run --json",
-            "reportVisualAddDryRun": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --title <title> --dry-run --json",
+            "reportVisualAddDryRun": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --dry-run --json",
             "reportVisualCloneDryRun": "powerbi-cli report visuals clone --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json",
             "reportVisualDeleteDryRun": "powerbi-cli report visuals delete --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json",
             "reportVisualSetPositionDryRun": "powerbi-cli report visuals set-position --project <project-dir-or.pbip> --handle <visual-handle> --x 40 --y 40 --dry-run --json",
@@ -656,7 +665,92 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.doctor.v1",
             "flags": ["--json", "--format json"],
             "examples": ["powerbi-cli doctor --json"],
-            "followUpFields": ["schema", "ok", "exitCode", "checks[].id", "checks[].status", "checks[].next", "checks[].instructions", "powerBiDesktop", "formatAssumptions", "offlineSafety", "next"]
+            "followUpFields": ["schema", "ok", "exitCode", "checks[].id", "checks[].status", "checks[].next", "checks[].instructions", "powerBiDesktop", "microsoftIntegrations", "formatAssumptions", "offlineSafety", "next"]
+        }),
+        json!({
+            "path": "workflow plan",
+            "usage": "powerbi-cli workflow plan --project <project-dir-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json",
+            "summary": "Create a fingerprinted deterministic plan for one selected PBIP closure and typed source-profile replacements",
+            "tags": ["workflow", "source-profile", "plan", "pbip", "mcp", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": true,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.workflow-plan.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--profile <source-profile.json>", "--out <new-plan.json>", "--out-dir <new-project-dir>", "--resource <name>=<path>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow plan --project report.pbip --profile workflow/source-profile.json --out ../powerbi-build/report.plan.json --out-dir ../powerbi-build/report --json"],
+            "limitations": ["Writes only a new plan file; it does not create the intended output directory. Plan and output paths must be outside the entire source project root, and credential-like canonical profile/template/resource/override/project/plan/output paths are refused before persistence.", "Profiles support only typed partition.replaceSource operations rooted at Excel.Workbook or PostgreSQL.Database. Resources require exact SHA-256 claims; unknown/dynamic connectors, computed/postfix invocations, and hard-coded file/URI paths are refused."],
+            "followUpFields": ["profileId", "plan", "planFingerprint", "selectedFiles", "resources", "replacements", "outputDir", "next"]
+        }),
+        json!({
+            "path": "workflow run",
+            "usage": "powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json",
+            "summary": "Recheck a fingerprinted plan, build a fresh selected-artifact closure, apply exact local MCP model edits, validate, and write a checksummed receipt",
+            "tags": ["workflow", "source-profile", "run", "pbip", "mcp", "official-validation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": true,
+            "confirmRequired": true,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.workflow-receipt.v1",
+            "flags": ["--plan <plan.json>", "--confirm <plan-fingerprint>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow run --plan ../powerbi-build/report.plan.json --confirm sha256:<fingerprint> --json"],
+            "limitations": ["Requires the exact installed modeling MCP and official report validator.", "Creates a narrow allowlisted output outside the source project; source projects are never edited and failed outputs retain an incomplete marker.", "Directory creation, create-only writes, copy readback, and marker removal are relative to the opened output-directory capability with no-follow component traversal; ambient path/FileId identity is checked separately before publication."],
+            "followUpFields": ["planFingerprint", "receiptChecksum", "outputDir", "receipt", "validation", "childrenReaped", "pumpsJoined", "next"]
+        }),
+        json!({
+            "path": "workflow verify",
+            "usage": "powerbi-cli workflow verify --plan <plan.json> --json",
+            "summary": "Reconstruct profile-derived plan and staged-model semantics, bind output and MCP readbacks, and rerun native/official validation without editing the workflow output",
+            "tags": ["workflow", "source-profile", "verify", "integrity", "validation", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.workflow-verify.v1",
+            "flags": ["--plan <plan.json>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow verify --plan ../powerbi-build/report.plan.json --json"],
+            "limitations": ["Requires the exact installed modeling MCP and official report validator.", "Creates a private temporary canonical MCP export to bind the complete staged model to evidence; all evidence TMDL is bounded UTF-8 and credential-scanned, and the workflow output remains read-only."],
+            "followUpFields": ["planFingerprint", "receiptChecksum", "outputTreeSha256", "validation", "sourceInputsUnchanged", "receiptClaimsValid", "evidenceClaimsValid"]
+        }),
+        json!({
+            "path": "integrations status",
+            "aliases": [],
+            "usage": "powerbi-cli integrations status [--deep] [--component modeling-mcp|report-authoring|desktop-bridge] --json",
+            "summary": "Inspect the exact optional Microsoft Power BI toolchain without installation or registry access",
+            "tags": ["microsoft", "integration", "supply-chain", "offline", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "networkRequired": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.integrations.status.v1",
+            "flags": ["--deep", "--component modeling-mcp|report-authoring|desktop-bridge", "--json", "--format json"],
+            "examples": ["powerbi-cli integrations status --json", "powerbi-cli integrations status --component report-authoring --deep --json"],
+            "limitations": ["Shallow status launches no child. Deep status runs bounded exact checks against an already installed version-addressed private cache; neither mode installs or contacts a registry.", "The installed-tree checksum detects accidental drift; the same-user cache is not a privileged trust store or a signature boundary."],
+            "followUpFields": ["ready", "mode", "selectedComponent", "platform", "lock.id", "lock.fingerprint", "node", "cache", "components[].id", "components[].state", "components[].ready", "childProcessesLaunched", "next"]
+        }),
+        json!({
+            "path": "integrations install",
+            "aliases": [],
+            "usage": "powerbi-cli integrations install --allow-network --json",
+            "summary": "Install and atomically activate the committed exact Microsoft Power BI npm graph",
+            "tags": ["microsoft", "integration", "supply-chain", "install", "network", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "networkRequired": true,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.integrations.install.v1",
+            "flags": ["--allow-network", "--json", "--format json"],
+            "examples": ["powerbi-cli integrations install --allow-network --json"],
+            "limitations": ["The network opt-in is mandatory. npm receives an allowlisted environment; normal commands never install, download, npm, or npx."],
+            "followUpFields": ["ok", "readOnly", "mutates", "mutatesProject", "networkRequired", "lockId", "lockFingerprint", "cachePath", "activationResult", "priorActiveVersion", "components", "changes", "next"]
         }),
         json!({
             "path": "desktop open-check",
@@ -699,6 +793,85 @@ fn command_catalog() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.observation", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
         }),
         json!({
+            "path": "desktop bridge status",
+            "usage": "powerbi-cli desktop bridge status [--pid <pid>] --json",
+            "summary": "Inspect pinned Microsoft Desktop Bridge instances and their exact current-file, dirty-state, and PBIR page inventory",
+            "tags": ["desktop", "bridge", "microsoft", "preview", "status", "windows", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "networkRequired": false,
+            "stability": "preview-output",
+            "proofLevel": "unit-smoke",
+            "observedStage": "state-inventory",
+            "outputSchema": "powerbi-cli.desktop.bridge.status.v1",
+            "platforms": ["windows", "linux unsupported_feature", "macos unsupported_feature"],
+            "flags": ["--pid <pid>", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop bridge status --json", "powerbi-cli desktop bridge status --pid 1234 --json"],
+            "limitations": ["Bridge state and page inventory do not prove report refresh, rendered correctness, save/reopen, interactions, drill behavior, issue-dialog absence, or semantic correctness."],
+            "followUpFields": ["ok", "exitCode", "ready", "status", "instances[].pid", "instances[].bridgeStatus", "instances[].currentFilePath", "instances[].hasUnsavedChanges", "instances[].pages", "backend.version", "backend.stdoutSha256", "proof", "next"]
+        }),
+        json!({
+            "path": "desktop bridge reload",
+            "usage": "powerbi-cli desktop bridge reload --project <project-dir-or.pbip> --pid <pid> --json",
+            "summary": "Reload the report definition only after exact canonical project/PID identity and a clean saved Desktop state are proven",
+            "tags": ["desktop", "bridge", "microsoft", "preview", "reload", "windows", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "networkRequired": false,
+            "stability": "preview-output",
+            "proofLevel": "unit-smoke",
+            "observedStage": "reload-request-completed",
+            "outputSchema": "powerbi-cli.desktop.bridge.reload.v1",
+            "platforms": ["windows", "linux unsupported_feature", "macos unsupported_feature"],
+            "flags": ["--project <project-dir-or.pbip>", "--pid <pid>", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop bridge reload --project build/sales --pid 1234 --json"],
+            "limitations": ["Reload uses reloadModelDefinition=false and is refused for dirty or non-exact instances. Completion does not prove refresh, save/reopen, rendered correctness, interactions, drill behavior, issue-dialog absence, or semantic correctness."],
+            "followUpFields": ["ok", "exitCode", "project", "pid", "hasUnsavedChanges", "ownership.owned", "ownership.cleanupEligible", "desktop.desktopVersion", "backend.version", "changes", "proof", "next"]
+        }),
+        json!({
+            "path": "desktop bridge screenshot-page",
+            "usage": "powerbi-cli desktop bridge screenshot-page --project <project-dir-or.pbip> --pid <pid> --page <id> --out <new.png> --json",
+            "summary": "Capture one exact inventoried PBIR page through the pinned Desktop Bridge into a new guarded PNG evidence file",
+            "tags": ["desktop", "bridge", "microsoft", "preview", "screenshot", "evidence", "windows", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesEvidenceArtifact": true,
+            "networkRequired": false,
+            "stability": "preview-output",
+            "proofLevel": "unit-smoke",
+            "observedStage": "page-screenshot-captured",
+            "outputSchema": "powerbi-cli.desktop.bridge.screenshotPage.v1",
+            "platforms": ["windows", "linux unsupported_feature", "macos unsupported_feature"],
+            "outputPathPolicy": "--out must be a new .png outside the PBIP project; existing evidence is never replaced or deleted",
+            "flags": ["--project <project-dir-or.pbip>", "--pid <pid>", "--page <id>", "--out <new.png>", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop bridge screenshot-page --project build/sales --pid 1234 --page ReportSection --out proof/page.png --json"],
+            "limitations": ["A dirty-instance capture is labeled diagnostic and cannot represent on-disk workflow output. PNG capture does not prove refresh, save/reopen, interactions, drill behavior, issue-dialog absence, or semantic correctness."],
+            "followUpFields": ["ok", "exitCode", "project", "pid", "page", "hasUnsavedChanges", "screenshot.path", "screenshot.width", "screenshot.height", "screenshot.bytes", "screenshot.sha256", "ownership", "desktop.desktopVersion", "backend", "proof", "next"]
+        }),
+        json!({
+            "path": "desktop bridge screenshot-all",
+            "usage": "powerbi-cli desktop bridge screenshot-all --project <project-dir-or.pbip> --pid <pid> --out-dir <new-dir> --json",
+            "summary": "Capture the exact bounded Desktop status page inventory through the pinned Bridge into a new guarded directory",
+            "tags": ["desktop", "bridge", "microsoft", "preview", "screenshot", "pages", "evidence", "windows", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesEvidenceArtifact": true,
+            "networkRequired": false,
+            "stability": "preview-output",
+            "proofLevel": "unit-smoke",
+            "observedStage": "all-page-screenshots-captured",
+            "outputSchema": "powerbi-cli.desktop.bridge.screenshotAll.v1",
+            "platforms": ["windows", "linux unsupported_feature", "macos unsupported_feature"],
+            "outputPathPolicy": "--out-dir must not exist and must be outside the PBIP project; existing evidence is never replaced or deleted",
+            "flags": ["--project <project-dir-or.pbip>", "--pid <pid>", "--out-dir <new-dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop bridge screenshot-all --project build/sales --pid 1234 --out-dir proof/pages --json"],
+            "limitations": ["Capture inventory must equal the bounded status inventory. Dirty-instance captures are diagnostic and cannot represent on-disk workflow output. Screenshots do not prove refresh, save/reopen, interactions, drill behavior, issue-dialog absence, or semantic correctness."],
+            "followUpFields": ["ok", "exitCode", "project", "pid", "hasUnsavedChanges", "pageInventory", "screenshots[].pageId", "screenshots[].file.path", "screenshots[].file.width", "screenshots[].file.height", "screenshots[].file.sha256", "outputDirectory", "ownership", "desktop.desktopVersion", "backend", "proof", "next"]
+        }),
+        json!({
             "path": "fixture normalize",
             "aliases": ["fixture summary", "fixtures normalize"],
             "usage": "powerbi-cli fixture normalize <project-dir-or.pbip> [--out <summary.json>] --json",
@@ -714,7 +887,7 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.fixture.summary.v1",
             "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--out <summary.json>", "--json", "--format json"],
             "examples": ["powerbi-cli fixture normalize build/sales --json", "powerbi-cli fixture normalize build/sales --out testdata/golden/sales.summary.json --json"],
-            "followUpFields": ["fingerprint", "counts", "model", "report", "verification", "next"]
+            "followUpFields": ["fingerprint", "counts", "model", "report", "pbir.pages[].visuals[].fingerprints.visualContainerObjects", "verification", "next"]
         }),
         json!({
             "path": "fixture verify",
@@ -2440,7 +2613,7 @@ fn command_catalog() -> Vec<Value> {
             "path": "report visuals formatting set-text",
             "aliases": ["report visuals format set-text", "report visuals formatting title", "report visuals format title", "report visuals formatting set-title"],
             "usage": "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--title <text>] [--show-title true|false] [--alt-text <text> | --clear-alt-text] [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Patch typed PBIR visual title visibility/text and top-level alt text without replacing other formatting objects",
+            "summary": "Patch typed PBIR visual title visibility/text and shared visual-container alt text without replacing other formatting objects",
             "tags": ["pbir", "report", "visual", "formatting", "title", "alt-text", "accessibility", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -2452,7 +2625,7 @@ fn command_catalog() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-handle>", "--title <text>", "--show-title true|false", "--alt-text <text>", "--clear-alt-text", "--include-raw", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals formatting set-text --project build/sales --handle <visual-handle> --title \"Revenue Overview\" --alt-text \"Revenue KPI card\" --dry-run --json", "powerbi-cli report visuals format title --project build/sales --handle <visual-handle> --show-title false --out-dir build/sales-no-title --json"],
             "followUpFields": ["dryRun", "mode", "target.handle", "textPlan.requested", "textPlan.before", "textPlan.after", "changes[].jsonPointers", "changes[].before", "changes[].after", "readbackCommand", "rawReviewCommand", "visualReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
-            "limitations": ["Patches title properties in the existing /visual/visualContainerObjects/title and /visual/objects/title containers, keeps an existing powerbi-cli.placeholderTitle annotation synchronized, and patches /visual/objects/general/0 altText. Other typed formatting properties remain bundle- or Desktop-fixture gated."]
+            "limitations": ["Patches title properties in the existing /visual/visualContainerObjects/title and /visual/objects/title containers, keeps an existing powerbi-cli.placeholderTitle annotation synchronized, and patches the official shared VCO /visual/visualContainerObjects/general/0 altText. An explicit alt-text mutation removes a legacy powerbi-cli /visual/objects/general/0 altText while preserving sibling properties. Other typed formatting properties remain bundle- or Desktop-fixture gated."]
         }),
         json!({
             "path": "report visuals formatting set-color",
@@ -2493,7 +2666,7 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "report visuals add",
             "aliases": ["report visuals create"],
-            "usage": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-name-or-handle> --title <title> [--visual-type <type>] [--mode basic|dropdown] [--name <visual-name>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] [--binding <key=value,...> | --bindings-json <json> | --bindings-file <file>] [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "usage": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-name-or-handle> --title <title> [--visual-type <type>] [--mode basic|dropdown] [--name <visual-name>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file>) [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Create a PBIR visual container on an existing page using the same minimal generated patterns as scaffold",
             "tags": ["pbir", "report", "visual", "layout", "binding", "pie", "donut", "matrix", "slicer", "mutation", "agent"],
             "readOnly": false,
@@ -2505,7 +2678,7 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.visuals.mutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--title <title>", "--visual-type <type>", "--type <type>", "--mode basic|dropdown", "--name <visual-name>", "--x <n>", "--y <n>", "--width <n>", "--height <n>", "--z <n>", "--tab-order <n>", "--binding <key=value,...>", "--bindings-json <json>", "--bindings-file <file>", "--allow-outside-page", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
-            "examples": ["powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --title \"Revenue Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals create --project build/sales --page page:ReportSectionOverview --title \"Scratch Card\" --out-dir build/sales-visual --json"],
+            "examples": ["powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --title \"Revenue Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals create --project build/sales --page page:ReportSectionOverview --title \"Scratch Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --out-dir build/sales-visual --json"],
             "limitations": ["Generated --title emits a literal title with show=true under /visual/visualContainerObjects/title and keeps altText/annotation readback metadata; the Desktop-authored shape and schema goldens exist, but the changed generated bytes await Desktop open/refresh/save re-verification.", "Raw columns in measure/value roles and repeated use of one field return unsupported_feature instead of guessed PBIR."],
             "followUpFields": ["dryRun", "target.handle", "visualPlan.after", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
@@ -2612,17 +2785,23 @@ fn command_catalog() -> Vec<Value> {
         }),
         json!({
             "path": "validate",
-            "usage": "powerbi-cli --json validate [--strict] <project-dir-or.pbip>",
-            "summary": "Check required PBIP/PBIR/TMDL files, JSON parseability, page references, offline-safe hazards, and optional strict lint findings",
-            "tags": ["pbip", "pbir", "tmdl", "validation", "offline"],
+            "usage": "powerbi-cli --json validate [--strict] [--backend native|microsoft-report|all] <project-dir-or.pbip>",
+            "summary": "Run native PBIP/PBIR/TMDL validation by default, or explicitly add the exact official Microsoft report validator",
+            "tags": ["pbip", "pbir", "tmdl", "validation", "offline", "microsoft", "no-fallback"],
             "readOnly": true,
             "mutates": false,
             "stability": "stable-shape",
             "proofLevel": "unit-smoke",
             "outputSchema": "validateResult.v1",
-            "flags": ["--strict", "--json", "--format json"],
-            "examples": ["powerbi-cli --json validate build/sales", "powerbi-cli validate --strict build/sales --json"],
-            "followUpFields": ["ok", "exitCode", "counts", "warnings", "errors", "lint"]
+            "outputSchemas": {
+                "native": "validateResult.v1",
+                "microsoft-report": "powerbi-cli.validate.microsoft-report.v1",
+                "all": "powerbi-cli.validate.all.v1"
+            },
+            "flags": ["--strict", "--backend native|microsoft-report|all", "--json", "--format json"],
+            "examples": ["powerbi-cli --json validate build/sales", "powerbi-cli validate --strict build/sales --json", "powerbi-cli validate build/sales --backend microsoft-report --json", "powerbi-cli validate build/sales --strict --backend all --json"],
+            "limitations": ["Native remains the default. microsoft-report runs only the installed exact official validator with --no-schema and emits powerbi-cli.validate.microsoft-report.v1. all requires both validators to complete successfully."],
+            "followUpFields": ["ok", "exitCode", "backend", "counts", "warnings", "errors", "lint", "validators.native", "validators.microsoftReport"]
         }),
     ]
 }
@@ -2653,9 +2832,13 @@ fn diagnostic_codes() -> Vec<Value> {
         json!({"code": "unsupported_feature", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "file_not_found", "exitCode": EXIT_FILE_NOT_FOUND}),
         json!({"code": "validation_failed", "exitCode": EXIT_VALIDATION_FAILED}),
+        json!({"code": "integrity_failed", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "proof_incomplete", "exitCode": EXIT_PROOF_INCOMPLETE}),
         json!({"code": "oracle_unavailable", "exitCode": EXIT_ORACLE_UNAVAILABLE}),
+        json!({"code": "dependency_unavailable", "exitCode": EXIT_ORACLE_UNAVAILABLE}),
         json!({"code": "oracle_failed", "exitCode": EXIT_ORACLE_FAILED}),
+        json!({"code": "backend_failed", "exitCode": EXIT_ORACLE_FAILED}),
+        json!({"code": "protocol_failed", "exitCode": EXIT_ORACLE_FAILED}),
         json!({"code": "unexpected", "exitCode": EXIT_UNEXPECTED}),
     ]
 }

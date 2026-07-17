@@ -76,6 +76,9 @@
         {
           "title": "Revenue",
           "visualType": "card",
+          "bindings": [
+            { "role": "Values", "table": "FactSales", "measure": "Total Revenue" }
+          ],
           "x": 32,
           "y": 32,
           "width": 280,
@@ -84,6 +87,10 @@
         {
           "title": "Revenue Trend",
           "visualType": "lineChart",
+          "bindings": [
+            { "role": "Category", "table": "DimDate", "column": "FiscalYear" },
+            { "role": "Y", "table": "FactSales", "measure": "Total Revenue" }
+          ],
           "x": 32,
           "y": 184,
           "width": 600,
@@ -92,6 +99,10 @@
         {
           "title": "Customer Detail",
           "visualType": "tableEx",
+          "bindings": [
+            { "role": "Values", "table": "DimCustomer", "column": "CustomerName" },
+            { "role": "Values", "table": "FactSales", "measure": "Total Revenue" }
+          ],
           "x": 664,
           "y": 184,
           "width": 560,

@@ -134,6 +134,9 @@ fn remove_visual_container(visual_path: &Path, visual_dir: &Path) -> CliResult<(
     Ok(())
 }
 
+// Windows exposes only the readonly flag here; the Unix world-writable concern behind
+// this Clippy lint does not apply to the cfg-gated branch below.
+#[cfg_attr(windows, allow(clippy::permissions_set_readonly_false))]
 fn prepare_visual_dir_for_removal(visual_dir: &Path) -> CliResult<fs::Permissions> {
     let original_permissions = fs::metadata(visual_dir)
         .map_err(|err| {
@@ -165,7 +168,7 @@ fn restore_visual_dir_permissions(
 ) -> std::io::Result<()> {
     #[cfg(windows)]
     {
-        return fs::set_permissions(visual_dir, original_permissions);
+        fs::set_permissions(visual_dir, original_permissions)
     }
 
     #[cfg(not(windows))]

@@ -510,7 +510,16 @@ fn bundled_resource_changes(
         } else {
             None
         };
-        let after = resource["themeJson"].clone();
+        let mut after = resource["themeJson"].clone();
+        let resource_name = relative_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| {
+                CliError::validation_failed(format!(
+                    "theme bundle resource path has no file name: {relative}"
+                ))
+            })?;
+        after["name"] = Value::String(resource_name.to_string());
         crate::pbir_themes::validate_theme_json(&after, &path)?;
         changes.push(json!({
             "kind": "pbir.report.registeredThemeResource",
@@ -858,7 +867,7 @@ fn builtin_theme_bundle(preset: BuiltinThemePreset) -> Value {
     );
     let resource_name = format!("powerbi-cli-{}.json", preset.id);
     let theme_json = json!({
-        "name": preset.name,
+        "name": resource_name,
         "dataColors": preset.colors,
         "background": preset.background,
         "foreground": preset.foreground,

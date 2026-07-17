@@ -217,14 +217,24 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                         visual["path"].as_str(),
                     ));
                 }
-                if visual_missing_alt_text(&visual) {
-                    findings.push(finding(
-                        "bpa.report.visual_missing_alt_text",
-                        "warning",
-                        &format!("visual is missing alt text: {title}"),
-                        visual_handle,
-                        visual["path"].as_str(),
-                    ));
+                match visual_alt_text_status(&visual) {
+                    VisualAltTextStatus::Missing => findings.push(finding(
+                            "bpa.report.visual_missing_alt_text",
+                            "warning",
+                            &format!("visual is missing alt text: {title}"),
+                            visual_handle,
+                            visual["path"].as_str(),
+                        )),
+                    VisualAltTextStatus::Legacy => findings.push(finding(
+                            "pbir.visual_alt_text_legacy_location",
+                            "warning",
+                            &format!(
+                                "visual alt text uses legacy visual.objects.general instead of visual.visualContainerObjects.general: {title}; reapply it with report visuals formatting set-text"
+                            ),
+                            visual_handle,
+                            visual["path"].as_str(),
+                        )),
+                    VisualAltTextStatus::Canonical => {}
                 }
                 if visual_outside_page(&visual, page_width, page_height) {
                     findings.push(finding(
@@ -291,18 +301,36 @@ fn visual_outside_page(visual: &Value, page_width: f64, page_height: f64) -> boo
     x < 0.0 || y < 0.0 || x + width > page_width || y + height > page_height
 }
 
-fn visual_missing_alt_text(visual: &Value) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VisualAltTextStatus {
+    Canonical,
+    Legacy,
+    Missing,
+}
+
+fn visual_alt_text_status(visual: &Value) -> VisualAltTextStatus {
     let Some(path) = visual["path"].as_str() else {
-        return false;
+        return VisualAltTextStatus::Missing;
     };
     let Ok(raw) = read_json_value(PathBuf::from(path).as_path()) else {
-        return false;
+        return VisualAltTextStatus::Missing;
     };
-    let value = raw
+    let canonical = raw
+        .pointer("/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !canonical.trim().is_empty() {
+        return VisualAltTextStatus::Canonical;
+    }
+    let legacy = raw
         .pointer("/visual/objects/general/0/properties/altText/expr/Literal/Value")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    value.trim().is_empty()
+    if legacy.trim().is_empty() {
+        VisualAltTextStatus::Missing
+    } else {
+        VisualAltTextStatus::Legacy
+    }
 }
 
 fn normalized_label(value: &str) -> String {

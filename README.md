@@ -16,6 +16,75 @@ bring schema/dummy rows home
 -> replace dummy M partitions with corporate sources and refresh
 ```
 
+The deterministic Rust commands need no vendor runtime. To enable Microsoft's
+semantic engine, official report validator, and (on Windows) Desktop Bridge,
+explicitly install the committed exact tool graph into your private user cache:
+
+```bash
+powerbi-cli integrations install --allow-network --json
+powerbi-cli integrations status --deep --json
+```
+
+These tools run as bounded local child processes over stdio or one-shot argv;
+the report/model is not uploaded to a hosted MCP service. The pinned Modeling
+MCP preview may independently emit Microsoft usage telemetry and exposes no
+disable flag, so this is not described as an OS-enforced zero-egress sandbox.
+Normal commands never invoke npm or download packages. See
+[`docs/microsoft-powerbi-agentic-integration-plan.md`](docs/microsoft-powerbi-agentic-integration-plan.md)
+for the exact architecture and licensing boundary.
+
+The committed npm lock and package integrity values authenticate what the
+explicit install downloads. The installed-tree checksum then detects accidental
+cache drift before a child is launched. The private cache is not a privileged
+trust store: a hostile process already running as the same OS user could rewrite
+both cached tools and their receipts, just as it could replace `powerbi-cli`
+itself.
+
+For repeatable source changes, use the closed staged workflow instead of
+editing the source project:
+
+```bash
+powerbi-cli workflow plan \
+  --project Report.pbip \
+  --profile workflow/source-profile.json \
+  --out ../powerbi-build/report.plan.json \
+  --out-dir ../powerbi-build/report \
+  --json
+powerbi-cli workflow run \
+  --plan ../powerbi-build/report.plan.json \
+  --confirm sha256:<plan-fingerprint> \
+  --json
+powerbi-cli workflow verify --plan ../powerbi-build/report.plan.json --json
+```
+
+The versioned `powerbi-cli.source-profile.v1` JSON contract registers named
+resources and `partition.replaceSource` entries. Each entry names one exact
+table/partition, its expected current source hash, a complete profile-relative
+M template, one of the two closed root connectors (`Excel.Workbook` or
+`PostgreSQL.Database`), and the resource placeholders used by that template. A
+resource path is either profile-relative or supplied at plan time with
+`--resource name=path`, and its exact SHA-256 is declared in the profile;
+credentials are never accepted, including credential-like canonical override
+paths. Computed/postfix M calls cannot bypass the closed connector grammar.
+
+`plan` fingerprints only the selected PBIP, its referenced Report and
+SemanticModel, the registered templates/resources, and the pinned Microsoft
+integration lock. `run` rechecks those inputs, creates a new output directory,
+copies only that selected closure, applies the typed edits through the local
+Microsoft MCP child, and requires strict native plus official report validation.
+All output mutations are create-only and relative to the newly opened output
+directory capability, so an ambient rename or junction/symlink swap cannot
+redirect a write. It never edits the source. `verify` recomputes the output,
+evidence, receipt checksum and semantic invariants, and validation claims
+without changing the workflow output. It binds the complete evidence tree to a
+fresh canonical read-only MCP export and credential-scans every bounded TMDL
+file. A failed run remains marked incomplete for diagnosis and is not a
+publishable result. Both the plan file and output directory must stay outside
+the complete source project root. The selected artifact closure rejects caches,
+private metadata, unregistered data, links, and credential-bearing source text.
+See [`docs/source-profile-workflow.md`](docs/source-profile-workflow.md) for the
+complete profile shape and command contract.
+
 This project does not generate `.pbix` or `.pbit` binaries directly. It can
 inspect and safely extract metadata/source files from PBIX/PBIT archives when
 those entries are present, and it can import PBIP/PBIR/TMDL source folders from
@@ -35,11 +104,11 @@ deterministic golden summaries and manual Desktop canvas/refresh proof records
 under `testdata/desktop-proof/`. In particular,
 `canvas-proof.2026-07-10.refresh-session.json` records generated pie, donut,
 matrix, and slicer visuals rendering after refresh with exact expected values.
-Same-report drillthrough was proven end to end in Desktop Store 2.155.756.0 by
-a manual Desktop canvas/refresh session (2026-07-10); that evidence record is
-retained in a private repository. Those records remain
-  `manual-desktop-canvas-refresh` evidence for their binding/canvas baselines;
-  current generated visuals add title-container bytes and are
+Those public records remain `manual-desktop-canvas-refresh` evidence for their
+binding/canvas baselines. Same-report drillthrough has `schema-golden` proof
+from the public schema and Desktop-authored reference shape; reproducible
+end-to-end Desktop interaction proof remains open. Current generated visuals
+  add title-container bytes and are
   `desktop-golden-pending` until re-verified. The opt-in live `desktop open-check`
   command reports process launch and exact project-title observations under
   `proof.observedStage`; its canonical `proof.level` remains `unit-smoke`.
@@ -307,7 +376,8 @@ three pages.
   It validates table, column, and measure names against local TMDL and returns
   readback commands. Generated `--title` text is emitted as PBIR container chrome
   under `/visual/visualContainerObjects/title` (`show = true`), with alt text
-  and annotation metadata retained for accessibility/readback. Raw columns are
+  under the shared `/visual/visualContainerObjects/general` object and
+  annotation metadata retained for accessibility/readback. Raw columns are
   refused in card Values, chart Y, matrix Values, and scatter X/Y/Size roles;
   define a measure until a Desktop-authored aggregation binding is available.
   Reusing the same model field twice in one visual is also refused because no
@@ -335,7 +405,7 @@ three pages.
   `/objects`; apply refuses copied literal text unless `--allow-literal-text` is
   passed.
   `report visuals formatting set-text` patches typed title text, title
-  visibility, and top-level alt text while preserving sibling formatting
+  visibility, and shared visual-container alt text while preserving sibling formatting
   properties. More visual families, richer typed formatting mutations,
   `Default`/reset interaction semantics, slicer selection/sync and additional
   mode authoring, filter
@@ -428,10 +498,9 @@ three pages.
   page type, and hides the page by default. It does not author visual action
   links or support cross-report drillthrough. Readback surfaces the linked
   binding and filter metadata without selected data values. The supported
-  same-report slice is `manual-desktop-canvas-refresh`, backed by a manual
-  Desktop canvas/refresh session (2026-07-10, Desktop Store 2.155.756.0) whose
-  evidence record is retained in a private repository; automated
-  drillthrough navigation proof remains open.
+  same-report slice is `schema-golden`, backed by the public page schema and
+  Desktop-authored reference shape; reproducible Desktop drillthrough
+  navigation proof remains open.
 - Programmatic report filter handling covers `report filters
   list/show/add/update/delete/clear` for raw report/page/visual PBIR
   `filterConfig.filters` readback; categorical, numeric range, visual TopN, and
@@ -603,3 +672,10 @@ three pages.
   agent-first in the style of `ooxml-cli`.
 - [skills/powerbi-cli/SKILL.md](skills/powerbi-cli/SKILL.md): canonical
   agent-facing operating guide for using and improving `powerbi-cli`.
+
+## License
+
+`powerbi-cli` source is available under the [MIT License](LICENSE). Optional
+Microsoft integrations are downloaded directly into each user's private cache
+and remain governed by their upstream licenses; see
+[the recorded integration license decision](integrations/microsoft/LICENSE-REVIEW.md).

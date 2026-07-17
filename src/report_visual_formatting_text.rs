@@ -163,16 +163,31 @@ fn apply_text_patch(visual_json: &mut Value, options: &TextOptions) -> CliResult
         update_placeholder_title_annotation(visual_json, title, &mut pointers)?;
     }
     if let Some(alt_text) = &options.alt_text {
-        let properties = ensure_visual_object_properties(visual_json, "general")?;
+        let properties = ensure_visual_container_object_properties(visual_json, "general")?;
         properties.insert("altText".to_string(), literal_text_expression(alt_text));
-        pointers
-            .push("/visual/objects/general/0/properties/altText/expr/Literal/Value".to_string());
+        pointers.push(
+            "/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value"
+                .to_string(),
+        );
+        if existing_visual_object_properties(visual_json, "general")?
+            .and_then(|properties| properties.remove("altText"))
+            .is_some()
+        {
+            pointers.push("/visual/objects/general/0/properties/altText".to_string());
+        }
     }
     if options.clear_alt_text {
-        if let Some(properties) = existing_visual_object_properties(visual_json, "general")? {
+        if let Some(properties) =
+            existing_visual_container_object_properties(visual_json, "general")?
+        {
             properties.remove("altText");
         }
-        pointers.push("/visual/objects/general/0/properties/altText".to_string());
+        pointers.push("/visual/visualContainerObjects/general/0/properties/altText".to_string());
+        if let Some(properties) = existing_visual_object_properties(visual_json, "general")?
+            && properties.remove("altText").is_some()
+        {
+            pointers.push("/visual/objects/general/0/properties/altText".to_string());
+        }
     }
     Ok(pointers)
 }
@@ -266,18 +281,30 @@ fn visual_text_state(visual_json: &Value, include_raw: bool) -> Value {
             visual_json.pointer("/visual/objects/title/0/properties/show/expr/Literal/Value")
         })
         .and_then(Value::as_str);
-    let alt_literal = visual_json
+    let canonical_alt_literal = visual_json
+        .pointer("/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value")
+        .and_then(Value::as_str);
+    let legacy_alt_literal = visual_json
         .pointer("/visual/objects/general/0/properties/altText/expr/Literal/Value")
         .and_then(Value::as_str);
+    let alt_literal = canonical_alt_literal.or(legacy_alt_literal);
     let mut state = json!({
         "title": title_literal.map(decode_text_literal),
         "showTitle": show_literal.and_then(decode_bool_literal),
-        "altText": alt_literal.map(decode_text_literal)
+        "altText": alt_literal.map(decode_text_literal),
+        "altTextSource": if canonical_alt_literal.is_some() {
+            "visualContainerObjects"
+        } else if legacy_alt_literal.is_some() {
+            "legacyVisualObjects"
+        } else {
+            "missing"
+        }
     });
     if include_raw {
         state["raw"] = json!({
             "visualContainerTitle": visual_json.pointer("/visual/visualContainerObjects/title/0").cloned().unwrap_or(Value::Null),
             "visualObjectTitle": visual_json.pointer("/visual/objects/title/0").cloned().unwrap_or(Value::Null),
+            "visualContainerGeneral": visual_json.pointer("/visual/visualContainerObjects/general/0").cloned().unwrap_or(Value::Null),
             "general": visual_json.pointer("/visual/objects/general/0").cloned().unwrap_or(Value::Null)
         });
     }
@@ -333,6 +360,25 @@ fn existing_visual_object_properties<'a>(
         return Ok(None);
     };
     object_properties(value, object_name, "/visual/objects").map(Some)
+}
+
+fn existing_visual_container_object_properties<'a>(
+    visual_json: &'a mut Value,
+    object_name: &str,
+) -> CliResult<Option<&'a mut Map<String, Value>>> {
+    let root = json_object_mut(visual_json, "visual.json root")?;
+    let Some(visual) = root.get_mut("visual") else {
+        return Ok(None);
+    };
+    let visual = json_object_mut(visual, "visual.json visual")?;
+    let Some(objects) = visual.get_mut("visualContainerObjects") else {
+        return Ok(None);
+    };
+    let objects = json_object_mut(objects, "/visual/visualContainerObjects")?;
+    let Some(value) = objects.get_mut(object_name) else {
+        return Ok(None);
+    };
+    object_properties(value, object_name, "/visual/visualContainerObjects").map(Some)
 }
 
 fn ensure_object_properties<'a>(

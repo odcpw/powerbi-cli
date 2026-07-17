@@ -5,9 +5,17 @@ They intentionally omit absolute paths, raw PBIR blobs, timestamps, Desktop
 process data, and screenshot paths so they compare across Windows, Linux, and
 macOS.
 
+Visual summaries fingerprint `visual.objects` and the official shared
+`visual.visualContainerObjects` separately. This makes accessibility/title
+container migrations reviewable without persisting literal formatting data.
+
 ## sales.summary.json
 
-Purpose: compact scaffold baseline.
+Purpose: compact scaffold baseline. Its card, line chart, and table carry real
+model bindings because the exact Microsoft report-authoring CLI 0.1.4 rejects
+unbound data visuals on the consumed PBIR surface (`PBIR_QUERY_STATE_MISSING`).
+The normalized fixture was refreshed after that exact-package conformance
+finding.
 
 Generated with:
 

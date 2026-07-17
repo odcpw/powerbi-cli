@@ -237,7 +237,7 @@ Desktop hardening work migrates it.
 | Visual was deleted locally | `report visuals delete` dry-run/apply plus `report visuals list` and `validate --strict` | Desktop open/save round-trip |
 | Visual binding was written/read locally | `report visuals set-bindings` dry-run/apply plus `report visuals show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
 | Pie, donut, matrix, or Basic/Dropdown slicer binding/canvas baseline has prior manual proof | `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` plus exact current `visual.json` assertions, `validate --strict`, `handoff check`, and `fixture verify` against `catalog-proof.summary.json` | Re-open/refresh/save the current title-bearing bytes, then automate `desktop-canvas-refresh` assertions |
-| Same-report one-column drillthrough is manually proven end to end | `report drillthrough set/show/clear` shape/readback tests plus a manual Desktop canvas/refresh session (2026-07-10, Desktop Store 2.155.756.0; evidence record retained in a private repository) for well registration, level-correct context menu, navigation, and carried filters | Automated drillthrough canvas/navigation assertions; Desktop-authored visual-action, multi-field, and cross-report fixtures before widening scope |
+| Same-report one-column drillthrough matches the public schema-golden shape | `report drillthrough set/show/clear` shape/readback tests plus the public page schema and Desktop-authored reference shape | Reproducible Desktop well/context-menu/navigation/carried-filter proof; visual-action, multi-field, and cross-report fixtures before widening scope |
 | Visual formatting bundle was applied | `report visuals formatting extract/apply` dry-run/apply plus `report visuals formatting show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
 | Visual interaction override was written/read locally | `report interactions set/disable` dry-run/apply plus `report interactions show` and `validate --strict` | Desktop open/save round-trip with interaction inspection |
 | Bookmark metadata was edited locally | `report bookmarks set-display-name/reorder/delete` dry-run/apply plus `report bookmarks list/show` and `validate --strict` | Desktop open/save round-trip with bookmark pane inspection |
@@ -499,7 +499,7 @@ This is raw per-visual PBIR formatting portability. Apply writes only
 `/objects`. It refuses
 copied literal title/alt-text/display strings unless `--allow-literal-text` is
 explicit. `set-text` is the typed patch surface for title text, title
-visibility, and top-level alt text; it preserves sibling formatting properties.
+visibility, and the official shared visual-container alt text; it preserves sibling formatting properties and removes only a legacy misplaced altText during an explicit alt-text mutation.
 `set-color` is the typed patch surface for static literal `title.fontColor` and
 wildcard/static `dataPoint.fill`. These commands are not typed legend, axis,
 data-label, selector-specific color, or conditional formatting APIs.
@@ -709,6 +709,41 @@ branch. `model dax lint` and `validate --strict` catch common direct uses, but
 they are not a complete DAX engine.
 
 ### Handoff Between Home And Work
+
+For a deterministic resource/source reorientation, prefer the fingerprinted workflow:
+
+```bash
+pbi --json workflow plan --project Report.pbip --profile workflow/source-profile.json --out ../powerbi-build/report.plan.json --out-dir ../powerbi-build/report
+pbi --json workflow run --plan ../powerbi-build/report.plan.json --confirm sha256:<plan-fingerprint>
+pbi --json workflow verify --plan ../powerbi-build/report.plan.json
+```
+
+Use exactly the `powerbi-cli.source-profile.v1` shape: one stable `profileId`,
+named `resources`, and typed `partition.replaceSource` entries. Every entry
+must provide the exact table/partition, `expectedBeforeSha256`, a complete
+profile-relative M `template`, `expectedConnector`, and the exact resource
+names referenced as `{{powerbi-cli.resourcePath:<name>}}`. Each resource also
+declares its lowercase `expectedSha256`. Do not put absolute machine paths or
+credentials in a tracked profile. Supply a machine-local resource at plan time
+as `--resource name=path`.
+
+Keep `--out` and `--out-dir` outside the entire source project. The workflow
+rejects caches, private directories, unregistered nested data, links, and
+credential-bearing text inside selected Report/SemanticModel artifacts. An
+`expectedConnector` is narrowly `Excel.Workbook` or `PostgreSQL.Database` and
+must be the direct `Source = ...` root flow. Excel accepts exactly one declared
+resource through `File.Contents`; PostgreSQL accepts none. Comments, strings,
+dynamic calls, unknown connectors, and hard-coded file/URI paths never satisfy
+the contract.
+
+`workflow plan` writes only a new plan. Read its `planFingerprint` and pass it
+unchanged to `workflow run`; never manufacture or shorten the confirmation.
+Run creates a separate selected-artifact closure and leaves the source byte
+identical. Treat an output containing `.powerbi-cli-workflow-incomplete` as
+diagnostic only. A publishable result must pass `workflow verify`, which
+reconstructs plan semantics and the expected staged definition from the
+profile, checks copied closure/resource bytes, binds local MCP partition
+readbacks, and reruns both validators.
 
 The target workflow is:
 

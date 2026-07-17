@@ -1,28 +1,52 @@
+use crate::bridge::desktop_bridge_command;
+#[cfg(windows)]
 use crate::contract::CONTRACT_VERSION;
+#[cfg(windows)]
 use crate::lint::lint_project;
+use crate::{CliError, CliResult, canonical_display};
+#[cfg(windows)]
 use crate::{
-    CliError, CliResult, EXIT_ORACLE_FAILED, EXIT_ORACLE_UNAVAILABLE, EXIT_PROOF_INCOMPLETE,
-    EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg, resolve_project,
-    validate_project,
+    EXIT_ORACLE_FAILED, EXIT_ORACLE_UNAVAILABLE, EXIT_PROOF_INCOMPLETE, EXIT_SUCCESS,
+    EXIT_VALIDATION_FAILED, command_arg, resolve_project, validate_project,
 };
+#[cfg(any(windows, test))]
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
+#[cfg(any(windows, test))]
+use serde_json::json;
+#[cfg(windows)]
 use std::collections::BTreeSet;
+#[cfg(any(windows, test))]
 use std::fs;
+#[cfg(any(windows, test))]
 use std::io;
-use std::path::{Component, Path, PathBuf};
+#[cfg(windows)]
+use std::path::Component;
+use std::path::{Path, PathBuf};
+#[cfg(windows)]
 use std::process::{Command, Stdio};
+#[cfg(any(windows, test))]
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+#[cfg(any(windows, test))]
+use std::time::Duration;
+#[cfg(windows)]
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+#[cfg(windows)]
 const WINDOW_POLL_INTERVAL_MS: u64 = 250;
+#[cfg(windows)]
 const COMMAND_POLL_INTERVAL_MS: u64 = 25;
+#[cfg(windows)]
 const CLEANUP_TIMEOUT_MS: u64 = 15_000;
 // Budget covers foreground activation plus a canvas settle delay before the capture itself.
+#[cfg(windows)]
 const SCREENSHOT_CAPTURE_TIMEOUT_MS: u64 = 25_000;
+#[cfg(windows)]
 const SCREENSHOT_SETTLE_MS: u64 = 4_000;
+#[cfg(windows)]
 const DESKTOP_COMMAND_PROOF_LEVEL: &str = "unit-smoke";
+#[cfg(any(windows, test))]
 static SCREENSHOT_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
@@ -32,6 +56,7 @@ pub(crate) struct PowerBiDesktopDetection {
     pub(crate) version: Option<String>,
     pub(crate) checked: Vec<String>,
     pub(crate) source: String,
+    #[cfg(windows)]
     path_buf: Option<PathBuf>,
 }
 
@@ -49,6 +74,7 @@ impl DesktopOperation {
         }
     }
 
+    #[cfg(windows)]
     fn output_schema(self) -> &'static str {
         match self {
             Self::OpenCheck => "powerbi-cli.desktop.openCheck.v1",
@@ -91,6 +117,7 @@ impl Default for DesktopOptions {
     }
 }
 
+#[cfg(windows)]
 #[derive(Debug, Clone)]
 struct DesktopLaunchPlan {
     method: &'static str,
@@ -99,6 +126,7 @@ struct DesktopLaunchPlan {
     file_association_reason: Option<&'static str>,
 }
 
+#[cfg(windows)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProcessWindow {
@@ -108,6 +136,7 @@ struct ProcessWindow {
     main_window_title: String,
 }
 
+#[cfg(windows)]
 #[derive(Debug, Clone)]
 struct WindowObservation {
     attempted: bool,
@@ -125,6 +154,7 @@ struct WindowObservation {
     candidate_process_ids: Vec<u32>,
 }
 
+#[cfg(windows)]
 impl WindowObservation {
     fn not_attempted() -> Self {
         Self {
@@ -163,12 +193,14 @@ impl WindowObservation {
     }
 }
 
+#[cfg(windows)]
 #[derive(Debug)]
 struct Watchdog {
     started: Instant,
     budget: Duration,
 }
 
+#[cfg(windows)]
 impl Watchdog {
     fn new(timeout_ms: u64) -> Self {
         Self {
@@ -190,12 +222,14 @@ impl Watchdog {
     }
 }
 
+#[cfg(windows)]
 #[derive(Debug)]
 pub(crate) enum Timed<T> {
     Completed(T),
     TimedOut,
 }
 
+#[cfg(any(windows, test))]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ScreenshotDimensions {
@@ -203,6 +237,7 @@ struct ScreenshotDimensions {
     height: u32,
 }
 
+#[cfg(any(windows, test))]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ScreenshotCaptureResult {
@@ -214,6 +249,7 @@ struct ScreenshotCaptureResult {
     captured: bool,
 }
 
+#[cfg(windows)]
 #[derive(Debug)]
 struct ScreenshotCapture {
     dimensions: ScreenshotDimensions,
@@ -223,6 +259,7 @@ struct ScreenshotCapture {
     replaced_existing: bool,
 }
 
+#[cfg(windows)]
 #[derive(Debug)]
 enum ScreenshotCaptureOutcome {
     Captured(ScreenshotCapture),
@@ -235,7 +272,7 @@ enum ScreenshotCaptureOutcome {
 pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(
-            CliError::invalid_args("desktop requires a subcommand: open-check or screenshot")
+            CliError::invalid_args("desktop requires a subcommand: open-check, screenshot, or bridge")
                 .with_hint(
                     "Run powerbi-cli --json capabilities --for desktop for supported Desktop oracle commands.",
                 )
@@ -251,6 +288,7 @@ pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
     match action.as_str() {
         "open-check" | "openCheck" => run_desktop(DesktopOperation::OpenCheck, rest),
         "screenshot" => run_desktop(DesktopOperation::Screenshot, rest),
+        "bridge" => desktop_bridge_command(rest),
         _ => Err(CliError::invalid_args(format!(
             "unknown desktop command: {action}"
         ))
@@ -287,10 +325,12 @@ pub(crate) fn detect_power_bi_desktop(override_path: Option<&Path>) -> PowerBiDe
             .map(|path| path.display().to_string())
             .collect(),
         source,
+        #[cfg(windows)]
         path_buf: found,
     }
 }
 
+#[cfg(windows)]
 fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value> {
     let options = parse_desktop_args(operation, args)?;
     ensure_desktop_platform(std::env::consts::OS)?;
@@ -917,6 +957,15 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     Ok(response)
 }
 
+#[cfg(not(windows))]
+fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value> {
+    let _options = parse_desktop_args(operation, args)?;
+    ensure_desktop_platform(std::env::consts::OS)?;
+    Err(CliError::unexpected(
+        "Desktop oracle platform dispatch failed",
+    ))
+}
+
 fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult<DesktopOptions> {
     let mut options = DesktopOptions::default();
     let mut i = 0;
@@ -1025,6 +1074,7 @@ fn set_project(
     Ok(())
 }
 
+#[cfg(windows)]
 fn validate_screenshot_output(out: &Path, project_dir: &Path) -> CliResult<PathBuf> {
     let out = canonicalize_with_missing_tail(&absolute_lexical_path(out)?)?;
     let project_dir = canonicalize_with_missing_tail(&absolute_lexical_path(project_dir)?)?;
@@ -1056,6 +1106,7 @@ fn validate_screenshot_output(out: &Path, project_dir: &Path) -> CliResult<PathB
     Ok(out)
 }
 
+#[cfg(windows)]
 fn canonicalize_with_missing_tail(path: &Path) -> CliResult<PathBuf> {
     let mut existing = path;
     let mut missing = Vec::new();
@@ -1081,6 +1132,7 @@ fn canonicalize_with_missing_tail(path: &Path) -> CliResult<PathBuf> {
     Ok(normalize_lexically(&resolved))
 }
 
+#[cfg(windows)]
 fn absolute_lexical_path(path: &Path) -> CliResult<PathBuf> {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
@@ -1092,6 +1144,7 @@ fn absolute_lexical_path(path: &Path) -> CliResult<PathBuf> {
     Ok(normalize_lexically(&absolute))
 }
 
+#[cfg(windows)]
 fn normalize_lexically(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();
     for component in path.components() {
@@ -1113,6 +1166,7 @@ fn normalize_lexically(path: &Path) -> PathBuf {
     normalized
 }
 
+#[cfg(any(windows, test))]
 fn path_is_within_directory(path: &Path, directory: &Path) -> bool {
     if cfg!(windows) {
         let path = path
@@ -1131,6 +1185,7 @@ fn path_is_within_directory(path: &Path, directory: &Path) -> bool {
     }
 }
 
+#[cfg(windows)]
 fn unproven_signals(observation: &WindowObservation) -> Vec<&'static str> {
     let mut signals = Vec::new();
     if observation.window_observed.is_none() {
@@ -1148,10 +1203,12 @@ fn unproven_signals(observation: &WindowObservation) -> Vec<&'static str> {
     signals
 }
 
+#[cfg(any(windows, test))]
 fn screenshot_observation_is_eligible(title_matched: Option<bool>) -> bool {
     title_matched == Some(true)
 }
 
+#[cfg(windows)]
 fn observe_window(
     launched_pid: u32,
     baseline_process_ids: &[u32],
@@ -1234,6 +1291,7 @@ fn observe_window(
     Ok(observation)
 }
 
+#[cfg(any(windows, test))]
 fn title_matches_project(title: &str, project_name: &str) -> bool {
     let title = normalize_window_title(title);
     let project_name = normalize_window_title(project_name);
@@ -1250,6 +1308,7 @@ fn title_matches_project(title: &str, project_name: &str) -> bool {
     })
 }
 
+#[cfg(any(windows, test))]
 fn normalize_window_title(value: &str) -> String {
     value
         .split_whitespace()
@@ -1258,6 +1317,7 @@ fn normalize_window_title(value: &str) -> String {
         .to_lowercase()
 }
 
+#[cfg(any(windows, test))]
 fn is_power_bi_desktop_process(process_name: &str) -> bool {
     process_name
         .trim()
@@ -1265,10 +1325,12 @@ fn is_power_bi_desktop_process(process_name: &str) -> bool {
         .starts_with("pbidesktop")
 }
 
+#[cfg(windows)]
 fn duration_ms(duration: Duration) -> u64 {
     u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
+#[cfg(windows)]
 fn unix_time_ms() -> io::Result<u64> {
     let elapsed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1277,6 +1339,7 @@ fn unix_time_ms() -> io::Result<u64> {
         .map_err(|_| io::Error::other("current Unix timestamp does not fit in u64 milliseconds"))
 }
 
+#[cfg(any(windows, test))]
 fn remaining_budget(budget: Duration, elapsed: Duration) -> Duration {
     budget.saturating_sub(elapsed)
 }
@@ -1296,6 +1359,7 @@ fn snapshot_desktop_process_ids(timeout: Duration) -> io::Result<Timed<Vec<u32>>
     }
 }
 
+#[cfg(any(windows, test))]
 const PROCESS_SNAPSHOT_SCRIPT: &str = r#"
 $items = @(
     Get-Process -ErrorAction SilentlyContinue |
@@ -1311,13 +1375,9 @@ $items = @(
 [Console]::Out.Write((ConvertTo-Json -InputObject $items -Compress))
 "#;
 
+#[cfg(any(windows, test))]
 fn render_process_snapshot_script() -> String {
     PROCESS_SNAPSHOT_SCRIPT.to_string()
-}
-
-#[cfg(not(windows))]
-fn snapshot_desktop_process_ids(_timeout: Duration) -> io::Result<Timed<Vec<u32>>> {
-    Ok(Timed::Completed(Vec::new()))
 }
 
 #[cfg(windows)]
@@ -1332,6 +1392,7 @@ fn query_desktop_windows(timeout: Duration) -> io::Result<Timed<Vec<ProcessWindo
     }
 }
 
+#[cfg(any(windows, test))]
 const WINDOW_QUERY_SCRIPT: &str = r#"
 $items = @(
     Get-Process -ErrorAction SilentlyContinue |
@@ -1347,13 +1408,9 @@ $items = @(
 [Console]::Out.Write((ConvertTo-Json -InputObject $items -Compress))
 "#;
 
+#[cfg(any(windows, test))]
 fn render_window_query_script() -> String {
     WINDOW_QUERY_SCRIPT.to_string()
-}
-
-#[cfg(not(windows))]
-fn query_desktop_windows(_timeout: Duration) -> io::Result<Timed<Vec<ProcessWindow>>> {
-    Ok(Timed::Completed(Vec::new()))
 }
 
 #[cfg(windows)]
@@ -1380,28 +1437,18 @@ fn launch_desktop(
     }
 }
 
+#[cfg(any(windows, test))]
 const LAUNCH_SCRIPT: &str = r#"
 $p = Start-Process -FilePath __PBIP_PATH__ -PassThru
 [Console]::Out.Write($p.Id)
 "#;
 
+#[cfg(any(windows, test))]
 fn render_launch_script(pbip_path: &str) -> String {
     LAUNCH_SCRIPT.replace("__PBIP_PATH__", &powershell_single_quoted(pbip_path))
 }
 
-#[cfg(not(windows))]
-fn launch_desktop(
-    _desktop_path: &Path,
-    _pbip_path: &Path,
-    _launch_plan: &DesktopLaunchPlan,
-    _timeout: Duration,
-) -> io::Result<Timed<u32>> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "Power BI Desktop launch is Windows-only",
-    ))
-}
-
+#[cfg(any(windows, test))]
 fn screenshot_changes(
     captured: bool,
     replaced_existing: bool,
@@ -1529,6 +1576,7 @@ fn capture_primary_display(
     }
 }
 
+#[cfg(any(windows, test))]
 const SCREENSHOT_SCRIPT: &str = r#"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -1593,6 +1641,7 @@ $result = [pscustomobject]@{
 [Console]::Out.Write((ConvertTo-Json -InputObject $result -Compress))
 "#;
 
+#[cfg(any(windows, test))]
 fn render_screenshot_script(
     out_path: &str,
     foreground_pid: Option<u32>,
@@ -1616,10 +1665,12 @@ fn render_screenshot_script(
         )
 }
 
+#[cfg(any(windows, test))]
 fn capture_is_authorized(result: &ScreenshotCaptureResult, allow_unverified_capture: bool) -> bool {
     result.foreground_verified || allow_unverified_capture
 }
 
+#[cfg(any(windows, test))]
 fn unique_screenshot_sibling(path: &Path, role: &str) -> io::Result<PathBuf> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     let file_name = path
@@ -1642,6 +1693,7 @@ fn unique_screenshot_sibling(path: &Path, role: &str) -> io::Result<PathBuf> {
     )))
 }
 
+#[cfg(any(windows, test))]
 fn publish_screenshot(temp: &Path, out: &Path) -> io::Result<bool> {
     if !out.try_exists()? {
         fs::rename(temp, out)?;
@@ -1677,23 +1729,14 @@ fn publish_screenshot(temp: &Path, out: &Path) -> io::Result<bool> {
     Ok(true)
 }
 
+#[cfg(windows)]
 fn remove_file_if_present(path: &Path) {
     if path.is_file() {
         let _ = fs::remove_file(path);
     }
 }
 
-#[cfg(not(windows))]
-fn capture_primary_display(
-    _out: &Path,
-    _foreground_pid: Option<u32>,
-    _allow_unverified_capture: bool,
-) -> io::Result<Timed<ScreenshotCaptureOutcome>> {
-    Err(io::Error::other(
-        "primary-display screenshot capture is Windows-only",
-    ))
-}
-
+#[cfg(windows)]
 fn cleanup_after_launch(
     launch_attempted: bool,
     process_id: Option<u32>,
@@ -1792,6 +1835,7 @@ fn cleanup_after_launch(
     }
 }
 
+#[cfg(windows)]
 fn cleanup_refused(
     baseline_process_ids: &[u32],
     launch_timestamp_unix_ms: Option<u64>,
@@ -1837,6 +1881,7 @@ fn cleanup_spawned_processes(
     }
 }
 
+#[cfg(any(windows, test))]
 const CLEANUP_SCRIPT: &str = r#"
 $baseline = @(__BASELINE_IDS__)
 $associationPid = __ASSOCIATION_PID__
@@ -2026,6 +2071,7 @@ $result = [pscustomobject]@{
 [Console]::Out.Write((ConvertTo-Json -InputObject $result -Compress -Depth 6))
 "#;
 
+#[cfg(any(windows, test))]
 fn render_cleanup_script(
     process_id: u32,
     baseline_process_ids: &[u32],
@@ -2047,20 +2093,6 @@ fn render_cleanup_script(
             "__LAUNCH_TIME_UNIX_MS__",
             &launch_timestamp_unix_ms.to_string(),
         )
-}
-
-#[cfg(not(windows))]
-fn cleanup_spawned_processes(
-    _process_id: u32,
-    _baseline_process_ids: &[u32],
-    _project_name: &str,
-    _desktop_path: &Path,
-    _launch_timestamp_unix_ms: u64,
-) -> io::Result<Timed<Value>> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "Desktop cleanup is Windows-only",
-    ))
 }
 
 #[cfg(windows)]
@@ -2133,10 +2165,12 @@ where
         .map_err(|err| io::Error::other(format!("parse PowerShell JSON output: {err}: {text}")))
 }
 
+#[cfg(any(windows, test))]
 fn powershell_single_quoted(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
+#[cfg(any(windows, test))]
 fn desktop_argument_path(path: &Path) -> String {
     let value = path.as_os_str().to_string_lossy();
     if let Some(stripped) = value.strip_prefix(r"\\?\UNC\") {
@@ -2148,6 +2182,7 @@ fn desktop_argument_path(path: &Path) -> String {
     }
 }
 
+#[cfg(windows)]
 fn desktop_launch_plan(
     options: &DesktopOptions,
     detection: &PowerBiDesktopDetection,
@@ -2170,6 +2205,7 @@ fn desktop_launch_plan(
     }
 }
 
+#[cfg(windows)]
 fn desktop_launch_method() -> &'static str {
     if cfg!(windows) {
         "windows-file-association"
@@ -2226,6 +2262,7 @@ fn append_store_install_candidates(candidates: &mut Vec<PathBuf>) {
     }
 }
 
+#[cfg(windows)]
 fn lint_error_findings(lint: Option<&Value>) -> Vec<Value> {
     lint.and_then(|value| value["findings"].as_array())
         .map(|findings| {
@@ -2257,23 +2294,15 @@ fn desktop_file_version(
     }
 }
 
+#[cfg(any(windows, test))]
 const VERSION_SCRIPT: &str = "(Get-Item -LiteralPath __DESKTOP_PATH__).VersionInfo.ProductVersion";
 
+#[cfg(any(windows, test))]
 fn render_version_script(desktop_path: &str) -> String {
     VERSION_SCRIPT.replace("__DESKTOP_PATH__", &powershell_single_quoted(desktop_path))
 }
 
-#[cfg(not(windows))]
-fn desktop_file_version(
-    _path: Option<&Path>,
-    _timeout: Duration,
-) -> io::Result<Timed<Option<String>>> {
-    Err(io::Error::new(
-        io::ErrorKind::Unsupported,
-        "Power BI Desktop version probing is Windows-only",
-    ))
-}
-
+#[cfg(windows)]
 fn oracle_enabled() -> bool {
     std::env::var("POWERBI_DESKTOP_ORACLE")
         .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
@@ -2439,6 +2468,10 @@ mod tests {
             foreground_process_id: Some(777),
             captured: false,
         };
+        assert_eq!((unverified.width, unverified.height), (1920, 1080));
+        assert!(!unverified.activation_succeeded);
+        assert_eq!(unverified.foreground_process_id, Some(777));
+        assert!(!unverified.captured);
         assert!(!capture_is_authorized(&unverified, false));
         assert!(capture_is_authorized(&unverified, true));
 
