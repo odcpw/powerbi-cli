@@ -10605,6 +10605,80 @@ fn report_themes_extract_and_apply_raw_bundle() {
 }
 
 #[test]
+fn report_theme_preset_uses_schema_three_version_object() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let source = scaffold_sales(temp.path());
+    let source_arg = source.to_str().expect("source path");
+    let source_report = report_json(&source);
+    let mut report: Value =
+        serde_json::from_str(&fs::read_to_string(&source_report).expect("source report JSON"))
+            .expect("parse source report JSON");
+    report["$schema"] = Value::from(
+        "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/report/3.3.0/schema.json",
+    );
+    fs::write(
+        &source_report,
+        serde_json::to_string_pretty(&report).expect("schema-three report JSON"),
+    )
+    .expect("write schema-three report JSON");
+
+    let themed = temp.path().join("schema-three-themed");
+    let themed_arg = themed.to_str().expect("themed path");
+    let apply = run_powerbi(&[
+        "report",
+        "themes",
+        "apply-preset",
+        "--project",
+        source_arg,
+        "--preset",
+        "risk-dashboard",
+        "--out-dir",
+        themed_arg,
+        "--json",
+    ]);
+    assert_eq!(apply.code, 0, "stderr: {}", apply.stderr);
+
+    let themed_report: Value = serde_json::from_str(
+        &fs::read_to_string(report_json(&themed)).expect("themed report JSON"),
+    )
+    .expect("parse themed report JSON");
+    assert_eq!(
+        themed_report["themeCollection"]["customTheme"]["reportVersionAtImport"],
+        json!({
+            "visual": "2.10.0",
+            "page": "2.3.1",
+            "report": "3.4.0"
+        })
+    );
+
+    let validation = run_powerbi(&["validate", themed_arg, "--strict", "--json"]);
+    assert_eq!(validation.code, 0, "stderr: {}", validation.stderr);
+
+    let mut malformed = themed_report;
+    malformed["themeCollection"]["customTheme"]["reportVersionAtImport"] = json!({
+        "visual": "2.10.0",
+        "report": "not-a-version"
+    });
+    fs::write(
+        report_json(&themed),
+        serde_json::to_string_pretty(&malformed).expect("malformed report JSON"),
+    )
+    .expect("write malformed report JSON");
+    let rejected = run_powerbi(&["validate", themed_arg, "--json"]);
+    assert_eq!(rejected.code, 10);
+    assert!(
+        stdout_json(&rejected)["errors"]
+            .as_array()
+            .expect("validation errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .unwrap_or_default()
+                .contains("reportVersionAtImport must match"))
+    );
+}
+
+#[test]
 fn report_themes_apply_rejects_unsafe_or_wrong_bundle() {
     let temp = tempfile::tempdir().expect("tempdir");
     let target = scaffold_sales(temp.path());

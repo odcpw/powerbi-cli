@@ -423,7 +423,10 @@ three pages.
   open, `POWERBI_DESKTOP_ORACLE=1` and `--allow-data-read` are both required,
   only `EVALUATE` or `DEFINE ... EVALUATE` query forms are accepted, and the
   query text is never returned. Rows and cell text are capped because result
-  data can be sensitive. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
+  data can be sensitive. This live preflight ignores only each selected
+  artifact's root `.pbi/` runtime directory, which Desktop creates beside the
+  source definition. Offline validation, packaging, workflow, and handoff keep
+  rejecting those runtime files. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
   instead of silently dropping it; Power BI Desktop or an explicit engine bridge
   remains the compatibility oracle.
 - Programmatic static-table authoring covers `model tables add-static` for a

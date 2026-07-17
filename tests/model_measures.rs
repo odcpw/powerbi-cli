@@ -235,6 +235,114 @@ fn model_dax_execute_requires_data_and_oracle_opt_ins_without_echoing_query() {
 }
 
 #[test]
+fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let report_dir = project.join("SalesOperations.Report");
+    let semantic_dir = project.join("SalesOperations.SemanticModel");
+
+    for runtime_dir in [report_dir.join(".pbi"), semantic_dir.join(".pbi")] {
+        fs::create_dir_all(&runtime_dir).expect("create Desktop runtime dir");
+        fs::write(runtime_dir.join("localSettings.json"), "{}\n").expect("write local settings");
+        fs::write(runtime_dir.join("editorSettings.json"), "{}\n").expect("write editor settings");
+    }
+    fs::write(report_dir.join(".pbi").join("localSettings.json"), "{")
+        .expect("write opaque Desktop-owned settings");
+    fs::write(
+        semantic_dir.join(".pbi").join("cache.abf"),
+        b"runtime cache",
+    )
+    .expect("write Desktop cache");
+
+    let offline = run_powerbi(&["validate", project_arg, "--strict", "--json"]);
+    assert_eq!(offline.code, 10);
+    assert!(
+        stdout_json(&offline)["errors"]
+            .as_array()
+            .expect("offline errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .unwrap_or_default()
+                .contains("offline-unsafe"))
+    );
+
+    let live = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args([
+            "model",
+            "dax",
+            "execute",
+            "--project",
+            project_arg,
+            "--query",
+            "EVALUATE ROW(\"Value\", 1)",
+            "--allow-data-read",
+            "--json",
+        ])
+        .env_remove("POWERBI_DESKTOP_ORACLE")
+        .output()
+        .expect("run live Desktop preflight");
+    assert_eq!(live.status.code(), Some(30));
+    let live_json: Value = serde_json::from_slice(&live.stdout).expect("live JSON");
+    assert_eq!(live_json["validation"]["ok"], Value::Bool(true));
+    assert_eq!(
+        live_json["stage"],
+        if cfg!(windows) {
+            "oracle-opt-in"
+        } else {
+            "platform"
+        }
+    );
+
+    fs::write(report_dir.join("unsafe.pbit"), b"not a runtime artifact")
+        .expect("write unsafe non-runtime file");
+    let rejected = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args([
+            "model",
+            "dax",
+            "execute",
+            "--project",
+            project_arg,
+            "--query",
+            "EVALUATE ROW(\"Value\", 1)",
+            "--allow-data-read",
+            "--json",
+        ])
+        .env_remove("POWERBI_DESKTOP_ORACLE")
+        .output()
+        .expect("run unsafe live Desktop preflight");
+    assert_eq!(rejected.status.code(), Some(10));
+    let rejected_json: Value = serde_json::from_slice(&rejected.stdout).expect("rejected JSON");
+    assert_eq!(rejected_json["stage"], Value::from("project-validation"));
+
+    fs::remove_file(report_dir.join("unsafe.pbit")).expect("remove unsafe non-runtime file");
+    let nested_runtime_lookalike = report_dir.join("definition").join(".pbi");
+    fs::create_dir_all(&nested_runtime_lookalike).expect("create nested runtime lookalike");
+    fs::write(nested_runtime_lookalike.join("broken.json"), "{")
+        .expect("write malformed nested JSON");
+    let nested_rejected = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args([
+            "model",
+            "dax",
+            "execute",
+            "--project",
+            project_arg,
+            "--query",
+            "EVALUATE ROW(\"Value\", 1)",
+            "--allow-data-read",
+            "--json",
+        ])
+        .env_remove("POWERBI_DESKTOP_ORACLE")
+        .output()
+        .expect("run nested runtime-lookalike preflight");
+    assert_eq!(nested_rejected.status.code(), Some(10));
+    let nested_json: Value =
+        serde_json::from_slice(&nested_rejected.stdout).expect("nested rejection JSON");
+    assert_eq!(nested_json["stage"], Value::from("project-validation"));
+}
+
+#[test]
 fn model_measures_add_update_delete_round_trip() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales_project(temp.path());

@@ -6,7 +6,7 @@ use crate::project_io::{copy_project_dir, write_json_atomic};
 use crate::safety_scan::contains_external_uri as value_contains_external_uri;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
-    read_json_value, resolve_project, validate_project,
+    read_json_value, report_schema_major, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -89,6 +89,9 @@ struct BuiltinThemePreset {
 const REGISTERED_RESOURCES_PACKAGE: &str = "RegisteredResources";
 const CUSTOM_THEME_ITEM_TYPE: &str = "CustomTheme";
 const REPORT_VERSION_AT_IMPORT: &str = "2.0.0";
+const REPORT_VERSION_AT_IMPORT_VISUAL: &str = "2.10.0";
+const REPORT_VERSION_AT_IMPORT_PAGE: &str = "2.3.1";
+const REPORT_VERSION_AT_IMPORT_REPORT: &str = "3.4.0";
 
 fn show_theme(args: &[String]) -> CliResult<Value> {
     let options = parse_project_args(args, "report themes show")?;
@@ -174,7 +177,7 @@ fn apply_theme(args: &[String]) -> CliResult<Value> {
     let mut report_json = read_json_value(&report_json_path)?;
     let before_theme_collection = report_json["themeCollection"].clone();
     let after_theme_collection =
-        normalized_theme_collection_for_bundle(&bundle["themeCollection"], &bundle)?;
+        normalized_theme_collection_for_bundle(&bundle["themeCollection"], &bundle, &report_json)?;
     validate_theme_collection(&after_theme_collection, bundle_path)?;
     let resource_changes = bundled_resource_changes(&target_resolved, &bundle)?;
     let before_resource_packages = report_json["resourcePackages"].clone();
@@ -354,7 +357,7 @@ fn apply_theme_preset(args: &[String]) -> CliResult<Value> {
     let mut report_json = read_json_value(&report_json_path)?;
     let before_theme_collection = report_json["themeCollection"].clone();
     let after_theme_collection =
-        normalized_theme_collection_for_bundle(&bundle["themeCollection"], &bundle)?;
+        normalized_theme_collection_for_bundle(&bundle["themeCollection"], &bundle, &report_json)?;
     validate_theme_collection(&after_theme_collection, Path::new(preset.id))?;
     let resource_changes = bundled_resource_changes(&target_resolved, &bundle)?;
     let before_resource_packages = report_json["resourcePackages"].clone();
@@ -930,7 +933,11 @@ fn builtin_theme_bundle(preset: BuiltinThemePreset) -> Value {
     })
 }
 
-fn normalized_theme_collection_for_bundle(value: &Value, bundle: &Value) -> CliResult<Value> {
+fn normalized_theme_collection_for_bundle(
+    value: &Value,
+    bundle: &Value,
+    report_json: &Value,
+) -> CliResult<Value> {
     let mut theme_collection = if value.is_object() {
         value.clone()
     } else {
@@ -948,10 +955,24 @@ fn normalized_theme_collection_for_bundle(value: &Value, bundle: &Value) -> CliR
         .to_string();
     theme_collection["customTheme"] = json!({
         "name": item_name,
-        "reportVersionAtImport": REPORT_VERSION_AT_IMPORT,
+        "reportVersionAtImport": theme_version_at_import(report_json)?,
         "type": REGISTERED_RESOURCES_PACKAGE
     });
     Ok(theme_collection)
+}
+
+fn theme_version_at_import(report_json: &Value) -> CliResult<Value> {
+    match report_schema_major(report_json) {
+        Some(3) => Ok(json!({
+            "visual": REPORT_VERSION_AT_IMPORT_VISUAL,
+            "page": REPORT_VERSION_AT_IMPORT_PAGE,
+            "report": REPORT_VERSION_AT_IMPORT_REPORT
+        })),
+        Some(2) => Ok(Value::String(REPORT_VERSION_AT_IMPORT.to_string())),
+        _ => Err(CliError::validation_failed(
+            "report $schema does not contain a supported report schema version",
+        )),
+    }
 }
 
 fn upsert_registered_resource_package(report_json: &mut Value, bundle: &Value) -> CliResult<()> {

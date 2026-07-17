@@ -1,7 +1,7 @@
 use crate::cli_support::{required_project, take_value};
 use crate::{
     CliError, CliResult, EXIT_ORACLE_UNAVAILABLE, EXIT_VALIDATION_FAILED, canonical_display,
-    resolve_project, validate_project,
+    resolve_project, validate_desktop_runtime_project,
 };
 #[cfg(windows)]
 use crate::{EXIT_ORACLE_FAILED, EXIT_SUCCESS};
@@ -120,7 +120,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
 
     let project = required_project(options.project.clone(), "model dax execute")?;
     let resolved = resolve_project(&project)?;
-    let validation = validate_project(&resolved)?;
+    let validation = validate_desktop_runtime_project(&resolved)?;
     let validation_json = json!({
         "ok": validation.errors.is_empty(),
         "warnings": validation.warnings,

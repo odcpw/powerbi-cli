@@ -190,7 +190,9 @@ supported.
   `POWERBI_DESKTOP_ORACLE=1`, `--allow-data-read`, and an `EVALUATE` or `DEFINE
   ... EVALUATE` query. Treat returned rows as sensitive, keep the default bounds
   unless the task justifies widening them, and never infer canvas/refresh proof
-  from a successful query.
+  from a successful query. Its live preflight ignores only the report and
+  semantic-model artifacts' root `.pbi/` runtime directories. Strict offline
+  validation, packaging, workflow, and handoff continue to reject those files.
 - Separate Desktop refresh proof from accepting a Desktop save round-trip.
   Saving can normalize many otherwise unchanged PBIP files, add automatic date
   tables, cultures, diagram metadata, and local `.pbi` caches. After a proof

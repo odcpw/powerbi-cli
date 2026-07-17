@@ -2194,6 +2194,19 @@ fn project_reference_escape(label: &str, value: &str) -> CliError {
 }
 
 pub(crate) fn validate_project(resolved: &ResolvedProject) -> CliResult<ValidationReport> {
+    validate_project_with_runtime_policy(resolved, false)
+}
+
+pub(crate) fn validate_desktop_runtime_project(
+    resolved: &ResolvedProject,
+) -> CliResult<ValidationReport> {
+    validate_project_with_runtime_policy(resolved, true)
+}
+
+fn validate_project_with_runtime_policy(
+    resolved: &ResolvedProject,
+    allow_desktop_runtime_files: bool,
+) -> CliResult<ValidationReport> {
     let mut report = ValidationReport::default();
     required_file(&resolved.pbip_path, &mut report);
     required_file(&resolved.report_dir.join("definition.pbir"), &mut report);
@@ -2239,12 +2252,12 @@ pub(crate) fn validate_project(resolved: &ResolvedProject) -> CliResult<Validati
         &mut report,
     );
 
-    check_json_files(resolved, &mut report)?;
+    check_json_files(resolved, &mut report, allow_desktop_runtime_files)?;
     check_report_theme(resolved, &mut report)?;
     check_report_pages(resolved, &mut report)?;
     check_report_filter_configs(resolved, &mut report)?;
     check_semantic_model(resolved, &mut report)?;
-    check_offline_hazards(resolved, &mut report)?;
+    check_offline_hazards(resolved, &mut report, allow_desktop_runtime_files)?;
     Ok(report)
 }
 
@@ -2256,22 +2269,41 @@ fn required_file(path: &Path, report: &mut ValidationReport) {
     }
 }
 
-fn check_json_files(resolved: &ResolvedProject, report: &mut ValidationReport) -> CliResult<()> {
+fn check_json_files(
+    resolved: &ResolvedProject,
+    report: &mut ValidationReport,
+    allow_desktop_runtime_files: bool,
+) -> CliResult<()> {
     check_json_file(&resolved.pbip_path, report)?;
     for artifact_dir in [&resolved.report_dir, &resolved.semantic_model_dir] {
-        check_json_files_in(artifact_dir, report)?;
+        check_json_files_in(artifact_dir, report, allow_desktop_runtime_files)?;
     }
     Ok(())
 }
 
-fn check_json_files_in(artifact_dir: &Path, report: &mut ValidationReport) -> CliResult<()> {
+fn check_json_files_in(
+    artifact_dir: &Path,
+    report: &mut ValidationReport,
+    allow_desktop_runtime_files: bool,
+) -> CliResult<()> {
     // Required-file checks already report a missing artifact as structured
     // validation output. Do not turn that expected validation failure into an
     // exit-70 filesystem traversal error.
     if !artifact_dir.is_dir() {
         return Ok(());
     }
-    for entry in WalkDir::new(artifact_dir) {
+    let entries = WalkDir::new(artifact_dir)
+        .into_iter()
+        .filter_entry(|entry| {
+            !allow_desktop_runtime_files
+                || entry.depth() != 1
+                || !entry.file_type().is_dir()
+                || !entry
+                    .file_name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(".pbi")
+        });
+    for entry in entries {
         let entry = walkdir_entry(artifact_dir, entry, "walk selected artifact JSON files")?;
         if !entry.file_type().is_file() {
             continue;
@@ -2351,7 +2383,7 @@ fn check_report_theme(resolved: &ResolvedProject, report: &mut ValidationReport)
             report_json_path.display()
         ));
     }
-    for field in ["name", "reportVersionAtImport", "type"] {
+    for field in ["name", "type"] {
         if custom_theme
             .get(field)
             .and_then(Value::as_str)
@@ -2362,6 +2394,22 @@ fn check_report_theme(resolved: &ResolvedProject, report: &mut ValidationReport)
                 report_json_path.display()
             ));
         }
+    }
+    let theme_version_valid = match report_schema_major(&report_json) {
+        Some(3) => custom_theme
+            .get("reportVersionAtImport")
+            .is_some_and(valid_theme_version_object),
+        Some(2) => custom_theme
+            .get("reportVersionAtImport")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty()),
+        _ => false,
+    };
+    if !theme_version_valid {
+        report.errors.push(format!(
+            "{} themeCollection.customTheme.reportVersionAtImport must match the report schema version",
+            report_json_path.display()
+        ));
     }
     let theme_type = custom_theme.get("type").and_then(Value::as_str);
     if !matches!(theme_type, Some("RegisteredResources" | "SharedResources")) {
@@ -3179,6 +3227,7 @@ fn tmdl_column_exists(tables: &[tmdl::TableDocument], table: &str, column: &str)
 fn check_offline_hazards(
     resolved: &ResolvedProject,
     report: &mut ValidationReport,
+    allow_desktop_runtime_files: bool,
 ) -> CliResult<()> {
     for artifact_dir in [&resolved.report_dir, &resolved.semantic_model_dir] {
         if !artifact_dir.is_dir() {
@@ -3200,11 +3249,22 @@ fn check_offline_hazards(
                 .to_string_lossy()
                 .replace('\\', "/")
                 .to_ascii_lowercase();
-            if normalized.ends_with(".pbi/cache.abf")
-                || normalized.ends_with("cache.abf")
-                || normalized.ends_with("localsettings.json")
-                || normalized.ends_with(".pbix")
-                || normalized.ends_with(".pbit")
+            let desktop_runtime_file = path
+                .strip_prefix(artifact_dir)
+                .ok()
+                .and_then(|relative| relative.components().next())
+                .is_some_and(|component| {
+                    component
+                        .as_os_str()
+                        .to_string_lossy()
+                        .eq_ignore_ascii_case(".pbi")
+                });
+            if (!allow_desktop_runtime_files || !desktop_runtime_file)
+                && (normalized.ends_with(".pbi/cache.abf")
+                    || normalized.ends_with("cache.abf")
+                    || normalized.ends_with("localsettings.json")
+                    || normalized.ends_with(".pbix")
+                    || normalized.ends_with(".pbit"))
             {
                 report.errors.push(format!(
                     "offline-unsafe data/cache/local file present: {}",
@@ -3214,6 +3274,41 @@ fn check_offline_hazards(
         }
     }
     Ok(())
+}
+
+pub(crate) fn report_schema_major(report_json: &Value) -> Option<u64> {
+    report_json
+        .get("$schema")?
+        .as_str()?
+        .rsplit_once("/report/")?
+        .1
+        .split('/')
+        .next()?
+        .split('.')
+        .next()?
+        .parse()
+        .ok()
+}
+
+fn valid_theme_version_object(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    object.len() == 3
+        && ["visual", "page", "report"].into_iter().all(|field| {
+            object
+                .get(field)
+                .and_then(Value::as_str)
+                .is_some_and(is_three_part_numeric_version)
+        })
+}
+
+fn is_three_part_numeric_version(value: &str) -> bool {
+    let parts = value.split('.').collect::<Vec<_>>();
+    parts.len() == 3
+        && parts
+            .into_iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 pub(crate) fn read_json_value(path: &Path) -> CliResult<Value> {

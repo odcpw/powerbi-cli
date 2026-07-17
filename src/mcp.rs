@@ -3897,13 +3897,15 @@ mod tests {
         )
         .expect("open graceful descendant fake");
         session.handshake().expect("handshake");
+        wait_for_file(&descendant_pid);
+        let descendant = process_identity_from_marker(&descendant_pid);
         let cleanup = session.shutdown(true);
         assert!(cleanup.children_reaped);
         assert!(!cleanup.forced);
         assert!(cleanup.monitor.root_reaped);
         assert!(cleanup.monitor.captured_descendants >= 1);
         assert!(cleanup.monitor.descendants_gone);
-        assert_process_from_marker_is_gone(&descendant_pid);
+        assert_process_identities_are_gone(&[descendant]);
     }
 
     #[test]
@@ -3924,8 +3926,9 @@ mod tests {
             .write_all(b"start\n")
             .expect("start child tree");
         wait_for_file(&descendant_pid);
+        let descendant = process_identity_from_marker(&descendant_pid);
         drop(ChildGuard::new(child));
-        assert_process_from_marker_is_gone(&descendant_pid);
+        assert_process_identities_are_gone(&[descendant]);
     }
 
     #[test]
@@ -3939,20 +3942,10 @@ mod tests {
             .stderr(Stdio::null());
         let child = spawn_contained(&mut command).expect("spawn contained descendant race");
         wait_for_pid_lines(&descendant_pids, 3);
+        let descendants = process_identities_from_markers(&descendant_pids);
+        assert!(descendants.len() >= 3);
         drop(ChildGuard::new(child));
-
-        let pids = std::fs::read_to_string(&descendant_pids).expect("descendant pid list");
-        let pids = pids
-            .lines()
-            .map(|value| Pid::from_u32(value.parse().expect("descendant pid")))
-            .collect::<Vec<_>>();
-        assert!(pids.len() >= 3);
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&pids), true);
-        assert!(
-            pids.iter().all(|pid| system.process(*pid).is_none()),
-            "spawn-time containment left a racing descendant running"
-        );
+        assert_process_identities_are_gone(&descendants);
     }
 
     fn wait_for_file(path: &Path) {
@@ -3980,15 +3973,57 @@ mod tests {
         }
     }
 
-    fn assert_process_from_marker_is_gone(path: &Path) {
+    fn process_identity_from_marker(path: &Path) -> (u32, u64) {
         let pid_text = std::fs::read_to_string(path).expect("descendant pid marker");
         let pid = Pid::from_u32(pid_text.trim().parse().expect("descendant pid"));
         let mut system = System::new();
         system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
-        assert!(
-            system.process(pid).is_none(),
-            "cleanup left a captured descendant process running"
-        );
+        let process = system
+            .process(pid)
+            .expect("descendant process must exist before cleanup");
+        (pid.as_u32(), process.start_time())
+    }
+
+    fn process_identities_from_markers(path: &Path) -> Vec<(u32, u64)> {
+        let pid_text = std::fs::read_to_string(path).expect("descendant pid list");
+        let pids = pid_text
+            .lines()
+            .map(|value| Pid::from_u32(value.parse().expect("descendant pid")))
+            .collect::<Vec<_>>();
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&pids), true);
+        pids.into_iter()
+            .filter_map(|pid| {
+                system
+                    .process(pid)
+                    .map(|process| (pid.as_u32(), process.start_time()))
+            })
+            .collect()
+    }
+
+    fn assert_process_identities_are_gone(identities: &[(u32, u64)]) {
+        let started = Instant::now();
+        let pids = identities
+            .iter()
+            .map(|(pid, _)| Pid::from_u32(*pid))
+            .collect::<Vec<_>>();
+        let mut system = System::new();
+        loop {
+            system.refresh_processes(ProcessesToUpdate::Some(&pids), true);
+            let alive = identities.iter().any(|(pid, process_started)| {
+                system
+                    .process(Pid::from_u32(*pid))
+                    .is_some_and(|process| process.start_time() == *process_started)
+            });
+            if !alive {
+                return;
+            }
+            assert!(
+                started.elapsed() < Duration::from_secs(2),
+                "cleanup left a captured descendant process identity running"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 
     #[cfg(windows)]
