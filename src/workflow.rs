@@ -2777,7 +2777,7 @@ fn materialize_replacements(
                 "staged resource",
                 MAX_RESOURCE_BYTES,
             )?;
-            let escaped = m_string_content(&unicode_path(&path, "staged resource")?)?;
+            let escaped = m_file_path_content(&path, "staged resource")?;
             expression = expression.replace(
                 &format!("{{{{powerbi-cli.resourcePath:{name}}}}}"),
                 &escaped,
@@ -3369,6 +3369,18 @@ fn m_string_content(value: &str) -> CliResult<String> {
     Ok(value.replace('#', "#(0023)").replace('"', "\"\""))
 }
 
+fn m_file_path_content(path: &Path, label: &str) -> CliResult<String> {
+    let canonical = unicode_path(path, label)?;
+    let power_query_path = if let Some(stripped) = canonical.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{stripped}")
+    } else if let Some(stripped) = canonical.strip_prefix(r"\\?\") {
+        stripped.to_owned()
+    } else {
+        canonical
+    };
+    m_string_content(&power_query_path)
+}
+
 fn verify_file_claim(claim: &FileClaim, max_bytes: u64, label: &str) -> CliResult<()> {
     let actual = claim_for_file(Path::new(&claim.path), max_bytes)?;
     if actual.path != claim.path || actual.bytes != claim.bytes || actual.sha256 != claim.sha256 {
@@ -3546,6 +3558,25 @@ mod tests {
             "C:\\data\\book#(0023)(cr)\"\"copy.xlsx"
         );
         assert!(m_string_content("bad\npath").is_err());
+    }
+
+    #[test]
+    fn staged_resource_path_uses_power_query_compatible_windows_spelling() {
+        assert_eq!(
+            m_file_path_content(Path::new(r"\\?\C:\data\book.xlsx"), "resource")
+                .expect("drive path"),
+            r"C:\data\book.xlsx"
+        );
+        assert_eq!(
+            m_file_path_content(Path::new(r"\\?\UNC\server\share\book.xlsx"), "resource")
+                .expect("UNC path"),
+            r"\\server\share\book.xlsx"
+        );
+        assert_eq!(
+            m_file_path_content(Path::new(r"C:\data\book.xlsx"), "resource")
+                .expect("ordinary path"),
+            r"C:\data\book.xlsx"
+        );
     }
 
     #[test]
@@ -4038,6 +4069,11 @@ mod tests {
         assert!(expression.contains("Table.TransformColumnTypes"));
         assert!(!expression.contains("{{powerbi-cli."));
         assert!(expression.contains("resources"));
+        #[cfg(windows)]
+        {
+            assert!(expression.contains("File.Contents(\""));
+            assert!(!expression.contains(r"\\?\"));
+        }
         assert!(
             template_placeholders(
                 "let Source = File.Contents({{powerbi-cli.resourcePath:workbook}}) in Source",
