@@ -38,37 +38,37 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
         visual_type: "lineChart",
         aliases: &["line", "linechart"],
         family: VisualBindingFamily::CategoryY,
-        summary: "Line chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Line chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "areaChart",
         aliases: &["area", "areachart"],
         family: VisualBindingFamily::CategoryY,
-        summary: "Area chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Area chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "stackedAreaChart",
         aliases: &["stackedarea", "stackedareachart"],
         family: VisualBindingFamily::CategoryY,
-        summary: "Stacked area chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Stacked area chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "clusteredBarChart",
         aliases: &["clusteredbar", "clusteredbarchart"],
         family: VisualBindingFamily::CategoryY,
-        summary: "Clustered bar chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Clustered bar chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "clusteredColumnChart",
         aliases: &["clusteredcolumn", "clusteredcolumnchart"],
         family: VisualBindingFamily::CategoryY,
-        summary: "Clustered column chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Clustered column chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "barChart",
         aliases: &["bar", "barchart", "stackedbar", "stackedbarchart"],
         family: VisualBindingFamily::CategoryY,
-        summary: "Stacked bar chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Stacked bar chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "columnChart",
@@ -79,13 +79,13 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
             "stackedcolumnchart",
         ],
         family: VisualBindingFamily::CategoryY,
-        summary: "Stacked column chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, and an optional Series column.",
+        summary: "Stacked column chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "scatterChart",
         aliases: &["scatter", "scatterchart", "bubble", "bubblechart"],
         family: VisualBindingFamily::ScatterBubble,
-        summary: "Scatter/bubble chart; accepts required X and Y measures plus optional Category, Size measure, Legend, and Tooltips bindings.",
+        summary: "Scatter/bubble chart; accepts required X and Y measures plus optional Category, Size measure, Series, and Tooltips bindings.",
     },
     VisualTypeSpec {
         visual_type: "pieChart",
@@ -188,6 +188,7 @@ pub(crate) fn normalize_role(visual_type: &str, role: &str) -> CliResult<String>
             "category" | "categories" | "axis" | "x" => Some("Category"),
             "y" | "values" | "value" => Some("Y"),
             "series" | "legend" | "color" | "colour" => Some("Series"),
+            "tooltip" | "tooltips" => Some("Tooltips"),
             _ => None,
         },
         VisualBindingFamily::CategoryShare => match lower_role.as_str() {
@@ -212,7 +213,7 @@ pub(crate) fn normalize_role(visual_type: &str, role: &str) -> CliResult<String>
             "x" | "xaxis" | "x-axis" | "x_axis" => Some("X"),
             "y" | "yaxis" | "y-axis" | "y_axis" => Some("Y"),
             "size" | "bubble" | "bubblesize" | "bubble-size" | "bubble_size" => Some("Size"),
-            "legend" | "series" | "color" | "colour" => Some("Legend"),
+            "legend" | "series" | "color" | "colour" => Some("Series"),
             "tooltip" | "tooltips" => Some("Tooltips"),
             _ => None,
         },
@@ -390,6 +391,15 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "fieldKinds": ["column"],
                 "aliases": ["series", "legend", "color", "colour"],
                 "summary": "Optional legend/series grouping column."
+            },
+            {
+                "role": "Tooltips",
+                "required": false,
+                "min": 0,
+                "max": null,
+                "fieldKinds": ["column", "measure"],
+                "aliases": ["tooltip", "tooltips"],
+                "summary": "Optional fields shown in tooltips."
             }
         ]),
         VisualBindingFamily::CategoryShare => json!([
@@ -490,7 +500,7 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "summary": "Optional bubble-size measure."
             },
             {
-                "role": "Legend",
+                "role": "Series",
                 "required": false,
                 "min": 0,
                 "max": 1,
@@ -536,7 +546,7 @@ fn example_commands(spec: &VisualTypeSpec) -> Vec<String> {
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type slicer --mode basic --title <title> --binding \"role=Values,table=<table>,column=<column>\" --dry-run --json".to_string(),
         ],
         VisualBindingFamily::ScatterBubble => vec![format!(
-            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<detail-column>\" --binding \"role=X,table=<table>,measure=<x-measure>\" --binding \"role=Y,table=<table>,measure=<y-measure>\" --binding \"role=Size,table=<table>,measure=<size-measure>\" --dry-run --json",
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<detail-column>\" --binding \"role=X,table=<table>,measure=<x-measure>\" --binding \"role=Y,table=<table>,measure=<y-measure>\" --binding \"role=Size,table=<table>,measure=<size-measure>\" --binding \"role=Series,table=<table>,column=<color-column>\" --dry-run --json",
             spec.visual_type
         )],
     }
@@ -545,14 +555,18 @@ fn example_commands(spec: &VisualTypeSpec) -> Vec<String> {
 fn role_names(family: VisualBindingFamily) -> Vec<&'static str> {
     match family {
         VisualBindingFamily::SingleValue | VisualBindingFamily::ValuesList => vec!["Values"],
-        VisualBindingFamily::CategoryY => vec!["Category", "Y", "Series"],
+        VisualBindingFamily::CategoryY => vec!["Category", "Y", "Series", "Tooltips"],
         VisualBindingFamily::CategoryShare => vec!["Category", "Y"],
         VisualBindingFamily::RowsColumnsValues => vec!["Rows", "Columns", "Values"],
         VisualBindingFamily::SlicerField => vec!["Values"],
         VisualBindingFamily::ScatterBubble => {
-            vec!["Category", "X", "Y", "Size", "Legend", "Tooltips"]
+            vec!["Category", "X", "Y", "Size", "Series", "Tooltips"]
         }
     }
+}
+
+pub(crate) fn supported_roles(visual_type: &str) -> CliResult<Vec<&'static str>> {
+    binding_family(visual_type).map(role_names)
 }
 
 fn binding_family_name(family: VisualBindingFamily) -> &'static str {

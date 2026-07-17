@@ -18,7 +18,7 @@
     "visuals": 2
   },
   "exitCode": 0,
-  "fingerprint": "ecd19ccdea590231",
+  "fingerprint": "7ed236389896bd7c",
   "lint": {
     "counts": {
       "errors": 0,
@@ -237,7 +237,7 @@
                 "field": "Region",
                 "kind": "column",
                 "measure": null,
-                "role": "Legend",
+                "role": "Series",
                 "table": "Facilities"
               },
               {
@@ -268,9 +268,9 @@
             "fingerprints": {
               "objects": "7beb70fe026d0691",
               "position": "f04f5c9706a7f823",
-              "queryState": "5f20b6c3071cc479",
-              "visual": "5333c38a5bd942e6",
-              "visualJson": "a62201e81e2651d1"
+              "queryState": "30e9990a61187465",
+              "visual": "bf0035dc6b654712",
+              "visualJson": "7aaf7bc717cb566d"
             },
             "name": "VisualContainerPortfolioBubble",
             "ordinal": 1,

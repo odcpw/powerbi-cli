@@ -191,7 +191,7 @@ impl Watchdog {
 }
 
 #[derive(Debug)]
-enum Timed<T> {
+pub(crate) enum Timed<T> {
     Completed(T),
     TimedOut,
 }
@@ -2090,7 +2090,7 @@ fn run_powershell(script: &str, timeout: Duration) -> io::Result<Timed<std::proc
 }
 
 #[cfg(windows)]
-fn run_command_with_timeout(
+pub(crate) fn run_command_with_timeout(
     mut command: Command,
     timeout: Duration,
 ) -> io::Result<Timed<std::process::Output>> {

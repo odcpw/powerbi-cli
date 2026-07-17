@@ -17,8 +17,10 @@ struct DaxOptions {
 pub(crate) fn dax_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(
-            CliError::invalid_args("model dax requires a subcommand: bridge-plan")
-                .with_hint("Run `model dax bridge-plan` before depending on DAX validation.")
+            CliError::invalid_args(
+                "model dax requires a subcommand: bridge-plan, dependencies, lint, or execute",
+            )
+                .with_hint("Use `execute` for an explicitly opted-in, read-only query against an already-open Desktop model.")
                 .with_suggested_command(
                     "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
                 ),
@@ -28,9 +30,12 @@ pub(crate) fn dax_command(args: &[String]) -> CliResult<Value> {
         "bridge-plan" | "bridge" | "plan" | "validate-plan" => bridge_plan(rest),
         "dependencies" | "references" | "refs" => dependencies(rest),
         "lint" | "check" => lint(rest),
+        "execute" | "query" => crate::dax_execute::execute(rest),
         other => Err(
             CliError::invalid_args(format!("unknown model dax command: {other}"))
-                .with_hint("Supported DAX commands are `bridge-plan`, `dependencies`, and `lint`.")
+                .with_hint(
+                    "Supported DAX commands are `bridge-plan`, `dependencies`, `lint`, and `execute`.",
+                )
                 .with_suggested_command(
                     "powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json",
                 ),
@@ -99,16 +104,11 @@ fn bridge_plan(args: &[String]) -> CliResult<Value> {
                 "reason": "powerbi-cli does not ship a DAX parser or semantic engine; it will not pretend local TMDL text checks prove DAX compatibility."
             },
             "desktopOracle": {
-                "available": false,
-                "activation": "Run `POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check <project> --json` on a Windows machine with Power BI Desktop installed.",
-                "scope": "Power BI Desktop remains the compatibility oracle for DAX syntax and semantic binding."
+                "commandAvailable": true,
+                "activation": "Open the exact PBIP in Desktop, then run `POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project> --query-file <query.dax> --allow-data-read --json` on Windows.",
+                "scope": "The bounded read-only bridge executes EVALUATE or DEFINE ... EVALUATE against the already-open local semantic model; it does not mutate the model, launch Desktop, or validate every stored expression automatically."
             },
             "futureEngines": [
-                {
-                    "engine": "Power BI Desktop automation",
-                    "status": "planned",
-                    "proofRequired": "fixture-backed Desktop open/refresh/readback"
-                },
                 {
                     "engine": "XMLA/Analysis Services parser",
                     "status": "planned",
@@ -124,6 +124,7 @@ fn bridge_plan(args: &[String]) -> CliResult<Value> {
         "next": [
             format!("powerbi-cli model dax dependencies --project {project_arg} --json"),
             format!("powerbi-cli model dax lint --project {project_arg} --json"),
+            format!("POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project {project_arg} --query-file <query.dax> --allow-data-read --json"),
             format!("powerbi-cli model measures list --project {project_arg} --json"),
             format!("powerbi-cli model calculated-columns list --project {project_arg} --json"),
             format!("powerbi-cli desktop open-check {project_arg} --json")
@@ -388,12 +389,186 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
                 )),
             }
         }
+        for (variable, table_functions) in
+            scalar_if_variables_used_as_tables(&expression.expression)
+        {
+            findings.push(dax_finding(
+                "dax.table_variable_scalar_if",
+                "error",
+                format!(
+                    "{} assigns VAR {variable} with scalar IF() and later passes it as a table argument to {}; branch around the table-consuming calculation instead of choosing between table expressions with IF()",
+                    expression.handle,
+                    table_functions.join(", ")
+                ),
+                &expression.handle,
+                &expression.path,
+            ));
+        }
     }
 
     DaxAnalysis {
         expressions,
         findings,
     }
+}
+
+fn scalar_if_variables_used_as_tables(expression: &str) -> Vec<(String, Vec<String>)> {
+    const TABLE_FIRST_ARGUMENT_FUNCTIONS: &[&str] = &[
+        "AVERAGEX",
+        "CONCATENATEX",
+        "CONTAINS",
+        "COUNTROWS",
+        "EXCEPT",
+        "FILTER",
+        "INTERSECT",
+        "MAXX",
+        "MINX",
+        "SUMX",
+        "TREATAS",
+        "UNION",
+    ];
+
+    let masked = mask_dax_strings_and_comments(expression).to_ascii_uppercase();
+    let bytes = masked.as_bytes();
+    let mut scalar_if_variables = BTreeSet::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        if !keyword_at(bytes, index, b"VAR") {
+            index += 1;
+            continue;
+        }
+        let mut cursor = skip_ascii_whitespace(bytes, index + 3);
+        let name_start = cursor;
+        while cursor < bytes.len() && is_dax_identifier_byte(bytes[cursor]) {
+            cursor += 1;
+        }
+        if cursor == name_start {
+            index += 3;
+            continue;
+        }
+        let variable = &masked[name_start..cursor];
+        cursor = skip_ascii_whitespace(bytes, cursor);
+        if bytes.get(cursor) != Some(&b'=') {
+            index += 3;
+            continue;
+        }
+        cursor = skip_ascii_whitespace(bytes, cursor + 1);
+        if keyword_at(bytes, cursor, b"IF") {
+            let after_if = skip_ascii_whitespace(bytes, cursor + 2);
+            if bytes.get(after_if) == Some(&b'(') {
+                scalar_if_variables.insert(variable.to_string());
+            }
+        }
+        index = cursor.saturating_add(1);
+    }
+
+    scalar_if_variables
+        .into_iter()
+        .filter_map(|variable| {
+            let functions = TABLE_FIRST_ARGUMENT_FUNCTIONS
+                .iter()
+                .filter(|function| table_function_first_argument_is(bytes, function, &variable))
+                .map(|function| (*function).to_string())
+                .collect::<Vec<_>>();
+            (!functions.is_empty()).then_some((variable, functions))
+        })
+        .collect()
+}
+
+fn table_function_first_argument_is(bytes: &[u8], function: &str, variable: &str) -> bool {
+    let function = function.as_bytes();
+    let variable = variable.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if !keyword_at(bytes, index, function) {
+            index += 1;
+            continue;
+        }
+        let mut cursor = skip_ascii_whitespace(bytes, index + function.len());
+        if bytes.get(cursor) != Some(&b'(') {
+            index += function.len();
+            continue;
+        }
+        cursor = skip_ascii_whitespace(bytes, cursor + 1);
+        if keyword_at(bytes, cursor, variable) {
+            let after_variable = skip_ascii_whitespace(bytes, cursor + variable.len());
+            if matches!(bytes.get(after_variable), Some(b',') | Some(b')')) {
+                return true;
+            }
+        }
+        index += function.len();
+    }
+    false
+}
+
+fn keyword_at(bytes: &[u8], index: usize, keyword: &[u8]) -> bool {
+    let end = index.saturating_add(keyword.len());
+    end <= bytes.len()
+        && &bytes[index..end] == keyword
+        && (index == 0 || !is_dax_identifier_byte(bytes[index - 1]))
+        && (end == bytes.len() || !is_dax_identifier_byte(bytes[end]))
+}
+
+fn skip_ascii_whitespace(bytes: &[u8], mut index: usize) -> usize {
+    while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+        index += 1;
+    }
+    index
+}
+
+fn is_dax_identifier_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+fn mask_dax_strings_and_comments(expression: &str) -> String {
+    let bytes = expression.as_bytes();
+    let mut masked = bytes.to_vec();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'"' {
+            masked[index] = b' ';
+            index += 1;
+            while index < bytes.len() {
+                masked[index] = if bytes[index] == b'\n' { b'\n' } else { b' ' };
+                if bytes[index] == b'"' {
+                    if bytes.get(index + 1) == Some(&b'"') {
+                        masked[index + 1] = b' ';
+                        index += 2;
+                        continue;
+                    }
+                    index += 1;
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        if bytes[index..].starts_with(b"//") {
+            while index < bytes.len() && bytes[index] != b'\n' {
+                masked[index] = b' ';
+                index += 1;
+            }
+            continue;
+        }
+        if bytes[index..].starts_with(b"/*") {
+            masked[index] = b' ';
+            masked[index + 1] = b' ';
+            index += 2;
+            while index < bytes.len() {
+                if bytes[index..].starts_with(b"*/") {
+                    masked[index] = b' ';
+                    masked[index + 1] = b' ';
+                    index += 2;
+                    break;
+                }
+                masked[index] = if bytes[index] == b'\n' { b'\n' } else { b' ' };
+                index += 1;
+            }
+            continue;
+        }
+        index += 1;
+    }
+    String::from_utf8(masked).unwrap_or_default()
 }
 
 fn analyze_expression_text(

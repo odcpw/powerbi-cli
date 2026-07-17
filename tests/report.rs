@@ -7736,6 +7736,7 @@ fn report_visuals_catalog_advertises_generated_types_roles_and_limits() {
     assert!(roles.iter().any(|role| role["role"] == "Category"));
     assert!(roles.iter().any(|role| role["role"] == "Y"));
     assert!(roles.iter().any(|role| role["role"] == "Series"));
+    assert!(roles.iter().any(|role| role["role"] == "Tooltips"));
     assert_eq!(
         roles
             .iter()
@@ -7757,6 +7758,8 @@ fn report_visuals_catalog_advertises_generated_types_roles_and_limits() {
     assert!(scatter_roles.iter().any(|role| role["role"] == "X"));
     assert!(scatter_roles.iter().any(|role| role["role"] == "Y"));
     assert!(scatter_roles.iter().any(|role| role["role"] == "Size"));
+    assert!(scatter_roles.iter().any(|role| role["role"] == "Series"));
+    assert!(scatter_roles.iter().all(|role| role["role"] != "Legend"));
     assert!(scatter_roles.iter().any(|role| role["role"] == "Tooltips"));
     for role_name in ["X", "Y", "Size"] {
         assert_eq!(
@@ -7908,6 +7911,8 @@ fn report_visual_add_supports_series_and_scatter_bubble_roles() {
         "role=legend,table=DimCustomer,column=Segment",
         "--binding",
         "role=Y,table=FactSales,measure=Total Revenue",
+        "--binding",
+        "role=tooltip,table=FactSales,measure=Total Units",
         "--dry-run",
         "--json",
     ]);
@@ -7919,6 +7924,13 @@ fn report_visual_add_supports_series_and_scatter_bubble_roles() {
             .expect("line bindings")
             .iter()
             .any(|binding| binding["role"] == "Series")
+    );
+    assert!(
+        line_json["bindingPlan"]["after"]
+            .as_array()
+            .expect("line bindings")
+            .iter()
+            .any(|binding| binding["role"] == "Tooltips")
     );
 
     let scatter_base = build_scatter_bubble(temp.path());
@@ -7958,6 +7970,8 @@ fn report_visual_add_supports_series_and_scatter_bubble_roles() {
         "role=Y,table=Facilities,measure=Average Incident Rate",
         "--binding",
         "role=Size,table=Facilities,measure=Total Exposure Hours",
+        "--binding",
+        "role=legend,table=Facilities,column=Region",
         "--binding",
         "role=Tooltips,table=Facilities,column=RiskScore",
         "--x",
@@ -8009,6 +8023,8 @@ fn report_visual_add_supports_series_and_scatter_bubble_roles() {
     assert!(binding_roles.contains(&"X".to_string()));
     assert!(binding_roles.contains(&"Y".to_string()));
     assert!(binding_roles.contains(&"Size".to_string()));
+    assert!(binding_roles.contains(&"Series".to_string()));
+    assert!(!binding_roles.contains(&"Legend".to_string()));
     assert!(binding_roles.contains(&"Tooltips".to_string()));
 
     let visual_json_path = PathBuf::from(
@@ -8022,6 +8038,89 @@ fn report_visual_add_supports_series_and_scatter_bubble_roles() {
     assert!(visual_json["visual"]["query"]["queryState"]["X"].is_object());
     assert!(visual_json["visual"]["query"]["queryState"]["Y"].is_object());
     assert!(visual_json["visual"]["query"]["queryState"]["Size"].is_object());
+    assert!(visual_json["visual"]["query"]["queryState"]["Series"].is_object());
+    assert!(visual_json["visual"]["query"]["queryState"]["Legend"].is_null());
+}
+
+#[test]
+fn validate_rejects_stale_scatter_legend_role_with_series_repair() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = build_scatter_bubble(temp.path());
+    let listed = run_powerbi(&[
+        "report",
+        "visuals",
+        "list",
+        "--project",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(listed.code, 0, "stderr: {}", listed.stderr);
+    let listed_json = stdout_json(&listed);
+    let visual_path = PathBuf::from(
+        listed_json["visuals"]
+            .as_array()
+            .expect("visuals")
+            .iter()
+            .find(|visual| visual["visualType"] == "scatterChart")
+            .and_then(|visual| visual["path"].as_str())
+            .expect("scatter path"),
+    );
+    patch_json(&visual_path, |visual| {
+        let series = visual["visual"]["query"]["queryState"]
+            .as_object_mut()
+            .expect("queryState")
+            .remove("Series")
+            .expect("Series role");
+        visual["visual"]["query"]["queryState"]["Legend"] = series;
+    });
+
+    let output = run_powerbi(&[
+        "validate",
+        "--strict",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let output_json = stdout_json(&output);
+    assert!(
+        output_json["errors"]
+            .as_array()
+            .expect("errors")
+            .iter()
+            .any(|error| error.as_str().is_some_and(|message| {
+                message.contains("queryState role `Legend`") && message.contains("use `Series`")
+            }))
+    );
+}
+
+#[test]
+fn validate_reports_empty_visual_directory_with_repair_hint() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let empty_visual = first_page_json(&project)
+        .parent()
+        .expect("page dir")
+        .join("visuals")
+        .join("deleted_visual_leftover");
+    fs::create_dir_all(&empty_visual).expect("empty visual dir");
+
+    let output = run_powerbi(&[
+        "validate",
+        "--strict",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    assert!(
+        stdout_json(&output)["errors"]
+            .as_array()
+            .expect("errors")
+            .iter()
+            .any(|error| error.as_str().is_some_and(|message| {
+                message.contains("visual directory is missing visual.json")
+                    && message.contains("Remove the empty visual directory")
+            }))
+    );
 }
 
 #[test]

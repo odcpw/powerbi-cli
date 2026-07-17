@@ -1,6 +1,6 @@
 # PBIR Desktop Oracle Notes
 
-Date: 2026-06-23, updated 2026-07-10
+Date: 2026-06-23, updated 2026-07-17
 
 This document records the compatibility facts learned while making
 CLI-generated PBIP projects open and render in Power BI Desktop. Do not
@@ -274,6 +274,93 @@ Reference-only/quarantined comparator:
 For license handling, see `docs/clean-room-research.md`.
 
 ## Desktop Findings
+
+### Scatter Legend UI uses PBIR `Series`
+
+Desktop's scatter field well is labelled Legend, but the PBIR query-state role
+that actually binds color grouping is `Series`. A generated scatter using
+`queryState.Legend` can pass JSON/schema checks and open without a visible
+error, while Desktop silently leaves Legend empty and renders no grouped
+bubbles. Replacing only the role key with `Series` immediately restored the
+legend and bubbles in Desktop Store 2.155.756.0.
+
+Implemented guardrails:
+
+- scatter catalog output exposes `Series`, not `Legend`;
+- CLI input aliases `legend`, `series`, `color`, and `colour` normalize to
+  `Series`;
+- report builders and mutations validate Series as the optional grouping
+  column;
+- project validation rejects stale `queryState.Legend` on a scatter and tells
+  the caller to use `Series`;
+- the scatter archetype and regression fixtures use `Series`.
+
+The same validation pass initially exposed a useful catalog omission: standard
+Category/Y charts can carry raw `queryState.Tooltips`. A Desktop-rendered line
+chart used this for raw values alongside a transformed log-scale Y measure.
+Category/Y catalog roles now include optional column-or-measure Tooltips so the
+validator rejects only genuinely unsupported stored roles.
+
+### DAX `IF()` cannot select a table variable
+
+`IF()` is scalar in DAX. A pattern such as
+`VAR Chosen = IF(condition, VisibleRows, TopRows)` may survive reference-only
+lint, but Desktop rejects the measure once `Chosen` is passed as a table to
+`CONTAINS`, `TREATAS`, `COUNTROWS`, or another iterator/table consumer. Branch
+around the calculation instead: perform the table-consuming expression once in
+each scalar IF branch.
+
+`model dax lint` and `validate --strict` now report
+`dax.table_variable_scalar_if` when a variable assigned directly from `IF()` is
+later used as the first argument of a known table-consuming function. This is a
+conservative pattern rule, not a complete DAX parser; Desktop refresh remains
+required.
+
+### Bounded Desktop DAX query execution
+
+`model dax execute` closes the gap between offline DAX lint and manual query
+entry in Desktop. It attaches only to the one running `PBIDesktop*` process
+whose command line contains the exact canonical PBIP path, follows that process
+to its child `msmdsrv` workspace, reads the local port, and uses Desktop's
+bundled `Microsoft.PowerBI.AdomdClient.dll` from a private temporary copy. The
+temporary script, query, and DLL are removed after the bridge process exits.
+
+The bridge is intentionally opt-in and read-only:
+
+- Windows, an already-open exact PBIP, `POWERBI_DESKTOP_ORACLE=1`, and
+  `--allow-data-read` are all required;
+- Desktop is never auto-launched and the model is never written;
+- the query must begin with `EVALUATE` or use `DEFINE ... EVALUATE`;
+- XMLA/model-mutation payloads are refused before Desktop is contacted;
+- query bytes, returned rows, text characters per cell, and runtime are bounded;
+- output includes a stable query fingerprint and length, never the query text;
+- returned rows are not redacted and must be treated as potentially sensitive.
+
+Example:
+
+```powershell
+$env:POWERBI_DESKTOP_ORACLE='1'
+powerbi-cli model dax execute `
+  --project .\build\sales `
+  --query 'EVALUATE ROW("Revenue", [Total Revenue])' `
+  --allow-data-read --max-rows 10 --json
+```
+
+A synthetic live smoke test on 2026-07-17 used Power BI Desktop Store
+2.155.756.0 and returned both a literal `ROW` query and report measures through
+the bridge. Unit tests cover refusal, privacy metadata, query-form guards,
+bounds, and the generated bridge contract. This proves bounded query execution;
+it does not prove canvas rendering, refresh success, or every stored measure.
+
+Microsoft's separate Power BI Desktop IPC Bridge preview should not be confused
+with this DAX bridge. As documented on 2026-07-15, its discoverable methods cover
+application state, report-page screenshots, and file reload, but not DAX query
+execution. Microsoft also documents the established external-tools architecture:
+Desktop hosts an Analysis Services model on a dynamically assigned local port,
+and Analysis Services client libraries can execute DAX queries. This command
+uses that model engine while the official IPC manifest lacks a query method. Its
+exact process/workspace discovery is therefore a version-sensitive boundary;
+prefer a future official IPC query method if Microsoft adds one.
 
 ### Enhanced PBIR visual formatting location
 
@@ -753,7 +840,7 @@ Add:
 - calculation groups/items;
 - deeper DAX formatting and lint rules beyond the current static
   dependency/reference pass;
-- optional DAX execution through Desktop/Fabric bridge.
+- optional remote DAX execution through a credential-isolated Fabric/XMLA bridge.
 
 ### P2: Agent Batch Operations
 

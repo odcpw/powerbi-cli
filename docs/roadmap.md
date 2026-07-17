@@ -440,8 +440,8 @@ frozen until proven.
 
 ### Phase 9: Optional Bridges
 
-- Add Windows Desktop bridge commands only where they prove compatibility or
-  unlock DAX execution.
+- Maintain the delivered bounded Windows Desktop DAX execution command and add
+  further bridge commands only where they prove a distinct compatibility claim.
 - Add Fabric/service commands only as an authenticated optional extension.
 - Keep the core CLI cross-platform and offline-safe.
 
@@ -553,8 +553,8 @@ coverage only from Desktop-authored or Desktop-proved fixtures.
 11. **Broaden semantic model authoring.**
     Add tables/columns CRUD beyond scaffold, calculated tables, named
     expressions, date-table helpers, roles/RLS, perspectives, translations,
-    calculation groups/items, DAX format/lint, and optional DAX execution
-    through Desktop/Fabric.
+    calculation groups/items, and broader DAX format/lint. Bounded Desktop DAX
+    execution is delivered; authenticated Fabric/XMLA execution remains optional.
 12. **Add durable batch operations.**
     Add `apply --ops`, `plan validate`, `plan replay`, and `plan diff` so one
     agent can produce a mutation plan and another can inspect or replay it.

@@ -590,6 +590,7 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
         "lint",
         "diff",
         "model dax bridge-plan",
+        "model dax execute",
         "report tree",
         "report find",
         "report cat",
@@ -615,6 +616,17 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
             .expect("dax tags")
             .iter()
             .any(|tag| tag == "no-fallback")
+    );
+
+    let dax_execute = command_by_path(commands, "model dax execute");
+    assert_eq!(dax_execute["readOnly"], Value::Bool(true));
+    assert_eq!(dax_execute["returnsModelData"], Value::Bool(true));
+    assert!(
+        dax_execute["explicitOptIn"]
+            .as_array()
+            .expect("DAX execute opt-ins")
+            .iter()
+            .any(|value| value == "--allow-data-read")
     );
 
     let sanitize_apply = command_by_path(commands, "report sanitize apply");
@@ -644,6 +656,13 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
             .expect("model dax bridge plan fields")
             .iter()
             .any(|field| field == "bridge.noFakeFallbacks")
+    );
+    assert!(
+        value["schemaManifest"]["modelDaxExecuteFields"]
+            .as_array()
+            .expect("model DAX execute fields")
+            .iter()
+            .any(|field| field == "runtime.temporaryFilesRemoved")
     );
 }
 

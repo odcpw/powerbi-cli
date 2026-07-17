@@ -789,6 +789,74 @@ fn dax_dependencies_and_lint_report_static_reference_failures() {
 }
 
 #[test]
+fn dax_lint_rejects_scalar_if_variable_used_as_a_table() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+
+    let broken = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--name",
+        "Broken Table Choice",
+        "--expression",
+        "VAR Candidate = IF(TRUE(), VALUES('DimCustomer'[Segment]), ALL('DimCustomer'[Segment])) RETURN COUNTROWS(TREATAS(Candidate, 'DimCustomer'[Segment]))",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(broken.code, 0, "stderr: {}", broken.stderr);
+
+    let valid_scalar = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--name",
+        "Valid Scalar Choice",
+        "--expression",
+        "VAR Candidate = IF(TRUE(), 1, 0) RETURN Candidate",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(valid_scalar.code, 0, "stderr: {}", valid_scalar.stderr);
+
+    let lint = run_powerbi(&["model", "dax", "lint", "--project", project_arg, "--json"]);
+    assert_eq!(lint.code, 10, "stderr: {}", lint.stderr);
+    let lint_json = stdout_json(&lint);
+    let table_if_findings = lint_json["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .filter(|finding| finding["code"] == "dax.table_variable_scalar_if")
+        .collect::<Vec<_>>();
+    assert_eq!(table_if_findings.len(), 1);
+    assert!(
+        table_if_findings[0]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("TREATAS")
+    );
+
+    let strict = run_powerbi(&["validate", "--strict", project_arg, "--json"]);
+    assert_eq!(strict.code, 10, "stderr: {}", strict.stderr);
+    assert!(
+        stdout_json(&strict)["lint"]["findings"]
+            .as_array()
+            .expect("strict lint findings")
+            .iter()
+            .any(|finding| finding["code"] == "dax.table_variable_scalar_if")
+    );
+}
+
+#[test]
 fn advanced_model_inventory_reads_roles_perspectives_cultures_and_expressions() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

@@ -422,9 +422,12 @@ pub(crate) fn validate_binding_cardinality(
             let series_is_column = bindings.iter().all(|binding| {
                 binding.role != "Series" || matches!(binding.kind, VisualBindingKind::Column)
             });
-            let only_supported_roles = bindings
-                .iter()
-                .all(|binding| matches!(binding.role.as_str(), "Category" | "Y" | "Series"));
+            let only_supported_roles = bindings.iter().all(|binding| {
+                matches!(
+                    binding.role.as_str(),
+                    "Category" | "Y" | "Series" | "Tooltips"
+                )
+            });
             if category_count >= 1
                 && category_is_column
                 && has_y
@@ -435,9 +438,9 @@ pub(crate) fn validate_binding_cardinality(
                 return Ok(());
             }
             Err(CliError::invalid_args(
-                "chart visuals require one or more Category column bindings, at least one Y binding, and at most one Series column binding",
+                "chart visuals require one or more Category column bindings, at least one Y binding, at most one Series column binding, and optional Tooltips",
             )
-            .with_hint("Use Category for axis columns, Y for one or more values, and optional Series for a legend column. Multiple Category bindings become a drill hierarchy.")
+            .with_hint("Use Category for axis columns, Y for one or more values, optional Series for a legend column, and Tooltips for extra fields. Multiple Category bindings become a drill hierarchy.")
             .with_suggested_command(
                 "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type lineChart --title <title> --binding \"role=Category,table=<table>,column=<year-column>\" --binding \"role=Category,table=<table>,column=<month-column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
             ))
@@ -528,34 +531,34 @@ pub(crate) fn validate_binding_cardinality(
             let y_count = count_role("Y");
             let category_count = count_role("Category");
             let size_count = count_role("Size");
-            let legend_count = count_role("Legend");
+            let series_count = count_role("Series");
             let only_supported_roles = bindings.iter().all(|binding| {
                 matches!(
                     binding.role.as_str(),
-                    "Category" | "X" | "Y" | "Size" | "Legend" | "Tooltips"
+                    "Category" | "X" | "Y" | "Size" | "Series" | "Tooltips"
                 )
             });
             let category_is_column = bindings.iter().all(|binding| {
                 binding.role != "Category" || matches!(binding.kind, VisualBindingKind::Column)
             });
-            let legend_is_column = bindings.iter().all(|binding| {
-                binding.role != "Legend" || matches!(binding.kind, VisualBindingKind::Column)
+            let series_is_column = bindings.iter().all(|binding| {
+                binding.role != "Series" || matches!(binding.kind, VisualBindingKind::Column)
             });
             if x_count == 1
                 && y_count == 1
                 && category_count <= 1
                 && size_count <= 1
-                && legend_count <= 1
+                && series_count <= 1
                 && category_is_column
-                && legend_is_column
+                && series_is_column
                 && only_supported_roles
             {
                 return Ok(());
             }
             Err(CliError::invalid_args(
-                "scatter/bubble visuals require exactly one X binding and exactly one Y binding; Category, Size, Legend, and Tooltips are optional",
+                "scatter/bubble visuals require exactly one X binding and exactly one Y binding; Category, Size, Series, and Tooltips are optional",
             )
-            .with_hint("Use X and Y for numeric axes, optional Size for bubble size, optional Category for bubble identity, optional Legend for color grouping, and Tooltips for extra fields.")
+            .with_hint("Use X and Y for numeric axes, optional Size for bubble size, optional Category for bubble identity, optional Series for color grouping, and Tooltips for extra fields. The CLI accepts legend/color as input aliases and writes Desktop's PBIR Series role.")
             .with_suggested_command(
                 "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type scatterChart --title <title> --binding \"role=Category,table=<table>,column=<detail-column>\" --binding \"role=X,table=<table>,measure=<x-measure>\" --binding \"role=Y,table=<table>,measure=<y-measure>\" --binding \"role=Size,table=<table>,measure=<size-measure>\" --dry-run --json",
             ))

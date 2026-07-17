@@ -4,6 +4,7 @@ mod calculated_columns;
 mod cli;
 mod cli_support;
 mod contract;
+mod dax_execute;
 mod desktop;
 mod diff;
 mod doctor;
@@ -2288,22 +2289,40 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
                         visuals_dir.display()
                     ))
                 })?;
+                if !visual_entry
+                    .file_type()
+                    .map_err(|err| {
+                        CliError::unexpected(format!(
+                            "read visual entry type {}: {err}",
+                            visual_entry.path().display()
+                        ))
+                    })?
+                    .is_dir()
+                {
+                    continue;
+                }
                 let visual_json = visual_entry.path().join("visual.json");
-                if visual_json.is_file() {
-                    report.visuals += 1;
-                    let visual = read_json_value(&visual_json)?;
-                    if visual["visual"]["query"]["queryState"]
-                        .as_object()
-                        .is_some_and(|query_state| {
-                            query_state.values().any(|role| {
-                                role["projections"]
-                                    .as_array()
-                                    .is_some_and(|projections| !projections.is_empty())
-                            })
+                if !visual_json.is_file() {
+                    report.errors.push(format!(
+                        "visual directory is missing visual.json: {}. Remove the empty visual directory or restore its visual.json before retrying",
+                        visual_entry.path().display()
+                    ));
+                    continue;
+                }
+                report.visuals += 1;
+                let visual = read_json_value(&visual_json)?;
+                check_visual_query_state_roles(&visual_json, &visual, report);
+                if visual["visual"]["query"]["queryState"]
+                    .as_object()
+                    .is_some_and(|query_state| {
+                        query_state.values().any(|role| {
+                            role["projections"]
+                                .as_array()
+                                .is_some_and(|projections| !projections.is_empty())
                         })
-                    {
-                        report.bound_visuals += 1;
-                    }
+                    })
+                {
+                    report.bound_visuals += 1;
                 }
             }
         }
@@ -2332,6 +2351,40 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
         }
     }
     Ok(())
+}
+
+fn check_visual_query_state_roles(
+    visual_json_path: &Path,
+    visual: &Value,
+    report: &mut ValidationReport,
+) {
+    let Some(visual_type) = visual["visual"]["visualType"].as_str() else {
+        return;
+    };
+    let Ok(supported_roles) = visual_catalog::supported_roles(visual_type) else {
+        return;
+    };
+    let Some(query_state) = visual["visual"]["query"]["queryState"].as_object() else {
+        return;
+    };
+    for (role, role_value) in query_state {
+        if !role_value["projections"].is_array() || supported_roles.contains(&role.as_str()) {
+            continue;
+        }
+        match visual_catalog::normalize_role(visual_type, role) {
+            Ok(canonical) => report.errors.push(format!(
+                "{} {} queryState role `{role}` is a CLI input alias, not the Desktop PBIR role; use `{canonical}`. Reapply the visual bindings with `report visuals set-bindings`",
+                visual_json_path.display(),
+                visual_type
+            )),
+            Err(_) => report.errors.push(format!(
+                "{} {} queryState contains unsupported role `{role}`; supported Desktop PBIR roles are: {}. Reapply the visual bindings with `report visuals set-bindings`",
+                visual_json_path.display(),
+                visual_type,
+                supported_roles.join(", ")
+            )),
+        }
+    }
 }
 
 fn check_positive_page_number(

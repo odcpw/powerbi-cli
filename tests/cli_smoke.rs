@@ -80,6 +80,33 @@ fn capabilities_advertise_generated_visual_contract_and_proof_statuses() {
             .iter()
             .any(|role| role["role"] == "X" && role["min"] == 1 && role["max"] == 1)
     );
+    assert!(
+        scatter["roles"]
+            .as_array()
+            .expect("scatter roles")
+            .iter()
+            .any(|role| role["role"] == "Series")
+    );
+    assert!(
+        scatter["roles"]
+            .as_array()
+            .expect("scatter roles")
+            .iter()
+            .all(|role| role["role"] != "Legend")
+    );
+    let line = visual_contract["visualTypes"]
+        .as_array()
+        .expect("visual type contracts")
+        .iter()
+        .find(|visual_type| visual_type["visualType"] == "lineChart")
+        .expect("line contract");
+    assert!(
+        line["roles"]
+            .as_array()
+            .expect("line roles")
+            .iter()
+            .any(|role| role["role"] == "Tooltips")
+    );
 
     let archetypes = stdout["desktopProofedArchetypes"]
         .as_array()

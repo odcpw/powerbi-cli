@@ -677,7 +677,7 @@ fn validate_binding_contract(
                     "powerbi-cli report visuals catalog --visual-type scatterChart --json",
                 ));
             }
-            for role in ["Category", "Size", "Legend"] {
+            for role in ["Category", "Size", "Series"] {
                 if count(role) > 1 {
                     return Err(CliError::invalid_args(format!(
                         "{} scatterChart accepts at most one {role} binding",
@@ -685,9 +685,9 @@ fn validate_binding_contract(
                     )));
                 }
             }
-            if has_measure("Category") || has_measure("Legend") {
+            if has_measure("Category") || has_measure("Series") {
                 return Err(CliError::invalid_args(format!(
-                    "{} scatterChart Category and Legend bindings must be columns, not measures",
+                    "{} scatterChart Category and Series bindings must be columns, not measures",
                     visual_path()
                 )));
             }

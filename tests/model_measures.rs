@@ -163,6 +163,71 @@ fn model_dax_bridge_plan_reports_inventory_and_validation_boundary() {
 }
 
 #[test]
+fn model_dax_execute_requires_data_and_oracle_opt_ins_without_echoing_query() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let out = project.to_str().expect("project path");
+    let query = "EVALUATE ROW(\"PrivateLabel\", 42)";
+
+    let missing_data_opt_in = run_powerbi(&[
+        "model",
+        "dax",
+        "execute",
+        "--project",
+        out,
+        "--query",
+        query,
+        "--json",
+    ]);
+    assert_eq!(missing_data_opt_in.code, 2);
+    assert_eq!(
+        stderr_json(&missing_data_opt_in)["error"]["message"],
+        "model dax execute requires --allow-data-read"
+    );
+
+    let oracle_disabled = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args([
+            "model",
+            "dax",
+            "execute",
+            "--project",
+            out,
+            "--query",
+            query,
+            "--allow-data-read",
+            "--json",
+        ])
+        .env_remove("POWERBI_DESKTOP_ORACLE")
+        .output()
+        .expect("run oracle-disabled DAX execute");
+    assert_eq!(oracle_disabled.status.code(), Some(30));
+    let stdout = String::from_utf8_lossy(&oracle_disabled.stdout);
+    let value: Value = serde_json::from_str(stdout.trim()).expect("stdout JSON");
+    assert_eq!(value["stage"], "oracle-opt-in");
+    assert_eq!(value["query"]["textReturned"], Value::Bool(false));
+    assert!(!stdout.contains("PrivateLabel"));
+
+    let mutation_payload = run_powerbi(&[
+        "model",
+        "dax",
+        "execute",
+        "--project",
+        out,
+        "--query",
+        "CREATE TABLE Nope",
+        "--allow-data-read",
+        "--json",
+    ]);
+    assert_eq!(mutation_payload.code, 2);
+    assert!(
+        stderr_json(&mutation_payload)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("only DAX query forms")
+    );
+}
+
+#[test]
 fn model_measures_add_update_delete_round_trip() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales_project(temp.path());

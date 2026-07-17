@@ -52,6 +52,15 @@ retained in a private repository. Those records remain
   automates canvas or refresh proof; the `desktop-canvas-refresh` level remains
   open.
 
+Two additional Desktop-discovered guardrails are enforced locally. Scatter
+color grouping is stored under PBIR `queryState.Series`, even though Desktop's
+field well is labelled Legend; CLI inputs `legend`, `series`, `color`, and
+`colour` all normalize to `Series`, and validation rejects a raw stale
+`Legend` role. DAX lint also rejects a variable assigned with scalar `IF()`
+when that variable is later passed directly as a table argument (for example to
+`TREATAS` or `CONTAINS`). These are focused static checks, not a replacement for
+refreshing every changed page in Desktop.
+
 ## No Fake Fallbacks
 
 `powerbi-cli` is agent-first: supported features emit real PBIP/PBIR/TMDL
@@ -119,6 +128,8 @@ cargo run --bin powerbi-cli -- inspect --deep .\build\sales --json
 cargo run --bin powerbi-cli -- model measures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model dax dependencies --project .\build\sales --json
 cargo run --bin powerbi-cli -- model dax lint --project .\build\sales --json
+$env:POWERBI_DESKTOP_ORACLE='1'
+cargo run --bin powerbi-cli -- model dax execute --project .\build\sales --query 'EVALUATE ROW("Revenue", [Total Revenue])' --allow-data-read --max-rows 10 --json
 cargo run --bin powerbi-cli -- model advanced inventory --project .\build\sales --json
 cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model perspectives list --project .\build\sales --json
@@ -301,6 +312,9 @@ three pages.
   define a measure until a Desktop-authored aggregation binding is available.
   Reusing the same model field twice in one visual is also refused because no
   Desktop-authored duplicate queryRef numbering convention is available.
+  Scatter color grouping uses the canonical PBIR `Series` role. User-facing
+  aliases such as `legend` are accepted on input but never written to
+  `queryState` because Desktop silently leaves that field well unbound.
   Pie and donut use exactly one Category column plus one or more Y measures and
   emit the Desktop-authored default descending sort by the first Y field. Matrix
   uses ordered Rows, optional Columns, and one or more Values measures. Slicer
@@ -332,8 +346,14 @@ three pages.
   proves file structure and readback, not DAX engine semantics.
   `model dax dependencies` and `model dax lint` add offline static reference
   checks for measures and calculated columns: missing fields, ambiguous
-  references, self references, and simple measure cycles. They do not execute
-  DAX. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
+  references, self references, simple measure cycles, and scalar `IF()`
+  variables passed directly to known table-argument functions. They do not
+  parse or execute the complete DAX language. On Windows, `model dax execute`
+  provides a separate bounded live-engine path: the exact PBIP must already be
+  open, `POWERBI_DESKTOP_ORACLE=1` and `--allow-data-read` are both required,
+  only `EVALUATE` or `DEFINE ... EVALUATE` query forms are accepted, and the
+  query text is never returned. Rows and cell text are capped because result
+  data can be sensitive. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
   instead of silently dropping it; Power BI Desktop or an explicit engine bridge
   remains the compatibility oracle.
 - Programmatic static-table authoring covers `model tables add-static` for a
@@ -512,6 +532,9 @@ three pages.
 - `lint` now includes a small BPA-style report/model pass: DAX static findings,
   duplicate page/visual titles, and missing visual alt text. Generated visuals
   include default alt text so new reports start on the right side of that rule.
+- Structural validation reports an empty PBIR visual container as a missing
+  `visual.json` with an explicit remove-or-restore repair, instead of allowing a
+  later deep-inspection `file_not_found` failure.
 - `diff` compares normalized semantic summaries with stable handles, so agents
   can verify measure, calculated-column, and relationship changes after CLI
   mutations or Desktop round-trips without reading raw TMDL.

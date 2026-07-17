@@ -102,7 +102,7 @@ then the first mutation kernel for `model measures` with dry-run/readback.
 | Roles/RLS | MCP, Tabular Editor | Readback implemented; mutations later | `model roles list/show` and `model advanced inventory` can inventory existing TMDL role metadata. Authoring RLS expressions needs object-specific mutation rules and engine/Desktop validation. |
 | Perspectives/translations/cultures | MCP, Tabular Editor, Semantic Link Labs | Readback implemented; mutations later | `model perspectives|cultures|expressions list/show` cover existing enterprise metadata. Mutations are lower priority than first dashboard generation and need fixtures. |
 | Calculation groups/items | MCP, Tabular Editor | Reimplement later with Desktop goldens | Powerful but easy to corrupt without oracle fixtures. |
-| DAX static analysis and query execution | MCP, DAX Studio, `pbi-cli` | Static dependency/lint implemented; execution deferred to optional Desktop/Fabric bridge | Offline project authoring cannot execute DAX without a live engine. `model dax dependencies/lint` now catches local reference problems and simple cycles but reports `daxEngineValidated=false`. |
+| DAX static analysis and query execution | MCP, DAX Studio, `pbi-cli` | Static dependency/lint plus bounded Desktop execution implemented; remote Fabric/XMLA bridge deferred | Offline project authoring still cannot prove engine semantics. `model dax dependencies/lint` catches local reference problems and simple cycles; `model dax execute` requires two opt-ins and an exact already-open Desktop PBIP, then runs row/cell/time-bounded EVALUATE queries without model writes or query echo. |
 | Report page CRUD | `pbi-cli`, `pbir-utils` | First page mutation slice implemented | `report pages add/update/reorder/set-active/delete-empty` covers low-risk page metadata and order. Visibility/background remain planned. |
 | Visual CRUD and layout | `pbi-cli`, `pbir-utils` | First visual catalog/add/clone/delete/layout slices implemented; continue with fixtures | `report design-plan` profiles local TMDL/PBIR metadata and returns agent-ready report commands. `report layout auto` rewrites visual `position` blocks into deterministic page slots. `report visuals catalog` exposes generated visual types and role contracts. `report visuals add` creates guarded generated-pattern card/tableEx/line/area/stacked area/clustered bar/clustered column/stacked bar/stacked column/scatter containers. `report visuals clone` duplicates simple template visuals by copying only `visual.json` and patching name/position/clone annotations, preserving existing PBIR without expanding arbitrary visual-family generation. `report visuals delete` removes only simple visual containers with no unknown sidecars. Update and set-container remain planned. |
 | Visual bindings | Current project, `pbi-cli` | First replacement and hierarchy slices implemented; expand from Desktop goldens | `report visuals add` and `set-bindings` can write `queryState` for supported card/table, category/value chart, and scatter/bubble visuals with TMDL name validation. `report drilldown set-hierarchy` replaces Category projections on existing Category/Y charts with two or more resolved model columns. Do not expand advanced PBIR binding shapes without Desktop-authored fixtures. |
@@ -309,8 +309,8 @@ These are Windows-only optional commands. CI should run them only when
 
 ### Phase 9: Optional Bridges
 
-- Add a Windows Desktop bridge for DAX validation/query execution, Desktop
-  reload, and live model proof.
+- Extend the delivered bounded Windows Desktop DAX query bridge only where live
+  proof warrants it; keep canvas/reload proof on the official Desktop IPC path.
 - Add a Fabric/service bridge only as an authenticated optional extension.
 - Keep core generation, inspection, validation, and mutation cross-platform.
 

@@ -780,6 +780,23 @@ fn everything_acceptance_invokes_every_catalog_command() {
         "model dax lint",
         &svec(["model", "dax", "lint", "--project", &project_arg, "--json"]),
     );
+    let dax_execute = h.code(
+        "model dax execute",
+        30,
+        &svec([
+            "model",
+            "dax",
+            "execute",
+            "--project",
+            &project_arg,
+            "--query",
+            "EVALUATE ROW(\"Value\", 1)",
+            "--allow-data-read",
+            "--json",
+        ]),
+    );
+    assert_eq!(dax_execute["stage"], "oracle-opt-in");
+    assert_eq!(dax_execute["query"]["textReturned"], Value::Bool(false));
     install_advanced_model_fixtures(&project);
     h.ok(
         "model advanced inventory",
@@ -2399,7 +2416,7 @@ fn acceptance_dashboard() -> Value {
                 "displayName": "Scatter Drill",
                 "size": { "width": 1280, "height": 720 },
                 "visuals": [
-                    visual!("bubble", "scatterChart", "Branch Injury Cost Bubble", 32, 92, 700, 460, vec![("Category", "FactIncidents[Cause]"), ("X", "FactIncidents[Incident Rate]"), ("Y", "FactIncidents[Severity Share]"), ("Size", "FactIncidents[Total Cost]"), ("Legend", "DimBranch[Branch]"), ("Tooltips", "FactIncidents[Average Risk Score]")]),
+                    visual!("bubble", "scatterChart", "Branch Injury Cost Bubble", 32, 92, 700, 460, vec![("Category", "FactIncidents[Cause]"), ("X", "FactIncidents[Incident Rate]"), ("Y", "FactIncidents[Severity Share]"), ("Size", "FactIncidents[Total Cost]"), ("Series", "DimBranch[Branch]"), ("Tooltips", "FactIncidents[Average Risk Score]")]),
                     visual!("slicer_seed", "tableEx", "Branch Slicer Seed", 772, 92, 280, 210, vec![("Values", "DimBranch[Branch]")]),
                     visual!("scatter_detail", "tableEx", "Scatter Detail", 772, 332, 420, 220, vec![("Values", "DimBranch[Branch]"), ("Values", "FactIncidents[Cause]"), ("Values", "FactIncidents[InjuryType]"), ("Values", "FactIncidents[Total Cost]")])
                 ]

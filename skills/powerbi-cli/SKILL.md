@@ -45,6 +45,9 @@ build or resolve powerbi-cli
   logic, read `docs/pbir-desktop-oracle.md`. It records Desktop-discovered PBIR
   constraints, source links, proof commands, and the current implementation
   backlog.
+- For report repair or multi-page dashboard work, also read
+  `references/desktop-runtime-regression.md`. It captures the shortest
+  source-mirroring, DAX, scatter, selector, and live-Desktop regression loop.
 - Implementation must stay modular. Do not add new command families to
   `src/main.rs`; use focused modules for CLI dispatch, live contract, schema
   manifests, PBIR, TMDL, project validation, Desktop oracle proof, and future
@@ -100,6 +103,7 @@ pbi --json capabilities --for lint
 pbi --json capabilities --for diff
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
+pbi --json capabilities --for "model dax execute"
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
@@ -120,7 +124,8 @@ infer/validate/summarize, deterministic report planning, declarative report spec
 validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
 inspect, semantic measure,
 calculated-column, and relationship diff, report wireframe JSON export,
-measure list/show/add/update/delete, static DAX dependencies/lint,
+measure list/show/add/update/delete, static DAX dependencies/lint, explicitly
+opted-in bounded DAX query execution against an exact already-open Desktop PBIP,
 advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
@@ -180,6 +185,12 @@ supported.
 - Validate before moving a project between home and work machines.
 - Do not claim Power BI Desktop compatibility from local validation alone. Use
   Desktop open/save proof when the claim matters.
+- Prefer `model dax execute` over UI automation when a bounded live DAX query is
+  sufficient. It requires Windows, an exact already-open PBIP,
+  `POWERBI_DESKTOP_ORACLE=1`, `--allow-data-read`, and an `EVALUATE` or `DEFINE
+  ... EVALUATE` query. Treat returned rows as sensitive, keep the default bounds
+  unless the task justifies widening them, and never infer canvas/refresh proof
+  from a successful query.
 - Separate Desktop refresh proof from accepting a Desktop save round-trip.
   Saving can normalize many otherwise unchanged PBIP files, add automatic date
   tables, cultures, diagram metadata, and local `.pbi` caches. After a proof
@@ -218,6 +229,7 @@ Desktop hardening work migrates it.
 | PBIX/PBIT contains usable source metadata | `package inspect` plus `package extract` into a temporary folder | `package import` succeeds and `validate --strict` passes on the imported project |
 | Model object exists | `inspect --deep` or list/show command | Desktop open-check |
 | DAX references are locally plausible | `model dax dependencies` and `model dax lint` | Desktop/XMLA/Fabric engine validation |
+| One bounded DAX query executes in the open model | `model dax execute` with both opt-ins, exact-project match, `ok=true`, and no truncation relevant to the assertion | Repeat the targeted query after refresh; canvas/render proof remains separate |
 | Advanced semantic metadata exists | `model advanced inventory` or the relevant roles/perspectives/cultures/expressions list/show command | Desktop open/save round-trip |
 | Page metadata/order was written/read locally | `report pages add/update/reorder/set-active/delete-empty` dry-run/apply plus `report pages list/show` and `validate --strict` | Desktop open/save round-trip |
 | Visual was created/read locally | `report visuals add` dry-run/apply plus `report visuals show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
@@ -574,8 +586,10 @@ Raw columns are refused with `unsupported_feature` in card Values, chart Y,
 matrix Values, and scatter X/Y/Size roles. Define a measure or wait for a
 Desktop-authored aggregation-binding fixture. A model field may appear only once
 per visual; duplicate queryRef/nativeQueryRef numbering is not invented without
-Desktop ground truth. Category, Series/Legend, table detail Values, matrix
+Desktop ground truth. Category, Series, table detail Values, matrix
 Rows/Columns, slicer Values, and Tooltips retain their proven column paths.
+For scatter/bubble color grouping the field-well label is Legend but the PBIR
+role is `Series`; `legend` remains an accepted CLI input alias only.
 
 `report visuals clone` is template reuse, not new visual-family generation. It
 copies only a simple visual container whose directory contains `visual.json` and
@@ -687,6 +701,12 @@ expression mutation beyond the documented categorical update, interaction Defaul
 formatting beyond title/alt-text/static color must still be driven by
 Desktop-authored fixtures.
 Do not invent PBIR formatting JSON by memory.
+
+When DAX chooses between two table expressions, do not assign the choice with
+`VAR T = IF(condition, TableA, TableB)`. DAX `IF()` is scalar. Put the
+table-consuming `CALCULATE`, `CONTAINS`, `TREATAS`, or iterator in each scalar
+branch. `model dax lint` and `validate --strict` catch common direct uses, but
+they are not a complete DAX engine.
 
 ### Handoff Between Home And Work
 

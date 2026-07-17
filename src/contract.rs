@@ -78,6 +78,7 @@ Usage:
   powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json
   powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json
   powerbi-cli model dax lint --project <project-dir-or.pbip> --json
+  powerbi-cli model dax execute --project <project-dir-or.pbip> --query-file <query.dax> --allow-data-read --json
   powerbi-cli model advanced inventory --project <project-dir-or.pbip> --json
   powerbi-cli model roles list --project <project-dir-or.pbip> --json
   powerbi-cli model perspectives list --project <project-dir-or.pbip> --json
@@ -266,7 +267,7 @@ Rules for agents:
 - Use `model measures list/show/add/update/delete` for DAX measure authoring; updates refuse unsupported Desktop-authored TMDL metadata, local validation proves file structure, and Power BI Desktop remains the DAX compatibility oracle.
 - Use `model calculated-columns list/show/add/update/delete` for DAX calculated column authoring; input type `date` normalizes to TMDL `dateTime` with a default `Short Date` format, updates refuse unsupported Desktop-authored TMDL metadata, and calculated columns may require refresh after Desktop opens the project.
 - Reuse returned semantic-model handles. Literal `%` and `:` inside table, column, measure, and partition components are encoded as `%25` and `%3A` so handles round-trip without ambiguity.
-- Use `model dax dependencies/lint/bridge-plan` to enumerate DAX expressions, static references, obvious broken dependencies, and validation boundaries before invoking any external/Desktop DAX compatibility bridge.
+- Use `model dax dependencies/lint/bridge-plan` to enumerate DAX expressions, static references, obvious broken dependencies, and validation boundaries. On an opted-in Windows oracle machine, `model dax execute` can run a bounded read-only EVALUATE query against the exact already-open PBIP; it never launches Desktop or returns the query text.
 - Use `model advanced inventory`, `model roles list/show`, `model perspectives list/show`, `model cultures list/show`, and `model expressions list/show` for advanced TMDL readback. Mutations remain fixture-gated.
 - Use `model relationships list/show/add/update/delete` for model relationships. Endpoint rewiring is delete+add in this alpha surface; `update` changes active state and cross-filtering behavior.
 - Use `model partitions list/show` to inspect generated dummy M partitions and their offline safety classification.
@@ -341,6 +342,7 @@ pub(crate) fn robot_triage() -> Value {
             "relationshipAddDryRun": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --dry-run --json",
             "partitionList": "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
+            "modelDaxExecute": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip> --query-file <query.dax> --allow-data-read --json",
             "sourceTemplateList": "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
@@ -1200,6 +1202,25 @@ fn command_catalog() -> Vec<Value> {
             "examples": ["powerbi-cli model dax lint --project build/sales --json"],
             "limitations": ["Static reference lint only; Power BI Desktop remains the compatibility oracle for DAX syntax and semantics."],
             "followUpFields": ["ok", "analysisBoundary", "counts.errors", "counts.warnings", "findings[].code", "validation", "next"]
+        }),
+        json!({
+            "path": "model dax execute",
+            "aliases": ["model dax query"],
+            "usage": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip> (--query <dax> | --query-file <path|->) --allow-data-read [--max-rows <1..100000>] [--max-cell-chars <1..1000000>] [--timeout-ms <1000..300000>] --json",
+            "summary": "Execute a bounded read-only DAX EVALUATE query against the exact already-open Power BI Desktop semantic model",
+            "tags": ["tmdl", "semantic-model", "dax", "query", "desktop", "oracle", "read-only", "data-read", "agent", "no-fallback"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "returnsModelData": true,
+            "explicitOptIn": ["POWERBI_DESKTOP_ORACLE=1", "--allow-data-read"],
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.model.dax.execute.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--query <dax>", "--query-file <path|->", "--allow-data-read", "--max-rows <1..100000>", "--max-cell-chars <1..1000000>", "--timeout-ms <1000..300000>", "--json", "--format json"],
+            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project build/sales --query-file checks/total-revenue.dax --allow-data-read --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax query --project build/sales --query \"EVALUATE ROW(\\\"Value\\\", 1)\" --allow-data-read --max-rows 10 --json"],
+            "limitations": ["Windows and an already-open exact PBIP match are required; the command never launches Desktop.", "Only EVALUATE or DEFINE ... EVALUATE query forms are accepted; XMLA/model mutations are refused.", "Returned rows can contain sensitive model data and are bounded but not redacted.", "The local Desktop Analysis Services endpoint and bundled ADOMD client are implementation details and may change with Desktop."],
+            "followUpFields": ["ok", "exitCode", "query.fingerprint", "query.textReturned", "safety", "limits", "stage", "engine.desktopProcessId", "engine.modelProcessId", "columns", "rows", "counts", "truncation", "runtime.temporaryFilesRemoved", "diagnostics", "validation", "next"]
         }),
         json!({
             "path": "model advanced inventory",
@@ -2658,6 +2679,7 @@ fn schema_manifest() -> Value {
         "partitionFields": ["handle", "table", "name", "expressionKind", "mode", "sourceKind", "offlineSafety", "sourcePreview", "source", "sourceIncluded"],
         "partitionSourceKinds": ["dummyMTable", "sqlDatabase", "postgresqlDatabase", "odbcDataSource", "webContents", "externalFile", "unknown", "missing"],
         "modelDaxBridgePlanFields": ["ok", "projectDir", "counts.measures", "counts.calculatedColumns", "daxInventory.measures[].handle", "daxInventory.measures[].expression", "daxInventory.calculatedColumns[].handle", "daxInventory.calculatedColumns[].expression", "bridge.required", "bridge.supportedEngines", "bridge.noFakeFallbacks", "validationBridge.offlineDaxParser.available", "next"],
+        "modelDaxExecuteFields": ["ok", "exitCode", "projectDir", "pbip", "query.source", "query.lengthBytes", "query.fingerprint", "query.textReturned", "safety.readOnlyQueryFormsOnly", "safety.allowDataRead", "safety.exactOpenProjectMatchRequired", "safety.autoLaunch", "safety.modelWrites", "limits.maxRows", "limits.maxCellChars", "limits.timeoutMs", "stage", "engine.kind", "engine.desktopProcessId", "engine.modelProcessId", "engine.port", "columns[].ordinal", "columns[].name", "columns[].dataType", "rows", "counts.rows", "counts.columns", "counts.truncatedCells", "truncation.rows", "truncation.cells", "runtime.temporaryFilesRemoved", "diagnostics", "validation", "next"],
         "modelStaticTableMutationFields": ["ok", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.columns", "tablePlan.kind", "tablePlan.dataType", "tablePlan.dataTypes", "tablePlan.columnCount", "tablePlan.rowCount", "tablePlan.uniqueFirstColumn", "tablePlan.relationshipCount", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "modelDaxDependenciesFields": ["analysisBoundary.daxEngineValidated", "counts", "expressions[].handle", "expressions[].tableColumns", "expressions[].measureReferences", "graph.edges", "findings", "validation", "next"],
         "modelAdvancedInventoryFields": ["families[].family", "families[].count", "families[].records[].handle", "families[].records[].summary", "validation", "next"],
@@ -2788,7 +2810,7 @@ fn generated_visual_contract() -> Value {
         "bindingRules": [
             "Prefer structured bindings with table plus column or measure to avoid ambiguity.",
             "Legacy field strings use Table[Name] and fail when a column and measure share the same name.",
-            "Category, Series, Legend, Rows, Columns, scatter Category, and slicer Values bindings must resolve to columns.",
+            "Category, Series (including scatter color grouping), Rows, Columns, scatter Category, and slicer Values bindings must resolve to columns.",
             "Card Values, chart Y, matrix Values, and scatter X/Y/Size require measures; table Values and Tooltips may resolve to columns or measures.",
             "One model field may appear only once per visual until Desktop-authored duplicate queryRef numbering is available.",
             "Pie and donut require exactly one Category plus one or more Y measures and emit a default descending sort by the first Y binding.",

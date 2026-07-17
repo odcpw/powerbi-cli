@@ -101,7 +101,7 @@ pub(crate) fn fields_command(args: &[String]) -> CliResult<Value> {
         "tables": tables,
         "fields": fields,
         "rules": [
-            "Use table+column for Category, Series, Legend, and scatter Category roles.",
+            "Use table+column for Category, Series (including scatter color grouping), and scatter Category roles.",
             "Use table+measure for DAX measures, especially when a column and measure might share a name.",
             "Legacy field strings use Table[Name]; structured bindings are safer for generated specs."
         ],
