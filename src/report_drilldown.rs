@@ -3,8 +3,8 @@ use crate::cli_support::{
 };
 use crate::pbir::{VisualSelector, find_visual, load_report_snapshot, visual_detail};
 use crate::pbir_bindings::{
-    VisualBindingInput, VisualBindingKind, binding_summary, resolve_visual_bindings,
-    set_binding_status_annotation, visual_query_json,
+    VisualBindingKind, VisualBindingResolved, binding_summary, set_binding_status_annotation,
+    visual_query_json,
 };
 use crate::project_io::write_json_atomic;
 use crate::tmdl::{load_table_documents, same_name};
@@ -30,6 +30,8 @@ struct HierarchyPlan {
     visual_json: Value,
     before: Value,
     after: Value,
+    controls_before: Value,
+    controls_after: Value,
     fields: Vec<Value>,
     bindings: Vec<Value>,
 }
@@ -39,7 +41,7 @@ pub(crate) fn drilldown_command(args: &[String]) -> CliResult<Value> {
         return Err(CliError::invalid_args(
             "report drilldown requires a subcommand: set-hierarchy",
         )
-        .with_hint("Set a hierarchy axis on an existing line/bar/column/area chart.")
+        .with_hint("Set a hierarchy axis on an existing line, area, bar, column, or combo chart.")
         .with_suggested_command(
             "powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> --handle <visual-handle> --field 'Table[Year]' --field 'Table[Month]' --dry-run --json",
         ));
@@ -70,7 +72,6 @@ fn set_hierarchy(args: &[String]) -> CliResult<Value> {
         &options.selector,
         "report drilldown set-hierarchy",
     )?;
-    ensure_category_chart(&visual.visual_type)?;
     let visual_path = visual.path.as_ref().ok_or_else(|| {
         CliError::validation_failed(format!("visual has no path: {}", visual.handle))
     })?;
@@ -97,41 +98,54 @@ fn build_hierarchy_plan(
     options: &HierarchyOptions,
 ) -> CliResult<HierarchyPlan> {
     let mut visual_json = read_json_value(visual_path)?;
+    ensure_category_chart(visual_type)?;
     let docs = load_table_documents(resolved)?;
-    let inputs = options
+    let resolved_bindings = options
         .fields
         .iter()
         .map(|field| {
             let (table, column) = parse_field_ref(field)?;
             resolve_column_ref(&docs, &table, &column)?;
-            Ok(VisualBindingInput {
+            Ok(VisualBindingResolved {
                 role: "Category".to_string(),
                 table,
-                column: Some(column),
-                measure: None,
+                field: column,
+                kind: VisualBindingKind::Column,
                 display_name: None,
                 format_string: None,
             })
         })
         .collect::<CliResult<Vec<_>>>()?;
-    let resolved_bindings = resolve_visual_bindings(&docs, visual_type, &inputs)?;
-    if !resolved_bindings
-        .iter()
-        .all(|binding| matches!(binding.kind, VisualBindingKind::Column))
-    {
-        return Err(CliError::invalid_args(
-            "drilldown hierarchy fields must resolve to model columns",
-        ));
+    for (index, binding) in resolved_bindings.iter().enumerate() {
+        if resolved_bindings[..index].iter().any(|previous| {
+            same_name(&previous.table, &binding.table) && same_name(&previous.field, &binding.field)
+        }) {
+            return Err(CliError::invalid_args(format!(
+                "duplicate drilldown hierarchy field: {}[{}]",
+                binding.table, binding.field
+            )));
+        }
     }
 
     let before = category_state(&visual_json, options.include_raw);
-    let projections = visual_query_json(visual_type, &resolved_bindings)["queryState"]["Category"]
-        ["projections"]
-        .clone();
-    replace_category_projections(&mut visual_json, projections)?;
+    let controls_before = drill_control_state(&visual_json, options.include_raw);
+    let mut projections =
+        visual_query_json(visual_type, &resolved_bindings)["queryState"]["Category"]["projections"]
+            .clone();
+    let projection_items = projections.as_array_mut().ok_or_else(|| {
+        CliError::validation_failed("generated hierarchy projections are not an array")
+    })?;
+    if let Some(first) = projection_items.first_mut().and_then(Value::as_object_mut) {
+        // Desktop persists the current hierarchy level through the projection's
+        // active marker. Start every authored hierarchy at its first level.
+        first.insert("active".to_string(), Value::Bool(true));
+    }
+    replace_category_projections(&mut visual_json, visual_type, projections)?;
+    enable_drill_controls(&mut visual_json)?;
     visual_json["howCreated"] = Value::String("DraggedToFieldWell".to_string());
     set_binding_status_annotation(&mut visual_json, "bound");
     let after = category_state(&visual_json, options.include_raw);
+    let controls_after = drill_control_state(&visual_json, options.include_raw);
     let fields = resolved_bindings
         .iter()
         .map(|binding| {
@@ -152,12 +166,18 @@ fn build_hierarchy_plan(
         visual_json,
         before,
         after,
+        controls_before,
+        controls_after,
         fields,
         bindings,
     })
 }
 
-fn replace_category_projections(visual_json: &mut Value, projections: Value) -> CliResult<()> {
+fn replace_category_projections(
+    visual_json: &mut Value,
+    visual_type: &str,
+    projections: Value,
+) -> CliResult<()> {
     let visual = visual_json["visual"].as_object_mut().ok_or_else(|| {
         CliError::validation_failed("visual.json has no visual object")
             .with_hint("Run `validate --strict` before mutating this report.")
@@ -175,15 +195,23 @@ fn replace_category_projections(visual_json: &mut Value, projections: Value) -> 
     let query_state_object = query_state
         .as_object_mut()
         .ok_or_else(|| CliError::validation_failed("visual.query.queryState is not an object"))?;
-    if query_state_object
-        .get("Y")
-        .and_then(|role| role["projections"].as_array())
-        .is_none_or(|items| items.is_empty())
-    {
+    let has_role = |role: &str| {
+        query_state_object
+            .get(role)
+            .and_then(|value| value["projections"].as_array())
+            .is_some_and(|items| !items.is_empty())
+    };
+    let has_required_values = match visual_type {
+        "lineClusteredColumnComboChart" | "lineStackedColumnComboChart" => {
+            has_role("Y") || has_role("Y2")
+        }
+        _ => has_role("Y"),
+    };
+    if !has_required_values {
         return Err(CliError::invalid_args(
-            "report drilldown set-hierarchy requires an existing Y binding on the chart",
+            "report drilldown set-hierarchy requires the chart's existing numeric bindings",
         )
-        .with_hint("Bind the chart first with `report visuals set-bindings`, then set the hierarchy.")
+        .with_hint("Bind the chart first, then set the hierarchy. Scatter charts require X and Y; combo charts require Y or Y2; other category charts require Y.")
         .with_suggested_command(
             "powerbi-cli report visuals set-bindings --project <project-dir-or.pbip> --handle <visual-handle> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
         ));
@@ -193,6 +221,73 @@ fn replace_category_projections(visual_json: &mut Value, projections: Value) -> 
         json!({ "projections": projections }),
     );
     Ok(())
+}
+
+const DRILL_CONTROL_PROPERTIES: &[(&str, &str)] = &[
+    ("show", "visible"),
+    ("showDrillRoleSelector", "roleSelector"),
+    ("showDrillUpButton", "drillUp"),
+    ("showDrillToggleButton", "drillMode"),
+    ("showDrillDownLevelButton", "nextLevel"),
+    ("showDrillDownExpandButton", "expandLevel"),
+];
+
+fn enable_drill_controls(visual_json: &mut Value) -> CliResult<()> {
+    let visual = visual_json["visual"].as_object_mut().ok_or_else(|| {
+        CliError::validation_failed("visual.json has no visual object")
+            .with_hint("Run `validate --strict` before mutating this report.")
+            .with_suggested_command("powerbi-cli validate --strict <project-dir-or.pbip> --json")
+    })?;
+    let container_objects = visual
+        .entry("visualContainerObjects".to_string())
+        .or_insert_with(|| Value::Object(Map::new()))
+        .as_object_mut()
+        .ok_or_else(|| {
+            CliError::validation_failed("visual.visualContainerObjects is not an object")
+        })?;
+    let header = container_objects
+        .entry("visualHeader".to_string())
+        .or_insert_with(|| Value::Array(vec![json!({ "properties": {} })]))
+        .as_array_mut()
+        .ok_or_else(|| CliError::validation_failed("visualHeader formatting is not an array"))?;
+    if header.is_empty() {
+        header.push(json!({ "properties": {} }));
+    }
+    let card = header[0].as_object_mut().ok_or_else(|| {
+        CliError::validation_failed("visualHeader formatting card is not an object")
+    })?;
+    let properties = card
+        .entry("properties".to_string())
+        .or_insert_with(|| Value::Object(Map::new()))
+        .as_object_mut()
+        .ok_or_else(|| CliError::validation_failed("visualHeader properties is not an object"))?;
+    for (property, _) in DRILL_CONTROL_PROPERTIES {
+        properties.insert(
+            (*property).to_string(),
+            json!({ "expr": { "Literal": { "Value": "true" } } }),
+        );
+    }
+    Ok(())
+}
+
+fn drill_control_state(visual_json: &Value, include_raw: bool) -> Value {
+    let header = &visual_json["visual"]["visualContainerObjects"]["visualHeader"];
+    let properties = &header[0]["properties"];
+    let mut summary = Map::new();
+    for (property, label) in DRILL_CONTROL_PROPERTIES {
+        let value = properties[*property]["expr"]["Literal"]["Value"]
+            .as_str()
+            .and_then(|value| value.parse::<bool>().ok());
+        summary.insert(
+            (*label).to_string(),
+            value.map(Value::Bool).unwrap_or(Value::Null),
+        );
+    }
+    let mut state = Value::Object(summary);
+    if include_raw {
+        state["raw"] = header.clone();
+    }
+    state
 }
 
 fn category_state(visual_json: &Value, include_raw: bool) -> Value {
@@ -266,6 +361,14 @@ fn drilldown_response(
     if include_raw {
         change["rawIncluded"] = Value::Bool(true);
     }
+    let controls_change = json!({
+        "kind": "pbir.visual.formatting",
+        "action": "enable-drill-controls",
+        "path": canonical_display(visual_path),
+        "jsonPointer": "/visual/visualContainerObjects/visualHeader",
+        "before": plan.controls_before,
+        "after": plan.controls_after
+    });
     Ok(json!({
         "schema": "powerbi-cli.report.drilldown.hierarchyMutation.v1",
         "ok": validation_ok,
@@ -281,9 +384,13 @@ fn drilldown_response(
             "fields": plan.fields,
             "bindings": plan.bindings,
             "before": plan.before,
-            "after": plan.after
+            "after": plan.after,
+            "controls": {
+                "before": plan.controls_before,
+                "after": plan.controls_after
+            }
         },
-        "changes": [change],
+        "changes": [change, controls_change],
         "validation": validation.map(|report| json!({
             "ok": report.errors.is_empty(),
             "warnings": report.warnings,
@@ -306,12 +413,20 @@ fn drilldown_response(
 }
 
 fn ensure_category_chart(visual_type: &str) -> CliResult<()> {
+    if matches!(
+        visual_type,
+        "lineClusteredColumnComboChart" | "lineStackedColumnComboChart"
+    ) {
+        return Ok(());
+    }
     match binding_family(visual_type)? {
         VisualBindingFamily::CategoryY => Ok(()),
         _ => Err(CliError::invalid_args(format!(
             "drilldown hierarchy is supported for category-axis charts, not {visual_type}"
         ))
-        .with_hint("Use a line, area, bar, or column chart with Category and Y bindings.")
+        .with_hint(
+            "Use a line, area, bar, column, or combo chart with a Category field well. Power BI scatter Category accepts only one projection.",
+        )
         .with_suggested_command(
             "powerbi-cli report visuals catalog --visual-type lineChart --json",
         )),

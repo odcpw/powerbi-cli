@@ -1957,7 +1957,7 @@ fn command_catalog() -> Vec<Value> {
             "path": "report drilldown set-hierarchy",
             "aliases": ["report drilldown hierarchy", "report drilldown set", "report drill-down set-hierarchy"],
             "usage": "powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <table[column]> --field <table[column]>... (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json",
-            "summary": "Replace an existing category-axis chart's Category projections with a multi-column hierarchy axis for Desktop drill up/down",
+            "summary": "Replace a category-axis chart's Category projections with a multi-column hierarchy and enable its Desktop drill controls",
             "tags": ["pbir", "report", "drilldown", "hierarchy", "visual", "binding", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1967,9 +1967,9 @@ fn command_catalog() -> Vec<Value> {
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.drilldown.hierarchyMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--field <table[column]>", "--target <table[column]>", "--category <table[column]>", "--dry-run", "--in-place", "--out-dir <dir>", "--include-raw", "--json", "--format json"],
-            "limitations": ["Requires an existing Category/Y chart visual.", "Requires at least two model columns.", "Does not set transient Desktop UI expand/collapse state."],
+            "limitations": ["Requires an existing line, area, bar, column, or combo chart with its numeric field wells already bound.", "Requires at least two model columns.", "Scatter Category is intentionally refused because Microsoft Report Authoring permits only one projection in that role.", "Sets the first hierarchy field active as the initial level; later end-user drill position and expanded data state remain transient."],
             "examples": ["powerbi-cli report drilldown set-hierarchy --project build/sales --handle <visual-handle> --field 'DimDate[FiscalYear]' --field 'DimDate[Month]' --dry-run --json"],
-            "followUpFields": ["dryRun", "mode", "target.handle", "hierarchyPlan.fields", "hierarchyPlan.before", "hierarchyPlan.after", "changes[].jsonPointer", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
+            "followUpFields": ["dryRun", "mode", "target.handle", "hierarchyPlan.fields", "hierarchyPlan.before", "hierarchyPlan.after", "hierarchyPlan.controls.before", "hierarchyPlan.controls.after", "changes[].jsonPointer", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "report drillthrough set",

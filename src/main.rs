@@ -2819,10 +2819,9 @@ fn check_filter_config_entry(
         return;
     }
     let Some(body) = filter.get("filter").and_then(Value::as_object) else {
-        report.errors.push(format!(
-            "{} {filter_type} filterConfig.filters[{index}] is missing filter object",
-            path.display(),
-        ));
+        // Desktop materializes one field-well placeholder per visual binding when a
+        // report is saved. These entries deliberately carry only name, field, and
+        // type; they are metadata, not active filter predicates.
         return;
     };
     if filter_type == "Categorical" && body.contains_key("values") {
@@ -2867,21 +2866,23 @@ fn check_filter_config_entry(
 }
 
 fn check_filter_field(path: &Path, index: usize, filter: &Value, report: &mut ValidationReport) {
-    let column = filter.pointer("/field/Column");
-    let valid = column.is_some_and(|column| {
-        column
+    let field = filter
+        .pointer("/field/Column")
+        .or_else(|| filter.pointer("/field/Measure"));
+    let valid = field.is_some_and(|field| {
+        field
             .pointer("/Expression/SourceRef/Entity")
             .and_then(Value::as_str)
             .is_some_and(|entity| !entity.is_empty())
-            && column
+            && field
                 .get("Property")
                 .and_then(Value::as_str)
                 .is_some_and(|property| !property.is_empty())
-            && column.pointer("/Expression/SourceRef/Source").is_none()
+            && field.pointer("/Expression/SourceRef/Source").is_none()
     });
     if !valid {
         report.errors.push(format!(
-            "{} filterConfig.filters[{index}] field must be a Column with top-level SourceRef.Entity and a Property",
+            "{} filterConfig.filters[{index}] field must be a Column or Measure with top-level SourceRef.Entity and a Property",
             path.display()
         ));
     }

@@ -241,4 +241,146 @@ fn drilldown_set_hierarchy_replaces_category_projections() {
     assert_eq!(projections.len(), 2);
     assert_eq!(projections[0]["nativeQueryRef"], Value::from("FiscalYear"));
     assert_eq!(projections[1]["nativeQueryRef"], Value::from("Month"));
+    assert_eq!(projections[0]["active"], Value::Bool(true));
+    assert!(projections[1].get("active").is_none());
+    let controls =
+        &visual_json["visual"]["visualContainerObjects"]["visualHeader"][0]["properties"];
+    for property in [
+        "show",
+        "showDrillRoleSelector",
+        "showDrillUpButton",
+        "showDrillToggleButton",
+        "showDrillDownLevelButton",
+        "showDrillDownExpandButton",
+    ] {
+        assert_eq!(
+            controls[property]["expr"]["Literal"]["Value"],
+            Value::from("true")
+        );
+    }
+}
+
+#[test]
+fn drilldown_set_hierarchy_supports_combo_category_axes() {
+    let visual_type = "lineClusteredColumnComboChart";
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let handle = line_chart_handle(&project);
+
+    let bind = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-bindings",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--binding",
+        "role=Category,table=DimDate,column=Date",
+        "--binding",
+        "role=Y,table=FactSales,measure=Total Revenue",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(bind.code, 0, "stderr: {}", bind.stderr);
+    let visual_path = stdout_json(&bind)["target"]["path"]
+        .as_str()
+        .expect("visual path")
+        .to_string();
+    let mut visual_json: Value =
+        serde_json::from_str(&fs::read_to_string(&visual_path).expect("read visual json"))
+            .expect("parse visual json");
+    visual_json["visual"]["visualType"] = Value::from(visual_type);
+    fs::write(
+        &visual_path,
+        serde_json::to_string_pretty(&visual_json).expect("visual json"),
+    )
+    .expect("write visual json");
+
+    let drilldown = run_powerbi(&[
+        "report",
+        "drilldown",
+        "set-hierarchy",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--field",
+        "DimDate[FiscalYear]",
+        "--field",
+        "DimDate[Month]",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(drilldown.code, 0, "{visual_type}: {}", drilldown.stderr);
+    let output = stdout_json(&drilldown);
+    assert_eq!(
+        output["hierarchyPlan"]["controls"]["after"]["drillMode"],
+        Value::Bool(true)
+    );
+    assert_eq!(output["changes"].as_array().expect("changes").len(), 2);
+}
+
+#[test]
+fn drilldown_set_hierarchy_rejects_scatter_category_role_overflow() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let handle = line_chart_handle(&project);
+    let bind = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-bindings",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--binding",
+        "role=Category,table=DimDate,column=Date",
+        "--binding",
+        "role=Y,table=FactSales,measure=Total Revenue",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(bind.code, 0, "stderr: {}", bind.stderr);
+    let visual_path = stdout_json(&bind)["target"]["path"]
+        .as_str()
+        .expect("visual path")
+        .to_string();
+    let mut visual_json: Value =
+        serde_json::from_str(&fs::read_to_string(&visual_path).expect("read visual json"))
+            .expect("parse visual json");
+    visual_json["visual"]["visualType"] = Value::from("scatterChart");
+    visual_json["visual"]["query"]["queryState"]["X"] =
+        visual_json["visual"]["query"]["queryState"]["Y"].clone();
+    fs::write(
+        &visual_path,
+        serde_json::to_string_pretty(&visual_json).expect("visual json"),
+    )
+    .expect("write visual json");
+
+    let rejected = run_powerbi(&[
+        "report",
+        "drilldown",
+        "set-hierarchy",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--field",
+        "DimDate[FiscalYear]",
+        "--field",
+        "DimDate[Month]",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(rejected.code, 2, "stderr: {}", rejected.stderr);
+    assert!(
+        serde_json::from_str::<Value>(rejected.stderr.trim()).expect("stderr JSON")["error"]
+            ["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("scatterChart")
+    );
 }

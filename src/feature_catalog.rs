@@ -904,7 +904,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: true,
         commands: &["report drilldown set-hierarchy"],
         refusal_code: None,
-        reason: "The CLI writes multiple resolved model-column projections under visual.query.queryState.Category for existing Category/Y chart visuals. Transient Desktop expand/collapse UI state is not authored.",
+        reason: "The CLI writes multiple resolved model-column projections under visual.query.queryState.Category for existing line, area, bar, column, and combo charts, marks the first field active as the initial level, then explicitly enables their visual-header drill controls. Scatter is refused because Microsoft Report Authoring permits only one Category projection. Later end-user drill position and expanded data state remain transient.",
         next_proof: &[
             "Capture Desktop-authored chart hierarchy drilldown fixtures for every supported chart family",
             "Add Desktop oracle screenshot/readback proof for hierarchy buttons on generated samples",

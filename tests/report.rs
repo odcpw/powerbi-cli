@@ -1009,6 +1009,38 @@ fn install_bookmark_fixtures(project: &Path) {
 }
 
 #[test]
+fn validate_accepts_desktop_field_well_filter_placeholders() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    patch_json(&first_visual_json(&project), |visual| {
+        visual["filterConfig"]["filters"] = json!([
+            {
+                "name": "desktopCategoryPlaceholder",
+                "field": {
+                    "Column": {
+                        "Expression": { "SourceRef": { "Entity": "DimDate" } },
+                        "Property": "Month"
+                    }
+                },
+                "type": "Categorical"
+            },
+            {
+                "name": "desktopMeasurePlaceholder",
+                "field": {
+                    "Measure": {
+                        "Expression": { "SourceRef": { "Entity": "FactSales" } },
+                        "Property": "Total Revenue"
+                    }
+                },
+                "type": "Advanced"
+            }
+        ]);
+    });
+
+    assert_strict_valid(&project);
+}
+
+#[test]
 fn report_object_tree_find_cat_and_query_expose_stable_handles() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

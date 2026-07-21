@@ -575,8 +575,12 @@ three pages.
   `report layout auto`, and `report drilldown set-hierarchy`. Design-plan is a
   read-only profile with exact next commands; auto-layout rewrites only visual
   `position` blocks; drilldown hierarchy replaces a chart's Category
-  projections with two or more resolved model columns and requires an existing
-  Y binding.
+  projections with two or more resolved model columns, marks the first field
+  active as the initial level, and explicitly enables its visual-header drill
+  controls. Line, area, bar, column, and combo charts
+  are supported when their numeric field wells are already bound. Scatter is
+  refused because Microsoft's report validator permits only one Category
+  projection for that visual.
 - Programmatic report theme authoring covers `report themes show/extract/apply`
   for raw report-level theme bundles plus `report themes presets` and
   `report themes apply-preset` for built-in registered-resource theme presets.
