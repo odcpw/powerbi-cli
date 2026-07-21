@@ -789,6 +789,42 @@ fn dax_dependencies_and_lint_report_static_reference_failures() {
 }
 
 #[test]
+fn dax_lint_accepts_addcolumns_and_selectcolumns_virtual_columns() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+
+    let add = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--name",
+        "Ranked Revenue",
+        "--expression",
+        "VAR Ranked = ADDCOLUMNS(ALL('DimCustomer'[Segment]), \"__RankValue\", [Total Revenue]) VAR Projected = SELECTCOLUMNS(Ranked, \"__ProjectedValue\", [__RankValue]) RETURN MAXX(Projected, [__ProjectedValue])",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+
+    let lint = run_powerbi(&["model", "dax", "lint", "--project", project_arg, "--json"]);
+    assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
+    let lint_json = stdout_json(&lint);
+    assert_eq!(lint_json["counts"]["errors"], 0);
+    assert!(
+        lint_json["findings"]
+            .as_array()
+            .expect("findings")
+            .iter()
+            .all(|finding| finding["code"] != "dax.reference_missing_measure")
+    );
+}
+
+#[test]
 fn dax_lint_rejects_scalar_if_variable_used_as_a_table() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

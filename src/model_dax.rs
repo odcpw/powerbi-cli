@@ -581,6 +581,7 @@ fn analyze_expression_text(
     index: &DaxReferenceIndex<'_>,
 ) -> DaxExpressionAnalysis {
     let raw_refs = extract_bracket_references(expression);
+    let virtual_columns = extract_virtual_column_aliases(expression);
     let mut table_columns = BTreeSet::new();
     let mut measure_refs = BTreeSet::new();
     for raw in raw_refs {
@@ -596,7 +597,7 @@ fn analyze_expression_text(
                 column: resolved_column,
                 resolved,
             });
-        } else {
+        } else if !virtual_columns.contains(&raw.name.to_ascii_lowercase()) {
             let handles = index
                 .measures_by_name
                 .get(&raw.name.to_ascii_lowercase())
@@ -649,6 +650,153 @@ fn extract_bracket_references(expression: &str) -> Vec<RawBracketRef> {
         i += 1;
     }
     refs
+}
+
+fn extract_virtual_column_aliases(expression: &str) -> BTreeSet<String> {
+    const EXTENSION_COLUMN_FUNCTIONS: &[&str] = &["ADDCOLUMNS", "SELECTCOLUMNS"];
+
+    let chars = expression.chars().collect::<Vec<_>>();
+    let mut aliases = BTreeSet::new();
+    let mut index = 0;
+    while index < chars.len() {
+        if chars[index] == '"' {
+            index = skip_double_quoted(&chars, index + 1);
+            continue;
+        }
+        if chars[index] == '/' && chars.get(index + 1) == Some(&'/') {
+            index = skip_line_comment(&chars, index + 2);
+            continue;
+        }
+        if chars[index] == '/' && chars.get(index + 1) == Some(&'*') {
+            index = skip_block_comment(&chars, index + 2);
+            continue;
+        }
+
+        for function in EXTENSION_COLUMN_FUNCTIONS {
+            if !dax_keyword_at(&chars, index, function) {
+                continue;
+            }
+            let mut open = index + function.len();
+            while chars.get(open).is_some_and(|ch| ch.is_whitespace()) {
+                open += 1;
+            }
+            if chars.get(open) == Some(&'(') {
+                aliases.extend(extension_column_aliases_in_call(&chars, open + 1));
+            }
+            break;
+        }
+        index += 1;
+    }
+    aliases
+}
+
+fn extension_column_aliases_in_call(chars: &[char], start: usize) -> BTreeSet<String> {
+    let mut aliases = BTreeSet::new();
+    let mut argument_index = 0;
+    let mut argument_start = start;
+    let mut depth = 1;
+    let mut index = start;
+    while index < chars.len() {
+        if chars[index] == '"' {
+            index = skip_double_quoted(chars, index + 1);
+            continue;
+        }
+        if chars[index] == '/' && chars.get(index + 1) == Some(&'/') {
+            index = skip_line_comment(chars, index + 2);
+            continue;
+        }
+        if chars[index] == '/' && chars.get(index + 1) == Some(&'*') {
+            index = skip_block_comment(chars, index + 2);
+            continue;
+        }
+        match chars[index] {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    collect_extension_alias(
+                        chars,
+                        argument_start,
+                        index,
+                        argument_index,
+                        &mut aliases,
+                    );
+                    break;
+                }
+            }
+            ',' if depth == 1 => {
+                collect_extension_alias(chars, argument_start, index, argument_index, &mut aliases);
+                argument_index += 1;
+                argument_start = index + 1;
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    aliases
+}
+
+fn collect_extension_alias(
+    chars: &[char],
+    start: usize,
+    end: usize,
+    argument_index: usize,
+    aliases: &mut BTreeSet<String>,
+) {
+    if argument_index.is_multiple_of(2) {
+        return;
+    }
+    let mut index = start;
+    while index < end && chars[index].is_whitespace() {
+        index += 1;
+    }
+    if chars.get(index) != Some(&'"') {
+        return;
+    }
+    index += 1;
+    let mut alias = String::new();
+    while index < end {
+        if chars[index] == '"' {
+            if chars.get(index + 1) == Some(&'"') {
+                alias.push('"');
+                index += 2;
+                continue;
+            }
+            aliases.insert(alias.trim().to_ascii_lowercase());
+            return;
+        }
+        alias.push(chars[index]);
+        index += 1;
+    }
+}
+
+fn dax_keyword_at(chars: &[char], index: usize, keyword: &str) -> bool {
+    let end = index + keyword.len();
+    end <= chars.len()
+        && chars[index..end]
+            .iter()
+            .copied()
+            .zip(keyword.chars())
+            .all(|(actual, expected)| actual.eq_ignore_ascii_case(&expected))
+        && (index == 0 || !is_unquoted_identifier_char(chars[index - 1]))
+        && (end == chars.len() || !is_unquoted_identifier_char(chars[end]))
+}
+
+fn skip_line_comment(chars: &[char], mut index: usize) -> usize {
+    while index < chars.len() && chars[index] != '\n' {
+        index += 1;
+    }
+    index
+}
+
+fn skip_block_comment(chars: &[char], mut index: usize) -> usize {
+    while index + 1 < chars.len() {
+        if chars[index] == '*' && chars[index + 1] == '/' {
+            return index + 2;
+        }
+        index += 1;
+    }
+    chars.len()
 }
 
 fn skip_double_quoted(chars: &[char], mut i: usize) -> usize {
