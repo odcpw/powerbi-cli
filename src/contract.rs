@@ -51,6 +51,8 @@ Usage:
   powerbi-cli --json doctor
   powerbi-cli integrations status [--deep] [--component modeling-mcp|report-authoring|desktop-bridge] --json
   powerbi-cli integrations install --allow-network --json
+  powerbi-cli skill status --json
+  powerbi-cli skill install --json
   powerbi-cli workflow plan --project <project-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json
   powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
   powerbi-cli workflow verify --plan <plan.json> --json
@@ -342,6 +344,8 @@ pub(crate) fn robot_triage() -> Value {
             "guide": "powerbi-cli robot-docs guide",
             "robotTriage": "powerbi-cli robot-triage",
             "doctor": "powerbi-cli --json doctor",
+            "skillStatus": "powerbi-cli skill status --json",
+            "skillInstall": "powerbi-cli skill install --json",
             "desktopOpen": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json",
             "desktopClose": "powerbi-cli desktop close --json",
             "desktopOpenCheck": "powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json",
@@ -809,6 +813,39 @@ fn command_catalog() -> Vec<Value> {
             "examples": ["powerbi-cli integrations install --allow-network --json"],
             "limitations": ["The network opt-in is mandatory. npm receives an allowlisted environment; normal commands never install, download, npm, or npx."],
             "followUpFields": ["ok", "readOnly", "mutates", "mutatesProject", "networkRequired", "lockId", "lockFingerprint", "cachePath", "activationResult", "priorActiveVersion", "components", "changes", "next"]
+        }),
+        json!({
+            "path": "skill status",
+            "aliases": ["skill verify", "skill check", "skills status"],
+            "usage": "powerbi-cli skill status --json",
+            "summary": "Verify that the globally installed Codex skill exactly matches the repository-embedded canonical skill",
+            "tags": ["skill", "codex", "install", "verify", "agent", "no-python"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "stable-shape",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.skill.status.v1",
+            "flags": ["--json", "--format json"],
+            "examples": ["powerbi-cli skill status --json"],
+            "followUpFields": ["installed", "inSync", "sourceOfTruth", "root", "files[].relativePath", "files[].present", "files[].matchesEmbedded", "next"]
+        }),
+        json!({
+            "path": "skill install",
+            "aliases": ["skill sync", "skills install"],
+            "usage": "powerbi-cli skill install --json",
+            "summary": "Install or repair the canonical embedded Codex skill without Python, network access, or an external script",
+            "tags": ["skill", "codex", "install", "repair", "agent", "no-python"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "networkRequired": false,
+            "stability": "stable-shape",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.skill.status.v1",
+            "flags": ["--json", "--format json"],
+            "examples": ["powerbi-cli skill install --json"],
+            "limitations": ["Writes only the skill files owned by powerbi-cli under CODEX_HOME/skills/powerbi-cli (or the default ~/.codex path); unrelated files are preserved.", "Start a new Codex session after a changed install so the formal skill catalog reloads."],
+            "followUpFields": ["installed", "inSync", "changed", "changes", "reloadRequired", "root", "files", "next"]
         }),
         json!({
             "path": "desktop open",

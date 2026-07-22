@@ -183,6 +183,8 @@ cargo run --bin powerbi-cli -- features list --json
 cargo run --bin powerbi-cli -- features list --for drillthrough --json
 cargo run --bin powerbi-cli -- robot-docs guide
 cargo run --bin powerbi-cli -- --robot-triage
+cargo run --bin powerbi-cli -- skill status --json
+cargo run --bin powerbi-cli -- skill install --json
 cargo run --bin powerbi-cli -- package inspect .\template.pbit --json
 cargo run --bin powerbi-cli -- package extract .\template.pbit --out-dir .\build\template-source --json
 cargo run --bin powerbi-cli -- package import .\source.pbix --out-dir .\build\imported-source --json

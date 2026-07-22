@@ -13,6 +13,7 @@ use crate::package::package_command;
 use crate::profile::profile_command;
 use crate::report::report_command;
 use crate::schema::schema_command;
+use crate::skill_package::skill_command;
 use crate::source_template::source_template_command;
 use crate::workflow::workflow_command;
 use crate::{
@@ -124,6 +125,7 @@ fn run() -> CliResult<CliOutput> {
         }
         "scaffold" => value_output(scaffold_command(&args[1..])?, flags.json),
         "schema" => value_output(schema_command(&args[1..])?, flags.json),
+        "skill" | "skills" => value_output(skill_command(&args[1..])?, flags.json),
         "profile" => value_output(profile_command(&args[1..])?, flags.json),
         "inspect" => value_output(inspect_command(&args[1..])?, flags.json),
         "lint" => value_output(lint_command(&args[1..])?, flags.json),
