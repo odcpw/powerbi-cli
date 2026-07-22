@@ -1,0 +1,1 @@
+Regression implementation: `src/mcp.rs` tests `fake_server_timeout_cancels_and_reaps_without_deadlock` and `graceful_root_exit_also_reaps_captured_descendants` pin bounded latency and assert the recorded descendant process identities are gone. They intentionally do not require a nonzero best-effort diagnostic counter after the Windows job object has already reaped a child.

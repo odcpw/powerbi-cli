@@ -27,3 +27,11 @@ The shipped improvement batch is intentionally narrow and evidence-backed:
 
 See [EVIDENCE.md](EVIDENCE.md), [SCORECARD.md](SCORECARD.md), and
 [HANDOFF.md](HANDOFF.md).
+
+## 2026-07-22 follow-up pass
+
+The structured in-tree workspace under [audit](audit/) records a second focused
+pass covering duplicate-title Desktop selection, screenshot foreground
+ownership, compact capability discovery, canonical wrong-path suggestions, the
+dashboard repair skill, and MCP shutdown latency. Start with
+[audit/manifest.json](audit/manifest.json) and [audit/HANDOFF.md](audit/HANDOFF.md).

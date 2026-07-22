@@ -1,0 +1,6 @@
+{"recommendation_id":"R-001","status":"applied","files":["src/desktop.rs","docs/pbir-desktop-oracle.md"],"regression":"desktop::tests::duplicate_*","commit":"0392216"}
+{"recommendation_id":"R-002","status":"applied","files":["src/desktop.rs","README.md"],"regression":"desktop::tests::generated_window_and_capture_scripts_enforce_intended_desktop_pid","commit":"0392216"}
+{"recommendation_id":"R-003","status":"applied","files":["src/contract.rs","tests/cli_contract.rs"],"regression":"focused_capabilities_omit_large_unrelated_catalogs","commit":"0392216"}
+{"recommendation_id":"R-004","status":"applied","files":["src/cli.rs","src/report.rs","src/contract.rs","tests/cli_contract.rs"],"regression":"misplaced_nested_commands_suggest_the_exact_live_path","commit":"0392216"}
+{"recommendation_id":"R-005","status":"applied","files":["skills/powerbi-cli/SKILL.md","skills/powerbi-cli/references/desktop-runtime-regression.md"],"regression":"skill quick_validate.py","commit":"0392216"}
+{"recommendation_id":"R-006","status":"applied","files":["src/mcp.rs"],"regression":"mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock and graceful_root_exit_also_reaps_captured_descendants","commit":"2bbf2e3"}

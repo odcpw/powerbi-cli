@@ -1,0 +1,7 @@
+{"recommendation_id":"R-001","title":"Select launched/new Desktop window before same-title baseline windows","priority":"P0","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-002","title":"Accept only verified descendant foreground ownership","priority":"P0","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-003","title":"Make filtered capabilities responses actually focused","priority":"P1","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-004","title":"Teach canonical nested paths for plausible wrong invocations","priority":"P1","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-005","title":"Codify safe dashboard repair and interaction semantics in the skill","priority":"P1","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-006","title":"Refresh only process-tree identity data in the MCP monitor","priority":"P0","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-007","title":"Automate Desktop canvas refresh and interaction proof","priority":"P2","applied":false,"deferred_reason":"Requires a reliable supported Desktop automation surface and substantially exceeds this focused elegance pass; current commands continue to state the limitation explicitly."}

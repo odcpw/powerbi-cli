@@ -1,0 +1,1 @@
+Regression implementation: `src/desktop.rs` tests `duplicate_titles_prefer_the_new_process_instead_of_the_oldest_pid` and `duplicate_baseline_titles_are_ambiguous_instead_of_guessed`.

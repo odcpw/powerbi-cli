@@ -1,0 +1,4 @@
+{"case_id":"I-001","input":"powerbi-cli dax lint --json","before":"Generic capabilities suggestion","after":"Suggests canonical model dax lint capability query","status":"fixed"}
+{"case_id":"I-002","input":"powerbi-cli report export-wireframe --json","before":"Generic report subcommand error","after":"Suggests canonical report wireframe export capability query","status":"fixed"}
+{"case_id":"I-003","input":"desktop screenshot with old and new same-title PBIDesktop windows","before":"Lowest PID selected","after":"Association/new PID selected; ambiguous baselines refused","status":"fixed"}
+{"case_id":"I-004","input":"focused capabilities --for validate","before":"Returned unrelated large schema/visual catalogs","after":"Returns 11040-byte focused contract with fullContractCommand","status":"fixed"}

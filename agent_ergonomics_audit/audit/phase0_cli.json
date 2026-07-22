@@ -1,0 +1,17 @@
+{
+  "target_path": ".",
+  "discovered_at": "2026-07-22T03:31:47Z",
+  "languages": [
+    "rust"
+  ],
+  "binaries": [
+    "powerbi-cli"
+  ],
+  "env_var_prefix": "POWERBI_CLI",
+  "existing_surfaces": {
+    "robot_mode": true,
+    "capabilities": true,
+    "robot_docs": true
+  },
+  "recommended_mode": "audit-only"
+}

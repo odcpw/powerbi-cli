@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="150" role="img" aria-label="Post-pass agent ergonomics heatmap">
+  <style>text{font:14px sans-serif}.good{fill:#2e7d32}.label{fill:#111}</style>
+  <text class="label" x="10" y="22">Desktop selection</text><rect class="good" x="220" y="8" width="460" height="18"/>
+  <text class="label" x="10" y="50">Screenshot ownership</text><rect class="good" x="220" y="36" width="430" height="18"/>
+  <text class="label" x="10" y="78">Focused capabilities</text><rect class="good" x="220" y="64" width="485" height="18"/>
+  <text class="label" x="10" y="106">Command recovery</text><rect class="good" x="220" y="92" width="475" height="18"/>
+  <text class="label" x="10" y="134">Dashboard repair skill</text><rect class="good" x="220" y="120" width="455" height="18"/>
+</svg>
