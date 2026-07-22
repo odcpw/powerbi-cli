@@ -277,7 +277,8 @@ cargo run --bin powerbi-cli -- report visuals formatting conditional-formatting 
 cargo run --bin powerbi-cli -- report visuals formatting extract --project .\corp\template --handle <source-visual-handle> --out .\build\visual-formatting-bundle.json --json
 cargo run --bin powerbi-cli -- report visuals formatting apply --project .\build\sales --handle <target-visual-handle> --bundle .\build\visual-formatting-bundle.json --dry-run --json
 cargo run --bin powerbi-cli -- report visuals formatting apply --project .\build\sales --handle <target-visual-handle> --bundle .\build\visual-formatting-bundle.json --allow-literal-text --out-dir .\build\sales-styled --json
-cargo run --bin powerbi-cli -- report visuals formatting set-text --project .\build\sales --handle <visual-handle> --title "Revenue Overview" --alt-text "Revenue KPI card" --dry-run --json
+cargo run --bin powerbi-cli -- report visuals formatting set-text --project .\build\sales --handle <visual-handle> --title "Revenue Overview" --dry-run --json
+cargo run --bin powerbi-cli -- report visuals formatting set-text --project .\build\sales --handle <visual-handle> --clear-alt-text --dry-run --json
 cargo run --bin powerbi-cli -- report visuals add --project .\build\sales --page <page-handle> --title "Revenue Card" --binding "role=Values,table=FactSales,measure=Total Revenue" --out-dir .\build\sales-visual --json
 cargo run --bin powerbi-cli -- report visuals clone --project .\corp\template --handle <template-visual-handle> --title "Revenue Clone" --out-dir .\build\sales-cloned --json
 cargo run --bin powerbi-cli -- report visuals set-position --project .\build\sales --handle <visual-handle> --x 120 --y 140 --width 360 --height 220 --out-dir .\build\sales-layout --json
@@ -380,9 +381,10 @@ three pages.
   bindings, formatting, filters, and raw PBIR already inside `visual.json`.
   It validates table, column, and measure names against local TMDL and returns
   readback commands. Generated `--title` text is emitted as PBIR container chrome
-  under `/visual/visualContainerObjects/title` (`show = true`), with alt text
-  under the shared `/visual/visualContainerObjects/general` object and
-  annotation metadata retained for accessibility/readback. Raw columns are
+  under `/visual/visualContainerObjects/title` (`show = true`), with annotation
+  metadata retained for readback. Generated visuals omit `general.altText`
+  because Microsoft powerbi-report-authoring-cli rejects that formatting
+  property. Raw columns are
   refused in card Values, chart Y, matrix Values, and scatter X/Y/Size roles;
   define a measure until a Desktop-authored aggregation binding is available.
   Reusing the same model field twice in one visual is also refused because no
@@ -410,9 +412,11 @@ three pages.
   replacing only `/visual/objects` and removing any forbidden root-level
   `/objects`; apply refuses copied literal text unless `--allow-literal-text` is
   passed.
-  `report visuals formatting set-text` patches typed title text, title
-  visibility, and shared visual-container alt text while preserving sibling formatting
-  properties. More visual families, richer typed formatting mutations,
+  `report visuals formatting set-text` patches typed title text and visibility,
+  and removes rejected legacy/shared `general.altText` metadata with
+  `--clear-alt-text`, while preserving sibling formatting properties. Alt-text
+  authoring is refused until Microsoft exposes a validator-supported PBIR
+  location. More visual families, richer typed formatting mutations,
   `Default`/reset interaction semantics, slicer selection/sync and additional
   mode authoring, filter
   sort and arbitrary expression-level filter mutations, and conditional
@@ -612,8 +616,9 @@ three pages.
   Bare prose is not enough: German UI text such as `Passwort ändern` and words
   containing `pass` do not match without credential assignment syntax.
 - `lint` now includes a small BPA-style report/model pass: DAX static findings,
-  duplicate page/visual titles, and missing visual alt text. Generated visuals
-  include default alt text so new reports start on the right side of that rule.
+  duplicate page/visual titles, and validator-rejected `general.altText`
+  placements with an explicit `--clear-alt-text` remediation. Missing alt text
+  is valid until Microsoft exposes a supported PBIR location.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.

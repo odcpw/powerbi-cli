@@ -18,7 +18,7 @@
     "visuals": 5
   },
   "exitCode": 0,
-  "fingerprint": "fcab63c2b3b77ef5",
+  "fingerprint": "da98a8b3e69d3135",
   "lint": {
     "counts": {
       "errors": 0,
@@ -151,9 +151,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "b10b3d82a602c27a",
-              "visual": "35046225897533c4",
-              "visualContainerObjects": "08cc39cbe49d7218",
-              "visualJson": "11e76c2bfe2b9b43"
+              "visual": "66ba17eddba0e235",
+              "visualContainerObjects": "74e78bc10da7c02b",
+              "visualJson": "02f9c5c134401e40"
             },
             "name": "VisualContainerCategorySharePie",
             "ordinal": 0,
@@ -205,9 +205,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "b10b3d82a602c27a",
-              "visual": "14b89c4b4427d1c6",
-              "visualContainerObjects": "e884e7da81b78060",
-              "visualJson": "8d01ca2d2ebe4c19"
+              "visual": "cecd8da208675b81",
+              "visualContainerObjects": "a629c90db45cbd85",
+              "visualJson": "61479744cac5711c"
             },
             "name": "VisualContainerCategoryShareDonut",
             "ordinal": 0,
@@ -267,9 +267,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "475cdcd8f9fcff83",
-              "visual": "e96252fc3cf0d328",
-              "visualContainerObjects": "78dee4d5116b4940",
-              "visualJson": "0728645f75e8d6e1"
+              "visual": "e280e79096c47cb5",
+              "visualContainerObjects": "5b49e5b4461d5c5f",
+              "visualJson": "ddf4b08c6c6fa0fe"
             },
             "name": "VisualContainerRowsColumnsValuesMatrix",
             "ordinal": 0,
@@ -313,9 +313,9 @@
               "objects": "685364fcc43e03c4",
               "position": "f7d3c15e6f16eb11",
               "queryState": "dc039ae7e1b89f7c",
-              "visual": "39cca60eee44942c",
-              "visualContainerObjects": "d407d6f4f7e53c16",
-              "visualJson": "a798636d4e228859"
+              "visual": "2ab4e9c58c0312ce",
+              "visualContainerObjects": "ce0806b308ea7cda",
+              "visualJson": "884c9c488f8a2973"
             },
             "name": "VisualContainerBasicCategorySlicer",
             "ordinal": 0,
@@ -367,9 +367,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "62c4d6e9597b0503",
               "queryState": "cae5c379b6600e55",
-              "visual": "0193c3e444722dd8",
-              "visualContainerObjects": "de4e98c367d26b2e",
-              "visualJson": "7421120f3d1e440e"
+              "visual": "0ba8878dc714b85a",
+              "visualContainerObjects": "3ad2eec950d5a8a6",
+              "visualJson": "39257af8ea9b81aa"
             },
             "name": "VisualContainerKnownGoodLineControl",
             "ordinal": 0,

@@ -18,7 +18,7 @@
     "visuals": 3
   },
   "exitCode": 0,
-  "fingerprint": "e59750e229782b86",
+  "fingerprint": "2babea4cdc7c6f37",
   "lint": {
     "counts": {
       "errors": 0,
@@ -280,9 +280,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "b601e0e0aa548821",
               "queryState": "c39d2fd75ea0d2bc",
-              "visual": "d02dbede734ddfdc",
-              "visualContainerObjects": "7e0105d6d76667bc",
-              "visualJson": "346025096bf05ad5"
+              "visual": "4fcfe0e8489571eb",
+              "visualContainerObjects": "93d4cd2f613c7dff",
+              "visualJson": "0747a925074bf9f8"
             },
             "name": "VisualContainerCustomerDetail",
             "ordinal": 0,
@@ -313,9 +313,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "dec796711fd9b3bf",
               "queryState": "2c299f7e7fbeb884",
-              "visual": "ad2cbf401d85245b",
-              "visualContainerObjects": "a97d9735ae28d4c6",
-              "visualJson": "d52881c46b9dbbc8"
+              "visual": "c4286959f0b95695",
+              "visualContainerObjects": "0ed42649f7bc0758",
+              "visualJson": "afb8dfbb4f10c52e"
             },
             "name": "VisualContainerRevenueCard",
             "ordinal": 1,
@@ -354,9 +354,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "ffff729ece655f4f",
               "queryState": "30a7c00d07ff162a",
-              "visual": "365d8d7f16953f1d",
-              "visualContainerObjects": "1994580895b20130",
-              "visualJson": "e4c7b8a58c5e5d28"
+              "visual": "cdf178190382a19c",
+              "visualContainerObjects": "096ab8651177b2c5",
+              "visualJson": "96ceee4c69875e2b"
             },
             "name": "VisualContainerRevenueTrend",
             "ordinal": 2,

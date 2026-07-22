@@ -18,7 +18,7 @@
     "visuals": 3
   },
   "exitCode": 0,
-  "fingerprint": "97b4cc89d7c9b907",
+  "fingerprint": "3b3efebb861e2c27",
   "lint": {
     "counts": {
       "errors": 0,
@@ -167,9 +167,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "dec796711fd9b3bf",
               "queryState": "90ce0e83ccc57369",
-              "visual": "2482b02c438a6b98",
-              "visualContainerObjects": "bb69072b2e1c93c8",
-              "visualJson": "a74683cc3b8af577"
+              "visual": "d3a22397d184ef4f",
+              "visualContainerObjects": "ade84df15e8a8c07",
+              "visualJson": "59ea3a43b9f4356e"
             },
             "name": "VisualContainerCompletedCard",
             "ordinal": 0,
@@ -208,9 +208,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "ffff729ece655f4f",
               "queryState": "c5527737b36e134c",
-              "visual": "9f4a0f1de72c7781",
-              "visualContainerObjects": "f4fc95826c11127c",
-              "visualJson": "5f6cf1453e0db114"
+              "visual": "9253840290cdf042",
+              "visualContainerObjects": "de557b3bdc914173",
+              "visualJson": "02ca1d1b9c33922d"
             },
             "name": "VisualContainerHoursByTeam",
             "ordinal": 1,
@@ -265,9 +265,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "b601e0e0aa548821",
               "queryState": "efb4635e84426cd0",
-              "visual": "74aed478957417c6",
-              "visualContainerObjects": "5faa20f7fe6e2596",
-              "visualJson": "32d3343ad65c2021"
+              "visual": "9e65a5daaea544f6",
+              "visualContainerObjects": "fa9e28d1378e94d6",
+              "visualJson": "b5339429f484fcd1"
             },
             "name": "VisualContainerWorkDetail",
             "ordinal": 2,

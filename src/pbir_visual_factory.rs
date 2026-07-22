@@ -78,14 +78,11 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
     // Desktop-authored visualContainer/2.4.0 fixtures place visual chrome titles
     // under /visual/visualContainerObjects/title. The literal-text variant is
     // archived in docs/reference/desktop-authored-visuals/slicer.visual.json.
+    // Do not emit general.altText here: Microsoft powerbi-report-authoring-cli
+    // v0.1.4 rejects it as PBIR_FORMATTING_PROP_UNKNOWN.
     visual_config.insert(
         "visualContainerObjects".to_string(),
         json!({
-            "general": [{
-                "properties": {
-                    "altText": literal_text_expression(&format!("{} visual", spec.title))
-                }
-            }],
             "title": [{
                 "properties": {
                     "text": literal_text_expression(&spec.title),

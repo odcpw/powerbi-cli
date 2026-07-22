@@ -230,29 +230,36 @@ fn scaffold_generates_offline_safe_pbip_project() {
         .join("pages")
         .join("ReportSectionOverview")
         .join("visuals");
-    let first_visual_path = fs::read_dir(&visuals_dir)
+    let visual_paths = fs::read_dir(&visuals_dir)
         .expect("read generated visuals")
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().expect("visual file type").is_dir())
         .map(|entry| entry.path().join("visual.json"))
-        .find(|path| path.is_file())
-        .expect("first generated visual.json");
-    let visual_json: Value = serde_json::from_str(
-        &fs::read_to_string(&first_visual_path).expect("read generated visual.json"),
-    )
-    .expect("parse generated visual.json");
-    assert!(
-        visual_json.get("objects").is_none(),
-        "Power BI Desktop rejects root-level visual container objects in enhanced PBIR"
+        .filter(|path| path.is_file())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        visual_paths.len(),
+        3,
+        "expected every generated visual.json"
     );
-    assert!(
-        visual_json
-            .pointer(
-                "/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value",
-            )
-            .is_some(),
-        "generated alt text should live under /visual/visualContainerObjects/general"
-    );
+    for visual_path in visual_paths {
+        let visual_json: Value = serde_json::from_str(
+            &fs::read_to_string(&visual_path).expect("read generated visual.json"),
+        )
+        .expect("parse generated visual.json");
+        assert!(
+            visual_json.get("objects").is_none(),
+            "Power BI Desktop rejects root-level visual container objects in enhanced PBIR: {}",
+            visual_path.display()
+        );
+        assert!(
+            visual_json
+                .pointer("/visual/visualContainerObjects/general/0/properties/altText",)
+                .is_none(),
+            "generated visual contains validator-rejected general.altText: {}",
+            visual_path.display()
+        );
+    }
 
     let (strict_code, strict_stdout, strict_stderr) =
         run_powerbi(&["validate", "--strict", out, "--json"]);

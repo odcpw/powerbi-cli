@@ -218,23 +218,29 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                     ));
                 }
                 match visual_alt_text_status(&visual) {
-                    VisualAltTextStatus::Missing => findings.push(finding(
-                            "bpa.report.visual_missing_alt_text",
-                            "warning",
-                            &format!("visual is missing alt text: {title}"),
-                            visual_handle,
-                            visual["path"].as_str(),
-                        )),
-                    VisualAltTextStatus::Legacy => findings.push(finding(
-                            "pbir.visual_alt_text_legacy_location",
+                    // Microsoft powerbi-report-authoring-cli v0.1.4 rejects both
+                    // known general.altText placements. Absence is valid PBIR.
+                    VisualAltTextStatus::Missing => {}
+                    VisualAltTextStatus::VisualObjects => findings.push(finding(
+                        "pbir.visual_alt_text_legacy_location",
+                        "warning",
+                        &format!(
+                            "visual contains validator-rejected alt text under visual.objects.general: {title}; remove it with report visuals formatting set-text --clear-alt-text"
+                        ),
+                        visual_handle,
+                        visual["path"].as_str(),
+                    )),
+                    VisualAltTextStatus::VisualContainerObjects | VisualAltTextStatus::Both => {
+                        findings.push(finding(
+                            "pbir.visual_alt_text_unsupported_location",
                             "warning",
                             &format!(
-                                "visual alt text uses legacy visual.objects.general instead of visual.visualContainerObjects.general: {title}; reapply it with report visuals formatting set-text"
+                                "visual contains validator-rejected alt text under visual.visualContainerObjects.general: {title}; remove it with report visuals formatting set-text --clear-alt-text"
                             ),
                             visual_handle,
                             visual["path"].as_str(),
-                        )),
-                    VisualAltTextStatus::Canonical => {}
+                        ));
+                    }
                 }
                 if visual_outside_page(&visual, page_width, page_height) {
                     findings.push(finding(
@@ -303,8 +309,9 @@ fn visual_outside_page(visual: &Value, page_width: f64, page_height: f64) -> boo
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum VisualAltTextStatus {
-    Canonical,
-    Legacy,
+    VisualContainerObjects,
+    VisualObjects,
+    Both,
     Missing,
 }
 
@@ -315,21 +322,17 @@ fn visual_alt_text_status(visual: &Value) -> VisualAltTextStatus {
     let Ok(raw) = read_json_value(PathBuf::from(path).as_path()) else {
         return VisualAltTextStatus::Missing;
     };
-    let canonical = raw
-        .pointer("/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    if !canonical.trim().is_empty() {
-        return VisualAltTextStatus::Canonical;
-    }
-    let legacy = raw
-        .pointer("/visual/objects/general/0/properties/altText/expr/Literal/Value")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    if legacy.trim().is_empty() {
-        VisualAltTextStatus::Missing
-    } else {
-        VisualAltTextStatus::Legacy
+    let visual_container_objects = raw
+        .pointer("/visual/visualContainerObjects/general/0/properties/altText")
+        .is_some();
+    let visual_objects = raw
+        .pointer("/visual/objects/general/0/properties/altText")
+        .is_some();
+    match (visual_container_objects, visual_objects) {
+        (true, true) => VisualAltTextStatus::Both,
+        (true, false) => VisualAltTextStatus::VisualContainerObjects,
+        (false, true) => VisualAltTextStatus::VisualObjects,
+        (false, false) => VisualAltTextStatus::Missing,
     }
 }
 

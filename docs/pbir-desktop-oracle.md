@@ -430,12 +430,15 @@ Accepted shape:
 Implementation rule:
 
 - Generated visuals must not emit root-level `objects`.
-- Visual-specific formatting and alt text belong under `/visual/objects`.
+- Visual-specific formatting belongs under `/visual/objects`; do not author
+  `general.altText` there or under `/visual/visualContainerObjects` because the
+  Microsoft validator rejects both known placements.
 - Visible visual-container chrome titles belong under
   `/visual/visualContainerObjects/title`. The archived Desktop-authored slicer
   proves literal `text` plus literal `show`; generated visuals emit the supplied
-  title text with `show = true` there while retaining alt text and annotation
-  metadata for accessibility/readback.
+  title text with `show = true` there while retaining annotation metadata for
+  readback. Generated visuals omit `general.altText`, which Microsoft
+  powerbi-report-authoring-cli v0.1.4 rejects as an unknown formatting property.
 - Formatting/style bundle apply must not write root-level `objects`; if a
   bundle contains them, treat them as read-only compatibility material or skip/
   reject the write instead of generating Desktop-rejected PBIR.
@@ -812,7 +815,7 @@ Add:
 Existing:
 
 - raw formatting extract/apply;
-- title/alt text;
+- title text/visibility and rejected alt-text cleanup;
 - static title/dataPoint color.
 
 Add:

@@ -614,7 +614,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "The CLI generates pieChart and donutChart from Desktop-authored reference shapes with exactly one Category column, one or more Y values, and the Desktop default descending Y sort. Local golden and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the binding/canvas baseline. Current generated title and alt-text container bytes await Desktop re-verification.",
+        reason: "The CLI generates pieChart and donutChart from Desktop-authored reference shapes with exactly one Category column, one or more Y values, and the Desktop default descending Y sort. Local golden and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the binding/canvas baseline. Current generated title container bytes await Desktop re-verification; validator-rejected general.altText is omitted.",
         next_proof: &[
             "Automate the manual pie/donut canvas and refresh assertions as the desktop-canvas-refresh proof level",
             "Widen typed pie/donut formatting coverage with Desktop-authored fixtures and PBIR readback",
@@ -640,7 +640,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "The CLI resolves matrix to the PBIR visualType pivotTable and generates ordered Rows, optional Columns, and Values projections from a Desktop-authored reference shape. Local golden and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the binding/canvas baseline. Current generated title and alt-text container bytes await Desktop re-verification.",
+        reason: "The CLI resolves matrix to the PBIR visualType pivotTable and generates ordered Rows, optional Columns, and Values projections from a Desktop-authored reference shape. Local golden and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the binding/canvas baseline. Current generated title container bytes await Desktop re-verification; validator-rejected general.altText is omitted.",
         next_proof: &[
             "Automate the manual matrix canvas and refresh assertions as the desktop-canvas-refresh proof level",
             "Widen typed matrix formatting and hierarchy coverage with Desktop-authored fixtures and PBIR readback",
@@ -978,7 +978,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report slicers clear",
         ],
         refusal_code: None,
-        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between provides a numeric/date range slider. Generated slicers deliberately contain no general.filter or other persisted selection state. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title and alt-text container bytes await Desktop re-verification.",
+        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between provides a numeric/date range slider. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
         next_proof: &[
             "Automate the manual slicer canvas, refresh, and interaction assertions as the desktop-canvas-refresh proof level",
             "Widen typed slicer formatting and mode coverage with Desktop-authored fixtures and PBIR readback",

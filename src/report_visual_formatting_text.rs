@@ -162,20 +162,6 @@ fn apply_text_patch(visual_json: &mut Value, options: &TextOptions) -> CliResult
     if let Some(title) = &options.title {
         update_placeholder_title_annotation(visual_json, title, &mut pointers)?;
     }
-    if let Some(alt_text) = &options.alt_text {
-        let properties = ensure_visual_container_object_properties(visual_json, "general")?;
-        properties.insert("altText".to_string(), literal_text_expression(alt_text));
-        pointers.push(
-            "/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value"
-                .to_string(),
-        );
-        if existing_visual_object_properties(visual_json, "general")?
-            .and_then(|properties| properties.remove("altText"))
-            .is_some()
-        {
-            pointers.push("/visual/objects/general/0/properties/altText".to_string());
-        }
-    }
     if options.clear_alt_text {
         if let Some(properties) =
             existing_visual_container_object_properties(visual_json, "general")?
@@ -474,20 +460,11 @@ fn require_text_intent(options: &TextOptions) -> CliResult<()> {
         && !options.clear_alt_text
     {
         return Err(CliError::invalid_args(
-            "report visuals formatting set-text requires --title, --show-title, --alt-text, or --clear-alt-text",
+            "report visuals formatting set-text requires --title, --show-title, or --clear-alt-text",
         )
         .with_hint("Start with `--dry-run` and specify at least one text formatting field.")
         .with_suggested_command(
             "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json",
-        ));
-    }
-    if options.alt_text.is_some() && options.clear_alt_text {
-        return Err(CliError::invalid_args(
-            "choose either --alt-text <text> or --clear-alt-text, not both",
-        )
-        .with_hint("Use --alt-text to set replacement accessibility text, or --clear-alt-text to remove it.")
-        .with_suggested_command(
-            "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --alt-text <text> --dry-run --json",
         ));
     }
     if let Some(title) = &options.title {
@@ -495,6 +472,15 @@ fn require_text_intent(options: &TextOptions) -> CliResult<()> {
     }
     if let Some(alt_text) = &options.alt_text {
         validate_nonempty_text(alt_text, "--alt-text")?;
+        return Err(CliError::unsupported_feature(
+            "--alt-text authoring is unavailable because Microsoft powerbi-report-authoring-cli v0.1.4 rejects every proven general.altText placement as PBIR_FORMATTING_PROP_UNKNOWN",
+        )
+        .with_hint(
+            "Use --clear-alt-text to remove rejected metadata. Do not author a replacement until Microsoft exposes a validator-supported PBIR location.",
+        )
+        .with_suggested_command(
+            "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --clear-alt-text --dry-run --json",
+        ));
     }
     Ok(())
 }

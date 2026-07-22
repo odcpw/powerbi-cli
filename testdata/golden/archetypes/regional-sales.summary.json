@@ -18,7 +18,7 @@
     "visuals": 9
   },
   "exitCode": 0,
-  "fingerprint": "d788f3b16b41be4b",
+  "fingerprint": "d48db555339e874b",
   "lint": {
     "counts": {
       "errors": 0,
@@ -347,9 +347,9 @@
               "objects": "685364fcc43e03c4",
               "position": "8043e93a17fb1cd5",
               "queryState": "c4d18200705a0952",
-              "visual": "5da8290170de4ee4",
-              "visualContainerObjects": "aa485e11a35dc4b0",
-              "visualJson": "74aadacc01a608f2"
+              "visual": "69f917ac45d28a7e",
+              "visualContainerObjects": "0524ea18595c520a",
+              "visualJson": "1171df5d723d0cf4"
             },
             "name": "VisualContainerGroessenklasseSlicer",
             "ordinal": 0,
@@ -388,9 +388,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "b55212f456dbd467",
               "queryState": "ebea89072fd928b7",
-              "visual": "cc758ce3a0bdfbcc",
-              "visualContainerObjects": "85bdf5b3566edf5a",
-              "visualJson": "2c53e4eee25e2d97"
+              "visual": "ba4e7d5883a4ed06",
+              "visualContainerObjects": "92e51907be2e117e",
+              "visualJson": "9ca61815d4b35c4d"
             },
             "name": "VisualContainerRevenueByYearLine",
             "ordinal": 1,
@@ -421,9 +421,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "9433cc521c94d855",
               "queryState": "2c299f7e7fbeb884",
-              "visual": "36047b30933c3037",
-              "visualContainerObjects": "bd06c57e473a4baa",
-              "visualJson": "5fb22ddefaa8f9ba"
+              "visual": "6096980172e9de2f",
+              "visualContainerObjects": "e6d1896fd485484e",
+              "visualJson": "0daa94e30fc23352"
             },
             "name": "VisualContainerTotalRevenueCard",
             "ordinal": 2,
@@ -454,9 +454,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "95982d99a50893bf",
               "queryState": "48b4afbeecd54f33",
-              "visual": "68e43e2772353e7e",
-              "visualContainerObjects": "1a482f3bbcbec9d8",
-              "visualJson": "811c523020334753"
+              "visual": "963fa3022e50ec65",
+              "visualContainerObjects": "ba4717d2219c0dcb",
+              "visualJson": "bad01892852865ca"
             },
             "name": "VisualContainerTotalUnitsCard",
             "ordinal": 3,
@@ -487,9 +487,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "b913113a12b2cb3f",
               "queryState": "2648467c358ff79b",
-              "visual": "36f4edbe0253a23e",
-              "visualContainerObjects": "1f33ceba6fc28a20",
-              "visualJson": "1d2fb3ad2d3df338"
+              "visual": "237dc3b4376c8bfd",
+              "visualContainerObjects": "2441e2a5f8f32d03",
+              "visualJson": "2c1b4e64fae642d3"
             },
             "name": "VisualContainerUmsatzUebersichtCard",
             "ordinal": 4,
@@ -563,9 +563,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "61715a28915bc0f7",
               "queryState": "d651b09c7b2de50f",
-              "visual": "94950e154abfafc5",
-              "visualContainerObjects": "7e0105d6d76667bc",
-              "visualJson": "700676bd969ef1c3"
+              "visual": "b693c6fc1f2af234",
+              "visualContainerObjects": "93d4cd2f613c7dff",
+              "visualJson": "e1939e27fdb6b572"
             },
             "name": "VisualContainerCustomerDetailTable",
             "ordinal": 0,
@@ -596,9 +596,9 @@
               "objects": "685364fcc43e03c4",
               "position": "e0a629f31ff8ff9c",
               "queryState": "cefa3e06ae2c1855",
-              "visual": "ae97d6dc2f3fa997",
-              "visualContainerObjects": "3a3ecb934e24b6a8",
-              "visualJson": "6ce97482e11e90a9"
+              "visual": "68c309dd19f1182e",
+              "visualContainerObjects": "e969bc2ede8f8523",
+              "visualJson": "a25132e83c45d1c8"
             },
             "name": "VisualContainerSegmentSlicer",
             "ordinal": 1,
@@ -672,9 +672,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "61715a28915bc0f7",
               "queryState": "46dd3e070e597db8",
-              "visual": "94208fefbc9dae06",
-              "visualContainerObjects": "7ff59dfd20cda908",
-              "visualJson": "04a5c762e331b99e"
+              "visual": "d3e5bde2d2c6ff6c",
+              "visualContainerObjects": "e0b5017c2377a8e2",
+              "visualJson": "e6e95f6d84cce1c4"
             },
             "name": "VisualContainerSegmentDetailTable",
             "ordinal": 0,
@@ -705,9 +705,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "7c557bc06b3bac33",
               "queryState": "2c299f7e7fbeb884",
-              "visual": "36047b30933c3037",
-              "visualContainerObjects": "bd06c57e473a4baa",
-              "visualJson": "83ef89c81d5cff09"
+              "visual": "6096980172e9de2f",
+              "visualContainerObjects": "e6d1896fd485484e",
+              "visualJson": "d513e483a0c2b7a7"
             },
             "name": "VisualContainerSegmentTotalCard",
             "ordinal": 1,

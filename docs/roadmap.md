@@ -221,8 +221,8 @@ validation, proof, then mutation breadth.
   oversized pages, missing handles, unsafe files, unused objects, and style
   drift.
 - Implemented first BPA-lite lint slice: static DAX findings, duplicate
-  page/visual titles, and missing visual alt text. Generated visuals now include
-  default alt text so new projects satisfy that accessibility rule.
+  page/visual titles, and validator-rejected `general.altText` placements with
+  explicit cleanup guidance. Generated visuals omit the rejected property.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 
@@ -399,7 +399,8 @@ frozen until proven.
   rows and stale endpoints, returns readback/wireframe/inspect/validate
   commands, and leaves `Default`/reset behavior fixture-gated.
 - Implemented typed formatting mutation slices: `report visuals formatting
-  set-text` patches title/alt text, and `set-color` patches static literal
+  set-text` patches title text/visibility and clears rejected alt-text metadata,
+  while `set-color` patches static literal
   `title.fontColor` plus wildcard/static `dataPoint.fill`; data-bound color
   selectors and conditional-formatting authoring remain Desktop-fixture gated.
 - Implemented first design/layout slices: `report design-plan` profiles local

@@ -18,7 +18,7 @@
     "visuals": 2
   },
   "exitCode": 0,
-  "fingerprint": "e19f793856294baa",
+  "fingerprint": "18d0974712ffb6cd",
   "lint": {
     "counts": {
       "errors": 0,
@@ -205,9 +205,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "fa04ff5f77aa9e64",
               "queryState": "3c63a09f4b16f86a",
-              "visual": "2b107ab758f67432",
-              "visualContainerObjects": "54c0fb503d714446",
-              "visualJson": "30aaa2c0c961a361"
+              "visual": "8e8bd3b84c0cefea",
+              "visualContainerObjects": "425ef8a04ff7988e",
+              "visualJson": "1f62b3317dcd7201"
             },
             "name": "VisualContainerFacilityTable",
             "ordinal": 0,
@@ -270,9 +270,9 @@
               "objects": "5b9bc4ba528108e4",
               "position": "f04f5c9706a7f823",
               "queryState": "30e9990a61187465",
-              "visual": "17abcc09d5a346d6",
-              "visualContainerObjects": "fadcec75cfe8e9da",
-              "visualJson": "155414e7df203701"
+              "visual": "7881090c59d57adc",
+              "visualContainerObjects": "fb37a7832568866e",
+              "visualJson": "aa9e90c7e0b42fa3"
             },
             "name": "VisualContainerPortfolioBubble",
             "ordinal": 1,

@@ -1423,9 +1423,9 @@ fn report_visuals_formatting_list_and_show_summarize_objects_without_raw() {
     assert_eq!(list_json["counts"]["visualsWithFormatting"], Value::from(3));
     assert_eq!(
         list_json["counts"]["formatObjectContainers"],
-        Value::from(8)
+        Value::from(6)
     );
-    assert_eq!(list_json["counts"]["formatProperties"], Value::from(14));
+    assert_eq!(list_json["counts"]["formatProperties"], Value::from(12));
     assert_eq!(list_json["rawIncluded"], Value::Bool(false));
     assert!(
         !list.stdout.contains("#123456"),
@@ -1779,7 +1779,7 @@ fn report_visuals_formatting_extract_and_apply_round_trip_through_out_dir() {
     let readback_json = stdout_json(&readback);
     assert_eq!(
         readback_json["formatting"]["formatObjectContainerCount"],
-        Value::from(5)
+        Value::from(4)
     );
     assert!(
         readback.stdout.contains("#123456"),
@@ -1848,13 +1848,46 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
 
     let legacy_lint = run_powerbi(&["lint", project_arg, "--json"]);
     assert_eq!(legacy_lint.code, 0, "stderr: {}", legacy_lint.stderr);
+    let legacy_lint_json = stdout_json(&legacy_lint);
+    let legacy_finding = legacy_lint_json["findings"]
+        .as_array()
+        .expect("lint findings")
+        .iter()
+        .find(|finding| finding["code"] == "pbir.visual_alt_text_legacy_location")
+        .expect("legacy alt text should produce an actionable lint finding");
     assert!(
-        stdout_json(&legacy_lint)["findings"]
-            .as_array()
-            .expect("lint findings")
-            .iter()
-            .any(|finding| finding["code"] == "pbir.visual_alt_text_legacy_location"),
-        "legacy alt text should produce an actionable lint finding"
+        legacy_finding["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("--clear-alt-text")
+    );
+
+    let rejected_alt_text = run_powerbi(&[
+        "report",
+        "visuals",
+        "formatting",
+        "set-text",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--alt-text",
+        "Updated executive KPI",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(rejected_alt_text.code, 2);
+    let rejected_json = stderr_json(&rejected_alt_text);
+    assert_eq!(rejected_json["error"]["code"], "unsupported_feature");
+    assert!(
+        rejected_json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("PBIR_FORMATTING_PROP_UNKNOWN")
+    );
+    assert_eq!(
+        fs::read_to_string(&source_path).expect("source visual after refused alt text"),
+        source_before
     );
 
     let dry_run = run_powerbi(&[
@@ -1868,8 +1901,6 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         &handle,
         "--title",
         "Updated Revenue",
-        "--alt-text",
-        "Updated executive KPI",
         "--include-raw",
         "--dry-run",
         "--json",
@@ -1895,7 +1926,7 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
     );
     assert_eq!(
         dry_json["textPlan"]["after"]["altText"],
-        Value::from("Updated executive KPI")
+        Value::from("Executive revenue chart")
     );
     assert_eq!(
         dry_json["textPlan"]["before"]["altTextSource"],
@@ -1903,7 +1934,7 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
     );
     assert_eq!(
         dry_json["textPlan"]["after"]["altTextSource"],
-        Value::from("visualContainerObjects")
+        Value::from("legacyVisualObjects")
     );
     let dry_pointers = dry_json["changes"][0]["jsonPointers"]
         .as_array()
@@ -1921,13 +1952,10 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
             .iter()
             .any(|pointer| pointer == "/annotations/0/value")
     );
-    assert!(dry_pointers.iter().any(|pointer| {
-        pointer == "/visual/visualContainerObjects/general/0/properties/altText/expr/Literal/Value"
-    }));
     assert!(
         dry_pointers
             .iter()
-            .any(|pointer| pointer == "/visual/objects/general/0/properties/altText")
+            .all(|pointer| !pointer.as_str().unwrap_or_default().contains("altText"))
     );
     assert_eq!(
         fs::read_to_string(&source_path).expect("source visual after dry-run"),
@@ -1949,8 +1977,6 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         "Updated Revenue",
         "--show-title",
         "false",
-        "--alt-text",
-        "Updated executive KPI",
         "--out-dir",
         styled_arg,
         "--json",
@@ -1996,21 +2022,16 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         Value::from("Updated Revenue")
     );
     assert_eq!(
-        styled_visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]["altText"]
-            ["expr"]["Literal"]["Value"],
-        Value::from("'Updated executive KPI'")
-    );
-    assert!(
-        styled_visual_json["visual"]["objects"]["general"][0]["properties"]
-            .get("altText")
-            .is_none(),
-        "an explicit mutation should migrate legacy alt text"
-    );
-    assert_eq!(
         styled_visual_json["visual"]["objects"]["general"][0]["properties"]["orientation"]["expr"]
             ["Literal"]["Value"],
         Value::from("'vertical'"),
-        "migration must preserve sibling legacy properties"
+        "title mutation must preserve sibling formatting properties"
+    );
+    assert_eq!(
+        styled_visual_json["visual"]["objects"]["general"][0]["properties"]["altText"]["expr"]["Literal"]
+            ["Value"],
+        Value::from("'Executive revenue chart'"),
+        "title-only mutation must not silently rewrite existing invalid metadata"
     );
     assert_eq!(
         styled_visual_json["visual"]["objects"]["title"][0]["properties"]["fontColor"]["solid"]["color"]
@@ -2018,15 +2039,15 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         Value::from("'#654321'")
     );
 
-    let migrated_lint = run_powerbi(&["lint", styled_arg, "--json"]);
-    assert_eq!(migrated_lint.code, 0, "stderr: {}", migrated_lint.stderr);
+    let styled_lint = run_powerbi(&["lint", styled_arg, "--json"]);
+    assert_eq!(styled_lint.code, 0, "stderr: {}", styled_lint.stderr);
     assert!(
-        stdout_json(&migrated_lint)["findings"]
+        stdout_json(&styled_lint)["findings"]
             .as_array()
             .expect("lint findings")
             .iter()
-            .all(|finding| finding["code"] != "pbir.visual_alt_text_legacy_location"),
-        "the explicit alt-text mutation should clear the legacy lint finding"
+            .any(|finding| finding["code"] == "pbir.visual_alt_text_legacy_location"),
+        "title-only mutation should leave rejected alt text visible to lint"
     );
 
     let visual_show = run_powerbi(&[
@@ -2044,6 +2065,33 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
         stdout_json(&visual_show)["visual"]["title"],
         Value::from("Updated Revenue")
     );
+
+    patch_json(&styled_visual_path, |visual| {
+        visual["visual"]["visualContainerObjects"]["general"] = json!([{
+            "properties": {
+                "altText": {
+                    "expr": { "Literal": { "Value": "'Rejected shared alt text'" } }
+                }
+            }
+        }]);
+    });
+    let container_lint = run_powerbi(&["lint", styled_arg, "--json"]);
+    assert_eq!(container_lint.code, 0, "stderr: {}", container_lint.stderr);
+    let container_lint_json = stdout_json(&container_lint);
+    let container_finding = container_lint_json["findings"]
+        .as_array()
+        .expect("lint findings")
+        .iter()
+        .find(|finding| finding["code"] == "pbir.visual_alt_text_unsupported_location")
+        .expect("visual-container alt text should produce an actionable lint finding");
+    assert!(
+        container_finding["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("--clear-alt-text")
+    );
+    let styled_before_clear =
+        fs::read_to_string(&styled_visual_path).expect("styled visual before clear");
 
     let cleared_project = temp.path().join("sales_project_text_cleared");
     let cleared_arg = cleared_project.to_str().expect("cleared project path");
@@ -2073,15 +2121,38 @@ fn report_visuals_formatting_set_text_round_trips_through_out_dir() {
     )
     .expect("parse cleared visual json");
     assert!(
-        cleared_visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]
-            .get("altText")
+        cleared_visual_json
+            .pointer("/visual/visualContainerObjects/general/0/properties/altText")
+            .is_none()
+    );
+    assert!(
+        cleared_visual_json
+            .pointer("/visual/objects/general/0/properties/altText")
             .is_none()
     );
     assert_eq!(
-        styled_visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]["altText"]
-            ["expr"]["Literal"]["Value"],
-        Value::from("'Updated executive KPI'"),
+        cleared_visual_json["visual"]["objects"]["general"][0]["properties"]["orientation"]["expr"]
+            ["Literal"]["Value"],
+        Value::from("'vertical'"),
+        "clear must preserve sibling formatting properties"
+    );
+    assert_eq!(
+        fs::read_to_string(&styled_visual_path).expect("styled source after out-dir clear"),
+        styled_before_clear,
         "out-dir clear should not mutate the styled source project"
+    );
+    let cleared_lint = run_powerbi(&["lint", cleared_arg, "--json"]);
+    assert_eq!(cleared_lint.code, 0, "stderr: {}", cleared_lint.stderr);
+    assert!(
+        stdout_json(&cleared_lint)["findings"]
+            .as_array()
+            .expect("lint findings")
+            .iter()
+            .all(|finding| !finding["code"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("alt_text")),
+        "cleared project should contain no rejected alt-text lint finding"
     );
 }
 
@@ -2120,8 +2191,6 @@ fn report_visuals_formatting_set_text_creates_missing_cards_with_page_visual_sel
         visual_name,
         "--title",
         "Generated Title",
-        "--alt-text",
-        "Generated alt text",
         "--out-dir",
         out_arg,
         "--json",
@@ -2159,10 +2228,10 @@ fn report_visuals_formatting_set_text_creates_missing_cards_with_page_visual_sel
         visual_json["annotations"][0]["value"],
         Value::from("Generated Title")
     );
-    assert_eq!(
-        visual_json["visual"]["visualContainerObjects"]["general"][0]["properties"]["altText"]["expr"]
-            ["Literal"]["Value"],
-        Value::from("'Generated alt text'")
+    assert!(
+        visual_json
+            .pointer("/visual/visualContainerObjects/general/0/properties/altText")
+            .is_none()
     );
 }
 
@@ -2227,7 +2296,7 @@ fn report_visuals_formatting_set_text_rejects_unsafe_requests() {
             .contains("requires --title")
     );
 
-    let conflicting_alt = run_powerbi(&[
+    let unsupported_alt = run_powerbi(&[
         "report",
         "visuals",
         "formatting",
@@ -2238,16 +2307,30 @@ fn report_visuals_formatting_set_text_rejects_unsafe_requests() {
         &handle,
         "--alt-text",
         "Replacement",
-        "--clear-alt-text",
         "--dry-run",
         "--json",
     ]);
-    assert_eq!(conflicting_alt.code, 2);
+    assert_eq!(unsupported_alt.code, 2);
+    let unsupported_alt_json = stderr_json(&unsupported_alt);
+    assert_eq!(
+        unsupported_alt_json["error"]["code"],
+        Value::from("unsupported_feature")
+    );
     assert!(
-        stderr_json(&conflicting_alt)["error"]["message"]
+        unsupported_alt_json["error"]["message"]
             .as_str()
             .unwrap_or_default()
-            .contains("choose either --alt-text")
+            .contains("PBIR_FORMATTING_PROP_UNKNOWN")
+    );
+    assert!(
+        unsupported_alt_json["error"]["suggestedCommands"]
+            .as_array()
+            .expect("suggested commands")
+            .iter()
+            .any(|command| command
+                .as_str()
+                .unwrap_or_default()
+                .contains("--clear-alt-text"))
     );
 }
 
@@ -8731,7 +8814,12 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             "{} emitted forbidden root-level objects",
             case.slug
         );
-        assert!(raw["visual"]["visualContainerObjects"]["general"].is_array());
+        assert!(
+            raw.pointer("/visual/visualContainerObjects/general/0/properties/altText")
+                .is_none(),
+            "{} emitted validator-rejected general.altText",
+            case.slug
+        );
         for role in case.roles {
             assert!(
                 raw["visual"]["query"]["queryState"][*role].is_object(),
@@ -8845,7 +8933,6 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             .as_array()
             .expect("formatting object names")
             .clone();
-        assert!(object_names.iter().any(|name| name == "general"));
         if case.canonical_type == "slicer" {
             assert!(object_names.iter().any(|name| name == "data"));
         }
@@ -11118,7 +11205,6 @@ fn capabilities_advertise_report_layout_commands() {
     for expected_flag in [
         "--title <text>",
         "--show-title true|false",
-        "--alt-text <text>",
         "--clear-alt-text",
         "--dry-run",
         "--out-dir <dir>",
@@ -11132,6 +11218,14 @@ fn capabilities_advertise_report_layout_commands() {
             "missing visual formatting set-text flag {expected_flag}"
         );
     }
+    assert!(
+        !visual_formatting_set_text["flags"]
+            .as_array()
+            .expect("flags")
+            .iter()
+            .any(|flag| flag == "--alt-text <text>"),
+        "capabilities must not advertise validator-rejected alt-text authoring"
+    );
     let visual_formatting_set_color = value["commands"]
         .as_array()
         .expect("commands")
