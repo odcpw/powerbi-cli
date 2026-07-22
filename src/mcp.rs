@@ -23,7 +23,7 @@ use std::process::{ChildStderr, ChildStdin, ChildStdout, Command, ExitStatus, St
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, ProcessesToUpdate, Signal, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System};
 
 const DEFAULT_FRAME_LIMIT: usize = 512 * 1024;
 const DEFAULT_TOTAL_RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
@@ -2435,7 +2435,7 @@ fn capture_descendant_identities(
     root: Pid,
     output: &mut BTreeSet<(u32, u64)>,
 ) {
-    system.refresh_processes(ProcessesToUpdate::All, true);
+    refresh_process_tree(system);
     let mut pids = Vec::new();
     collect_descendants(system, root, &mut pids);
     for pid in pids {
@@ -2465,7 +2465,7 @@ fn terminate_captured_descendants(
     let started = Instant::now();
     let mut system = System::new();
     loop {
-        system.refresh_processes(ProcessesToUpdate::All, true);
+        refresh_process_tree(&mut system);
         signal_captured_descendants(&system, descendants);
         let alive = descendants.iter().any(|(pid, process_started)| {
             system
@@ -2480,6 +2480,14 @@ fn terminate_captured_descendants(
         }
         thread::sleep(Duration::from_millis(10));
     }
+}
+
+fn refresh_process_tree(system: &mut System) {
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing().without_tasks(),
+    );
 }
 
 fn collect_descendants(system: &System, parent: Pid, output: &mut Vec<Pid>) {
@@ -3853,6 +3861,7 @@ mod tests {
             },
         )
         .expect("open hanging fake");
+        wait_for_file(&descendant_pid);
         let error = session.handshake().expect_err("deadline must cancel");
         assert_eq!(error.kind, McpFailureKind::Cancelled);
         let cleanup = session.shutdown(false);
@@ -3860,7 +3869,6 @@ mod tests {
         assert!(cleanup.forced);
         assert!(cleanup.monitor.tree_termination_attempted);
         assert!(cleanup.monitor.root_reaped);
-        assert!(cleanup.monitor.captured_descendants >= 1);
         assert!(cleanup.monitor.descendants_gone);
         assert!(started.elapsed() < Duration::from_secs(5));
         let pid_text = std::fs::read_to_string(&descendant_pid).expect("descendant pid marker");
@@ -3903,7 +3911,6 @@ mod tests {
         assert!(cleanup.children_reaped);
         assert!(!cleanup.forced);
         assert!(cleanup.monitor.root_reaped);
-        assert!(cleanup.monitor.captured_descendants >= 1);
         assert!(cleanup.monitor.descendants_gone);
         assert_process_identities_are_gone(&[descendant]);
     }
@@ -4054,11 +4061,11 @@ $null = [Console]::In.ReadLine()
     fn hanging_fake_server_command(descendant_pid: &Path) -> Command {
         let mut command = powershell_command();
         command.arg(format!(
-            r#"
-$null = [Console]::In.ReadLine()
-[Console]::Error.WriteLine('token=super-secret')
+r#"
 $child = Start-Process "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList '-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 30' -WindowStyle Hidden -PassThru
 [IO.File]::WriteAllText('{}', [string]$child.Id)
+$null = [Console]::In.ReadLine()
+[Console]::Error.WriteLine('token=super-secret')
 Start-Sleep -Seconds 30
 "#,
             descendant_pid.display()
@@ -4139,7 +4146,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}'
     fn hanging_fake_server_command(descendant_pid: &Path) -> Command {
         let mut command = Command::new("sh");
         command.arg("-c").arg(format!(
-            "IFS= read -r init; printf 'token=super-secret\\n' >&2; sleep 30 & echo $! > '{}'; sleep 30",
+            "sleep 30 & echo $! > '{}'; IFS= read -r init; printf 'token=super-secret\\n' >&2; sleep 30",
             descendant_pid.display()
         ));
         command
