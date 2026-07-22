@@ -92,6 +92,7 @@ Usage:
   powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json
   powerbi-cli model dax lint --project <project-dir-or.pbip> --json
   powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json
+  powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read --json
   powerbi-cli model advanced inventory --project <project-dir-or.pbip> --json
   powerbi-cli model roles list --project <project-dir-or.pbip> --json
   powerbi-cli model perspectives list --project <project-dir-or.pbip> --json
@@ -292,7 +293,7 @@ Rules for agents:
 - Use `model measures list/show/add/update/delete` for DAX measure authoring; updates refuse unsupported Desktop-authored TMDL metadata, local validation proves file structure, and Power BI Desktop remains the DAX compatibility oracle.
 - Use `model calculated-columns list/show/add/update/delete` for DAX calculated column authoring; input type `date` normalizes to TMDL `dateTime` with a default `Short Date` format, updates refuse unsupported Desktop-authored TMDL metadata, and calculated columns may require refresh after Desktop opens the project.
 - Reuse returned semantic-model handles. Literal `%` and `:` inside table, column, measure, and partition components are encoded as `%25` and `%3A` so handles round-trip without ambiguity.
-- Use `model dax dependencies/lint/bridge-plan` to enumerate DAX expressions, static references, obvious broken dependencies, and validation boundaries. On an opted-in Windows oracle machine, `model dax execute` can run a bounded read-only EVALUATE query against the exact already-open PBIP or PBIX document; it never launches Desktop or returns the query text. PBIP live preflight ignores only each selected artifact's root `.pbi/` runtime directory; PBIX preflight verifies the package/report/DataModel shape. Strict offline validation, packaging, workflow, and handoff still reject PBIP runtime state.
+- Use `model dax dependencies/lint/bridge-plan` to enumerate DAX expressions, static references, obvious broken dependencies, and validation boundaries. On an opted-in Windows oracle machine, `model dax execute` can run a bounded read-only EVALUATE query against the exact already-open PBIP or PBIX document; it never launches Desktop or returns the query text. `model live export-tmdl` uses the same exact live-engine identity and the pinned local Microsoft Modeling MCP to publish one credential-scanned semantic-model TMDL definition into a fresh output directory. It does not export report pages or claim full PBIX-to-PBIP conversion. PBIP live preflight ignores only each selected artifact's root `.pbi/` runtime directory; PBIX preflight verifies the package/report/DataModel shape. Strict offline validation, packaging, workflow, and handoff still reject PBIP runtime state.
 - Use `model advanced inventory`, `model roles list/show`, `model perspectives list/show`, `model cultures list/show`, and `model expressions list/show` for advanced TMDL readback. Mutations remain fixture-gated.
 - Use `model relationships list/show/add/update/delete` for model relationships. Endpoint rewiring is delete+add in this alpha surface; `update` changes active state and cross-filtering behavior.
 - Use `model partitions list/show` to inspect generated dummy M partitions and their offline safety classification.
@@ -372,6 +373,7 @@ pub(crate) fn robot_triage() -> Value {
             "partitionList": "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
             "modelDaxExecute": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
+            "modelLiveExportTmdl": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read --json",
             "sourceTemplateList": "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
@@ -1520,10 +1522,32 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.model.dax.execute.v2",
+            "timeoutContract": "timeout-ms is one end-to-end watchdog for exact Desktop/model discovery, in-bridge PID/creation/workspace/port revalidation, connection, and bounded query execution",
             "flags": ["--project <project-dir-or.pbip-or.pbix>", "--query <dax>", "--query-file <path|->", "--allow-data-read", "--max-rows <1..100000>", "--max-cell-chars <1..1000000>", "--timeout-ms <1000..300000>", "--json", "--format json"],
             "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project build/sales --query-file checks/total-revenue.dax --allow-data-read --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax query --project build/sales --query \"EVALUATE ROW(\\\"Value\\\", 1)\" --allow-data-read --max-rows 10 --json"],
             "limitations": ["Windows and an already-open exact PBIP or PBIX document match are required; the command never launches Desktop.", "Only EVALUATE or DEFINE ... EVALUATE query forms are accepted; XMLA/model mutations are refused.", "Returned rows can contain sensitive model data and are bounded but not redacted.", "The local Desktop Analysis Services endpoint and bundled ADOMD client are implementation details and may change with Desktop."],
             "followUpFields": ["ok", "exitCode", "document.kind", "document.path", "query.fingerprint", "query.textReturned", "safety", "limits", "stage", "engine.desktopProcessId", "engine.modelProcessId", "columns", "rows", "counts", "truncation", "runtime.temporaryFilesRemoved", "diagnostics", "validation", "next"]
+        }),
+        json!({
+            "path": "model live export-tmdl",
+            "usage": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read [--timeout-ms <1000..300000>] --json",
+            "summary": "Export the semantic model of one exact already-open Desktop PBIP/PBIX document to a fresh validated TMDL definition through the pinned local Microsoft MCP",
+            "tags": ["tmdl", "semantic-model", "pbix", "pbip", "desktop", "modeling-mcp", "read-only", "model-read", "agent", "no-fallback"],
+            "readOnly": true,
+            "mutates": false,
+            "writesOutput": true,
+            "writesDataCache": false,
+            "returnsModelData": false,
+            "returnsModelMetadata": true,
+            "explicitOptIn": ["POWERBI_DESKTOP_ORACLE=1", "--allow-model-read"],
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.model.live.export-tmdl.v1",
+            "timeoutContract": "timeout-ms is one end-to-end watchdog for discovery, exact endpoint revalidation, MCP handshake/connect/export, bounded output validation, publication, and a reserved MCP cleanup budget",
+            "flags": ["--document <project-dir-or.pbip-or.pbix>", "--out-dir <fresh-dir>", "--allow-model-read", "--timeout-ms <1000..300000>", "--json", "--format json"],
+            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document SourceProfile.pbix --out-dir build/source-profile-model --allow-model-read --json"],
+            "limitations": ["Windows and an already-open exact PBIP or PBIX document match are required; the command never launches Desktop.", "The pinned local Microsoft Modeling MCP integration must be installed and pass its exact handshake.", "The output is semantic-model TMDL only, not report pages and not a full PBIX-to-PBIP conversion.", "TMDL contains DAX, Power Query source expressions, and possibly small static table values; explicit model-read consent and review are required.", "The destination must be a fresh child of an existing ordinary directory; export occurs in a private sibling quarantine and is published only after bounded shape, UTF-8, link/reparse, and credential-like-text validation."],
+            "followUpFields": ["ok", "exitCode", "document.kind", "document.path", "output.kind", "output.root", "output.definition", "output.fileCount", "output.totalBytes", "output.sha256", "engine.desktopProcessId", "engine.modelProcessId", "integration.server", "integration.cleanup", "safety", "limits", "validation", "instructions", "next"]
         }),
         json!({
             "path": "model advanced inventory",

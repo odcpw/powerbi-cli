@@ -91,8 +91,12 @@ those entries are present, and it can import PBIP/PBIR/TMDL source folders from
 such archives. On Windows, PBIX is also a first-class managed Desktop document:
 `desktop open` launches it through the same owned-session lifecycle as PBIP, and
 `model dax execute` can issue bounded read-only queries against its exact live
-semantic-model engine. Binary export remains a Desktop handoff; PBIP/TMDL stays
-the editable source format.
+semantic-model engine. `model live export-tmdl` uses that same exact engine
+identity and the pinned local Microsoft Modeling MCP in read-only mode to
+publish a bounded, credential-scanned semantic-model TMDL definition into one
+fresh output directory. This is semantic-model extraction only: it does not
+export report pages or claim full PBIX-to-PBIP conversion. Binary export remains
+a Desktop handoff; PBIP/TMDL stays the editable source format.
 
 ## Desktop Compatibility Notes
 
@@ -209,6 +213,7 @@ $env:POWERBI_DESKTOP_ORACLE='1'
 cargo run --bin powerbi-cli -- model dax execute --project .\build\sales --query 'EVALUATE ROW("Revenue", [Total Revenue])' --allow-data-read --max-rows 10 --json
 cargo run --bin powerbi-cli -- desktop open .\SourceProfile.pbix --json
 cargo run --bin powerbi-cli -- model dax execute --project .\SourceProfile.pbix --query 'EVALUATE TOPN(20, INFO.VIEW.TABLES())' --allow-data-read --max-rows 20 --json
+cargo run --bin powerbi-cli -- model live export-tmdl --document .\SourceProfile.pbix --out-dir .\build\source-profile-model --allow-model-read --json
 cargo run --bin powerbi-cli -- desktop close --json
 cargo run --bin powerbi-cli -- model advanced inventory --project .\build\sales --json
 cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
@@ -450,6 +455,16 @@ three pages.
   workflow, and handoff keep rejecting PBIP runtime files. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
   instead of silently dropping it; Power BI Desktop or an explicit engine bridge
   remains the compatibility oracle.
+- Read-only live semantic-model extraction covers `model live export-tmdl` on
+  Windows. The exact PBIP/PBIX document must already be open, both
+  `POWERBI_DESKTOP_ORACLE=1` and `--allow-model-read` are required, and the
+  pinned Microsoft Modeling MCP must pass its locked handshake. The command
+  connects only to the exact locally discovered engine port, exports into a
+  fresh sibling quarantine, rejects links/reparse points, unexpected files,
+  invalid UTF-8, oversized definitions, and credential-like text, and publishes
+  only after the MCP process tree is reaped. The output contains only a
+  `definition/` TMDL tree; it is not a report export or full PBIX-to-PBIP
+  conversion.
 - Programmatic static-table authoring covers `model tables add-static` for a
   new disconnected single-string-column selector or a small 1-10-column string
   lookup dimension backed by a generated inline `#table` partition. Cells are

@@ -37,14 +37,19 @@ blank components and duplicate composites.
 4. When a targeted model assertion can be expressed as a table-valued DAX
    query, run `model dax execute` with both opt-ins and default/tighter bounds;
    keep its result separate from canvas proof.
-5. Visit every changed page and confirm that no visual has an error banner.
-6. Exercise every new selector/toggle, including its non-default option.
-7. Click the matrix/table rows that drive drill or cross-filter behavior.
-8. Confirm the time axis remains stable after branch/company/body-part
+5. When the live PBIX semantic model itself must be inspected as source, run
+   `model live export-tmdl` with `--allow-model-read` into one fresh temporary or
+   reviewed output. Require the output hash/counts and complete MCP child/pump
+   cleanup. Treat its M expressions and static values as sensitive metadata;
+   it is TMDL-only and does not prove report-page extraction.
+6. Visit every changed page and confirm that no visual has an error banner.
+7. Exercise every new selector/toggle, including its non-default option.
+8. Click the matrix/table rows that drive drill or cross-filter behavior.
+9. Confirm the time axis remains stable after branch/company/body-part
    selections.
-9. For scatter charts, confirm bubbles render, the Legend well is populated,
+10. For scatter charts, confirm bubbles render, the Legend well is populated,
    and a branch selection changes the point grain to companies when intended.
-10. Compare transformed charts with raw cards/tables to prevent misleading
+11. Compare transformed charts with raw cards/tables to prevent misleading
    labels or accidental aggregation changes.
 
 Use these exact local QA commands before Desktop:

@@ -1,5 +1,10 @@
 use crate::cli_support::{required_project, take_value};
 use crate::desktop_target::{ResolvedDesktopTarget, resolve_desktop_target};
+use crate::live_model::desktop_oracle_enabled;
+#[cfg(windows)]
+use crate::live_model::{
+    LiveModelEndpoint, OperationDeadline, resolve_live_model_endpoint, windows_argument_path,
+};
 use crate::{
     CliError, CliResult, EXIT_ORACLE_UNAVAILABLE, EXIT_VALIDATION_FAILED, canonical_display,
     validate_desktop_runtime_project,
@@ -185,7 +190,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
         ));
     }
 
-    if !oracle_enabled() {
+    if !desktop_oracle_enabled() {
         return Ok(base.render(
             false,
             EXIT_ORACLE_UNAVAILABLE,
@@ -226,7 +231,7 @@ impl BasePayloadContext<'_> {
             "safety": {
                 "readOnlyQueryFormsOnly": true,
                 "allowDataRead": self.options.allow_data_read,
-                "desktopOracleEnabled": oracle_enabled(),
+                "desktopOracleEnabled": desktop_oracle_enabled(),
                 "exactOpenProjectMatchRequired": true,
                 "autoLaunch": false,
                 "modelWrites": false,
@@ -264,6 +269,22 @@ fn execute_windows(
         query_metadata,
         validation,
     };
+    let deadline = OperationDeadline::new(Duration::from_millis(options.timeout_ms));
+    let endpoint = match deadline
+        .remaining("Desktop discovery")
+        .and_then(|remaining| resolve_live_model_endpoint(target, remaining))
+    {
+        Ok(endpoint) => endpoint,
+        Err(error) => {
+            let exit_code = error.exit_code;
+            return Ok(base.render(
+                false,
+                exit_code,
+                "desktop-discovery",
+                cli_error_diagnostic(error),
+            ));
+        }
+    };
     let mut runtime = RuntimeDir::create()?;
     let script_path = runtime.path.join("execute-dax.ps1");
     let query_path = runtime.path.join("query.dax");
@@ -288,6 +309,22 @@ fn execute_windows(
         .arg(&script_path)
         .arg("-DocumentPath")
         .arg(windows_argument_path(&target.artifact_path))
+        .arg("-DesktopExecutable")
+        .arg(windows_argument_path(&endpoint.desktop_executable))
+        .arg("-DesktopProcessId")
+        .arg(endpoint.desktop_process_id.to_string())
+        .arg("-ModelProcessId")
+        .arg(endpoint.model_process_id.to_string())
+        .arg("-Port")
+        .arg(endpoint.port.to_string())
+        .arg("-DesktopVersion")
+        .arg(&endpoint.desktop_version)
+        .arg("-DesktopCreationTicks")
+        .arg(endpoint.desktop_creation_ticks.to_string())
+        .arg("-ModelCreationTicks")
+        .arg(endpoint.model_creation_ticks.to_string())
+        .arg("-ModelWorkspace")
+        .arg(windows_argument_path(&endpoint.model_workspace))
         .arg("-QueryPath")
         .arg(&query_path)
         .arg("-AdomdCopyPath")
@@ -296,13 +333,28 @@ fn execute_windows(
         .arg(options.max_rows.to_string())
         .arg("-MaxCellChars")
         .arg(options.max_cell_chars.to_string())
-        .arg("-TimeoutMs")
-        .arg(options.timeout_ms.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let execution = run_command_with_timeout(command, Duration::from_millis(options.timeout_ms));
+    let bridge_budget = match deadline.remaining("DAX bridge execution") {
+        Ok(remaining) => remaining,
+        Err(error) => {
+            let cleanup_succeeded = runtime.cleanup();
+            let mut payload = base.render(
+                false,
+                error.exit_code,
+                "bridge-deadline",
+                cli_error_diagnostic(error),
+            );
+            payload["runtime"] = json!({"temporaryFilesRemoved": cleanup_succeeded});
+            return Ok(payload);
+        }
+    };
+    command
+        .arg("-TimeoutMs")
+        .arg(duration_millis_ceil(bridge_budget).to_string());
+    let execution = run_command_with_timeout(command, bridge_budget);
     let (bridge, process_diagnostic) = match execution {
         Ok(Timed::Completed(output)) if output.status.success() => {
             let text = String::from_utf8_lossy(&output.stdout);
@@ -332,7 +384,7 @@ fn execute_windows(
             None,
             Some(json!({
                 "code": "bridge_timeout",
-                "message": format!("Desktop DAX bridge exceeded the {} ms watchdog.", options.timeout_ms)
+                "message": format!("Desktop DAX operation exceeded the end-to-end {} ms watchdog.", options.timeout_ms)
             })),
         ),
         Err(err) => (
@@ -354,7 +406,7 @@ fn execute_windows(
     let bridge = bridge.expect("bridge result or process diagnostic");
     if !bridge.ok {
         let query_failure = bridge.stage == "query-execution";
-        let engine = bridge_engine_json(&bridge);
+        let engine = bridge_engine_json(&bridge, &endpoint);
         let exit_code = if query_failure {
             EXIT_VALIDATION_FAILED
         } else {
@@ -375,7 +427,7 @@ fn execute_windows(
         return Ok(payload);
     }
 
-    let engine = bridge_engine_json(&bridge);
+    let engine = bridge_engine_json(&bridge, &endpoint);
     let rows = bridge
         .rows
         .into_iter()
@@ -440,13 +492,31 @@ fn execute_windows(
 }
 
 #[cfg(windows)]
-fn bridge_engine_json(bridge: &BridgeResult) -> Value {
+fn cli_error_diagnostic(error: CliError) -> Value {
+    json!({
+        "code": error.code,
+        "message": error.message,
+        "hint": error.hint,
+        "suggestedCommands": error.suggested_commands
+    })
+}
+
+#[cfg(windows)]
+fn duration_millis_ceil(duration: Duration) -> u64 {
+    let millis = duration.as_millis();
+    u64::try_from(millis)
+        .unwrap_or(u64::MAX)
+        .max(u64::from(!duration.is_zero() && millis == 0))
+}
+
+#[cfg(windows)]
+fn bridge_engine_json(bridge: &BridgeResult, endpoint: &LiveModelEndpoint) -> Value {
     json!({
         "kind": "power-bi-desktop-local-analysis-services",
-        "desktopProcessId": bridge.desktop_process_id,
-        "modelProcessId": bridge.model_process_id,
-        "port": bridge.port,
-        "desktopVersion": bridge.desktop_version
+        "desktopProcessId": bridge.desktop_process_id.unwrap_or(u64::from(endpoint.desktop_process_id)),
+        "modelProcessId": bridge.model_process_id.unwrap_or(u64::from(endpoint.model_process_id)),
+        "port": bridge.port.unwrap_or(u64::from(endpoint.port)),
+        "desktopVersion": bridge.desktop_version.as_deref().unwrap_or(&endpoint.desktop_version)
     })
 }
 
@@ -709,12 +779,6 @@ fn mask_dax_literals_and_comments(query: &str) -> String {
     result
 }
 
-fn oracle_enabled() -> bool {
-    std::env::var("POWERBI_DESKTOP_ORACLE")
-        .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
-        .unwrap_or(false)
-}
-
 fn fingerprint_hex(text: &str) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in text.as_bytes() {
@@ -734,18 +798,6 @@ fn bounded_message(message: &str) -> String {
         format!("{bounded}…")
     } else {
         bounded
-    }
-}
-
-#[cfg(windows)]
-fn windows_argument_path(path: &Path) -> String {
-    let value = path.as_os_str().to_string_lossy();
-    if let Some(stripped) = value.strip_prefix(r"\\?\UNC\") {
-        format!(r"\\{stripped}")
-    } else if let Some(stripped) = value.strip_prefix(r"\\?\") {
-        stripped.to_string()
-    } else {
-        value.into_owned()
     }
 }
 
@@ -814,6 +866,14 @@ impl Drop for RuntimeDir {
 const DAX_EXECUTE_SCRIPT: &str = r#"
 param(
     [Parameter(Mandatory = $true)][string]$DocumentPath,
+    [Parameter(Mandatory = $true)][string]$DesktopExecutable,
+    [Parameter(Mandatory = $true)][int]$DesktopProcessId,
+    [Parameter(Mandatory = $true)][int]$ModelProcessId,
+    [Parameter(Mandatory = $true)][int]$Port,
+    [Parameter(Mandatory = $true)][string]$DesktopVersion,
+    [Parameter(Mandatory = $true)][long]$DesktopCreationTicks,
+    [Parameter(Mandatory = $true)][long]$ModelCreationTicks,
+    [Parameter(Mandatory = $true)][string]$ModelWorkspace,
     [Parameter(Mandatory = $true)][string]$QueryPath,
     [Parameter(Mandatory = $true)][string]$AdomdCopyPath,
     [Parameter(Mandatory = $true)][int]$MaxRows,
@@ -823,124 +883,113 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$stage = 'desktop-discovery'
-$desktop = $null
-$model = $null
-$port = $null
-$desktopVersion = $null
+$stage = 'assembly-load'
 $connection = $null
 $reader = $null
-try {
+function Assert-ExpectedEndpoint {
     $documentFull = [IO.Path]::GetFullPath($DocumentPath)
     $documentExtension = [IO.Path]::GetExtension($documentFull)
-    if (
-        -not [string]::Equals($documentExtension, '.pbip', [StringComparison]::OrdinalIgnoreCase) -and
-        -not [string]::Equals($documentExtension, '.pbix', [StringComparison]::OrdinalIgnoreCase)
-    ) {
-        throw "Unsupported Desktop document extension: $documentExtension"
-    }
     $processes = @(Get-CimInstance Win32_Process -ErrorAction Stop)
-    $desktopMatches = [System.Collections.Generic.List[object]]::new()
-    foreach ($candidate in @($processes | Where-Object { $_.Name -like 'PBIDesktop*.exe' })) {
-        $tokens = [System.Collections.Generic.List[string]]::new()
-        foreach ($match in [regex]::Matches([string]$candidate.CommandLine, '"(?<value>[^\"]+)"')) {
-            [void]$tokens.Add([string]$match.Groups['value'].Value)
-        }
-        foreach ($token in ([string]$candidate.CommandLine -split '\s+')) {
-            [void]$tokens.Add($token.Trim('"'))
-        }
-        $matched = $false
-        foreach ($token in $tokens) {
-            if (-not $token.EndsWith($documentExtension, [StringComparison]::OrdinalIgnoreCase)) {
-                continue
-            }
-            try {
-                $candidateDocument = [IO.Path]::GetFullPath($token)
-                if ([string]::Equals($candidateDocument, $documentFull, [StringComparison]::OrdinalIgnoreCase)) {
-                    $matched = $true
-                    break
-                }
-            } catch {}
-        }
-        if ($matched) {
-            [void]$desktopMatches.Add($candidate)
-        }
-    }
-    if ($desktopMatches.Count -eq 0) {
-        throw "No running Power BI Desktop process has the exact document open: $documentFull"
-    }
+    $desktopMatches = @($processes | Where-Object { [int]$_.ProcessId -eq $DesktopProcessId })
     if ($desktopMatches.Count -ne 1) {
-        throw "Expected one Power BI Desktop process for the exact document, found $($desktopMatches.Count)."
+        throw 'The exact Power BI Desktop PID is no longer present.'
     }
-    $desktop = $desktopMatches[0]
+    $expectedDesktop = $desktopMatches[0]
+    if ([int64]$expectedDesktop.CreationDate.ToUniversalTime().Ticks -ne $DesktopCreationTicks) {
+        throw 'The exact Power BI Desktop PID was reused.'
+    }
+    if (
+        [string]::IsNullOrWhiteSpace([string]$expectedDesktop.ExecutablePath) -or
+        -not [string]::Equals(
+            [IO.Path]::GetFullPath([string]$expectedDesktop.ExecutablePath),
+            [IO.Path]::GetFullPath($DesktopExecutable),
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        throw 'The exact Power BI Desktop executable identity changed.'
+    }
+    $tokens = [System.Collections.Generic.List[string]]::new()
+    foreach ($match in [regex]::Matches([string]$expectedDesktop.CommandLine, '"(?<value>[^\"]+)"')) {
+        [void]$tokens.Add([string]$match.Groups['value'].Value)
+    }
+    foreach ($token in ([string]$expectedDesktop.CommandLine -split '\s+')) {
+        [void]$tokens.Add($token.Trim('"'))
+    }
+    $documentMatched = $false
+    foreach ($token in $tokens) {
+        if (-not $token.EndsWith($documentExtension, [StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        try {
+            if ([string]::Equals([IO.Path]::GetFullPath($token), $documentFull, [StringComparison]::OrdinalIgnoreCase)) {
+                $documentMatched = $true
+                break
+            }
+        } catch {}
+    }
+    if (-not $documentMatched) {
+        throw 'The exact Power BI Desktop PID no longer has the requested document identity.'
+    }
 
-    $stage = 'model-discovery'
     $descendantIds = [System.Collections.Generic.HashSet[int]]::new()
-    [void]$descendantIds.Add([int]$desktop.ProcessId)
+    [void]$descendantIds.Add($DesktopProcessId)
     $changed = $true
     while ($changed) {
         $changed = $false
         foreach ($candidate in $processes) {
-            if (
-                $descendantIds.Contains([int]$candidate.ParentProcessId) -and
-                -not $descendantIds.Contains([int]$candidate.ProcessId)
-            ) {
+            if ($descendantIds.Contains([int]$candidate.ParentProcessId) -and -not $descendantIds.Contains([int]$candidate.ProcessId)) {
                 [void]$descendantIds.Add([int]$candidate.ProcessId)
                 $changed = $true
             }
         }
     }
-    $models = [System.Collections.Generic.List[object]]::new()
-    foreach ($candidate in @($processes | Where-Object { $_.Name -eq 'msmdsrv.exe' })) {
-        if (-not $descendantIds.Contains([int]$candidate.ProcessId)) {
-            continue
-        }
-        $workspaceMatch = [regex]::Match(
-            [string]$candidate.CommandLine,
-            '(?:^|\s)-s\s+(?:"(?<quoted>[^\"]+)"|(?<bare>\S+))',
-            [Text.RegularExpressions.RegexOptions]::IgnoreCase
-        )
-        if (-not $workspaceMatch.Success) {
-            continue
-        }
-        $workspace = if ($workspaceMatch.Groups['quoted'].Success) {
-            $workspaceMatch.Groups['quoted'].Value
-        } else {
-            $workspaceMatch.Groups['bare'].Value
-        }
-        $portFile = Join-Path $workspace 'msmdsrv.port.txt'
-        if (-not (Test-Path -LiteralPath $portFile -PathType Leaf)) {
-            continue
-        }
-        $portText = [IO.File]::ReadAllText($portFile, [Text.Encoding]::Unicode)
-        $portMatch = [regex]::Match($portText, '\d+')
-        if (-not $portMatch.Success) {
-            continue
-        }
-        $candidatePort = [int]$portMatch.Value
-        if ($candidatePort -lt 1 -or $candidatePort -gt 65535) {
-            continue
-        }
-        [void]$models.Add([pscustomobject]@{
-            process = $candidate
-            port = $candidatePort
-        })
+    $modelMatches = @($processes | Where-Object {
+        [int]$_.ProcessId -eq $ModelProcessId -and
+        $_.Name -eq 'msmdsrv.exe' -and
+        $descendantIds.Contains([int]$_.ProcessId)
+    })
+    if ($modelMatches.Count -ne 1) {
+        throw 'The exact descendant semantic-model PID is no longer present.'
     }
-    if ($models.Count -eq 0) {
-        throw 'The exact Desktop process has no discoverable local semantic-model engine.'
+    $expectedModel = $modelMatches[0]
+    if ([int64]$expectedModel.CreationDate.ToUniversalTime().Ticks -ne $ModelCreationTicks) {
+        throw 'The exact semantic-model PID was reused.'
     }
-    if ($models.Count -ne 1) {
-        throw "Expected one semantic-model engine below the exact Desktop process, found $($models.Count)."
+    $workspaceMatch = [regex]::Match(
+        [string]$expectedModel.CommandLine,
+        '(?:^|\s)-s\s+(?:"(?<quoted>[^\"]+)"|(?<bare>\S+))',
+        [Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    if (-not $workspaceMatch.Success) {
+        throw 'The exact semantic-model workspace is no longer discoverable.'
     }
-    $model = $models[0].process
-    $port = [int]$models[0].port
-
+    $workspace = if ($workspaceMatch.Groups['quoted'].Success) {
+        $workspaceMatch.Groups['quoted'].Value
+    } else {
+        $workspaceMatch.Groups['bare'].Value
+    }
+    $workspace = [IO.Path]::GetFullPath($workspace)
+    if (-not [string]::Equals($workspace, [IO.Path]::GetFullPath($ModelWorkspace), [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The exact semantic-model workspace changed.'
+    }
+    $portFile = Join-Path $workspace 'msmdsrv.port.txt'
+    if (-not (Test-Path -LiteralPath $portFile -PathType Leaf)) {
+        throw 'The exact semantic-model port file is no longer present.'
+    }
+    $portText = [IO.File]::ReadAllText($portFile, [Text.Encoding]::Unicode)
+    $portMatch = [regex]::Match($portText, '\d+')
+    if (-not $portMatch.Success -or [int]$portMatch.Value -ne $Port) {
+        throw 'The exact semantic-model endpoint port changed.'
+    }
+}
+try {
+    $stage = 'endpoint-revalidation'
+    Assert-ExpectedEndpoint
     $stage = 'assembly-load'
-    if ([string]::IsNullOrWhiteSpace([string]$desktop.ExecutablePath)) {
-        throw 'Power BI Desktop executable path is unavailable from the process inventory.'
+    if (-not (Test-Path -LiteralPath $DesktopExecutable -PathType Leaf)) {
+        throw 'The exact Power BI Desktop executable is no longer available.'
     }
-    $desktopVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo([string]$desktop.ExecutablePath).FileVersion
-    $adomdSource = Join-Path (Split-Path -Parent ([string]$desktop.ExecutablePath)) 'Microsoft.PowerBI.AdomdClient.dll'
+    $adomdSource = Join-Path (Split-Path -Parent $DesktopExecutable) 'Microsoft.PowerBI.AdomdClient.dll'
     if (-not (Test-Path -LiteralPath $adomdSource -PathType Leaf)) {
         throw 'Power BI Desktop did not expose its bundled Microsoft.PowerBI.AdomdClient.dll.'
     }
@@ -952,9 +1001,11 @@ try {
     $stage = 'connection'
     $query = [IO.File]::ReadAllText($QueryPath, [Text.Encoding]::UTF8)
     $connection = [Microsoft.AnalysisServices.AdomdClient.AdomdConnection]::new(
-        "Data Source=localhost:$port;Application Name=powerbi-cli"
+        "Data Source=localhost:$Port;Application Name=powerbi-cli"
     )
+    Assert-ExpectedEndpoint
     $connection.Open()
+    Assert-ExpectedEndpoint
     $command = $connection.CreateCommand()
     $command.CommandText = $query
     $command.CommandTimeout = [Math]::Max(1, [int][Math]::Ceiling($TimeoutMs / 1000.0))
@@ -1005,13 +1056,15 @@ try {
         [void]$rows.Add([pscustomobject]@{ values = $values })
     }
     $truncated = ($rows.Count -ge $MaxRows -and $reader.Read())
+    $stage = 'endpoint-revalidation'
+    Assert-ExpectedEndpoint
     $result = [pscustomobject]@{
         ok = $true
         stage = 'completed'
-        desktopProcessId = [int]$desktop.ProcessId
-        modelProcessId = [int]$model.ProcessId
-        port = $port
-        desktopVersion = $desktopVersion
+        desktopProcessId = $DesktopProcessId
+        modelProcessId = $ModelProcessId
+        port = $Port
+        desktopVersion = $DesktopVersion
         columns = [object[]]$columns.ToArray()
         rows = [object[]]$rows.ToArray()
         rowCount = $rows.Count
@@ -1025,10 +1078,10 @@ try {
         stage = $stage
         message = $_.Exception.Message
         errorType = $_.Exception.GetType().FullName
-        desktopProcessId = if ($null -eq $desktop) { $null } else { [int]$desktop.ProcessId }
-        modelProcessId = if ($null -eq $model) { $null } else { [int]$model.ProcessId }
-        port = $port
-        desktopVersion = $desktopVersion
+        desktopProcessId = $DesktopProcessId
+        modelProcessId = $ModelProcessId
+        port = $Port
+        desktopVersion = $DesktopVersion
     }
 } finally {
     if ($null -ne $reader) {
@@ -1111,12 +1164,20 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn bridge_script_contains_exact_match_and_result_guards() {
-        assert!(DAX_EXECUTE_SCRIPT.contains("exact document"));
-        assert!(DAX_EXECUTE_SCRIPT.contains(".pbix"));
+    fn bridge_script_contains_result_guards() {
         assert!(DAX_EXECUTE_SCRIPT.contains("$rows.Count -lt $MaxRows"));
         assert!(DAX_EXECUTE_SCRIPT.contains("$Value.Length -gt $MaxCellChars"));
         assert!(DAX_EXECUTE_SCRIPT.contains("$command.CommandTimeout"));
         assert!(DAX_EXECUTE_SCRIPT.contains("Microsoft.PowerBI.AdomdClient.dll"));
+        assert!(DAX_EXECUTE_SCRIPT.contains("function Assert-ExpectedEndpoint"));
+        assert!(DAX_EXECUTE_SCRIPT.contains("$DesktopCreationTicks"));
+        assert!(DAX_EXECUTE_SCRIPT.contains("$ModelCreationTicks"));
+        assert!(DAX_EXECUTE_SCRIPT.contains("$ModelWorkspace"));
+        assert!(
+            DAX_EXECUTE_SCRIPT
+                .matches("Assert-ExpectedEndpoint")
+                .count()
+                >= 5
+        );
     }
 }

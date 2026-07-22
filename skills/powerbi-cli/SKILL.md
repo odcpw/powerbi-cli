@@ -33,8 +33,11 @@ build or resolve powerbi-cli
   offline authoring.
 - The CLI authors PBIP/PBIR/TMDL folders, not `.pbix` or `.pbit` binaries.
   Package commands can inspect/extract/import safe metadata/source entries from
-  PBIX/PBIT archives, and `source-pack` writes only a scanned strict allowlist;
-  binary export is a Desktop handoff.
+  PBIX/PBIT archives, and `source-pack` writes only a scanned strict allowlist.
+  On Windows, `model live export-tmdl` can read the semantic model of one exact
+  already-open PBIP/PBIX document through the pinned local Microsoft Modeling
+  MCP and publish a guarded TMDL-only export; it does not export report pages or
+  claim full PBIX-to-PBIP conversion. Binary export is a Desktop handoff.
 - Generated home/offline projects must not contain credentials, real exported
   data, `.pbi/cache.abf`, `localSettings.json`, `.pbix`, or `.pbit`.
 - Dummy Power Query M partitions preserve schema shape until the work machine
@@ -104,6 +107,7 @@ pbi --json capabilities --for diff
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
 pbi --json capabilities --for "model dax execute"
+pbi --json capabilities --for "model live export-tmdl"
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
@@ -130,7 +134,9 @@ validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
 inspect, semantic measure,
 calculated-column, and relationship diff, report wireframe JSON export,
 measure list/show/add/update/delete, static DAX dependencies/lint, explicitly
-opted-in bounded DAX query execution against an exact already-open Desktop PBIP,
+opted-in bounded DAX query execution against an exact already-open Desktop
+PBIP/PBIX, guarded TMDL-only semantic-model export from that same exact live
+engine through the pinned local Microsoft MCP,
 advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
@@ -197,13 +203,25 @@ supported.
 - Do not claim Power BI Desktop compatibility from local validation alone. Use
   Desktop open/save proof when the claim matters.
 - Prefer `model dax execute` over UI automation when a bounded live DAX query is
-  sufficient. It requires Windows, an exact already-open PBIP,
+  sufficient. It requires Windows, an exact already-open PBIP/PBIX,
   `POWERBI_DESKTOP_ORACLE=1`, `--allow-data-read`, and an `EVALUATE` or `DEFINE
   ... EVALUATE` query. Treat returned rows as sensitive, keep the default bounds
   unless the task justifies widening them, and never infer canvas/refresh proof
   from a successful query. Its live preflight ignores only the report and
   semantic-model artifacts' root `.pbi/` runtime directories. Strict offline
   validation, packaging, workflow, and handoff continue to reject those files.
+- Use `model live export-tmdl` when a PBIX semantic model must become readable
+  TMDL before rebuilding or diagnosing it. It requires Windows, the exact
+  already-open PBIP/PBIX document, `POWERBI_DESKTOP_ORACLE=1`,
+  `--allow-model-read`, the pinned Modeling MCP integration, and a destination
+  that does not yet exist. The command shares the exact document/process/engine
+  matcher with live DAX, connects only to the validated local engine port, runs
+  MCP read-only, exports into a private sibling quarantine, validates bounded
+  UTF-8 TMDL shape, links/reparse points, and credential-like text, reaps the MCP
+  process tree, then atomically publishes the fresh directory. Treat DAX, Power
+  Query source expressions, and static table values in the export as sensitive
+  model metadata. The result is only `definition/` TMDL; do not call it a report
+  export or full PBIX-to-PBIP conversion.
 - Separate Desktop refresh proof from accepting a Desktop save round-trip.
   Saving can normalize many otherwise unchanged PBIP files, add automatic date
   tables, cultures, diagram metadata, and local `.pbi` caches. After a proof
@@ -243,6 +261,7 @@ Desktop hardening work migrates it.
 | Model object exists | `inspect --deep` or list/show command | Desktop open-check |
 | DAX references are locally plausible | `model dax dependencies` and `model dax lint` | Desktop/XMLA/Fabric engine validation |
 | One bounded DAX query executes in the open model | `model dax execute` with both opt-ins, exact-project match, `ok=true`, and no truncation relevant to the assertion | Repeat the targeted query after refresh; canvas/render proof remains separate |
+| One live PBIP/PBIX semantic model was exported to guarded TMDL | `model live export-tmdl` with both opt-ins, exact-document match, validated output hash/counts, and `integration.cleanup.childrenReaped=true` plus `pumpsJoined=true` | Wrap the reviewed TMDL in a PBIP semantic-model artifact and run strict local/official/Desktop proof; report pages remain separate |
 | Advanced semantic metadata exists | `model advanced inventory` or the relevant roles/perspectives/cultures/expressions list/show command | Desktop open/save round-trip |
 | Page metadata/order was written/read locally | `report pages add/update/reorder/set-active/delete-empty` dry-run/apply plus `report pages list/show` and `validate --strict` | Desktop open/save round-trip |
 | Visual was created/read locally | `report visuals add` dry-run/apply plus `report visuals show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
@@ -290,6 +309,33 @@ resources, and generated `.gitignore`, `POWERBI_HANDOFF.md`, and
 included content before creating the archive; credential-like content is unsafe,
 PII-suspect row literals require review, and non-dummy or unverified partition
 sources are refused.
+
+### Export A Live PBIX Semantic Model To TMDL
+
+Use this only on Windows when the PBIX/PBIP semantic model must be inspected or
+rebuilt as editable source. Keep one managed Desktop session and close it after
+the live operations:
+
+```bash
+export POWERBI_DESKTOP_ORACLE=1
+pbi --json desktop open SourceProfile.pbix
+pbi --json model live export-tmdl --document SourceProfile.pbix --out-dir build/source-profile-model --allow-model-read
+pbi --json model dax execute --project SourceProfile.pbix --query 'EVALUATE ROW("Value", 1)' --allow-data-read --max-rows 10
+pbi --json desktop close
+```
+
+Require a fresh output directory, `output.kind=tmdl-definition-export`, a
+nonempty `output.sha256`, and complete MCP cleanup. The local Modeling MCP
+server receives one closed canonical `localhost:<port>` request and writes the
+quarantined TMDL; its response exposes only an opaque connection name, so the
+CLI revalidates the exact local Desktop/model process, creation, workspace, and
+port identity before connection and after export instead of claiming endpoint
+readback. The CLI does not send the PBIX file to a hosted MCP service.
+The pinned preview may independently emit Microsoft usage telemetry. Never
+commit the live export before reviewing Power Query source expressions and
+static values. A successful export proves semantic-model source extraction,
+not report-page extraction, refresh, canvas behavior, or full PBIX-to-PBIP
+materialization.
 
 ### Build A Dashboard From Schema/Profile/Spec
 
@@ -847,7 +893,7 @@ remain open, and always run `desktop close` in a `finally`/cleanup step:
 
 ```bash
 pbi --json desktop open build/sales
-# bridge, bounded DAX, refresh, or canvas inspection
+# bridge, bounded DAX, guarded live TMDL export, refresh, or canvas inspection
 pbi --json desktop close
 ```
 

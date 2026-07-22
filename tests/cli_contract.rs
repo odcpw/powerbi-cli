@@ -594,6 +594,7 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
         "diff",
         "model dax bridge-plan",
         "model dax execute",
+        "model live export-tmdl",
         "report tree",
         "report find",
         "report cat",
@@ -630,6 +631,30 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
             .expect("DAX execute opt-ins")
             .iter()
             .any(|value| value == "--allow-data-read")
+    );
+    assert!(
+        dax_execute["timeoutContract"]
+            .as_str()
+            .expect("DAX timeout contract")
+            .contains("end-to-end")
+    );
+
+    let live_export = command_by_path(commands, "model live export-tmdl");
+    assert_eq!(live_export["readOnly"], Value::Bool(true));
+    assert_eq!(live_export["writesOutput"], Value::Bool(true));
+    assert_eq!(live_export["returnsModelData"], Value::Bool(false));
+    assert!(
+        live_export["explicitOptIn"]
+            .as_array()
+            .expect("live export opt-ins")
+            .iter()
+            .any(|value| value == "--allow-model-read")
+    );
+    assert!(
+        live_export["timeoutContract"]
+            .as_str()
+            .expect("live export timeout contract")
+            .contains("reserved MCP cleanup budget")
     );
 
     let sanitize_apply = command_by_path(commands, "report sanitize apply");

@@ -1,6 +1,6 @@
 # PBIR Desktop Oracle Notes
 
-Date: 2026-06-23, updated 2026-07-17
+Date: 2026-06-23, updated 2026-07-22
 
 This document records the compatibility facts learned while making
 CLI-generated PBIP projects open and render in Power BI Desktop. Do not
@@ -113,7 +113,8 @@ paths return `changes: []`.
 ### Managed Interactive Session
 
 Use `desktop open <project> --json` when Desktop must remain available for
-Bridge, bounded DAX queries, or manual review. It validates the PBIP, closes a
+Bridge, bounded DAX queries, guarded live TMDL export, or manual review. It
+validates the PBIP or preflights the PBIX archive, closes a
 previous CLI-owned session, observes the exact project window, then writes one
 ownership receipt under `%LOCALAPPDATA%\powerbi-cli`. The receipt records the
 canonical PBIP, association and observed PIDs, exact observed process creation
@@ -333,18 +334,19 @@ later used as the first argument of a known table-consuming function. This is a
 conservative pattern rule, not a complete DAX parser; Desktop refresh remains
 required.
 
-### Bounded Desktop DAX query execution
+### Shared exact live-model discovery, DAX, and TMDL export
 
 `model dax execute` closes the gap between offline DAX lint and manual query
-entry in Desktop. It attaches only to the one running `PBIDesktop*` process
-whose command line contains the exact canonical PBIP path, follows that process
-to its child `msmdsrv` workspace, reads the local port, and uses Desktop's
-bundled `Microsoft.PowerBI.AdomdClient.dll` from a private temporary copy. The
-temporary script, query, and DLL are removed after the bridge process exits.
+entry in Desktop. The shared live-model resolver attaches only to the one
+running `PBIDesktop*` process whose command line contains the exact canonical
+PBIP or PBIX path, follows that process to its single child `msmdsrv` workspace,
+and reads the bounded local port. DAX then uses Desktop's bundled
+`Microsoft.PowerBI.AdomdClient.dll` from a private temporary copy. The temporary
+scripts, query, and DLL are removed after the bridge process exits.
 
 The bridge is intentionally opt-in and read-only:
 
-- Windows, an already-open exact PBIP, `POWERBI_DESKTOP_ORACLE=1`, and
+- Windows, an already-open exact PBIP/PBIX, `POWERBI_DESKTOP_ORACLE=1`, and
   `--allow-data-read` are all required;
 - Desktop is never auto-launched and the model is never written;
 - the query must begin with `EVALUATE` or use `DEFINE ... EVALUATE`;
@@ -378,6 +380,31 @@ and Analysis Services client libraries can execute DAX queries. This command
 uses that model engine while the official IPC manifest lacks a query method. Its
 exact process/workspace discovery is therefore a version-sensitive boundary;
 prefer a future official IPC query method if Microsoft adds one.
+
+`model live export-tmdl` reuses that exact live-engine identity and sends the
+pinned local Microsoft Modeling MCP 0.5.0-beta.11 a closed, canonical
+`localhost:<port>` connection request in read-only mode. The server returns an
+opaque connection name, not an endpoint that can be read back, so the CLI does
+not claim MCP endpoint readback. Instead it revalidates the exact Desktop/model
+PIDs, process creation times, descendant relationship, workspace, and port
+immediately before MCP connect and after export. It exports semantic-model TMDL
+into a fresh private sibling quarantine, verifies exactly one listed connection
+with the returned opaque name, and validates bounded TMDL shape,
+UTF-8, ordinary paths, and credential-like text, requires complete MCP process
+and pump cleanup, then atomically publishes the fresh directory. The vendor's
+`ExportToTmdlFolder` has had public reports of writing outside the requested
+`definition/` or removing scaffold files; the private quarantine and exact
+post-export root shape are therefore required safety boundaries, not optional
+defense in depth. See the upstream report:
+<https://github.com/microsoft/powerbi-modeling-mcp/issues/96>.
+
+A live proof on 2026-07-22 against `SourceProfile.pbix` with Desktop Store
+2.155.756.0 exported 12 TMDL files (39,766 bytes), returned a nonempty definition
+SHA-256, reaped the MCP child tree and pumps, and then completed the shared DAX
+literal-row smoke query. The managed Desktop close reported no remaining PIDs.
+This proves the semantic model can be extracted as TMDL. It does not export
+report pages, refresh data, prove the canvas, or constitute full PBIX-to-PBIP
+conversion.
 
 ### Enhanced PBIR visual formatting location
 

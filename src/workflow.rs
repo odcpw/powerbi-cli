@@ -767,13 +767,13 @@ impl SourceTreeSnapshot {
 }
 
 #[derive(Debug)]
-struct TreeSummary {
-    sha256: String,
-    file_count: usize,
-    total_bytes: u64,
+pub(crate) struct TreeSummary {
+    pub(crate) sha256: String,
+    pub(crate) file_count: usize,
+    pub(crate) total_bytes: u64,
 }
 
-fn validate_tmdl_definition(definition: &Path) -> Result<TreeSummary, String> {
+pub(crate) fn validate_tmdl_definition(definition: &Path) -> Result<TreeSummary, String> {
     let definition = canonical_directory(definition, "TMDL definition")?;
     let mut database = false;
     let mut model = false;

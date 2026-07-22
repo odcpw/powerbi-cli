@@ -1021,6 +1021,91 @@ pub(crate) fn execute_staged_model_export_proof(
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct LiveTmdlExportMcpProof {
+    pub(crate) handshake: McpHandshake,
+    pub(crate) notifications_seen: usize,
+    pub(crate) cleanup_children_reaped: bool,
+    pub(crate) cleanup_pumps_joined: bool,
+    pub(crate) cleanup_forced: bool,
+    pub(crate) stderr_sha256: String,
+}
+
+pub(crate) fn execute_live_tmdl_export<F>(
+    tool: &InstalledMicrosoftTool,
+    port: u16,
+    definition_dir: &Path,
+    timeout: Duration,
+    mut verify_endpoint: F,
+) -> CliResult<LiveTmdlExportMcpProof>
+where
+    F: FnMut(Duration) -> CliResult<()>,
+{
+    let cleanup_timeout = DEFAULT_CLEANUP_TIMEOUT
+        .min(timeout / 4)
+        .max(Duration::from_millis(100));
+    let session_timeout = timeout.checked_sub(cleanup_timeout).ok_or_else(|| {
+        CliError::new(
+            "desktop_operation_timeout",
+            EXIT_ORACLE_FAILED,
+            "live TMDL export deadline left no MCP session budget",
+        )
+    })?;
+    let config = McpSessionConfig {
+        call_timeout: session_timeout,
+        session_timeout,
+        cleanup_timeout,
+        ..McpSessionConfig::default()
+    };
+    let mut session = McpSession::open_exact(tool, McpSessionMode::ReadOnly, config)
+        .map_err(McpFailure::into_cli_error)?;
+    let operation = (|| {
+        let handshake = session.handshake()?;
+        let verification_budget = session.remaining_call_timeout()?;
+        verify_endpoint(verification_budget).map_err(|error| {
+            McpFailure::backend(format!(
+                "live Desktop endpoint revalidation failed before MCP connect: {} ({})",
+                error.message, error.code
+            ))
+        })?;
+        let connection = connect_local_exact(&mut session, port)?;
+        call_tool_payload(
+            &mut session,
+            &McpOperation::ExportTmdlFolder {
+                connection_name: connection.name.clone(),
+                folder_path: definition_dir.to_path_buf(),
+            },
+            "ExportToTmdlFolder",
+        )?;
+        let verification_budget = session.remaining_call_timeout()?;
+        verify_endpoint(verification_budget).map_err(|error| {
+            McpFailure::backend(format!(
+                "live Desktop endpoint revalidation failed after MCP export: {} ({})",
+                error.message, error.code
+            ))
+        })?;
+        Ok::<_, McpFailure>((handshake, connection))
+    })();
+    let cleanup = session.shutdown(operation.is_ok() && !session.poisoned);
+    if !cleanup.children_reaped || !cleanup.pumps_joined {
+        return Err(
+            McpFailure::backend("live TMDL export MCP cleanup was incomplete")
+                .with_cleanup(&cleanup)
+                .into_cli_error(),
+        );
+    }
+    let (handshake, _connection) =
+        operation.map_err(|error| error.with_cleanup(&cleanup).into_cli_error())?;
+    Ok(LiveTmdlExportMcpProof {
+        notifications_seen: session.notifications_seen,
+        handshake,
+        cleanup_children_reaped: cleanup.children_reaped,
+        cleanup_pumps_joined: cleanup.pumps_joined,
+        cleanup_forced: cleanup.forced,
+        stderr_sha256: cleanup.stderr_sha256,
+    })
+}
+
 trait ModelMcpClient {
     fn call_model(&mut self, operation: &McpOperation) -> Result<Value, McpFailure>;
 }
@@ -1596,6 +1681,66 @@ struct ExactConnection {
     name: String,
 }
 
+fn connect_local_exact<C: ModelMcpClient>(
+    client: &mut C,
+    port: u16,
+) -> Result<ExactConnection, McpFailure> {
+    let connected = call_tool_payload(
+        client,
+        &McpOperation::ConnectLocalEndpoint { port },
+        "Connect",
+    )?;
+    let connection_name = connected
+        .get("data")
+        .and_then(|data| {
+            data.as_str().or_else(|| {
+                data.as_object()
+                    .and_then(|object| object.get("connectionName"))
+                    .and_then(Value::as_str)
+            })
+        })
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            McpFailure::protocol(format!(
+                "Connect payload omitted a data connection identity; fields=[{}], dataType={}",
+                connected
+                    .as_object()
+                    .map(|object| object.keys().cloned().collect::<Vec<_>>().join(", "))
+                    .unwrap_or_else(|| "non-object".to_string()),
+                match connected.get("data") {
+                    Some(Value::Null) => "null",
+                    Some(Value::Bool(_)) => "bool",
+                    Some(Value::Number(_)) => "number",
+                    Some(Value::String(_)) => "string",
+                    Some(Value::Array(_)) => "array",
+                    Some(Value::Object(_)) => "object",
+                    None => "missing",
+                }
+            ))
+        })?;
+    let listed = call_tool_payload(client, &McpOperation::ListConnections, "ListConnections")?;
+    let entries = listed
+        .get("data")
+        .and_then(Value::as_array)
+        .ok_or_else(|| McpFailure::protocol("ListConnections has no data array"))?;
+    let exact = entries
+        .iter()
+        .filter_map(Value::as_object)
+        .filter(|entry| {
+            entry.get("connectionName").and_then(Value::as_str) == Some(connection_name.as_str())
+        })
+        .count();
+    if exact != 1 {
+        return Err(McpFailure::protocol(format!(
+            "expected exactly one listed connection for the opaque name returned by Connect, found {exact}"
+        )));
+    }
+    Ok(ExactConnection {
+        name: connection_name,
+    })
+}
+
 fn connect_exact<C: ModelMcpClient>(
     client: &mut C,
     definition_dir: &Path,
@@ -1753,6 +1898,7 @@ fn validate_tool_result_metadata(
         "MCP tool result annotations",
     )?;
     let (expected_title, expected_read_only) = match expected_operation {
+        "Connect" => ("connection_operations.connect", true),
         "ConnectFolder" => ("connection_operations.connectfolder", true),
         "ListConnections" => ("connection_operations.listconnections", true),
         "GET" => ("partition_operations.get", true),
@@ -1935,6 +2081,9 @@ fn source_expression_sha256(value: &str) -> String {
 #[derive(Debug, Clone)]
 pub(crate) enum McpOperation {
     ListConnections,
+    ConnectLocalEndpoint {
+        port: u16,
+    },
     ConnectFolder {
         folder_path: PathBuf,
     },
@@ -1958,7 +2107,9 @@ pub(crate) enum McpOperation {
 impl McpOperation {
     fn tool_name(&self) -> &'static str {
         match self {
-            Self::ListConnections | Self::ConnectFolder { .. } => "connection_operations",
+            Self::ListConnections
+            | Self::ConnectLocalEndpoint { .. }
+            | Self::ConnectFolder { .. } => "connection_operations",
             Self::GetPartition { .. } | Self::ReplacePartitionSource { .. } => {
                 "partition_operations"
             }
@@ -1969,6 +2120,12 @@ impl McpOperation {
     fn arguments(&self) -> Result<Value, McpFailure> {
         match self {
             Self::ListConnections => Ok(json!({"request": {"operation": "ListConnections"}})),
+            Self::ConnectLocalEndpoint { port } => Ok(json!({
+                "request": {
+                    "operation": "Connect",
+                    "dataSource": format!("localhost:{port}")
+                }
+            })),
             Self::ConnectFolder { folder_path } => Ok(json!({
                 "request": {
                     "operation": "ConnectFolder",
@@ -2066,6 +2223,7 @@ impl ClosedToolPolicy {
             .ok_or_else(|| McpFailure::protocol("MCP tool request has no operation"))?;
         let (allowed, write) = match (tool, operation) {
             ("connection_operations", "ListConnections") => (&["operation"][..], false),
+            ("connection_operations", "Connect") => (&["dataSource", "operation"][..], false),
             ("connection_operations", "ConnectFolder") => (&["folderPath", "operation"][..], false),
             ("partition_operations", "Get") => {
                 (&["connectionName", "operation", "references"][..], false)
@@ -2101,6 +2259,26 @@ fn validate_nested_policy(
     request: &Map<String, Value>,
 ) -> Result<(), McpFailure> {
     match (tool, operation) {
+        ("connection_operations", "Connect") => {
+            let data_source = request
+                .get("dataSource")
+                .and_then(Value::as_str)
+                .ok_or_else(|| McpFailure::protocol("Connect dataSource must be a string"))?;
+            let port = data_source
+                .strip_prefix("localhost:")
+                .and_then(|value| value.parse::<u16>().ok())
+                .filter(|port| *port != 0)
+                .ok_or_else(|| {
+                    McpFailure::protocol(
+                        "Connect is restricted to one validated localhost:<u16> endpoint",
+                    )
+                })?;
+            if data_source != format!("localhost:{port}") {
+                return Err(McpFailure::protocol(
+                    "Connect endpoint must use canonical localhost:<u16> form",
+                ));
+            }
+        }
         ("partition_operations", "Get") => {
             validate_single_item_array(request, "references", &["name", "tableName"])?;
         }
@@ -2766,6 +2944,14 @@ mod tests {
     impl ModelMcpClient for FakeModelClient {
         fn call_model(&mut self, operation: &McpOperation) -> Result<Value, McpFailure> {
             match operation {
+                McpOperation::ConnectLocalEndpoint { port } => {
+                    self.enter("connect-local")?;
+                    assert_ne!(*port, 0);
+                    Ok(fake_tool_result(json!({
+                        "operation": "Connect",
+                        "data": "fixture-connection"
+                    })))
+                }
                 McpOperation::ConnectFolder { folder_path } => {
                     self.enter("connect")?;
                     assert_eq!(folder_path, &self.definition_dir);
@@ -2884,6 +3070,7 @@ mod tests {
             .and_then(Value::as_str)
             .unwrap_or("Update");
         let (title, read_only) = match operation {
+            "Connect" => ("connection_operations.connect", true),
             "ConnectFolder" => ("connection_operations.connectfolder", true),
             "ListConnections" => ("connection_operations.listconnections", true),
             "GET" | "Get" => ("partition_operations.get", true),
@@ -3552,6 +3739,37 @@ mod tests {
 
     #[test]
     fn closed_policy_rejects_unknown_nested_and_read_only_writes() {
+        let connect = McpOperation::ConnectLocalEndpoint { port: 65_348 };
+        let connect_arguments = connect.arguments().expect("typed local endpoint");
+        ClosedToolPolicy::authorize(
+            connect.tool_name(),
+            &connect_arguments,
+            McpSessionMode::ReadOnly,
+        )
+        .expect("canonical localhost endpoint");
+        assert!(
+            ClosedToolPolicy::authorize(
+                "connection_operations",
+                &json!({"request": {
+                    "operation": "Connect",
+                    "dataSource": "127.0.0.1:65348"
+                }}),
+                McpSessionMode::ReadOnly
+            )
+            .is_err()
+        );
+        assert!(
+            ClosedToolPolicy::authorize(
+                "connection_operations",
+                &json!({"request": {
+                    "operation": "Connect",
+                    "dataSource": "localhost:65348",
+                    "initialCatalog": "unvalidated"
+                }}),
+                McpSessionMode::ReadOnly
+            )
+            .is_err()
+        );
         assert!(
             ClosedToolPolicy::authorize(
                 "arbitrary_tool",

@@ -154,6 +154,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let wireframe = h.root.join("wireframe.json");
     let dax_file = h.root.join("average-cost.dax");
     let desktop_screenshot = h.root.join("everything-desktop.png");
+    let live_model_export = h.root.join("live-model-export");
 
     write_json(&schema, &acceptance_schema());
     write_json(&spec, &acceptance_dashboard());
@@ -170,6 +171,12 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok("--robot-triage", &svec(["--robot-triage", "--json"]));
     h.ok("robot-triage", &svec(["robot-triage", "--json"]));
     h.ok("doctor", &svec(["doctor", "--json"]));
+    h.ok("skill status", &svec(["skill", "status", "--json"]));
+    h.code(
+        "skill install",
+        2,
+        &svec(["skill", "install", "--unknown", "--json"]),
+    );
     h.code(
         "integrations status",
         2,
@@ -850,6 +857,20 @@ fn everything_acceptance_invokes_every_catalog_command() {
         }
     );
     assert_eq!(dax_execute["query"]["textReturned"], Value::Bool(false));
+    h.code(
+        "model live export-tmdl",
+        2,
+        &svec([
+            "model",
+            "live",
+            "export-tmdl",
+            "--document",
+            &project_arg,
+            "--out-dir",
+            &p(&live_model_export),
+            "--json",
+        ]),
+    );
     install_advanced_model_fixtures(&project);
     h.ok(
         "model advanced inventory",
