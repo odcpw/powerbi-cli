@@ -8,12 +8,14 @@ use crate::desktop_session::{
     open_desktop_session,
 };
 #[cfg(windows)]
+use crate::desktop_target::{DesktopTargetKind, ResolvedDesktopTarget, resolve_desktop_target};
+#[cfg(windows)]
 use crate::lint::lint_project;
 use crate::{CliError, CliResult, canonical_display};
 #[cfg(windows)]
 use crate::{
     EXIT_ORACLE_FAILED, EXIT_ORACLE_UNAVAILABLE, EXIT_PROOF_INCOMPLETE, EXIT_SUCCESS,
-    EXIT_VALIDATION_FAILED, command_arg, resolve_project, validate_project,
+    EXIT_VALIDATION_FAILED, ValidationReport, command_arg, validate_project,
 };
 #[cfg(any(windows, test))]
 use serde::Deserialize;
@@ -94,13 +96,13 @@ impl DesktopOperation {
     fn suggested_command(self) -> &'static str {
         match self {
             Self::Open => {
-                "powerbi-cli desktop open <project-dir-or.pbip> --timeout-ms 120000 --json"
+                "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --timeout-ms 120000 --json"
             }
             Self::OpenCheck => {
-                "powerbi-cli desktop open-check <project-dir-or.pbip> --timeout-ms 120000 --json"
+                "powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --timeout-ms 120000 --json"
             }
             Self::Screenshot => {
-                "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <evidence.png> --timeout-ms 120000 --json"
+                "powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <evidence.png> --timeout-ms 120000 --json"
             }
         }
     }
@@ -304,13 +306,15 @@ pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
                 .with_hint(
                     "Run powerbi-cli --json capabilities --for desktop for supported Desktop oracle commands.",
                 )
-                .with_suggested_command("powerbi-cli desktop open <project-dir-or.pbip> --json")
+                .with_suggested_command(
+                    "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json",
+                )
                 .with_suggested_command("powerbi-cli desktop close --json")
                 .with_suggested_command(
-                    "powerbi-cli desktop open-check <project-dir-or.pbip> --json",
+                    "powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json",
                 )
                 .with_suggested_command(
-                    "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <evidence.png> --json",
+                    "powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <evidence.png> --json",
                 ),
         );
     };
@@ -366,31 +370,38 @@ pub(crate) fn detect_power_bi_desktop(override_path: Option<&Path>) -> PowerBiDe
 fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value> {
     let options = parse_desktop_args(operation, args)?;
     ensure_desktop_platform(std::env::consts::OS)?;
-    let project = options.project.as_ref().ok_or_else(|| {
+    let document = options.project.as_ref().ok_or_else(|| {
         CliError::invalid_args(format!(
-            "{} requires <project-dir-or.pbip>",
+            "{} requires <project-dir-or.pbip-or.pbix>",
             operation.command_path()
         ))
-        .with_hint("Pass a PBIP project directory or .pbip file.")
+        .with_hint("Pass a PBIP project directory, .pbip file, or .pbix Desktop file.")
         .with_suggested_command(operation.suggested_command())
     })?;
-    let resolved = resolve_project(project)?;
+    let target = resolve_desktop_target(document)?;
     let screenshot_out = match operation {
         DesktopOperation::Open | DesktopOperation::OpenCheck => None,
         DesktopOperation::Screenshot => {
             let out = options.out.as_ref().ok_or_else(|| {
                 CliError::invalid_args("desktop screenshot requires --out <file.png>")
-                    .with_hint("Choose a PNG evidence path outside the PBIP project directory.")
+                    .with_hint("Choose a PNG evidence path separate from the selected document.")
                     .with_suggested_command(operation.suggested_command())
             })?;
-            Some(validate_screenshot_output(out, &resolved.project_dir)?)
+            Some(validate_screenshot_output(out, &target)?)
         }
     };
 
-    let validation = validate_project(&resolved)?;
+    let validation = match target.project() {
+        Some(project) => validate_project(project)?,
+        None => ValidationReport::default(),
+    };
     let validation_ok = validation.errors.is_empty();
-    let lint = if validation_ok {
-        Some(lint_project(&resolved, &validation)?)
+    let strict_preflight_enabled = target.kind == DesktopTargetKind::Pbip;
+    let lint = if validation_ok && strict_preflight_enabled {
+        Some(lint_project(
+            target.project().expect("PBIP target has a project"),
+            &validation,
+        )?)
     } else {
         None
     };
@@ -402,12 +413,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     let mut detection = detect_power_bi_desktop(options.desktop_path.as_deref());
     let oracle_enabled = oracle_enabled();
     let launch_plan = desktop_launch_plan(&options, &detection);
-    let project_name = resolved
-        .pbip_path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_string();
+    let project_name = target.name.clone();
 
     let mut diagnostics = Vec::new();
     let mut launched = false;
@@ -533,7 +539,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                     })?);
                     match launch_desktop(
                         &desktop_path,
-                        &resolved.pbip_path,
+                        &target.artifact_path,
                         &launch_plan,
                         watchdog.remaining(),
                     ) {
@@ -819,8 +825,9 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         ) {
             if let Some(identity) = observed_identity.clone() {
                 let draft = DesktopSessionDraft {
-                    project_name: project_name.clone(),
-                    project_path: canonical_display(&resolved.pbip_path),
+                    document_kind: target.kind.as_str().to_string(),
+                    document_name: project_name.clone(),
+                    document_path: canonical_display(&target.artifact_path),
                     desktop_path: canonical_display(&desktop_path_from_detection(&detection)?),
                     association_process_id: desktop_process_id
                         .expect("successful Desktop launch has an association PID"),
@@ -948,12 +955,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         "ok": exit_code == EXIT_SUCCESS,
         "exitCode": exit_code,
         "changes": changes,
-        "project": {
-            "input": project.display().to_string(),
-            "name": project_name,
-            "projectDir": canonical_display(&resolved.project_dir),
-            "pbip": canonical_display(&resolved.pbip_path)
-        },
+        "document": target.artifact_json(),
         "oracle": {
             "kind": "powerBiDesktop",
             "available": detection.found && cfg!(windows) && oracle_enabled,
@@ -981,7 +983,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                 "boundVisuals": validation.bound_visuals
             },
             "strict": {
-                "enabled": true,
+                "enabled": strict_preflight_enabled,
                 "ok": strict_preflight_ok,
                 "lint": lint
             }
@@ -1072,7 +1074,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
             "message": proof_message
         },
         "diagnostics": diagnostics,
-        "next": desktop_next_commands(operation, &resolved.project_dir),
+        "next": desktop_next_commands(operation, &target),
         "plannedNext": [
             "desktop refresh-check",
             "desktop save-check"
@@ -1094,7 +1096,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                         "unknown"
                     },
                     "owned": session_persisted,
-                    "project": managed_session.as_ref().map(|_| canonical_display(&resolved.pbip_path)),
+                    "document": managed_session.as_ref().map(|_| canonical_display(&target.artifact_path)),
                     "desktopProcessId": managed_session.as_ref().map(|session| session.identity.process_id),
                     "desktopProcessCreationTimeUtc": managed_session.as_ref().map(|session| session.identity.creation_time_utc.as_str()),
                     "desktopExecutablePath": managed_session.as_ref().and_then(|session| session.identity.executable_path.as_deref()),
@@ -1162,18 +1164,34 @@ fn desktop_path_from_detection(detection: &PowerBiDesktopDetection) -> CliResult
 }
 
 #[cfg(windows)]
-fn desktop_next_commands(operation: DesktopOperation, project_dir: &Path) -> Vec<String> {
+fn desktop_next_commands(
+    operation: DesktopOperation,
+    target: &ResolvedDesktopTarget,
+) -> Vec<String> {
     if operation == DesktopOperation::Open {
         return vec!["powerbi-cli desktop close --json".to_string()];
+    }
+    if target.kind == DesktopTargetKind::Pbix {
+        return vec![
+            format!(
+                "powerbi-cli package inspect {} --json",
+                command_arg(&target.artifact_path)
+            ),
+            format!(
+                "powerbi-cli model dax execute --project {} --query \"EVALUATE ROW('Value', 1)\" --allow-data-read --json",
+                command_arg(&target.artifact_path)
+            ),
+            "powerbi-cli --json capabilities --for desktop".to_string(),
+        ];
     }
     vec![
         format!(
             "powerbi-cli validate --strict {} --json",
-            command_arg(project_dir)
+            command_arg(&target.project_dir)
         ),
         format!(
             "powerbi-cli fixture normalize {} --json",
-            command_arg(project_dir)
+            command_arg(&target.project_dir)
         ),
         "powerbi-cli --json capabilities --for desktop".to_string(),
     ]
@@ -1200,7 +1218,7 @@ fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult
                     return Err(CliError::invalid_args(
                         "desktop screenshot accepts exactly one --out path",
                     )
-                    .with_hint("Pass one PNG evidence path outside the project directory.")
+                    .with_hint("Pass one PNG evidence path separate from the selected document.")
                     .with_suggested_command(operation.suggested_command()));
                 }
                 options.out = Some(PathBuf::from(take_value(args, &mut i, "--out")?));
@@ -1213,7 +1231,7 @@ fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult
                     "Use desktop open for an interactive CLI-owned session, then desktop close when inspection is complete.",
                 )
                 .with_suggested_command(
-                    "powerbi-cli desktop open <project-dir-or.pbip> --json",
+                    "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json",
                 )
                 .with_suggested_command("powerbi-cli desktop close --json"));
             }
@@ -1267,10 +1285,10 @@ pub(crate) fn ensure_desktop_platform(platform: &str) -> CliResult<()> {
         "desktop oracle commands are unsupported on {platform}; Power BI Desktop automation requires Windows"
     ))
     .with_hint(
-        "Run local validation on this platform, then move the PBIP project to an explicitly opted-in Windows Desktop oracle machine.",
+        "Use native PBIP/PBIX inspection on this platform, then move Desktop-only work to an explicitly opted-in Windows machine.",
     )
     .with_suggested_command(
-        "powerbi-cli validate --strict <project-dir-or.pbip> --json",
+        "powerbi-cli package inspect <file.pbix> --json",
     ))
 }
 
@@ -1292,20 +1310,23 @@ fn set_project(
 }
 
 #[cfg(windows)]
-fn validate_screenshot_output(out: &Path, project_dir: &Path) -> CliResult<PathBuf> {
+fn validate_screenshot_output(out: &Path, target: &ResolvedDesktopTarget) -> CliResult<PathBuf> {
     let out = canonicalize_with_missing_tail(&absolute_lexical_path(out)?)?;
-    let project_dir = canonicalize_with_missing_tail(&absolute_lexical_path(project_dir)?)?;
-    if path_is_within_directory(&out, &project_dir) {
-        return Err(CliError::invalid_args(format!(
-            "desktop screenshot --out must be outside the project directory: {}",
-            project_dir.display()
-        ))
-        .with_hint(
-            "Write Desktop evidence beside the project or under a separate proof/artifacts directory so the PBIP handoff stays clean.",
-        )
-        .with_suggested_command(
-            "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <outside-project/evidence.png> --json",
-        ));
+    if target.kind == DesktopTargetKind::Pbip {
+        let project_dir =
+            canonicalize_with_missing_tail(&absolute_lexical_path(&target.project_dir)?)?;
+        if path_is_within_directory(&out, &project_dir) {
+            return Err(CliError::invalid_args(format!(
+                "desktop screenshot --out must be outside the project directory: {}",
+                project_dir.display()
+            ))
+            .with_hint(
+                "Write Desktop evidence beside the project or under a separate proof/artifacts directory so the PBIP handoff stays clean.",
+            )
+            .with_suggested_command(
+                "powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <outside-project/evidence.png> --json",
+            ));
+        }
     }
     if out
         .extension()
@@ -1314,9 +1335,9 @@ fn validate_screenshot_output(out: &Path, project_dir: &Path) -> CliResult<PathB
     {
         return Err(
             CliError::invalid_args("desktop screenshot --out must end in .png")
-                .with_hint("Use a PNG evidence path outside the PBIP project directory.")
+                .with_hint("Use a PNG evidence path separate from the selected document.")
                 .with_suggested_command(
-                    "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <evidence.png> --json",
+                    "powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <evidence.png> --json",
                 ),
         );
     }
@@ -2918,7 +2939,7 @@ mod tests {
             assert_eq!(
                 error.suggested_commands,
                 [
-                    "powerbi-cli desktop open <project-dir-or.pbip> --json",
+                    "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json",
                     "powerbi-cli desktop close --json"
                 ]
             );

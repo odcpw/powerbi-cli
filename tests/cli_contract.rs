@@ -700,9 +700,10 @@ fn desktop_close_discards_a_stale_receipt_without_targeting_any_process() {
     fs::write(
         &receipt,
         serde_json::to_vec_pretty(&json!({
-            "schema": "powerbi-cli.desktop.session.v1",
-            "projectName": "Stale",
-            "projectPath": "C:\\Temp\\Stale.pbip",
+            "schema": "powerbi-cli.desktop.session.v2",
+            "documentKind": "pbip",
+            "documentName": "Stale",
+            "documentPath": "C:\\Temp\\Stale.pbip",
             "desktopPath": "C:\\Temp\\PBIDesktop.exe",
             "associationProcessId": 4_294_967_295_u32,
             "observedProcessId": 4_294_967_295_u32,
@@ -807,7 +808,7 @@ fn desktop_leave_open_points_to_the_managed_lifecycle() {
     assert_eq!(
         value["error"]["suggestedCommands"],
         json!([
-            "powerbi-cli desktop open <project-dir-or.pbip> --json",
+            "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json",
             "powerbi-cli desktop close --json"
         ])
     );

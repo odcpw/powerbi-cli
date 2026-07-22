@@ -314,7 +314,7 @@ fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
         .expect("run unsafe live Desktop preflight");
     assert_eq!(rejected.status.code(), Some(10));
     let rejected_json: Value = serde_json::from_slice(&rejected.stdout).expect("rejected JSON");
-    assert_eq!(rejected_json["stage"], Value::from("project-validation"));
+    assert_eq!(rejected_json["stage"], Value::from("document-validation"));
 
     fs::remove_file(report_dir.join("unsafe.pbit")).expect("remove unsafe non-runtime file");
     let nested_runtime_lookalike = report_dir.join("definition").join(".pbi");
@@ -339,7 +339,7 @@ fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
     assert_eq!(nested_rejected.status.code(), Some(10));
     let nested_json: Value =
         serde_json::from_slice(&nested_rejected.stdout).expect("nested rejection JSON");
-    assert_eq!(nested_json["stage"], Value::from("project-validation"));
+    assert_eq!(nested_json["stage"], Value::from("document-validation"));
 }
 
 #[test]

@@ -90,8 +90,9 @@ impl Drop for DesktopSessionLock {
 #[cfg(windows)]
 #[derive(Debug)]
 pub(crate) struct DesktopSessionDraft {
-    pub(crate) project_name: String,
-    pub(crate) project_path: String,
+    pub(crate) document_kind: String,
+    pub(crate) document_name: String,
+    pub(crate) document_path: String,
     pub(crate) desktop_path: String,
     pub(crate) association_process_id: u32,
     pub(crate) observed_identity: ProcessIdentity,
@@ -112,8 +113,9 @@ pub(crate) struct ManagedDesktopSession {
 #[serde(rename_all = "camelCase")]
 struct DesktopSessionReceipt {
     schema: String,
-    project_name: String,
-    project_path: String,
+    document_kind: String,
+    document_name: String,
+    document_path: String,
     desktop_path: String,
     association_process_id: u32,
     observed_process_id: u32,
@@ -143,9 +145,10 @@ pub(crate) fn open_desktop_session(
     write_json_atomic(
         &receipt_path,
         &json!({
-            "schema": "powerbi-cli.desktop.session.v1",
-            "projectName": draft.project_name,
-            "projectPath": draft.project_path,
+            "schema": "powerbi-cli.desktop.session.v2",
+            "documentKind": draft.document_kind,
+            "documentName": draft.document_name,
+            "documentPath": draft.document_path,
             "desktopPath": draft.desktop_path,
             "associationProcessId": draft.association_process_id,
             "observedProcessId": identity.process_id,
@@ -237,8 +240,9 @@ pub(crate) fn close_desktop_session(_lock: &DesktopSessionLock) -> CliResult<Val
         "session": {
             "state": if closed { "closed" } else { "open" },
             "alreadyClosed": false,
-            "project": receipt.project_path,
-            "projectName": receipt.project_name,
+            "document": receipt.document_path,
+            "documentKind": receipt.document_kind,
+            "documentName": receipt.document_name,
             "desktopPath": receipt.desktop_path,
             "associationProcessId": receipt.association_process_id,
             "desktopProcessId": receipt.observed_process_id,
@@ -286,7 +290,7 @@ fn read_receipt(path: &Path) -> CliResult<DesktopSessionReceipt> {
         ))
         .with_hint("Do not kill processes by title. Inspect or remove only this invalid receipt.")
     })?;
-    if receipt.schema != "powerbi-cli.desktop.session.v1" {
+    if receipt.schema != "powerbi-cli.desktop.session.v2" {
         return Err(CliError::unexpected(format!(
             "unsupported Desktop session receipt schema: {}",
             receipt.schema
@@ -345,7 +349,8 @@ fn already_closed_response(path: &Path, receipt: &DesktopSessionReceipt) -> Valu
         "session": {
             "state": "none",
             "alreadyClosed": true,
-            "project": receipt.project_path,
+            "document": receipt.document_path,
+            "documentKind": receipt.document_kind,
             "desktopProcessId": receipt.observed_process_id,
             "openedAtUnixMs": receipt.opened_at_unix_ms,
             "receiptPath": canonical_display(path),

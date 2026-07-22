@@ -260,7 +260,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "desktop screenshot",
         ],
         refusal_code: None,
-        reason: "On an opted-in Windows oracle machine, the CLI can own exactly one interactive Desktop session by exact PID and creation time, close it idempotently, enforce a launch/observation watchdog, observe a project-matched window title, and capture the primary display outside the project. These signals are evidence only and do not inspect the report canvas or refresh state.",
+        reason: "On an opted-in Windows oracle machine, the CLI can open a PBIP project or PBIX document as exactly one interactive Desktop session, own it by exact PID and creation time, close it idempotently, enforce a launch/observation watchdog, observe a document-matched window title, and capture the primary display. PBIP retains strict source preflight; PBIX gets bounded archive/report/DataModel preflight. These signals are evidence only and do not inspect the report canvas or refresh state.",
         next_proof: &[
             "Detect unresolved Desktop issue dialogs and banners",
             "Detect a rendered non-blank report canvas",
@@ -333,12 +333,12 @@ const FEATURE_CATALOG: &[Feature] = &[
         title: "Bounded DAX query execution against an open Desktop model",
         category: "desktop",
         status: "supported",
-        support: "explicit-opt-in-exact-project-read-only-query",
+        support: "explicit-opt-in-exact-document-read-only-query",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &["model dax execute"],
         refusal_code: None,
-        reason: "On an explicitly opted-in Windows oracle machine, the CLI locates the exact already-open PBIP process and its child semantic-model engine, loads Desktop's bundled ADOMD client from a private temporary copy, and executes only EVALUATE or DEFINE ... EVALUATE query forms. Rows, cell text, query size, and runtime are bounded; the command never launches Desktop, writes the model, or returns the query text.",
+        reason: "On an explicitly opted-in Windows oracle machine, the CLI locates the exact already-open PBIP or PBIX document process and its child semantic-model engine, loads Desktop's bundled ADOMD client from a private temporary copy, and executes only EVALUATE or DEFINE ... EVALUATE query forms. Rows, cell text, query size, and runtime are bounded; the command never launches Desktop, writes the model, or returns the query text.",
         next_proof: &[
             "Keep a live synthetic Desktop smoke test in the release checklist across supported Desktop versions",
             "Add a documented remote XMLA engine only with credential-isolated real-service integration tests",
@@ -358,6 +358,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "adomd",
             "read-only",
             "data-read",
+            "pbix",
         ],
     },
     Feature {

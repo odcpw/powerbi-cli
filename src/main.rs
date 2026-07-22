@@ -9,6 +9,7 @@ mod contract;
 mod dax_execute;
 mod desktop;
 mod desktop_session;
+mod desktop_target;
 mod diff;
 mod doctor;
 mod feature_catalog;

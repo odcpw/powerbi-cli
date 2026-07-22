@@ -1,7 +1,8 @@
 use crate::cli_support::{required_project, take_value};
+use crate::desktop_target::{ResolvedDesktopTarget, resolve_desktop_target};
 use crate::{
     CliError, CliResult, EXIT_ORACLE_UNAVAILABLE, EXIT_VALIDATION_FAILED, canonical_display,
-    resolve_project, validate_desktop_runtime_project,
+    validate_desktop_runtime_project,
 };
 #[cfg(windows)]
 use crate::{EXIT_ORACLE_FAILED, EXIT_SUCCESS};
@@ -114,18 +115,36 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
             "The query can return model data. Review the DAX and opt in explicitly; results are row- and cell-bounded.",
         )
         .with_suggested_command(
-            "powerbi-cli model dax execute --project <project-dir-or.pbip> --query-file <query.dax> --allow-data-read --json",
+            "powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
         ));
     }
 
     let project = required_project(options.project.clone(), "model dax execute")?;
-    let resolved = resolve_project(&project)?;
-    let validation = validate_desktop_runtime_project(&resolved)?;
-    let validation_json = json!({
-        "ok": validation.errors.is_empty(),
-        "warnings": validation.warnings,
-        "errors": validation.errors
-    });
+    let target = resolve_desktop_target(&project)?;
+    target.require_live_model()?;
+    let validation_json = match target.project() {
+        Some(resolved) => {
+            let validation = validate_desktop_runtime_project(resolved)?;
+            json!({
+                "kind": "pbip-runtime",
+                "ok": validation.errors.is_empty(),
+                "warnings": validation.warnings,
+                "errors": validation.errors
+            })
+        }
+        None => json!({
+            "kind": "pbix-archive",
+            "ok": true,
+            "warnings": [],
+            "errors": [],
+            "archive": target.pbix.as_ref().map(|info| json!({
+                "entries": info.entries,
+                "hasDataModel": info.has_data_model,
+                "hasReportDefinition": info.has_report_definition,
+                "hasLegacyReportLayout": info.has_legacy_report_layout
+            }))
+        }),
+    };
     let (query, query_source) = load_query(&options)?;
     validate_query_shape(&query)?;
     let query_metadata = json!({
@@ -136,8 +155,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
         "textReturned": false
     });
     let base = BasePayloadContext {
-        project_dir: &resolved.project_dir,
-        pbip_path: &resolved.pbip_path,
+        target: &target,
         options: &options,
         query_metadata: &query_metadata,
         validation: &validation_json,
@@ -147,10 +165,10 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
         return Ok(base.render(
             false,
             EXIT_VALIDATION_FAILED,
-            "project-validation",
+            "document-validation",
             json!({
-                "code": "project_validation_failed",
-                "message": "Local PBIP validation failed before the Desktop DAX bridge was contacted."
+                "code": "document_validation_failed",
+                "message": "Local document validation failed before the Desktop DAX bridge was contacted."
             }),
         ));
     }
@@ -181,14 +199,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
 
     #[cfg(windows)]
     {
-        return execute_windows(
-            &resolved.project_dir,
-            &resolved.pbip_path,
-            &query,
-            &query_metadata,
-            &validation_json,
-            &options,
-        );
+        return execute_windows(&target, &query, &query_metadata, &validation_json, &options);
     }
 
     #[allow(unreachable_code)]
@@ -198,8 +209,7 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
 }
 
 struct BasePayloadContext<'a> {
-    project_dir: &'a Path,
-    pbip_path: &'a Path,
+    target: &'a ResolvedDesktopTarget,
     options: &'a ExecuteOptions,
     query_metadata: &'a Value,
     validation: &'a Value,
@@ -208,11 +218,10 @@ struct BasePayloadContext<'a> {
 impl BasePayloadContext<'_> {
     fn render(&self, ok: bool, exit_code: i32, stage: &str, diagnostic: Value) -> Value {
         json!({
-            "schema": "powerbi-cli.model.dax.execute.v1",
+            "schema": "powerbi-cli.model.dax.execute.v2",
             "ok": ok,
             "exitCode": exit_code,
-            "projectDir": canonical_display(self.project_dir),
-            "pbip": canonical_display(self.pbip_path),
+            "document": self.target.artifact_json(),
             "query": self.query_metadata,
             "safety": {
                 "readOnlyQueryFormsOnly": true,
@@ -234,7 +243,7 @@ impl BasePayloadContext<'_> {
             "diagnostics": [diagnostic],
             "validation": self.validation,
             "next": [
-                "Keep the exact PBIP open in Power BI Desktop and rerun with both explicit opt-ins.",
+                "Keep the exact PBIP/PBIX document open in Power BI Desktop and rerun with both explicit opt-ins.",
                 "Use --max-rows, --max-cell-chars, and --timeout-ms to tighten result bounds."
             ]
         })
@@ -243,16 +252,14 @@ impl BasePayloadContext<'_> {
 
 #[cfg(windows)]
 fn execute_windows(
-    project_dir: &Path,
-    pbip_path: &Path,
+    target: &ResolvedDesktopTarget,
     query: &str,
     query_metadata: &Value,
     validation: &Value,
     options: &ExecuteOptions,
 ) -> CliResult<Value> {
     let base = BasePayloadContext {
-        project_dir,
-        pbip_path,
+        target,
         options,
         query_metadata,
         validation,
@@ -279,8 +286,8 @@ fn execute_windows(
             "-File",
         ])
         .arg(&script_path)
-        .arg("-ProjectPath")
-        .arg(windows_argument_path(pbip_path))
+        .arg("-DocumentPath")
+        .arg(windows_argument_path(&target.artifact_path))
         .arg("-QueryPath")
         .arg(&query_path)
         .arg("-AdomdCopyPath")
@@ -386,11 +393,10 @@ fn execute_windows(
         })
         .collect::<Vec<_>>();
     Ok(json!({
-        "schema": "powerbi-cli.model.dax.execute.v1",
+        "schema": "powerbi-cli.model.dax.execute.v2",
         "ok": true,
         "exitCode": EXIT_SUCCESS,
-        "projectDir": canonical_display(project_dir),
-        "pbip": canonical_display(pbip_path),
+        "document": target.artifact_json(),
         "query": query_metadata,
         "safety": {
             "readOnlyQueryFormsOnly": true,
@@ -505,7 +511,7 @@ fn parse_args(args: &[String]) -> CliResult<ExecuteOptions> {
         )
         .with_hint("Use --query for a short expression or --query-file <path|-> for file/stdin input.")
         .with_suggested_command(
-            "powerbi-cli model dax execute --project <project-dir-or.pbip> --query-file <query.dax> --allow-data-read --json",
+            "powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
         ));
     }
     Ok(options)
@@ -594,7 +600,7 @@ fn validate_query_shape(query: &str) -> CliResult<()> {
             "Model mutation/XMLA payloads are refused. DEFINE declarations are query-scoped and must be followed by EVALUATE.",
         )
         .with_suggested_command(
-            "powerbi-cli model dax execute --project <project-dir-or.pbip> --query \"EVALUATE ROW(\\\"Value\\\", 1)\" --allow-data-read --json",
+            "powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query \"EVALUATE ROW(\\\"Value\\\", 1)\" --allow-data-read --json",
         )),
     }
 }
@@ -807,7 +813,7 @@ impl Drop for RuntimeDir {
 #[cfg(windows)]
 const DAX_EXECUTE_SCRIPT: &str = r#"
 param(
-    [Parameter(Mandatory = $true)][string]$ProjectPath,
+    [Parameter(Mandatory = $true)][string]$DocumentPath,
     [Parameter(Mandatory = $true)][string]$QueryPath,
     [Parameter(Mandatory = $true)][string]$AdomdCopyPath,
     [Parameter(Mandatory = $true)][int]$MaxRows,
@@ -825,7 +831,14 @@ $desktopVersion = $null
 $connection = $null
 $reader = $null
 try {
-    $pbipFull = [IO.Path]::GetFullPath($ProjectPath)
+    $documentFull = [IO.Path]::GetFullPath($DocumentPath)
+    $documentExtension = [IO.Path]::GetExtension($documentFull)
+    if (
+        -not [string]::Equals($documentExtension, '.pbip', [StringComparison]::OrdinalIgnoreCase) -and
+        -not [string]::Equals($documentExtension, '.pbix', [StringComparison]::OrdinalIgnoreCase)
+    ) {
+        throw "Unsupported Desktop document extension: $documentExtension"
+    }
     $processes = @(Get-CimInstance Win32_Process -ErrorAction Stop)
     $desktopMatches = [System.Collections.Generic.List[object]]::new()
     foreach ($candidate in @($processes | Where-Object { $_.Name -like 'PBIDesktop*.exe' })) {
@@ -838,12 +851,12 @@ try {
         }
         $matched = $false
         foreach ($token in $tokens) {
-            if (-not $token.EndsWith('.pbip', [StringComparison]::OrdinalIgnoreCase)) {
+            if (-not $token.EndsWith($documentExtension, [StringComparison]::OrdinalIgnoreCase)) {
                 continue
             }
             try {
-                $candidatePbip = [IO.Path]::GetFullPath($token)
-                if ([string]::Equals($candidatePbip, $pbipFull, [StringComparison]::OrdinalIgnoreCase)) {
+                $candidateDocument = [IO.Path]::GetFullPath($token)
+                if ([string]::Equals($candidateDocument, $documentFull, [StringComparison]::OrdinalIgnoreCase)) {
                     $matched = $true
                     break
                 }
@@ -854,10 +867,10 @@ try {
         }
     }
     if ($desktopMatches.Count -eq 0) {
-        throw "No running Power BI Desktop process has the exact PBIP open: $pbipFull"
+        throw "No running Power BI Desktop process has the exact document open: $documentFull"
     }
     if ($desktopMatches.Count -ne 1) {
-        throw "Expected one Power BI Desktop process for the exact PBIP, found $($desktopMatches.Count)."
+        throw "Expected one Power BI Desktop process for the exact document, found $($desktopMatches.Count)."
     }
     $desktop = $desktopMatches[0]
 
@@ -1099,7 +1112,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn bridge_script_contains_exact_match_and_result_guards() {
-        assert!(DAX_EXECUTE_SCRIPT.contains("exact PBIP"));
+        assert!(DAX_EXECUTE_SCRIPT.contains("exact document"));
+        assert!(DAX_EXECUTE_SCRIPT.contains(".pbix"));
         assert!(DAX_EXECUTE_SCRIPT.contains("$rows.Count -lt $MaxRows"));
         assert!(DAX_EXECUTE_SCRIPT.contains("$Value.Length -gt $MaxCellChars"));
         assert!(DAX_EXECUTE_SCRIPT.contains("$command.CommandTimeout"));

@@ -88,8 +88,11 @@ complete profile shape and command contract.
 This project does not generate `.pbix` or `.pbit` binaries directly. It can
 inspect and safely extract metadata/source files from PBIX/PBIT archives when
 those entries are present, and it can import PBIP/PBIR/TMDL source folders from
-such archives. Binary export remains a Desktop handoff: use Power BI Desktop to
-open, save, or convert PBIP/PBIX/PBIT files.
+such archives. On Windows, PBIX is also a first-class managed Desktop document:
+`desktop open` launches it through the same owned-session lifecycle as PBIP, and
+`model dax execute` can issue bounded read-only queries against its exact live
+semantic-model engine. Binary export remains a Desktop handoff; PBIP/TMDL stays
+the editable source format.
 
 ## Desktop Compatibility Notes
 
@@ -202,6 +205,9 @@ cargo run --bin powerbi-cli -- model dax dependencies --project .\build\sales --
 cargo run --bin powerbi-cli -- model dax lint --project .\build\sales --json
 $env:POWERBI_DESKTOP_ORACLE='1'
 cargo run --bin powerbi-cli -- model dax execute --project .\build\sales --query 'EVALUATE ROW("Revenue", [Total Revenue])' --allow-data-read --max-rows 10 --json
+cargo run --bin powerbi-cli -- desktop open .\SourceProfile.pbix --json
+cargo run --bin powerbi-cli -- model dax execute --project .\SourceProfile.pbix --query 'EVALUATE TOPN(20, INFO.VIEW.TABLES())' --allow-data-read --max-rows 20 --json
+cargo run --bin powerbi-cli -- desktop close --json
 cargo run --bin powerbi-cli -- model advanced inventory --project .\build\sales --json
 cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model perspectives list --project .\build\sales --json
@@ -345,7 +351,9 @@ three pages.
   drillthrough action links, cross-report drillthrough, and conditional
   formatting authoring return `error.code = "unsupported_feature"` and do not
   write fallback PBIR.
-- PBIX/PBIT package commands are metadata doors, not binary writers.
+- PBIX/PBIT package commands are metadata doors, not binary writers. PBIX can
+  additionally be opened as an exact managed Desktop document and queried
+  read-only through the local model engine on opted-in Windows machines.
   `package inspect` classifies archive entries, `package extract` extracts only
   safe metadata/source entries by default, `package import` succeeds only when
   real allowlisted PBIP/PBIR/TMDL source files exist inside the archive,
@@ -429,14 +437,15 @@ three pages.
   references, self references, simple measure cycles, and scalar `IF()`
   variables passed directly to known table-argument functions. They do not
   parse or execute the complete DAX language. On Windows, `model dax execute`
-  provides a separate bounded live-engine path: the exact PBIP must already be
+  provides a separate bounded live-engine path: the exact PBIP or PBIX document must already be
   open, `POWERBI_DESKTOP_ORACLE=1` and `--allow-data-read` are both required,
   only `EVALUATE` or `DEFINE ... EVALUATE` query forms are accepted, and the
   query text is never returned. Rows and cell text are capped because result
-  data can be sensitive. This live preflight ignores only each selected
+  data can be sensitive. PBIP live preflight ignores only each selected
   artifact's root `.pbi/` runtime directory, which Desktop creates beside the
-  source definition. Offline validation, packaging, workflow, and handoff keep
-  rejecting those runtime files. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
+  source definition; PBIX preflight verifies the package, report payload, and
+  embedded DataModel before contacting Desktop. Offline validation, packaging,
+  workflow, and handoff keep rejecting PBIP runtime files. Updates refuse blocks with unsupported Desktop-authored TMDL metadata
   instead of silently dropping it; Power BI Desktop or an explicit engine bridge
   remains the compatibility oracle.
 - Programmatic static-table authoring covers `model tables add-static` for a
@@ -635,7 +644,7 @@ three pages.
   A verify mismatch includes the actual normalized JSON in
   `verification.actual` and writes nothing by default. Use
   `--write-actual <path>` only when an explicit mismatch artifact is wanted.
-- `desktop open` creates the single CLI-owned interactive Desktop session and
+- `desktop open` accepts PBIP projects and PBIX documents, creates the single CLI-owned interactive Desktop session, and
   returns its exact observed PID, creation time, receipt path, and cleanup command.
   `desktop close` is idempotent and closes only that recorded PID and verified
   descendants. A missing, exited, or PID-reused session receipt never triggers a
