@@ -126,7 +126,7 @@ struct DesktopLaunchPlan {
     file_association_reason: Option<&'static str>,
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProcessWindow {
@@ -152,6 +152,8 @@ struct WindowObservation {
     completed_reason: &'static str,
     polls: u64,
     candidate_process_ids: Vec<u32>,
+    exact_title_candidate_count: usize,
+    selection_reason: Option<&'static str>,
 }
 
 #[cfg(windows)]
@@ -171,6 +173,8 @@ impl WindowObservation {
             completed_reason: "not-attempted",
             polls: 0,
             candidate_process_ids: Vec::new(),
+            exact_title_candidate_count: 0,
+            selection_reason: None,
         }
     }
 
@@ -189,6 +193,8 @@ impl WindowObservation {
             completed_reason: "timeout",
             polls: 0,
             candidate_process_ids: Vec::new(),
+            exact_title_candidate_count: 0,
+            selection_reason: None,
         }
     }
 }
@@ -503,6 +509,16 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                                         observed_stage = "desktop-window";
                                         proof_status = "window-observed".to_string();
                                         proof_message = "Power BI Desktop exposed a non-empty main window title whose normalized project stem exactly matched the PBIP project name. Canvas render and refresh remain unproven.".to_string();
+                                    } else if observation.exact_title_candidate_count > 1 {
+                                        proof_status = "window-title-ambiguous".to_string();
+                                        proof_message = "Power BI Desktop exposed several windows with the same report title, but none could be tied safely to the new launch. The oracle refused to guess which report instance was intended.".to_string();
+                                        diagnostics.push(json!({
+                                            "code": "desktop_title_ambiguous",
+                                            "severity": "warning",
+                                            "message": "Several Power BI Desktop windows matched the project title; close duplicate report instances or leave the newly launched instance open and retry.",
+                                            "matchingWindowCount": observation.exact_title_candidate_count,
+                                            "candidateProcessIds": observation.candidate_process_ids
+                                        }));
                                     } else if observation.window_observed == Some(true) {
                                         proof_status = "window-title-timeout".to_string();
                                         proof_message = "Power BI Desktop exposed a titled window, but its normalized project stem did not exactly match the PBIP project name before the watchdog expired. Process launch remains observed; canvas render and refresh remain unproven.".to_string();
@@ -618,7 +634,17 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                                         }
                                         } else {
                                             exit_code = EXIT_PROOF_INCOMPLETE;
-                                            if observation.window_observed == Some(true) {
+                                            if observation.exact_title_candidate_count > 1 {
+                                                proof_status =
+                                                    "screenshot-not-captured-title-ambiguous"
+                                                        .to_string();
+                                                proof_message = "Desktop launch succeeded, but several pre-existing Power BI Desktop windows shared the project title and none could be tied safely to the launch, so no screenshot was captured.".to_string();
+                                                diagnostics.push(json!({
+                                                    "code": "proof_incomplete",
+                                                    "severity": "warning",
+                                                    "message": "No screenshot was captured because the exact report title matched several ambiguous pre-existing Desktop windows."
+                                                }));
+                                            } else if observation.window_observed == Some(true) {
                                                 proof_status =
                                                     "screenshot-not-captured-title-mismatch"
                                                         .to_string();
@@ -853,6 +879,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                 "observedWindowTitle": observation.observed_window_title,
                 "observedProcessId": observation.observed_process_id,
                 "observedProcessName": observation.observed_process_name,
+                "windowSelectionReason": observation.selection_reason,
                 "observation": {
                     "attempted": observation.attempted,
                     "watchdogScope": "desktop-launch-and-window-observation",
@@ -865,7 +892,8 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                     "timedOut": observation.timed_out,
                     "completedReason": observation.completed_reason,
                     "baselineProcessIds": baseline_process_ids,
-                    "candidateProcessIds": observation.candidate_process_ids
+                    "candidateProcessIds": observation.candidate_process_ids,
+                    "exactTitleCandidateCount": observation.exact_title_candidate_count
                 },
                 "screenshotCaptured": if operation == DesktopOperation::Screenshot {
                     Value::Bool(screenshot_captured)
@@ -1255,18 +1283,23 @@ fn observe_window(
         for process in &titled_candidates {
             candidate_ids.insert(process.id);
         }
-        if let Some(process) = titled_candidates
-            .iter()
-            .find(|process| title_matches_project(&process.main_window_title, project_name))
-            .cloned()
-            .or_else(|| titled_candidates.first().cloned())
-        {
+        let selection = select_window_candidate(
+            &titled_candidates,
+            launched_pid,
+            baseline_process_ids,
+            project_name,
+        );
+        observation.exact_title_candidate_count = observation
+            .exact_title_candidate_count
+            .max(selection.exact_title_candidate_count);
+        if let Some(process) = selection.process {
             let matched = title_matches_project(&process.main_window_title, project_name);
             observation.window_observed = Some(true);
             observation.title_matched = Some(matched);
             observation.observed_window_title = Some(process.main_window_title);
             observation.observed_process_id = Some(process.id);
             observation.observed_process_name = Some(process.process_name);
+            observation.selection_reason = selection.reason;
             observation
                 .observed_at_ms
                 .get_or_insert_with(|| watchdog.elapsed_ms());
@@ -1289,6 +1322,57 @@ fn observe_window(
     observation.elapsed_ms = watchdog.elapsed_ms();
     observation.candidate_process_ids = candidate_ids.into_iter().collect();
     Ok(observation)
+}
+
+#[cfg(any(windows, test))]
+struct WindowCandidateSelection {
+    process: Option<ProcessWindow>,
+    exact_title_candidate_count: usize,
+    reason: Option<&'static str>,
+}
+
+#[cfg(any(windows, test))]
+fn select_window_candidate(
+    processes: &[ProcessWindow],
+    launched_pid: u32,
+    baseline_process_ids: &[u32],
+    project_name: &str,
+) -> WindowCandidateSelection {
+    let exact = processes
+        .iter()
+        .filter(|process| title_matches_project(&process.main_window_title, project_name))
+        .collect::<Vec<_>>();
+    let exact_title_candidate_count = exact.len();
+
+    let selected = exact
+        .iter()
+        .find(|process| process.id == launched_pid)
+        .map(|process| ((*process).clone(), "association-launch-pid"))
+        .or_else(|| {
+            exact
+                .iter()
+                .find(|process| !baseline_process_ids.contains(&process.id))
+                .map(|process| ((*process).clone(), "new-desktop-process"))
+        })
+        .or_else(|| (exact.len() == 1).then(|| (exact[0].clone(), "unique-title-fallback")))
+        .or_else(|| {
+            processes
+                .iter()
+                .find(|process| process.id == launched_pid)
+                .map(|process| (process.clone(), "association-launch-diagnostic"))
+        })
+        .or_else(|| {
+            processes
+                .iter()
+                .find(|process| !baseline_process_ids.contains(&process.id))
+                .map(|process| (process.clone(), "new-process-diagnostic"))
+        });
+
+    WindowCandidateSelection {
+        process: selected.as_ref().map(|(process, _)| process.clone()),
+        exact_title_candidate_count,
+        reason: selected.map(|(_, reason)| reason),
+    }
 }
 
 #[cfg(any(windows, test))]
@@ -1615,6 +1699,26 @@ if ($foregroundWindow -ne [IntPtr]::Zero) {
 }
 $foregroundProcessId = if ($activeProcessId -gt 0) { [int]$activeProcessId } else { $null }
 $foregroundVerified = ($foregroundPid -gt 0 -and $activeProcessId -eq $foregroundPid)
+if (-not $foregroundVerified -and $foregroundPid -gt 0 -and $activeProcessId -gt 0) {
+    try {
+        $parents = @{}
+        foreach ($process in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
+            $parents[[int]$process.ProcessId] = [int]$process.ParentProcessId
+        }
+        $visited = [System.Collections.Generic.HashSet[int]]::new()
+        $cursor = [int]$activeProcessId
+        while ($cursor -gt 0 -and $visited.Add($cursor)) {
+            if ($cursor -eq $foregroundPid) {
+                $foregroundVerified = $true
+                break
+            }
+            if (-not $parents.ContainsKey($cursor)) {
+                break
+            }
+            $cursor = [int]$parents[$cursor]
+        }
+    } catch {}
+}
 $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $captured = $false
 if ($foregroundVerified -or $allowUnverifiedCapture) {
@@ -2322,13 +2426,14 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<Strin
 #[cfg(test)]
 mod tests {
     use super::{
-        DesktopOperation, ScreenshotCaptureResult, ScreenshotDimensions, capture_is_authorized,
-        desktop_argument_path, detect_power_bi_desktop, ensure_desktop_platform,
-        is_power_bi_desktop_process, parse_desktop_args, path_is_within_directory,
-        powershell_single_quoted, publish_screenshot, remaining_budget, render_cleanup_script,
-        render_launch_script, render_process_snapshot_script, render_screenshot_script,
-        render_version_script, render_window_query_script, screenshot_changes,
-        screenshot_observation_is_eligible, title_matches_project,
+        DesktopOperation, ProcessWindow, ScreenshotCaptureResult, ScreenshotDimensions,
+        capture_is_authorized, desktop_argument_path, detect_power_bi_desktop,
+        ensure_desktop_platform, is_power_bi_desktop_process, parse_desktop_args,
+        path_is_within_directory, powershell_single_quoted, publish_screenshot, remaining_budget,
+        render_cleanup_script, render_launch_script, render_process_snapshot_script,
+        render_screenshot_script, render_version_script, render_window_query_script,
+        screenshot_changes, screenshot_observation_is_eligible, select_window_candidate,
+        title_matches_project,
     };
     use serde_json::json;
     use std::fs;
@@ -2406,6 +2511,50 @@ mod tests {
         assert!(is_power_bi_desktop_process("PBIDesktopStore"));
         assert!(!is_power_bi_desktop_process("explorer"));
         assert!(!is_power_bi_desktop_process("msmdsrv"));
+    }
+
+    #[test]
+    fn duplicate_titles_prefer_the_new_process_instead_of_the_oldest_pid() {
+        let processes = vec![
+            ProcessWindow {
+                id: 17264,
+                process_name: "PBIDesktop".to_string(),
+                main_window_title: "SafetyDashboard".to_string(),
+            },
+            ProcessWindow {
+                id: 37004,
+                process_name: "PBIDesktop".to_string(),
+                main_window_title: "SafetyDashboard - Power BI Desktop".to_string(),
+            },
+        ];
+        let selected = select_window_candidate(&processes, 999, &[17264], "SafetyDashboard");
+
+        let process = selected.process.expect("new process");
+        assert_eq!(process.id, 37004);
+        assert_eq!(process.process_name, "PBIDesktop");
+        assert_eq!(selected.reason, Some("new-desktop-process"));
+        assert_eq!(selected.exact_title_candidate_count, 2);
+    }
+
+    #[test]
+    fn duplicate_baseline_titles_are_ambiguous_instead_of_guessed() {
+        let processes = vec![
+            ProcessWindow {
+                id: 100,
+                process_name: "PBIDesktop".to_string(),
+                main_window_title: "SameReport".to_string(),
+            },
+            ProcessWindow {
+                id: 200,
+                process_name: "PBIDesktopStore".to_string(),
+                main_window_title: "SameReport".to_string(),
+            },
+        ];
+        let selected = select_window_candidate(&processes, 999, &[100, 200], "SameReport");
+
+        assert!(selected.process.is_none());
+        assert_eq!(selected.reason, None);
+        assert_eq!(selected.exact_title_candidate_count, 2);
     }
 
     #[test]
@@ -2612,6 +2761,8 @@ mod tests {
         let screenshot = render_screenshot_script(r"C:\proof\evidence.png", Some(91), 25, false);
         assert!(screenshot.contains("GetWindowThreadProcessId"));
         assert!(screenshot.contains("$foregroundVerified ="));
+        assert!(screenshot.contains("Get-CimInstance Win32_Process"));
+        assert!(screenshot.contains("$cursor -eq $foregroundPid"));
         assert!(screenshot.contains("if ($foregroundVerified -or $allowUnverifiedCapture)"));
         assert!(screenshot.contains("activationSucceeded = [bool]$activationSucceeded"));
         assert!(screenshot.contains("foregroundProcessId = $foregroundProcessId"));

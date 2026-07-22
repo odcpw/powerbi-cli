@@ -10784,6 +10784,10 @@ fn report_themes_apply_rejects_unsafe_or_wrong_bundle() {
 
 #[test]
 fn capabilities_advertise_report_layout_commands() {
+    let full_contract = run_powerbi(&["capabilities", "--json"]);
+    assert_eq!(full_contract.code, 0, "stderr: {}", full_contract.stderr);
+    let full_contract_value = stdout_json(&full_contract);
+
     let output = run_powerbi(&["capabilities", "--json", "--for", "report"]);
     assert_eq!(output.code, 0, "stderr: {}", output.stderr);
     let value = stdout_json(&output);
@@ -11453,161 +11457,161 @@ fn capabilities_advertise_report_layout_commands() {
     assert_eq!(apply_theme["requiresOutput"], Value::Bool(true));
     assert_eq!(apply_theme["writesDataCache"], Value::Bool(false));
     assert!(
-        value["schemaManifest"]["visualMutationFields"]
+        full_contract_value["schemaManifest"]["visualMutationFields"]
             .as_array()
             .expect("visual mutation fields")
             .iter()
             .any(|field| field == "visualPlan.after")
     );
     assert!(
-        value["schemaManifest"]["visualDeleteMutationFields"]
+        full_contract_value["schemaManifest"]["visualDeleteMutationFields"]
             .as_array()
             .expect("visual delete mutation fields")
             .iter()
             .any(|field| field == "deletePlan.after")
     );
     assert!(
-        value["schemaManifest"]["visualCloneMutationFields"]
+        full_contract_value["schemaManifest"]["visualCloneMutationFields"]
             .as_array()
             .expect("visual clone mutation fields")
             .iter()
             .any(|field| field == "clonePlan.targetPath")
     );
     assert!(
-        value["schemaManifest"]["visualFormattingFields"]
+        full_contract_value["schemaManifest"]["visualFormattingFields"]
             .as_array()
             .expect("visual formatting fields")
             .iter()
             .any(|field| field == "containers")
     );
     assert!(
-        value["schemaManifest"]["visualFormattingContainerFields"]
+        full_contract_value["schemaManifest"]["visualFormattingContainerFields"]
             .as_array()
             .expect("visual formatting container fields")
             .iter()
             .any(|field| field == "propertyNames")
     );
     assert!(
-        value["schemaManifest"]["visualFormattingBundleFields"]
+        full_contract_value["schemaManifest"]["visualFormattingBundleFields"]
             .as_array()
             .expect("visual formatting bundle fields")
             .iter()
             .any(|field| field == "formatting.visualObjects")
     );
     assert!(
-        value["schemaManifest"]["visualFormattingMutationFields"]
+        full_contract_value["schemaManifest"]["visualFormattingMutationFields"]
             .as_array()
             .expect("visual formatting mutation fields")
             .iter()
             .any(|field| field == "formattingPlan.after")
     );
     assert!(
-        value["schemaManifest"]["visualFormattingTextMutationFields"]
+        full_contract_value["schemaManifest"]["visualFormattingTextMutationFields"]
             .as_array()
             .expect("visual formatting text mutation fields")
             .iter()
             .any(|field| field == "textPlan.after")
     );
     assert!(
-        value["schemaManifest"]["visualFormattingColorMutationFields"]
+        full_contract_value["schemaManifest"]["visualFormattingColorMutationFields"]
             .as_array()
             .expect("visual formatting color mutation fields")
             .iter()
             .any(|field| field == "colorPlan.after")
     );
     assert!(
-        value["schemaManifest"]["reportBookmarkFields"]
+        full_contract_value["schemaManifest"]["reportBookmarkFields"]
             .as_array()
             .expect("report bookmark fields")
             .iter()
             .any(|field| field == "safety")
     );
     assert!(
-        value["schemaManifest"]["reportBookmarkSafetyFields"]
+        full_contract_value["schemaManifest"]["reportBookmarkSafetyFields"]
             .as_array()
             .expect("report bookmark safety fields")
             .iter()
             .any(|field| field == "literalCountInBookmarkState")
     );
     assert!(
-        value["schemaManifest"]["reportFilterFields"]
+        full_contract_value["schemaManifest"]["reportFilterFields"]
             .as_array()
             .expect("report filter fields")
             .iter()
             .any(|field| field == "safety")
     );
     assert!(
-        value["schemaManifest"]["reportFilterMutationFields"]
+        full_contract_value["schemaManifest"]["reportFilterMutationFields"]
             .as_array()
             .expect("report filter mutation fields")
             .iter()
             .any(|field| field == "filterPlan.after")
     );
     assert!(
-        value["schemaManifest"]["reportFilterAddMutationFields"]
+        full_contract_value["schemaManifest"]["reportFilterAddMutationFields"]
             .as_array()
             .expect("report filter add mutation fields")
             .iter()
             .any(|field| field == "filterPlan.afterCount")
     );
     assert!(
-        value["schemaManifest"]["reportFilterClearMutationFields"]
+        full_contract_value["schemaManifest"]["reportFilterClearMutationFields"]
             .as_array()
             .expect("report filter clear mutation fields")
             .iter()
             .any(|field| field == "confirmToken")
     );
     assert!(
-        value["schemaManifest"]["reportFilterClearMutationFields"]
+        full_contract_value["schemaManifest"]["reportFilterClearMutationFields"]
             .as_array()
             .expect("report filter clear mutation fields")
             .iter()
             .any(|field| field == "filterPlan.arrayEdits")
     );
     assert!(
-        value["schemaManifest"]["reportSlicerFields"]
+        full_contract_value["schemaManifest"]["reportSlicerFields"]
             .as_array()
             .expect("report slicer fields")
             .iter()
             .any(|field| field == "target")
     );
     assert!(
-        value["schemaManifest"]["reportSlicerSafetyFields"]
+        full_contract_value["schemaManifest"]["reportSlicerSafetyFields"]
             .as_array()
             .expect("report slicer safety fields")
             .iter()
             .any(|field| field == "literalCountInSlicerState")
     );
     assert!(
-        value["schemaManifest"]["reportSlicerClearMutationFields"]
+        full_contract_value["schemaManifest"]["reportSlicerClearMutationFields"]
             .as_array()
             .expect("report slicer clear mutation fields")
             .iter()
             .any(|field| field == "confirmToken")
     );
     assert!(
-        value["schemaManifest"]["reportSlicerClearMutationFields"]
+        full_contract_value["schemaManifest"]["reportSlicerClearMutationFields"]
             .as_array()
             .expect("report slicer clear mutation fields")
             .iter()
             .any(|field| field == "slicerPlan.arrayEdits")
     );
     assert!(
-        value["schemaManifest"]["reportInteractionFields"]
+        full_contract_value["schemaManifest"]["reportInteractionFields"]
             .as_array()
             .expect("report interaction fields")
             .iter()
             .any(|field| field == "semantics")
     );
     assert!(
-        value["schemaManifest"]["reportInteractionSemanticsFields"]
+        full_contract_value["schemaManifest"]["reportInteractionSemanticsFields"]
             .as_array()
             .expect("report interaction semantics fields")
             .iter()
             .any(|field| field == "missingRowsMean")
     );
     assert!(
-        value["schemaManifest"]["reportInteractionMutationFields"]
+        full_contract_value["schemaManifest"]["reportInteractionMutationFields"]
             .as_array()
             .expect("report interaction mutation fields")
             .iter()

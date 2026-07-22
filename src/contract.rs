@@ -202,6 +202,7 @@ pub(crate) fn help_json() -> Value {
 
 pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
     let filter = parse_filter(args, "capabilities")?;
+    let focused = filter.is_some();
     let mut commands = command_catalog();
     if let Some(filter) = &filter {
         commands.retain(|command| command_matches_filter(command, filter));
@@ -231,13 +232,24 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "responseShapes": response_shapes(),
         "featurePolicy": feature_policy_json(),
         "filter": filter,
+        "scope": if focused { "focused" } else { "full" },
         "matchedCommands": matched_commands,
         "hint": hint,
         "commands": commands,
-        "schemaManifest": schema_manifest(),
-        "generatedVisualContract": generated_visual_contract(),
-        "desktopProofedArchetypes": desktop_proofed_archetypes(),
-        "formatTargets": format_targets(),
+        "schemaManifest": if focused { Value::Null } else { schema_manifest() },
+        "generatedVisualContract": if focused { Value::Null } else { generated_visual_contract() },
+        "desktopProofedArchetypes": if focused { Value::Null } else { desktop_proofed_archetypes() },
+        "formatTargets": if focused { Value::Null } else { format_targets() },
+        "omittedCatalogs": if focused {
+            json!(["schemaManifest", "generatedVisualContract", "desktopProofedArchetypes", "formatTargets"])
+        } else {
+            json!([])
+        },
+        "fullContractCommand": if focused {
+            Value::String("powerbi-cli --json capabilities".to_string())
+        } else {
+            Value::Null
+        },
         "proofLevels": proof_levels(),
         "architectureGuardrails": architecture_guardrails(),
         "designRules": design_rules()
@@ -468,6 +480,48 @@ fn command_matches_filter(command: &Value, filter: &str) -> bool {
         })
 }
 
+pub(crate) fn suggested_command_path(args: &[String]) -> Option<String> {
+    let attempted = normalized_command_tokens(args);
+    if attempted.is_empty() {
+        return None;
+    }
+    let paths = command_paths();
+
+    let suffix_matches = paths
+        .iter()
+        .filter(|path| {
+            normalized_command_tokens(&[path.as_str().to_string()]).ends_with(&attempted)
+        })
+        .collect::<Vec<_>>();
+    if suffix_matches.len() == 1 {
+        return suffix_matches.first().map(|path| (*path).clone());
+    }
+
+    let mut attempted_sorted = attempted.clone();
+    attempted_sorted.sort();
+    let reordered_matches = paths
+        .iter()
+        .filter(|path| {
+            let mut candidate = normalized_command_tokens(&[path.as_str().to_string()]);
+            candidate.sort();
+            candidate == attempted_sorted
+        })
+        .collect::<Vec<_>>();
+    (reordered_matches.len() == 1).then(|| reordered_matches[0].clone())
+}
+
+fn normalized_command_tokens(args: &[String]) -> Vec<String> {
+    args.iter()
+        .take_while(|arg| !arg.starts_with('-'))
+        .flat_map(|arg| {
+            arg.split(|character: char| character.is_whitespace() || character == '-')
+                .filter(|part| !part.is_empty())
+                .map(str::to_ascii_lowercase)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
 fn command_paths() -> Vec<String> {
     command_catalog()
         .into_iter()
@@ -480,7 +534,7 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "capabilities",
             "usage": "powerbi-cli --json capabilities [--for <filter>]",
-            "summary": "List the agent-facing command contract",
+            "summary": "List the agent-facing command contract; focused queries omit unrelated large catalogs",
             "tags": ["agent", "discovery", "contract"],
             "readOnly": true,
             "mutates": false,
@@ -489,7 +543,7 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "capabilities.v1",
             "flags": ["--for <filter>", "--json", "--format json"],
             "examples": ["powerbi-cli --json capabilities", "powerbi-cli capabilities --json --for scaffold"],
-            "followUpFields": ["commands[].usage", "commands[].examples", "exitCodes", "schemaManifest"]
+            "followUpFields": ["scope", "commands[].usage", "commands[].examples", "exitCodes", "omittedCatalogs", "fullContractCommand", "schemaManifest"]
         }),
         json!({
             "path": "version",
@@ -768,7 +822,7 @@ fn command_catalog() -> Vec<Value> {
             "timeoutContract": "timeout-ms is one watchdog budget for the bounded version probe, process baseline, file-association launch, and exact window/title polling; a timeout after confirmed launch returns exit 0 with observedStage=desktop-launch and timeout signals, while a launch timeout is oracle_failed",
             "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--timeout-ms <ms>", "--leave-open", "--close-after", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
             "examples": ["powerbi-cli desktop open-check build/sales --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check build/sales --desktop-path \"C:\\\\Program Files\\\\Microsoft Power BI Desktop\\\\bin\\\\PBIDesktop.exe\" --json"],
-            "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "oracle.detection.requestedDesktopPath", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.signals.launchMethod", "proof.signals.detectionPathUsedForLaunch", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.observation", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.claimedCompatibility", "proof.requiredCompatibilityLevel", "proof.unprovenSignals", "proof.manualReview", "validation", "diagnostics", "next"]
+            "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "oracle.detection.requestedDesktopPath", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.signals.launchMethod", "proof.signals.detectionPathUsedForLaunch", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.claimedCompatibility", "proof.requiredCompatibilityLevel", "proof.unprovenSignals", "proof.manualReview", "validation", "diagnostics", "next"]
         }),
         json!({
             "path": "desktop screenshot",
@@ -787,10 +841,10 @@ fn command_catalog() -> Vec<Value> {
             "ciPolicy": "never required in default CI; screenshots are evidence for manual/screen-agent review and never an automated canvas/render/refresh compatibility claim",
             "timeoutContract": "timeout-ms is one watchdog budget for the bounded version probe, process baseline, file-association launch, and exact window/title polling; if launch succeeds but no exact project title appears, screenshot returns proof_incomplete exit 20 rather than oracle_failed",
             "outputPathPolicy": "--out must end in .png and resolve outside the PBIP project directory; capture uses a unique same-directory temporary file and creates/replaces the destination only after success",
-            "captureSafety": "foreground PID must match the exactly titled PBIDesktop process; failure publishes no PNG. --allow-unverified-capture explicitly accepts the risk of capturing unrelated sensitive screen content",
+            "captureSafety": "foreground PID must be the selected PBIDesktop process or one of its verified descendants; failure publishes no PNG. --allow-unverified-capture explicitly accepts the risk of capturing unrelated sensitive screen content",
             "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--out <file.png>", "--timeout-ms <ms>", "--leave-open", "--close-after", "--desktop-path <PBIDesktop.exe>", "--allow-unverified-capture", "--json", "--format json"],
             "examples": ["powerbi-cli desktop screenshot build/sales --out proof/sales.png --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop screenshot build/sales --out proof/sales.png --leave-open --json"],
-            "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.observation", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
+            "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
         }),
         json!({
             "path": "desktop bridge status",
@@ -2874,8 +2928,8 @@ fn schema_manifest() -> Value {
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
-        "desktopOpenCheckFields": ["ok", "exitCode", "changes", "project", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.observation", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],
-        "desktopScreenshotFields": ["ok", "exitCode", "changes", "project", "oracle.available", "oracle.desktopVersion", "validation", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.timeoutMs", "proof.timeoutScope", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.observation", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.format", "screenshot.display", "screenshot.width", "screenshot.height", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "screenshot.limitations", "diagnostics", "next"],
+        "desktopOpenCheckFields": ["ok", "exitCode", "changes", "project", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],
+        "desktopScreenshotFields": ["ok", "exitCode", "changes", "project", "oracle.available", "oracle.desktopVersion", "validation", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.timeoutMs", "proof.timeoutScope", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.format", "screenshot.display", "screenshot.width", "screenshot.height", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "screenshot.limitations", "diagnostics", "next"],
         "fixtureSummaryFields": ["schema", "summaryVersion", "fingerprint", "project", "counts", "counts.explicitInteractions", "counts.unsupportedInteractions", "counts.staleInteractionVisualReferences", "model.tables", "model.relationships", "report.interactionSemantics", "report.pages", "pbir.reportDefinitionVersion", "pbir.filters.counts", "pbir.filters.items", "validation", "lint", "verification"],
         "fixtureVerificationFields": ["mode", "expected", "actualWritten", "actual", "same", "differences"],
         "fixtureReportPageFields": ["ordinal", "name", "displayName", "width", "height", "displayOption", "isActive", "visuals", "interactionCount", "interactions"],

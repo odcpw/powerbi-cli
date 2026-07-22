@@ -84,10 +84,20 @@ before `Stop-Process`; baseline, pre-launch, unknown-creation, and PID-reuse cas
 are never killed. `closed=true` means every targeted PID was verified dead and no
 ownership/stop error remained.
 
+Window selection never chooses the oldest matching title. It prefers the
+association-launch PID, then an exact-title Desktop PID absent from the
+pre-launch baseline, then a unique exact-title fallback. If only several
+pre-existing windows share the exact title, the command reports
+`desktop_title_ambiguous` and refuses to guess which instance is the requested
+PBIP.
+
 `desktop screenshot <project> --out <file.png>` performs the same preflight,
 launch, exact-title observation, and cleanup workflow. It activates only the
 matched `PBIDesktop*` PID and then verifies the actual foreground PID through
-`user32!GetForegroundWindow` and `GetWindowThreadProcessId`. Capture is written
+`user32!GetForegroundWindow` and `GetWindowThreadProcessId`. Power BI may put
+its foreground UI in a child process, so ownership is accepted only when that
+PID is the selected Desktop process or has a verified parent chain to it.
+Capture is written
 to a unique temporary file beside the destination; the previous PNG is replaced
 only after a non-empty capture succeeds. The output path must end in `.png` and
 resolve outside the PBIP project directory.

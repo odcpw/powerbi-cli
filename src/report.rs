@@ -1,3 +1,4 @@
+use crate::contract::suggested_command_path;
 use crate::feature_catalog::unsupported_feature_error;
 use crate::inspect::deep_inspect;
 use crate::report_bookmarks::bookmarks_command;
@@ -87,7 +88,7 @@ pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
         [family, ..] if matches!(family.as_str(), "tooltip" | "tooltips") => {
             Err(unsupported_feature_error("report.tooltip-pages"))
         }
-        [] | [_] => Err(CliError::invalid_args(
+        [] => Err(CliError::invalid_args(
             "report requires a subcommand: build, spec fields, spec validate, design-plan, wireframe export, pages, bookmarks, filters, slicers, interactions, themes, visuals",
         )
         .with_hint("Run `powerbi-cli report spec fields --schema <schema.json> --json`, `powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json`, or inspect supported report primitives.")
@@ -97,12 +98,27 @@ pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
         .with_suggested_command(
             "powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json",
         )),
-        _ => Err(CliError::invalid_args("unknown report command")
-            .with_hint(
-                "Run `powerbi-cli --json capabilities --for report` for supported report commands.",
-            )
-            .with_suggested_command("powerbi-cli --json capabilities --for report")),
+        _ => Err(unknown_report_command(args)),
     }
+}
+
+fn unknown_report_command(args: &[String]) -> CliError {
+    let mut attempted = vec!["report".to_string()];
+    attempted.extend_from_slice(args);
+    if let Some(candidate) = suggested_command_path(&attempted) {
+        return CliError::invalid_args(format!("unknown report command: {}", args.join(" ")))
+            .with_hint(format!(
+                "Did you mean `powerbi-cli {candidate}`? Inspect that exact command contract before running it."
+            ))
+            .with_suggested_command(format!(
+                "powerbi-cli --json capabilities --for \"{candidate}\""
+            ));
+    }
+    CliError::invalid_args("unknown report command")
+        .with_hint(
+            "Run `powerbi-cli --json capabilities --for report` for supported report commands.",
+        )
+        .with_suggested_command("powerbi-cli --json capabilities --for report")
 }
 
 fn wireframe_export(args: &[String]) -> CliResult<Value> {

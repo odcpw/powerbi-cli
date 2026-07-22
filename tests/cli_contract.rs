@@ -1176,6 +1176,50 @@ fn typo_recovery_for_bare_families_suggests_an_executable_discovery_command() {
 }
 
 #[test]
+fn misplaced_nested_commands_suggest_the_exact_live_path() {
+    let dax = run_powerbi(&["dax", "lint", "--json"]);
+    assert_eq!(dax.code, 2);
+    let dax_error = stderr_json(&dax);
+    assert_eq!(
+        dax_error["error"]["suggestedCommands"],
+        json!(["powerbi-cli --json capabilities --for \"model dax lint\""])
+    );
+    assert!(
+        dax_error["error"]["hint"]
+            .as_str()
+            .expect("hint")
+            .contains("powerbi-cli model dax lint")
+    );
+
+    let wireframe = run_powerbi(&["report", "export-wireframe", "--json"]);
+    assert_eq!(wireframe.code, 2);
+    let wireframe_error = stderr_json(&wireframe);
+    assert_eq!(
+        wireframe_error["error"]["suggestedCommands"],
+        json!(["powerbi-cli --json capabilities --for \"report wireframe export\""])
+    );
+}
+
+#[test]
+fn focused_capabilities_omit_large_unrelated_catalogs() {
+    let focused = run_powerbi(&["capabilities", "--for", "validate", "--json"]);
+    assert_eq!(focused.code, 0, "stderr: {}", focused.stderr);
+    let value = stdout_json(&focused);
+    assert_eq!(value["scope"], "focused");
+    assert!(value["schemaManifest"].is_null());
+    assert!(value["generatedVisualContract"].is_null());
+    assert_eq!(
+        value["fullContractCommand"],
+        "powerbi-cli --json capabilities"
+    );
+    assert!(
+        focused.stdout.len() < 20_000,
+        "focused discovery unexpectedly returned {} bytes",
+        focused.stdout.len()
+    );
+}
+
+#[test]
 fn semantic_model_handles_percent_encode_colon_components_and_round_trip() {
     let temp = tempfile::tempdir().expect("tempdir");
     let schema_path = temp.path().join("colon.schema.json");

@@ -118,6 +118,11 @@ pbi --json capabilities --for report
 pbi --json capabilities --for handoff
 ```
 
+A focused `--for` response returns the matching commands and small shared
+contract fields. It deliberately leaves the large unrelated schema/visual
+catalogs null and names them in `omittedCatalogs`; run the returned
+`fullContractCommand` only when those catalogs are actually needed.
+
 Key live surfaces include package inspect/extract/import/source-pack/export-plan,
 schema validate/normalize, profile
 infer/validate/summarize, deterministic report planning, declarative report spec
@@ -173,8 +178,10 @@ supported.
 - Semantic-model handles percent-encode literal `%` and `:` inside table,
   measure, column, and partition components as `%25` and `%3A`. Always reuse
   returned handles instead of constructing them by hand.
-- Visual deletion handles Windows/OneDrive read-only directory attributes and
-  restores `visual.json` if the enclosing directory cannot be removed.
+- Delete visual containers with `report visuals delete`, never by removing
+  `visual.json` directly. The command handles Windows/OneDrive read-only
+  directory attributes and restores `visual.json` if the enclosing directory
+  cannot be removed.
 - `report visuals formatting set-text` synchronizes existing PBIR title
   containers and the generated `powerbi-cli.placeholderTitle` annotation.
 - Mutate with explicit output directories or `--dry-run` when the command
@@ -335,6 +342,39 @@ pbi --json validate build/sales
 Use `inspect --deep` before report or model edits. It returns tables, columns,
 measures, relationships, pages, visuals, bindings,
 handles, hazards, and proof status.
+
+### Repair And Verify An Existing Dashboard
+
+Use the exact command paths below instead of guessing shortened families:
+
+```bash
+pbi --json validate --strict build/sales
+pbi --json model dax dependencies --project build/sales
+pbi --json model dax lint --project build/sales
+pbi --json report wireframe export build/sales
+pbi --json report interactions list --project build/sales
+pbi --json handoff check build/sales
+```
+
+Use `report visuals list/show` handles for every visual mutation. Delete a
+visual only with `report visuals delete --dry-run`, then an output copy or a
+confirmed in-place mutation. Never leave an empty visual directory.
+
+Treat three report behaviors separately:
+
+- A hierarchy drill changes one visual's category grain, such as branch to
+  company. Use `report drilldown set-hierarchy` and verify the visual's drill
+  controls in Desktop.
+- Comparing several companies at once is not hierarchy drill. Bind company as
+  the chart's Series/Legend field or use a multi-select company slicer, keeping
+  year on the axis.
+- Drillthrough navigates to a target page with filter context. Use `report
+  drillthrough show` to inspect an existing target; do not substitute it for
+  hierarchy drill or multi-series comparison.
+
+After a source rebind, use `model dax execute` for bounded model assertions and
+then inspect every changed page in Desktop. A successful DAX query does not
+prove canvas interactions, drill controls, bubbles, or refresh.
 
 ### Author Measures
 
@@ -791,7 +831,8 @@ pbi --json desktop screenshot build/sales --out proof/sales.png
 
 `desktop screenshot --out` accepts only PNG paths outside the PBIP project
 directory so evidence does not contaminate the handoff. It activates the exactly
-matched `PBIDesktop*` PID, verifies that PID owns the foreground window, captures
+selected `PBIDesktop*` PID, verifies that PID or one of its descendants owns the
+foreground window, captures
 to a unique same-directory temporary file, and publishes the destination only
 after success. A failed capture preserves previous evidence. The response records
 activation and foreground PIDs plus a `changes` entry when the PNG was created or
@@ -801,6 +842,12 @@ acceptance. Default cleanup reports every targeted PID with its ownership reason
 never kills baseline/pre-launch processes, and verifies targeted PIDs are dead.
 Pass `--leave-open` only when a screen-capable orchestrator will continue the
 session.
+
+When duplicate Desktop windows share the project title, selection prefers the
+association-launch PID and then a new post-baseline Desktop PID. If only
+pre-existing duplicates remain, the command reports `desktop_title_ambiguous`
+instead of guessing. Close duplicates or keep the newly launched instance open
+and retry.
 
 `--timeout-ms` is a total watchdog for the bounded Desktop version probe,
 pre-launch process baseline, file-association launch, and exact window/title

@@ -1,6 +1,6 @@
 use crate::contract::{
     CONTRACT_VERSION, capabilities, help_json, help_text, robot_docs_json, robot_docs_markdown,
-    robot_triage,
+    robot_triage, suggested_command_path,
 };
 use crate::desktop::desktop_command;
 use crate::feature_catalog::features_command;
@@ -136,7 +136,7 @@ fn run() -> CliResult<CliOutput> {
         }
         "validate" => value_output(validate_command(&args[1..])?, flags.json),
         "workflow" => value_output(workflow_command(&args[1..])?, flags.json),
-        other => Err(unknown_command_error(other)),
+        _ => Err(unknown_command_error(&args)),
     }
 }
 
@@ -265,7 +265,17 @@ fn correct_json_flag_command(raw_args: &[String]) -> String {
     format!("powerbi-cli {}", corrected.join(" "))
 }
 
-fn unknown_command_error(command: &str) -> CliError {
+fn unknown_command_error(args: &[String]) -> CliError {
+    let command = args.first().map(String::as_str).unwrap_or_default();
+    if let Some(candidate) = suggested_command_path(args) {
+        return CliError::invalid_args(format!("unknown command: {}", args.join(" ")))
+            .with_hint(format!(
+                "Did you mean `powerbi-cli {candidate}`? Inspect that exact command contract before running it."
+            ))
+            .with_suggested_command(format!(
+                "powerbi-cli --json capabilities --for \"{candidate}\""
+            ));
+    }
     let known = [
         "capabilities",
         "features",

@@ -807,6 +807,10 @@ fn desktop_oracle_is_an_unsupported_feature_before_opt_in_on_non_windows() {
 
 #[test]
 fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
+    let full_contract = run_powerbi(&["capabilities", "--json"]);
+    assert_eq!(full_contract.code, 0, "stderr: {}", full_contract.stderr);
+    let full_contract_value = stdout_json(&full_contract);
+
     let output = run_powerbi(&["capabilities", "--json", "--for", "fixture"]);
     assert_eq!(output.code, 0, "stderr: {}", output.stderr);
     let fixture_value = stdout_json(&output);
@@ -841,21 +845,21 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
             .any(|field| field == "verification.actual")
     );
     assert!(
-        fixture_value["schemaManifest"]["fixtureSummaryFields"]
+        full_contract_value["schemaManifest"]["fixtureSummaryFields"]
             .as_array()
             .expect("fixture summary fields")
             .iter()
             .any(|field| field == "fingerprint")
     );
     assert!(
-        fixture_value["schemaManifest"]["fixtureReportInteractionFields"]
+        full_contract_value["schemaManifest"]["fixtureReportInteractionFields"]
             .as_array()
             .expect("fixture report interaction fields")
             .iter()
             .any(|field| field == "staleVisualReference")
     );
     assert!(
-        fixture_value["schemaManifest"]["fixturePbirFilterFields"]
+        full_contract_value["schemaManifest"]["fixturePbirFilterFields"]
             .as_array()
             .expect("fixture PBIR filter fields")
             .iter()
@@ -957,14 +961,14 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
         ]
     );
     assert!(
-        desktop_catalog_value["schemaManifest"]["desktopScreenshotFields"]
+        full_contract_value["schemaManifest"]["desktopScreenshotFields"]
             .as_array()
             .expect("desktop screenshot fields")
             .iter()
             .any(|field| field == "screenshot.automatedCompatibilityProof")
     );
     assert!(
-        desktop_catalog_value["schemaManifest"]["desktopScreenshotFields"]
+        full_contract_value["schemaManifest"]["desktopScreenshotFields"]
             .as_array()
             .expect("desktop screenshot fields")
             .iter()

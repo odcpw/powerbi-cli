@@ -117,7 +117,8 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   desktop-golden-pending < manual-desktop-canvas-refresh <
   desktop-canvas-refresh`.
   `desktop screenshot` captures the primary display only after the foreground
-  window PID is verified as the exactly matched Desktop process. Neither command
+  window PID is verified as the selected Desktop process or one of its process
+  descendants. Neither command
   automates canvas or refresh proof; the `desktop-canvas-refresh` level remains
   open.
 
@@ -630,10 +631,15 @@ three pages.
   `proof.level` uses the canonical `unit-smoke` level; launch and exact normalized
   project-stem matches are reported separately as `proof.observedStage`. Window
   candidates must be `PBIDesktop*`; `AnnualSales` never matches project `Sales`.
+  When several open reports share the same title, the observer prefers the
+  association-launch PID and then a new post-baseline Desktop PID. It reports
+  `desktop_title_ambiguous` instead of selecting an arbitrary pre-existing
+  window when neither identifies the launch.
   Cleanup never targets baseline/pre-launch processes and reports a reason for
   every owned PID it targets. Screenshot output must be a PNG outside the project
   directory. Capture uses a same-directory temporary file, verifies foreground
-  PID ownership, and publishes/replaces the requested PNG only after success.
+  ownership by the selected Desktop PID or a descendant process, and
+  publishes/replaces the requested PNG only after success.
   `--allow-unverified-capture` explicitly bypasses foreground verification and
   risks capturing unrelated sensitive screen content. Responses always include
   `changes` (`[]` unless a PNG was created or replaced). Canvas rendering,

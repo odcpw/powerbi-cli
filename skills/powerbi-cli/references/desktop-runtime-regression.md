@@ -47,6 +47,25 @@ blank components and duplicate composites.
 10. Compare transformed charts with raw cards/tables to prevent misleading
    labels or accidental aggregation changes.
 
+Use these exact local QA commands before Desktop:
+
+```bash
+pbi --json validate --strict <project>
+pbi --json model dax dependencies --project <project>
+pbi --json model dax lint --project <project>
+pbi --json report wireframe export <project>
+pbi --json report interactions list --project <project>
+```
+
+Use hierarchy drill for one chart changing from branch to company. Use a
+company Series/Legend binding or multi-select slicer when several companies
+must remain visible on the same year axis. Use drillthrough only for navigation
+to a target page with carried filter context.
+
+If several Desktop instances share the same PBIP title, keep the newly launched
+instance open or close the duplicates before proof. The CLI refuses ambiguous
+pre-existing title matches instead of capturing an arbitrary report.
+
 If Desktop reveals a failure that strict validation missed, preserve a minimal
 fixture, add a validator/lint rule when it can be made precise, add a regression
 test, update `docs/pbir-desktop-oracle.md`, and repeat this loop.
