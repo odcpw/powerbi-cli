@@ -1,7 +1,7 @@
-# Pass 1 Handoff
+# Pass 2 Handoff
 
-Completed: duplicate-title Desktop selection, child-process foreground verification, compact focused capabilities, canonical wrong-path suggestions, the dashboard repair skill update, and fast MCP process-tree monitoring.
+Completed: single owned interactive Desktop lifecycle, exact creation-time process cleanup with serialized state, typed Between range slicers across add/build/rebind, and a canonical-project authoring loop in the skill. The fresh-eyes review found two bypasses; both are fixed and regression-covered.
 
-Deferred intentionally: automated Desktop canvas refresh and interaction assertions. The CLI must continue to label window/title/screenshot signals as evidence only.
+Deliberately deferred: transactional multi-operation report manifests and declarative DAX assertion suites. They are justified future improvements, but each deserves a narrow contract rather than being folded into this reliability pass.
 
-Next pass trigger: a reproducible Desktop failure not expressible through current strict validation, DAX execution, wireframe, interaction inventory, or manual canvas review.
+Next pass trigger: another real dashboard repair requiring many sequential visual mutations, or a repeated set of live DAX assertions that demonstrates the smallest useful batch shape.

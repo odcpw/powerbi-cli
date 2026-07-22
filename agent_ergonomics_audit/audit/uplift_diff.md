@@ -1,8 +1,7 @@
-# Uplift Diff
+# Pass 2 Uplift Diff
 
-- Focused capability discovery no longer carries the 27 KB generated visual catalog or 18 KB schema manifest; the observed serialized response is 11,040 bytes.
-- Duplicate report titles no longer cause selection of the oldest pre-launch PID.
-- Power BI child UI processes can satisfy foreground ownership only through a verified parent chain.
-- Two common wrong command shapes now return the exact canonical path.
-- The Power BI skill now encodes the safe dashboard repair loop learned from this work.
-- MCP cancellation no longer refreshes unused process metrics; the previously failing targeted test completes in about 1.5 seconds.
+- Interactive testing now has a first-class `desktop open` / idempotent `desktop close` lifecycle instead of unbounded `--leave-open` or raw launches.
+- Cleanup is serialized and requires exact PID, creation time, post-baseline provenance, and `PBIDesktop*` identity; unresolved ownership is an error, never a success.
+- Numeric/date Between slicers are first-class in direct visual creation and dashboard specs, and text rebinding cannot bypass the type contract.
+- The skill now directs agents to one canonical project, one reusable QA output, and a `finally`-style Desktop close step instead of proliferating same-title versions.
+- Windows tests, Linux `-D warnings` compilation, skill validation, a live managed open/close smoke, and independent fresh-eyes review all pass.

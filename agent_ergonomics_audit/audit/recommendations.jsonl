@@ -5,3 +5,9 @@
 {"recommendation_id":"R-005","title":"Codify safe dashboard repair and interaction semantics in the skill","priority":"P1","applied":true,"deferred_reason":null}
 {"recommendation_id":"R-006","title":"Refresh only process-tree identity data in the MCP monitor","priority":"P0","applied":true,"deferred_reason":null}
 {"recommendation_id":"R-007","title":"Automate Desktop canvas refresh and interaction proof","priority":"P2","applied":false,"deferred_reason":"Requires a reliable supported Desktop automation surface and substantially exceeds this focused elegance pass; current commands continue to state the limitation explicitly."}
+{"recommendation_id":"R-008","title":"Own one explicit interactive Desktop session with idempotent close","priority":"P0","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-009","title":"Require exact PID, creation time, process identity, and serialized lifecycle cleanup","priority":"P0","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-010","title":"Support typed Between slicers across creation, specs, and rebinding","priority":"P1","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-011","title":"Teach one canonical project and bounded Desktop test loop","priority":"P1","applied":true,"deferred_reason":null}
+{"recommendation_id":"R-012","title":"Add transactional multi-operation report mutation manifests","priority":"P2","applied":false,"deferred_reason":"The repeated visual edits justify future batching, but a new transaction surface would broaden this focused lifecycle/range pass and needs its own design proof."}
+{"recommendation_id":"R-013","title":"Add declarative DAX assertion suites","priority":"P2","applied":false,"deferred_reason":"Useful for repeated live-model checks, but independent of the observed session and range-slicer failures; retain bounded one-query execution until a concrete suite contract is designed."}

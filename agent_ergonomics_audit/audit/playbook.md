@@ -10,3 +10,7 @@
 8. Run strict validation, DAX dependency/lint, wireframe, interaction inventory, and handoff checks in that order.
 9. Keep Desktop canvas/refresh claims separate from file, DAX, window, and screenshot evidence.
 10. Keep MCP process monitoring to PID-tree identity data; never poll expensive CPU, memory, disk, executable, or task fields for cleanup.
+11. Keep one canonical dashboard project and one reusable QA output; use Git for rollback instead of same-title version directories.
+12. Use `desktop open` only for an explicit interactive session and always pair it with idempotent `desktop close`.
+13. Treat PID plus creation time as the minimum process-ownership identity; never recover ownership by title or executable sweep.
+14. Use Between slicers only for numeric/date columns and preserve that invariant during rebinding.

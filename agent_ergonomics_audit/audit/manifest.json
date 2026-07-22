@@ -42,9 +42,46 @@
         "simulations_pre": "audit/agent_simulations/pre_pass_1/",
         "simulations_post": "audit/agent_simulations/post_pass_1/"
       }
+    },
+    {
+      "pass": 2,
+      "started_at": "2026-07-22T10:16:00Z",
+      "completed_at": "2026-07-22T10:42:38Z",
+      "mode": "full",
+      "target_sha": "f12ede3fbeff3094000d67eec69fe3fb7f0bfbce",
+      "target_branch": "main",
+      "feature_branch": null,
+      "summary": {
+        "surfaces_inventoried": 4,
+        "surfaces_scored": 4,
+        "recommendations_total": 6,
+        "recommendations_applied": 4,
+        "substantive_commits": 1,
+        "dimensions_touched": 9,
+        "ambition_bar_met": true,
+        "ambition_bar_self_prompt_run": true,
+        "median_uplift_pts": 415,
+        "regressions_count": 0,
+        "fresh_eyes_rounds": 2
+      },
+      "artifacts": {
+        "surface_inventory": "audit/surface_inventory.jsonl",
+        "agent_surfaces": "audit/agent_surfaces.jsonl",
+        "intent_corpus": "audit/intent_inference_corpus.jsonl",
+        "recommendations": "audit/recommendations.jsonl",
+        "playbook": "audit/playbook.md",
+        "applied_changes": "audit/applied_changes.jsonl",
+        "ambition_bar_check": "audit/ambition_bar_check.md",
+        "scorecard": "audit/scorecard_pass_2.md",
+        "heatmap": "audit/heatmap.svg",
+        "uplift_diff": "audit/uplift_diff.md",
+        "regression_alerts": "audit/regression_alerts.md",
+        "handoff": "audit/HANDOFF.md",
+        "regression_tests": "audit/regression_tests/"
+      }
     }
   ],
-  "current_pass": 1,
+  "current_pass": 2,
   "pass_N+1_ready": true,
-  "next_pass_focus": "Automated Desktop canvas and refresh proof only when the runtime exposes stable, exact automation hooks."
+  "next_pass_focus": "A small transactional report-operation manifest or DAX assertion suite only after the next repeated real workflow proves the minimum useful contract."
 }
