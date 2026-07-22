@@ -35,9 +35,26 @@ pub(crate) fn handoff_command(args: &[String]) -> CliResult<Value> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum HandoffTarget {
+    #[default]
+    Offline,
+    Work,
+}
+
+impl HandoffTarget {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Offline => "offline",
+            Self::Work => "work",
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct CheckOptions {
     project: Option<PathBuf>,
+    target: HandoffTarget,
 }
 
 fn check_handoff(args: &[String]) -> CliResult<Value> {
@@ -80,7 +97,7 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         }
     }
     for partition in &partitions {
-        add_partition_findings(partition, &mut findings);
+        add_partition_findings(partition, options.target, &mut findings);
     }
     let source_template_path = source_templates_path(&resolved.project_dir);
     match load_source_template_store(&resolved) {
@@ -106,7 +123,7 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         .count();
     let review_partition_count = partitions
         .iter()
-        .filter(|partition| partition.safety.status != "safe")
+        .filter(|partition| !partition_safe_for_target(partition, options.target))
         .count();
     let review_finding_count = findings
         .iter()
@@ -125,13 +142,28 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         "safe"
     };
     let ok = status == "safe";
+    let has_live_sources = partitions
+        .iter()
+        .any(|partition| is_recognized_live_source(&partition.source_kind));
+    let has_dummy_sources = partitions
+        .iter()
+        .any(|partition| partition.source_kind == "dummyMTable");
+    let source_mode = match (has_live_sources, has_dummy_sources) {
+        (true, true) => "mixed",
+        (true, false) => "live",
+        (false, true) => "dummy",
+        (false, false) => "unknown",
+    };
     let project_arg = command_arg(&resolved.project_dir);
 
     Ok(json!({
         "schema": "powerbi-cli.handoff.check.v1",
         "ok": ok,
         "exitCode": if ok { EXIT_SUCCESS } else { EXIT_VALIDATION_FAILED },
-        "safeForOfflineHandoff": ok,
+        "target": options.target.as_str(),
+        "sourceMode": source_mode,
+        "safeForOfflineHandoff": ok && options.target == HandoffTarget::Offline,
+        "safeForWorkHandoff": ok && options.target == HandoffTarget::Work,
         "status": status,
         "projectDir": canonical_display(&resolved.project_dir),
         "pbip": canonical_display(&resolved.pbip_path),
@@ -141,6 +173,12 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
             "tables": docs.len(),
             "partitions": partitions.len(),
             "safePartitions": partitions.iter().filter(|partition| partition.safety.status == "safe").count(),
+            "acceptedLivePartitions": partitions.iter().filter(|partition| {
+                options.target == HandoffTarget::Work
+                    && is_recognized_live_source(&partition.source_kind)
+                    && partition_safe_for_target(partition, options.target)
+            }).count(),
+            "safeForTargetPartitions": partitions.iter().filter(|partition| partition_safe_for_target(partition, options.target)).count(),
             "reviewPartitions": review_partition_count,
             "reviewFindings": review_finding_count,
             "sourceTemplates": load_source_template_store(&resolved).map(|store| store.templates.len()).unwrap_or(0),
@@ -159,8 +197,10 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
                 format!("powerbi-cli validate --strict {} --json", project_arg)
             ]
         },
-        "instructions": if ok {
+        "instructions": if ok && options.target == HandoffTarget::Offline {
             vec![format!("Open {} in Power BI Desktop at work and rebind dummy #table partitions to corporate sources.", command_arg(&resolved.pbip_path))]
+        } else if ok {
+            vec![format!("Open {} in Power BI Desktop on the target work network, configure credentials if prompted, refresh, and verify the report.", command_arg(&resolved.pbip_path))]
         } else {
             Vec::<String>::new()
         }
@@ -183,6 +223,21 @@ fn parse_check_args(args: &[String]) -> CliResult<CheckOptions> {
                     ));
                 }
                 options.project = Some(PathBuf::from(take_value(args, &mut i, "--project")?));
+            }
+            "--target" => {
+                let value = take_value(args, &mut i, "--target")?;
+                options.target = match value.as_str() {
+                    "offline" => HandoffTarget::Offline,
+                    "work" => HandoffTarget::Work,
+                    _ => {
+                        return Err(CliError::invalid_args(format!(
+                            "handoff check --target must be offline or work, got: {value}"
+                        ))
+                        .with_suggested_command(
+                            "powerbi-cli handoff check <project-dir-or.pbip> --target work --json",
+                        ));
+                    }
+                };
             }
             other if other.starts_with('-') => {
                 return Err(
@@ -211,17 +266,27 @@ fn parse_check_args(args: &[String]) -> CliResult<CheckOptions> {
     Ok(options)
 }
 
-fn add_partition_findings(partition: &PartitionRecord, findings: &mut Vec<Value>) {
+fn add_partition_findings(
+    partition: &PartitionRecord,
+    target: HandoffTarget,
+    findings: &mut Vec<Value>,
+) {
     for finding in &partition.safety.findings {
+        let accepted_live_source =
+            target == HandoffTarget::Work && finding.code.starts_with("partition.real_connector.");
         findings.push(json!({
             "code": finding.code,
-            "severity": finding.severity,
-            "message": finding.message,
+            "severity": if accepted_live_source { "info" } else { finding.severity.as_str() },
+            "message": if accepted_live_source {
+                format!("recognized live connector accepted for work target: {}", partition.source_kind)
+            } else {
+                finding.message.clone()
+            },
             "handle": partition.handle(),
             "path": canonical_display(&partition.path)
         }));
     }
-    if partition.source_kind != "dummyMTable" {
+    if target == HandoffTarget::Offline && partition.source_kind != "dummyMTable" {
         findings.push(json!({
             "code": "handoff.partition_not_dummy",
             "severity": "error",
@@ -229,6 +294,40 @@ fn add_partition_findings(partition: &PartitionRecord, findings: &mut Vec<Value>
             "handle": partition.handle(),
             "path": canonical_display(&partition.path)
         }));
+    } else if target == HandoffTarget::Work
+        && partition.source_kind != "dummyMTable"
+        && !is_recognized_live_source(&partition.source_kind)
+    {
+        findings.push(json!({
+            "code": "handoff.partition_source_unrecognized",
+            "severity": "error",
+            "message": format!("work handoff requires a dummy table or recognized connector; {} uses {}", partition.handle(), partition.source_kind),
+            "handle": partition.handle(),
+            "path": canonical_display(&partition.path)
+        }));
+    }
+}
+
+fn is_recognized_live_source(source_kind: &str) -> bool {
+    matches!(
+        source_kind,
+        "postgresqlDatabase" | "sqlDatabase" | "odbcDataSource" | "webContents" | "externalFile"
+    )
+}
+
+fn partition_safe_for_target(partition: &PartitionRecord, target: HandoffTarget) -> bool {
+    match target {
+        HandoffTarget::Offline => partition.safety.status == "safe",
+        HandoffTarget::Work if partition.source_kind == "dummyMTable" => {
+            partition.safety.status == "safe"
+        }
+        HandoffTarget::Work if is_recognized_live_source(&partition.source_kind) => {
+            !partition.safety.findings.iter().any(|finding| {
+                finding.severity == "error"
+                    && !finding.code.starts_with("partition.real_connector.")
+            })
+        }
+        HandoffTarget::Work => false,
     }
 }
 

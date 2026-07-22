@@ -183,6 +183,9 @@ supported.
 - Keep one canonical working project and one reusable QA output. Use Git or a
   deliberate backup for rollback; do not accumulate `v2`, `v3`, and other
   same-title project copies as an editing strategy.
+- Rebuild that canonical generated project with `report build --force`; the
+  cleanup is manifest-bounded, preserves user-added files, and clears Windows
+  read-only attributes on generated OneDrive directories before removing them.
 - Use handles returned by `inspect`, list, or show commands instead of guessed
   PBIR folder names or TMDL paths.
 - Semantic-model handles percent-encode literal `%` and `:` inside table,
@@ -228,6 +231,14 @@ supported.
   session, review the full diff, remove unintended generated sidecars and model
   additions, then rerun strict validation before committing. Never commit the
   noisy save merely because refresh succeeded.
+- After removing Desktop-created automatic date tables, run `validate --strict`.
+  It rejects dangling TMDL `variation.relationship` and
+  `variation.defaultHierarchy` references instead of leaving Desktop to fail on
+  open.
+- Keep slicers at least 76 px high. `report spec validate` and
+  `validate --strict` reject shorter slicers because the official Power BI
+  report validator does too; this catches clipped or overlapping controls before
+  Desktop review.
 - Do not add real data, credentials, caches, `.pbix`, or `.pbit` files to a
   home-authored project.
 - Do not use package extraction as a way to smuggle imported data caches into a
@@ -257,6 +268,7 @@ Desktop hardening work migrates it.
 |---|---|---|
 | Project is structurally present | `pbi --json validate <project>` | `validate --strict` once available |
 | Project is offline-safe | `pbi --json handoff check <project>` | `validate --strict` plus Desktop open-check |
+| Live-source PBIP is safe to take to its work network | `pbi --json handoff check <project> --target work` | Work-network refresh plus Desktop canvas inspection |
 | PBIX/PBIT contains usable source metadata | `package inspect` plus `package extract` into a temporary folder | `package import` succeeds and `validate --strict` passes on the imported project |
 | Model object exists | `inspect --deep` or list/show command | Desktop open-check |
 | DAX references are locally plausible | `model dax dependencies` and `model dax lint` | Desktop/XMLA/Fabric engine validation |
@@ -507,6 +519,7 @@ pbi --json model partitions list --project build/sales
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales"
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales" --include-source
 pbi --json handoff check build/sales
+pbi --json handoff check report/live.pbip --target work
 ```
 
 Generated partitions should normally report `sourceKind: dummyMTable` and
@@ -517,6 +530,10 @@ substring is not proof: the M expression must match the generated Source shape,
 the model column list, supported literal types, and row arity. PII-suspect row
 literals yield `status: review`. Partition show returns redacted previews by
 default; `--include-source` is refused unless the partition status is `safe`.
+For a canonical live-source report, use `--target work`: recognized connectors
+are accepted, but credentials, caches, embedded data, and unknown partition
+sources still fail. Check `safeForWorkHandoff`, not `safeForOfflineHandoff`, in
+that workflow.
 
 ### Prepare Source Templates And Rebind Plans
 
@@ -859,7 +876,9 @@ produce structured findings and suggested commands; `--allow-unmapped` is useful
 while drafting. Write the final work-machine instructions with
 `handoff rebind-plan <project> --out <file.md>` and keep every credential in
 Power BI Desktop at work. `handoff check` reports exactly one of `safe`, `review`,
-or `unsafe`; only `safe` sets `safeForOfflineHandoff: true`. Credential matching
+or `unsafe`; an offline-safe result sets `safeForOfflineHandoff`, while
+`--target work` sets `safeForWorkHandoff` for a credential-free recognized live
+source. Credential matching
 is case-insensitive and separator-tolerant but anchored to key/value syntax,
 Bearer authorization headers, or recognizable GitHub/AWS token formats. Plain
 prose such as `Passwort ändern` does not match. All matched values are rendered

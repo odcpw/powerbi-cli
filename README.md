@@ -628,13 +628,17 @@ three pages.
   categorical update, bookmark captured-state mutation,
   logos, richer typed PBIR formatting, and conditional formatting authoring
   remain planned.
-- `handoff check` fails fast on unsafe home/work transfer hazards, including
-  Power BI caches/binaries, local settings, embedded data files, real connector
-  partitions, and credential-like text in TMDL, M, JSON, Markdown, PBIP, PBIR,
-  PBISM, and `.platform` files. Structurally valid literal tables with
-  PII-suspect row values produce `status: review`; credentials or non-dummy
-  sources produce `status: unsafe`; only `status: safe` sets
-  `safeForOfflineHandoff: true`.
+- `handoff check` defaults to an offline/dummy target and fails on real
+  connectors. Use `handoff check <project> --target work` for a canonical PBIP
+  whose partitions already use recognized SQL Server, PostgreSQL, ODBC, Web,
+  or file connectors. Work-target validation accepts those connectors but still
+  fails on credentials, Power BI caches/binaries, local settings, embedded data
+  files, and unknown partition sources. The result reports `target`,
+  `sourceMode`, `safeForOfflineHandoff`, and `safeForWorkHandoff` explicitly.
+  Structurally valid literal tables with PII-suspect rows remain `review`.
+- Dashboard specs and strict PBIR validation reject slicers shorter than Power
+  BI's 76-pixel minimum, preventing a common source of clipped controls before
+  the report reaches Desktop.
 - Credential matching is case-insensitive and separator-tolerant for anchored
   key/value syntax (`password`, `pwd`, `pass`, account/access/SAS/API keys,
   `sig`, user identifiers, secrets/tokens), recognizes Bearer authorization

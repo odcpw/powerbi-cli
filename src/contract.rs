@@ -168,7 +168,7 @@ Usage:
   powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json> --json
   powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
-  powerbi-cli handoff check <project-dir-or.pbip> --json
+  powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json
   powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--out <file.md>] [--force] --json
   powerbi-cli --json validate [--strict] [--backend native|microsoft-report|all] <project-dir-or.pbip>
 
@@ -311,7 +311,7 @@ Rules for agents:
 - Use `report pages list/show/add/update/reorder/set-active/delete-empty`, `report layout auto`, `report drilldown set-hierarchy`, `report drillthrough set/show/clear`, `report bookmarks list/show/set-display-name/reorder/delete`, `report filters list/show/add/update/delete/clear`, `report slicers list/show/clear`, `report interactions list/show/set/disable`, and `report visuals list/show/catalog/formatting list/formatting show/formatting conditional-formatting list/show/formatting extract/formatting apply/formatting set-text/formatting set-color/add/clone/delete/set-position/set-bindings` for PBIR layout navigation, deterministic visual arrangement, chart hierarchy axes, same-report drillthrough page bindings, bookmark/filter/slicer/interaction inventory and readback, guarded categorical/range/TopN/relative-date filter authoring, type-preserving filter updates, deletion and owner-scoped clear, guarded slicer selection clear, guarded interaction overrides, guarded page metadata/order edits, visual type/role discovery, safe visual formatting inventory and bundle portability, conditional-formatting readback, typed title/static-color formatting and rejected alt-text cleanup, safe visual creation/cloning/deletion, geometry edits, and field-well binding replacement.
 - Use `report style inspect/extract/apply/diff` for master-style bundles that combine report themeCollection and per-visual formatting payloads. Review literal text before applying a style bundle with `--allow-literal-text`.
 - Use `report themes show/extract/apply`, `report themes presets list/show`, and `report themes apply-preset` for report-level theme bundles and built-in registered-resource theme presets. Theme copy is not per-visual formatting copy.
-- Run `handoff check <project>` before carrying a project between home and work; it fails on caches, Power BI binaries, embedded data files, real connectors, and credential-like partition text.
+- Run `handoff check <project>` for an offline/dummy project. For a canonical live-source PBIP going to its work network, use `handoff check <project> --target work`; recognized connectors are then accepted, while credentials, caches, binaries, embedded data, and unknown sources still fail.
 - Start measure mutations with `--dry-run`; use `--in-place` or `--out-dir <dir>` only after the returned TMDL block looks right.
 - Keep real data, credentials, gateway names, `.pbix`, `.pbit`, `.pbi/cache.abf`, and `localSettings.json` out of offline projects.
 - Treat PBIR visual bindings as Desktop-proved only after a public Desktop oracle proof record exists; a deterministic local golden alone is not Desktop proof. The pie, donut, matrix, and slicer binding families have manual-desktop-canvas-refresh evidence in testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json, but current title-bearing generated visual bytes are desktop-golden-pending until re-verified. Same-report drillthrough currently has schema-golden proof; end-to-end Desktop interaction proof remains open.
@@ -2908,17 +2908,17 @@ fn command_catalog() -> Vec<Value> {
         }),
         json!({
             "path": "handoff check",
-            "usage": "powerbi-cli handoff check <project-dir-or.pbip> --json",
-            "summary": "Classify a PBIP handoff as safe, review, or unsafe after partition-shape, credential, PII-suspect text, cache, binary, and embedded-data checks",
-            "tags": ["handoff", "offline", "safety", "partition", "agent"],
+            "usage": "powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json",
+            "summary": "Classify an offline/dummy or work-network/live-source PBIP handoff after partition-shape, credential, PII-suspect text, cache, binary, and embedded-data checks",
+            "tags": ["handoff", "offline", "work", "safety", "partition", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "handoffCheck.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
-            "examples": ["powerbi-cli handoff check build/sales --json", "powerbi-cli handoff-check build/sales --json"],
-            "followUpFields": ["ok", "exitCode", "status", "safeForOfflineHandoff", "counts.reviewPartitions", "counts.reviewFindings", "findings", "partitions", "next", "instructions"]
+            "flags": ["--project <project-dir-or.pbip>", "--target offline|work", "--json", "--format json"],
+            "examples": ["powerbi-cli handoff check build/sales --json", "powerbi-cli handoff check report/live.pbip --target work --json", "powerbi-cli handoff-check build/sales --json"],
+            "followUpFields": ["ok", "exitCode", "target", "sourceMode", "status", "safeForOfflineHandoff", "safeForWorkHandoff", "counts.safeForTargetPartitions", "counts.acceptedLivePartitions", "counts.reviewPartitions", "counts.reviewFindings", "findings", "partitions", "next", "instructions"]
         }),
         json!({
             "path": "handoff rebind-plan",

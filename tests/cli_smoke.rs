@@ -431,6 +431,185 @@ fn scaffold_force_removes_only_artifacts_from_the_prior_manifest() {
 }
 
 #[test]
+#[cfg(windows)]
+fn scaffold_force_clears_read_only_generated_directories() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("sales_project");
+    let out = out_dir.to_str().expect("output path");
+    let (first_code, _, first_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        "examples/sales.schema.json",
+        "--out-dir",
+        out,
+        "--json",
+    ]);
+    assert_eq!(first_code, 0, "stderr: {first_stderr}");
+
+    let visuals_dir = out_dir
+        .join("SalesOperations.Report")
+        .join("definition")
+        .join("pages")
+        .join("ReportSectionOverview")
+        .join("visuals");
+    let visual_dir = fs::read_dir(&visuals_dir)
+        .expect("visuals dir")
+        .next()
+        .expect("one visual")
+        .expect("visual entry")
+        .path();
+    let mut permissions = fs::metadata(&visual_dir)
+        .expect("visual dir metadata")
+        .permissions();
+    permissions.set_readonly(true);
+    fs::set_permissions(&visual_dir, permissions).expect("mark visual dir read-only");
+
+    let (force_code, force_stdout, force_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        "examples/sales.schema.json",
+        "--out-dir",
+        out,
+        "--force",
+        "--json",
+    ]);
+    assert_eq!(
+        force_code, 0,
+        "stdout: {force_stdout:?}\nstderr: {force_stderr}"
+    );
+}
+
+#[test]
+fn validate_rejects_dangling_variation_references() {
+    use std::io::Write;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("sales_project");
+    let out = out_dir.to_str().expect("output path");
+    let (first_code, _, first_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        "examples/sales.schema.json",
+        "--out-dir",
+        out,
+        "--json",
+    ]);
+    assert_eq!(first_code, 0, "stderr: {first_stderr}");
+
+    let table_path = out_dir
+        .join("SalesOperations.SemanticModel")
+        .join("definition")
+        .join("tables")
+        .join("DimDate.tmdl");
+    let mut table = fs::OpenOptions::new()
+        .append(true)
+        .open(&table_path)
+        .expect("open DimDate.tmdl");
+    writeln!(
+        table,
+        "\n\thierarchy ExistingHierarchy\n\t\tlevel Year\n\t\t\tcolumn: Year\n\n\tvariation Variation\n\t\trelationship: missingAutoDateRelationship\n\t\tdefaultHierarchy: MissingAutoDateTable.'Date Hierarchy'\n\n\tvariation ExistingTableMissingHierarchy\n\t\tdefaultHierarchy: DimDate.'Missing Hierarchy'"
+    )
+    .expect("append dangling variation");
+
+    let (code, stdout, stderr) = run_powerbi(&["validate", "--strict", out, "--json"]);
+    assert_eq!(code, 10, "stdout: {stdout:?}\nstderr: {stderr}");
+    let errors = stdout["errors"].as_array().expect("validation errors");
+    assert!(errors.iter().any(|error| {
+        error
+            .as_str()
+            .unwrap_or_default()
+            .contains("missing relationship: missingAutoDateRelationship")
+    }));
+    assert!(errors.iter().any(|error| {
+        error
+            .as_str()
+            .unwrap_or_default()
+            .contains("missing table: MissingAutoDateTable")
+    }));
+    assert!(errors.iter().any(|error| {
+        error
+            .as_str()
+            .unwrap_or_default()
+            .contains("missing hierarchy: DimDate.Missing Hierarchy")
+    }));
+}
+
+#[test]
+fn validate_rejects_slicers_below_power_bi_minimum_height() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let out_dir = temp.path().join("sales_project");
+    let out = out_dir.to_str().expect("output path");
+    let (first_code, _, first_stderr) = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        "examples/sales.schema.json",
+        "--out-dir",
+        out,
+        "--json",
+    ]);
+    assert_eq!(first_code, 0, "stderr: {first_stderr}");
+
+    let visuals_dir = out_dir
+        .join("SalesOperations.Report")
+        .join("definition")
+        .join("pages")
+        .join("ReportSectionOverview")
+        .join("visuals");
+    let visual_path = fs::read_dir(&visuals_dir)
+        .expect("visuals dir")
+        .next()
+        .expect("one visual")
+        .expect("visual entry")
+        .path()
+        .join("visual.json");
+    let mut visual: Value =
+        serde_json::from_str(&fs::read_to_string(&visual_path).expect("read visual.json"))
+            .expect("parse visual.json");
+    visual["visual"]["visualType"] = Value::from("slicer");
+    visual["position"]["height"] = Value::from(68.0);
+    fs::write(
+        &visual_path,
+        serde_json::to_string_pretty(&visual).expect("serialize visual.json"),
+    )
+    .expect("write visual.json");
+
+    let (code, stdout, stderr) = run_powerbi(&["validate", "--strict", out, "--json"]);
+    assert_eq!(code, 10, "stdout: {stdout:?}\nstderr: {stderr}");
+    assert!(
+        stdout["errors"]
+            .as_array()
+            .expect("validation errors")
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|error| error.contains("slicer height 68") && error.contains("minimum of 76"))
+    );
+
+    visual["position"]
+        .as_object_mut()
+        .expect("visual position")
+        .remove("height");
+    fs::write(
+        &visual_path,
+        serde_json::to_string_pretty(&visual).expect("serialize visual.json"),
+    )
+    .expect("write visual.json without height");
+    let (missing_code, missing_stdout, missing_stderr) =
+        run_powerbi(&["validate", "--strict", out, "--json"]);
+    assert_eq!(
+        missing_code, 10,
+        "stdout: {missing_stdout:?}\nstderr: {missing_stderr}"
+    );
+    assert!(
+        missing_stdout["errors"]
+            .as_array()
+            .expect("validation errors")
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|error| error.contains("position.height must be a number of at least 76"))
+    );
+}
+
+#[test]
 fn root_relative_pbip_selects_only_its_referenced_artifacts() {
     let temp = tempfile::tempdir().expect("tempdir");
     let out_dir = temp.path().join("sales_project");

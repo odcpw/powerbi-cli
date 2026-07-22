@@ -1222,6 +1222,18 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
             "unsupported slicer mode",
         ),
         (
+            "slicer-too-short",
+            json!({
+                "id": "bad_short_slicer",
+                "type": "slicer",
+                "layout": { "x": 20, "y": 20, "width": 200, "height": 68 },
+                "bindings": [
+                    { "role": "Values", "field": "CatalogFacts[Category]" }
+                ]
+            }),
+            "height must be at least 76",
+        ),
+        (
             "between-text-column",
             json!({
                 "id": "bad_text_range",

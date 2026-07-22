@@ -265,6 +265,86 @@ fn handoff_check_fails_external_connector_partition() {
         finding["code"] == "partition.credential_like_text"
             && finding["handle"] == "partition:FactSales:FactSales"
     }));
+
+    let unsafe_work = run_powerbi(&[
+        "handoff",
+        "check",
+        project_arg,
+        "--target",
+        "work",
+        "--json",
+    ]);
+    assert_eq!(unsafe_work.code, 10);
+    let unsafe_work_json = stdout_json(&unsafe_work);
+    assert_eq!(
+        unsafe_work_json["counts"]["acceptedLivePartitions"],
+        Value::from(0)
+    );
+    assert_eq!(
+        unsafe_work_json["counts"]["reviewPartitions"],
+        Value::from(1)
+    );
+}
+
+#[test]
+fn work_handoff_accepts_recognized_live_connector_without_credentials() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let path = fact_sales_tmdl(&project);
+    let text = fs::read_to_string(&path).expect("FactSales.tmdl before");
+    let source_start = text.find("        source =").expect("source block");
+    let replacement = r#"        source =
+            let
+                Database = PostgreSQL.Database("work-db.example:5432", "claims", [CreateNavigationProperties = false]),
+                Source = Database{[Schema = "public", Item = "claims"]}[Data]
+            in
+                Source
+
+"#;
+    fs::write(&path, format!("{}{}", &text[..source_start], replacement))
+        .expect("write live source");
+
+    let offline = run_powerbi(&["handoff", "check", project_arg, "--json"]);
+    assert_eq!(offline.code, 10);
+    assert_eq!(
+        stdout_json(&offline)["safeForOfflineHandoff"],
+        Value::Bool(false)
+    );
+
+    let work = run_powerbi(&[
+        "handoff",
+        "check",
+        project_arg,
+        "--target",
+        "work",
+        "--json",
+    ]);
+    assert_eq!(work.code, 0, "stderr: {}", work.stderr);
+    let work_json = stdout_json(&work);
+    assert_eq!(work_json["ok"], Value::Bool(true));
+    assert_eq!(work_json["target"], Value::from("work"));
+    assert_eq!(work_json["sourceMode"], Value::from("mixed"));
+    assert_eq!(work_json["safeForOfflineHandoff"], Value::Bool(false));
+    assert_eq!(work_json["safeForWorkHandoff"], Value::Bool(true));
+    assert_eq!(
+        work_json["counts"]["acceptedLivePartitions"],
+        Value::from(1)
+    );
+    assert_eq!(
+        work_json["counts"]["safeForTargetPartitions"],
+        Value::from(3)
+    );
+    assert!(
+        work_json["findings"]
+            .as_array()
+            .expect("findings")
+            .iter()
+            .any(|finding| {
+                finding["code"] == "partition.real_connector.postgres"
+                    && finding["severity"] == "info"
+            })
+    );
 }
 
 #[test]

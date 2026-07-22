@@ -473,6 +473,7 @@ fn compile_visuals(
             out.insert("title".to_string(), Value::String(title.to_string()));
         }
         apply_layout(visual_index, visual, &mut out);
+        validate_minimum_visual_size(page_index, visual_index, &visual_type, &out)?;
         let bindings = compile_bindings(page_index, visual_index, &visual_type, visual, model)?;
         validate_binding_contract(page_index, visual_index, &visual_type, &bindings)?;
         if slicer_mode == Some(SlicerMode::Between) {
@@ -490,6 +491,32 @@ fn compile_visuals(
         visuals.push(Value::Object(out));
     }
     Ok(visuals)
+}
+
+fn validate_minimum_visual_size(
+    page_index: usize,
+    visual_index: usize,
+    visual_type: &str,
+    visual: &Map<String, Value>,
+) -> CliResult<()> {
+    const SLICER_MIN_HEIGHT: f64 = 76.0;
+
+    if visual_type == "slicer" {
+        let height = visual
+            .get("height")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].visuals[{visual_index}] slicer height must be a number of at least {SLICER_MIN_HEIGHT} for Power BI compatibility"
+                ))
+            })?;
+        if height < SLICER_MIN_HEIGHT {
+            return Err(CliError::invalid_args(format!(
+                "pages[{page_index}].visuals[{visual_index}] slicer height must be at least {SLICER_MIN_HEIGHT} for Power BI compatibility"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn validate_between_binding(

@@ -90,7 +90,7 @@ use crate::pbir_bindings::{VisualBindingKind, VisualBindingResolved};
 use crate::pbir_visual_factory::{VisualBuildSpec, resolve_slicer_mode, visual_container_json};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -788,6 +788,7 @@ fn remove_generated_file(path: &Path) -> CliResult<()> {
             path.display()
         )));
     }
+    make_writable_on_windows(path)?;
     fs::remove_file(path).map_err(|err| {
         CliError::unexpected(format!(
             "remove previously generated artifact {}: {err}",
@@ -820,12 +821,37 @@ fn remove_generated_dir_if_empty(path: &Path) -> CliResult<()> {
         let _ = read_dir_entry(path, entry, "inspect generated directory cleanup")?;
         return Ok(());
     }
+    drop(entries);
+    make_writable_on_windows(path)?;
     fs::remove_dir(path).map_err(|err| {
         CliError::unexpected(format!(
             "remove empty generated directory {}: {err}",
             path.display()
         ))
     })
+}
+
+#[cfg(windows)]
+#[allow(clippy::permissions_set_readonly_false)]
+fn make_writable_on_windows(path: &Path) -> CliResult<()> {
+    let mut permissions = fs::metadata(path)
+        .map_err(|err| CliError::unexpected(format!("read permissions {}: {err}", path.display())))?
+        .permissions();
+    if permissions.readonly() {
+        permissions.set_readonly(false);
+        fs::set_permissions(path, permissions).map_err(|err| {
+            CliError::unexpected(format!(
+                "clear read-only attribute on generated artifact {}: {err}",
+                path.display()
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn make_writable_on_windows(_path: &Path) -> CliResult<()> {
+    Ok(())
 }
 
 fn write_project(spec: &DashboardSpec, out_dir: &Path) -> CliResult<()> {
@@ -2656,6 +2682,7 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
                 report.visuals += 1;
                 let visual = read_json_value(&visual_json)?;
                 check_visual_query_state_roles(&visual_json, &visual, report);
+                check_visual_minimum_size(&visual_json, &visual, report);
                 if visual["visual"]["query"]["queryState"]
                     .as_object()
                     .is_some_and(|query_state| {
@@ -2695,6 +2722,31 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
         }
     }
     Ok(())
+}
+
+fn check_visual_minimum_size(
+    visual_json_path: &Path,
+    visual: &Value,
+    report: &mut ValidationReport,
+) {
+    const SLICER_MIN_HEIGHT: f64 = 76.0;
+
+    if visual["visual"]["visualType"].as_str() != Some("slicer") {
+        return;
+    }
+    let Some(height) = visual["position"]["height"].as_f64() else {
+        report.errors.push(format!(
+            "{} slicer position.height must be a number of at least {SLICER_MIN_HEIGHT}",
+            visual_json_path.display()
+        ));
+        return;
+    };
+    if height < SLICER_MIN_HEIGHT {
+        report.errors.push(format!(
+            "{} slicer height {height} is below the Power BI minimum of {SLICER_MIN_HEIGHT}",
+            visual_json_path.display()
+        ));
+    }
 }
 
 fn check_visual_query_state_roles(
@@ -3238,7 +3290,120 @@ fn check_relationships(resolved: &ResolvedProject, report: &mut ValidationReport
             ));
         }
     }
+    check_variation_references(&tables, &relationship_doc.relationships, report)?;
     Ok(())
+}
+
+fn check_variation_references(
+    tables: &[tmdl::TableDocument],
+    relationships: &[relationship_tmdl::RelationshipRecord],
+    report: &mut ValidationReport,
+) -> CliResult<()> {
+    let relationship_names = relationships
+        .iter()
+        .map(|relationship| relationship.name.to_ascii_lowercase())
+        .collect::<BTreeSet<_>>();
+    let table_names = tables
+        .iter()
+        .map(|table| table.table.to_ascii_lowercase())
+        .collect::<BTreeSet<_>>();
+    let mut hierarchy_names = BTreeMap::<String, BTreeSet<String>>::new();
+    for table in tables {
+        let text = fs::read_to_string(&table.path)
+            .map_err(|err| CliError::unexpected(format!("read {}: {err}", table.path.display())))?;
+        let names = text
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("hierarchy "))
+            .map(unquote_tmdl_reference)
+            .map(|name| name.to_ascii_lowercase())
+            .collect();
+        hierarchy_names.insert(table.table.to_ascii_lowercase(), names);
+    }
+
+    for table in tables {
+        let text = fs::read_to_string(&table.path)
+            .map_err(|err| CliError::unexpected(format!("read {}: {err}", table.path.display())))?;
+        for (index, line) in text.lines().enumerate() {
+            let trimmed = line.trim();
+            if let Some(value) = trimmed.strip_prefix("relationship:") {
+                let name = unquote_tmdl_reference(value.trim());
+                if !name.is_empty() && !relationship_names.contains(&name.to_ascii_lowercase()) {
+                    report.errors.push(format!(
+                        "{}:{} variation references missing relationship: {}",
+                        table.path.display(),
+                        index + 1,
+                        name
+                    ));
+                }
+            }
+            if let Some(value) = trimmed.strip_prefix("defaultHierarchy:")
+                && let Some((table_name, hierarchy_name)) = hierarchy_reference(value.trim())
+            {
+                let table_key = table_name.to_ascii_lowercase();
+                if !table_names.contains(&table_key) {
+                    report.errors.push(format!(
+                        "{}:{} variation defaultHierarchy references missing table: {}",
+                        table.path.display(),
+                        index + 1,
+                        table_name
+                    ));
+                } else if !hierarchy_names
+                    .get(&table_key)
+                    .is_some_and(|names| names.contains(&hierarchy_name.to_ascii_lowercase()))
+                {
+                    report.errors.push(format!(
+                        "{}:{} variation defaultHierarchy references missing hierarchy: {}.{}",
+                        table.path.display(),
+                        index + 1,
+                        table_name,
+                        hierarchy_name
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn hierarchy_reference(value: &str) -> Option<(String, String)> {
+    let value = value.trim();
+    if value.starts_with('\'') {
+        let bytes = value.as_bytes();
+        let mut index = 1;
+        while index < bytes.len() {
+            if bytes[index] == b'\'' {
+                if bytes.get(index + 1) == Some(&b'\'') {
+                    index += 2;
+                    continue;
+                }
+                if bytes.get(index + 1) != Some(&b'.') {
+                    return None;
+                }
+                return Some((
+                    unquote_tmdl_reference(&value[..=index]),
+                    unquote_tmdl_reference(&value[index + 2..]),
+                ));
+            }
+            index += 1;
+        }
+        None
+    } else {
+        value.split_once('.').map(|(table, hierarchy)| {
+            (
+                unquote_tmdl_reference(table),
+                unquote_tmdl_reference(hierarchy),
+            )
+        })
+    }
+}
+
+fn unquote_tmdl_reference(value: &str) -> String {
+    let value = value.trim();
+    if value.len() >= 2 && value.starts_with('\'') && value.ends_with('\'') {
+        value[1..value.len() - 1].replace("''", "'")
+    } else {
+        value.to_string()
+    }
 }
 
 fn tmdl_column_exists(tables: &[tmdl::TableDocument], table: &str, column: &str) -> bool {
