@@ -192,6 +192,14 @@ fn apply_text_patch(visual_json: &mut Value, options: &TextOptions) -> CliResult
     Ok(pointers)
 }
 
+pub(crate) fn patch_visible_title(visual_json: &mut Value, title: &str) -> CliResult<()> {
+    let options = TextOptions {
+        title: Some(title.to_string()),
+        ..TextOptions::default()
+    };
+    patch_title_properties(visual_json, &options, &mut Vec::new())
+}
+
 fn patch_title_properties(
     visual_json: &mut Value,
     options: &TextOptions,

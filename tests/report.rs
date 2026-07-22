@@ -9106,6 +9106,34 @@ fn report_visual_clone_round_trips_through_out_dir() {
         .expect("clone handle")
         .to_string();
     assert_ne!(clone_handle, source_handle);
+    let cloned_visual_path =
+        PathBuf::from(clone_json["target"]["path"].as_str().expect("clone path"));
+    let cloned_visual_json: Value =
+        serde_json::from_str(&fs::read_to_string(&cloned_visual_path).expect("cloned visual.json"))
+            .expect("parse cloned visual.json");
+    assert_eq!(
+        cloned_visual_json
+            .pointer("/visual/visualContainerObjects/title/0/properties/text/expr/Literal/Value"),
+        Some(&Value::from("'Revenue Clone'")),
+        "--title must update the visible Power BI title"
+    );
+    assert_eq!(
+        cloned_visual_json
+            .pointer("/visual/visualContainerObjects/title/0/properties/show/expr/Literal/Value"),
+        Some(&Value::from("true")),
+        "a cloned title must be visible"
+    );
+    assert!(
+        cloned_visual_json["annotations"]
+            .as_array()
+            .expect("clone annotations")
+            .iter()
+            .any(|annotation| {
+                annotation["name"] == "powerbi-cli.placeholderTitle"
+                    && annotation["value"] == "Revenue Clone"
+            }),
+        "--title must keep the title annotation in sync"
+    );
     assert_eq!(
         fs::read_to_string(&source_path).expect("source after clone"),
         source_before,

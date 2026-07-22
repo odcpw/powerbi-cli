@@ -635,8 +635,11 @@ role is `Series`; `legend` remains an accepted CLI input alias only.
 
 `report visuals clone` is template reuse, not new visual-family generation. It
 copies only a simple visual container whose directory contains `visual.json` and
-no sidecars, then patches only cloned name, position, and clone annotations. It
-preserves visual type, bindings, formatting, filters, and raw PBIR already
+no sidecars, then patches the cloned name, position, visible title, and clone
+annotations. `--title` therefore updates both Power BI's literal container title
+and `powerbi-cli.placeholderTitle`; do not follow cloning with a redundant
+`formatting set-text` call. The clone preserves visual type, bindings,
+formatting, filters, and raw PBIR already
 inside `visual.json`, so it remains the path for non-catalog visual shapes and
 Desktop-authored formatting/state that generated families do not cover.
 

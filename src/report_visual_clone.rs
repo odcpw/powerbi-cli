@@ -7,6 +7,7 @@ use crate::pbir::{
     load_report_snapshot, visual_detail,
 };
 use crate::project_io::write_json_pretty;
+use crate::report_visual_formatting_text::patch_visible_title;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
     read_json_value, resolve_project, validate_project,
@@ -229,7 +230,7 @@ pub(crate) fn clone_visual(args: &[String]) -> CliResult<Value> {
                 "before": before_position,
                 "after": after_position
             },
-            "note": "This first clone slice copies simple visual containers that contain only visual.json. It preserves visual type, bindings, formatting, filters, and raw PBIR objects already in visual.json, then patches only name, position, and powerbi-cli clone annotations."
+            "note": "This clone copies a simple visual container that contains only visual.json. It preserves visual type, bindings, formatting, filters, and raw PBIR objects already in visual.json, then patches the name, position, visible title, and powerbi-cli clone annotations."
         },
         "changes": [{
             "kind": "pbir.visual",
@@ -272,6 +273,7 @@ fn patch_cloned_visual_json(
     })?;
     root.insert("name".to_string(), Value::String(name.to_string()));
     root.insert("position".to_string(), position.clone());
+    patch_visible_title(visual_json, title)?;
     upsert_annotation(
         visual_json,
         "powerbi-cli.placeholderTitle",
