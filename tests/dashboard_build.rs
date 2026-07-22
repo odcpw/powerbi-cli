@@ -1214,12 +1214,24 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
             json!({
                 "id": "bad_slicer_mode",
                 "type": "slicer",
-                "mode": "between",
+                "mode": "relative",
                 "bindings": [
                     { "role": "Values", "field": "CatalogFacts[Category]" }
                 ]
             }),
             "unsupported slicer mode",
+        ),
+        (
+            "between-text-column",
+            json!({
+                "id": "bad_text_range",
+                "type": "slicer",
+                "mode": "between",
+                "bindings": [
+                    { "role": "Values", "field": "CatalogFacts[Category]" }
+                ]
+            }),
+            "requires a numeric or date column",
         ),
     ];
 
@@ -1264,6 +1276,41 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
             result_json["errors"]
         );
     }
+
+    let between_spec = temp.path().join("valid-between.dashboard.json");
+    fs::write(
+        &between_spec,
+        serde_json::to_string_pretty(&json!({
+            "schema": "powerbi-cli.dashboard.v1",
+            "report": { "name": "VisualCatalogProof" },
+            "pages": [{
+                "id": "proof",
+                "visuals": [{
+                    "id": "year_range",
+                    "type": "slicer",
+                    "mode": "between",
+                    "bindings": [
+                        { "role": "Values", "field": "CatalogFacts[Year]" }
+                    ]
+                }]
+            }]
+        }))
+        .expect("serialize valid between spec"),
+    )
+    .expect("write valid between spec");
+    let between_arg = path_arg(&between_spec);
+    let between = run_powerbi(&[
+        "report",
+        "spec",
+        "validate",
+        "--schema",
+        "examples/archetypes/catalog-proof.schema.json",
+        "--spec",
+        &between_arg,
+        "--json",
+    ]);
+    assert_eq!(between.code, 0, "stderr: {}", between.stderr);
+    assert_eq!(stdout_json(&between)["ok"], Value::Bool(true));
 }
 
 #[test]

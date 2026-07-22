@@ -50,6 +50,10 @@ fn capabilities_advertise_generated_visual_contract_and_proof_statuses() {
     assert_eq!(code, 0, "stderr: {stderr}");
 
     let visual_contract = &stdout["generatedVisualContract"];
+    assert_eq!(
+        visual_contract["slicerModes"],
+        serde_json::json!(["Basic", "Dropdown", "Between"])
+    );
     assert!(
         visual_contract["supportedVisualTypes"]
             .as_array()

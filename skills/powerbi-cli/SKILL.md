@@ -136,7 +136,8 @@ readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
 PostgreSQL, ODBC, and Excel rebind metadata,
-handoff rebind-plan, fixture normalize/verify, desktop open-check/screenshot,
+handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
+one-shot desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
@@ -173,6 +174,9 @@ supported.
 - Treat every `next[]` and `suggestedCommands[]` entry as an executable
   `powerbi-cli` command template. Read prose from `instructions[]` or `notes[]`.
 - Prefer CLI semantic commands over direct PBIR/TMDL file edits.
+- Keep one canonical working project and one reusable QA output. Use Git or a
+  deliberate backup for rollback; do not accumulate `v2`, `v3`, and other
+  same-title project copies as an editing strategy.
 - Use handles returned by `inspect`, list, or show commands instead of guessed
   PBIR folder names or TMDL paths.
 - Semantic-model handles percent-encode literal `%` and `:` inside table,
@@ -245,7 +249,7 @@ Desktop hardening work migrates it.
 | Visual was cloned/read locally | `report visuals clone` dry-run/apply plus `report visuals show` and `validate --strict` | Desktop open/save round-trip, especially for Desktop-authored template visuals |
 | Visual was deleted locally | `report visuals delete` dry-run/apply plus `report visuals list` and `validate --strict` | Desktop open/save round-trip |
 | Visual binding was written/read locally | `report visuals set-bindings` dry-run/apply plus `report visuals show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
-| Pie, donut, matrix, or Basic/Dropdown slicer binding/canvas baseline has prior manual proof | `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` plus exact current `visual.json` assertions, `validate --strict`, `handoff check`, and `fixture verify` against `catalog-proof.summary.json` | Re-open/refresh/save the current title-bearing bytes, then automate `desktop-canvas-refresh` assertions |
+| Pie, donut, matrix, or Basic/Dropdown slicer binding/canvas baseline has prior manual proof | `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` plus exact current `visual.json` assertions, `validate --strict`, `handoff check`, and `fixture verify` against `catalog-proof.summary.json` | Re-open/refresh/save the current title-bearing bytes; Between slicers require that same Desktop proof before a compatibility claim |
 | Same-report one-column drillthrough matches the public schema-golden shape | `report drillthrough set/show/clear` shape/readback tests plus the public page schema and Desktop-authored reference shape | Reproducible Desktop well/context-menu/navigation/carried-filter proof; visual-action, multi-field, and cross-report fixtures before widening scope |
 | Visual formatting bundle was applied | `report visuals formatting extract/apply` dry-run/apply plus `report visuals formatting show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
 | Visual interaction override was written/read locally | `report interactions set/disable` dry-run/apply plus `report interactions show` and `validate --strict` | Desktop open/save round-trip with interaction inspection |
@@ -359,6 +363,8 @@ pbi --json handoff check build/sales
 Use `report visuals list/show` handles for every visual mutation. Delete a
 visual only with `report visuals delete --dry-run`, then an output copy or a
 confirmed in-place mutation. Never leave an empty visual directory.
+Keep the edit/test cycle on one canonical project path so Desktop title matching,
+receipts, diffs, and handoff checks all refer to the same artifact.
 
 Treat three report behaviors separately:
 
@@ -610,8 +616,8 @@ matrix (PBIR `pivotTable`), and slicer. Generated titles are visible literal
 container titles under `/visual/visualContainerObjects/title` with `show = true`.
 Pie/donut require exactly one Category column plus one or more Y measures;
 matrix requires Rows columns, optional Columns columns, and Values measures;
-slicer requires exactly one Values column and supports only
-Basic (default) or Dropdown mode. Generated slicers write mode under
+slicer requires exactly one Values column and supports Basic (default),
+Dropdown, or Between mode. Use Between for numeric/date range sliders. Generated slicers write mode under
 `/visual/objects/data` and never write `general.filter` or other selection state.
 Pie, donut, matrix, and slicer bindings retain `manual-desktop-canvas-refresh`
 evidence:
@@ -694,7 +700,7 @@ Desktop canvas/open-save proven. Do not use it as tuple-filter, arbitrary
 Advanced-expression, filter-sort, or type-changing update support.
 
 Generated slicer creation is available through `report visuals add` and
-dashboard specs for a single column in Basic or Dropdown mode. The generator
+dashboard specs for a single column in Basic, Dropdown, or Between mode. The generator
 emits no persisted selections. `report slicers list/show/clear` covers PBIR
 slicer inventory and the first guarded state-clear slice. `list/show` scans
 slicer visuals, returns both
@@ -703,13 +709,14 @@ bindings/state, and warns when slicer visual metadata may contain selected
 semantic-model values. `clear` removes persisted selection filters matching the
 slicer binding from `/filterConfig/filters` and legacy `/filters`, with
 `--dry-run`, `--out-dir`, or confirmed `--in-place`, and preserves slicer
-bindings, layout, and formatting. Do not use it as selection/default-value,
-sync-group, or additional-mode authoring support; those still require
-Desktop-authored fixtures. Basic/Dropdown generation is
+bindings, layout, and formatting. Do not use it as selection/default-value or
+sync-group authoring support; those still require Desktop-authored fixtures.
+Basic/Dropdown generation is
 backed by `manual-desktop-canvas-refresh` binding/canvas evidence in the
 2026-07-10 proof record; the current title-bearing bytes are
-`desktop-golden-pending`, and automated proof plus additional mode/formatting
-coverage remain open.
+`desktop-golden-pending`. Between emits the exact Desktop-authored mode literal
+but still needs a committed Desktop canvas/refresh proof; automated proof and
+wider formatting coverage remain open.
 
 `report interactions list/show/set/disable` covers the first PBIR interaction
 authoring slice. `list/show` scans page-level `visualInteractions`, resolves
@@ -832,6 +839,24 @@ pbi --json desktop open-check build/sales
 pbi --json desktop screenshot build/sales --out proof/sales.png
 ```
 
+Use `open-check` or `screenshot` for one-shot proof; both attempt bounded
+identity-checked cleanup. Require `proof.signals.cleanup.closed=true` before
+starting the next Desktop test.
+Use `desktop open` only when Bridge, DAX, or manual inspection needs the app to
+remain open, and always run `desktop close` in a `finally`/cleanup step:
+
+```bash
+pbi --json desktop open build/sales
+# bridge, bounded DAX, refresh, or canvas inspection
+pbi --json desktop close
+```
+
+Require `session.owned=true` before using an interactive session and
+`cleanup.closed=true` (or `session.alreadyClosed=true`) before the next test.
+`desktop open` closes a prior CLI-owned session before launching another. Never
+launch generated PBIPs with raw `Start-Process`, never accumulate same-title
+project copies in Desktop, and never close a user-owned session by title.
+
 `desktop screenshot --out` accepts only PNG paths outside the PBIP project
 directory so evidence does not contaminate the handoff. It activates the exactly
 selected `PBIDesktop*` PID, verifies that PID or one of its descendants owns the
@@ -842,9 +867,9 @@ activation and foreground PIDs plus a `changes` entry when the PNG was created o
 replaced. `--allow-unverified-capture` bypasses foreground verification and may
 capture unrelated sensitive screen content; use it only with explicit risk
 acceptance. Default cleanup reports every targeted PID with its ownership reason,
-never kills baseline/pre-launch processes, and verifies targeted PIDs are dead.
-Pass `--leave-open` only when a screen-capable orchestrator will continue the
-session.
+follows only the exact observed PID and verified descendants, never sweeps by
+title or executable path, and verifies targeted PIDs are dead. `--leave-open` is
+rejected; use the managed `desktop open`/`desktop close` pair.
 
 When duplicate Desktop windows share the project title, selection prefers the
 association-launch PID and then a new post-baseline Desktop PID. If only

@@ -109,7 +109,7 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
         visual_type: "slicer",
         aliases: &["slicer"],
         family: VisualBindingFamily::SlicerField,
-        summary: "Slicer visual; accepts exactly one Values column. Generated mode is Basic by default or Dropdown when requested.",
+        summary: "Slicer visual; accepts exactly one Values column. Generated mode is Basic by default, Dropdown for a compact selector, or Between for a numeric/date range slider.",
     },
 ];
 
@@ -320,7 +320,7 @@ fn unsupported_visual_type_error(value: &str, normalized: &str) -> CliError {
 }
 
 fn visual_type_json(spec: &VisualTypeSpec) -> Value {
-    json!({
+    let mut contract = json!({
         "visualType": spec.visual_type,
         "aliases": spec.aliases,
         "generatedBy": "report visuals add",
@@ -337,7 +337,11 @@ fn visual_type_json(spec: &VisualTypeSpec) -> Value {
             "Repeated use of one model field is refused until Desktop-authored duplicate queryRef numbering is available.",
             "Use formatting bundles, themes, or cloned Desktop-authored templates for style beyond generated defaults."
         ]
-    })
+    });
+    if spec.family == VisualBindingFamily::SlicerField {
+        contract["modes"] = json!(["Basic", "Dropdown", "Between"]);
+    }
+    contract
 }
 
 fn role_specs_json(family: VisualBindingFamily) -> Value {
@@ -544,6 +548,7 @@ fn example_commands(spec: &VisualTypeSpec) -> Vec<String> {
         ],
         VisualBindingFamily::SlicerField => vec![
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type slicer --mode basic --title <title> --binding \"role=Values,table=<table>,column=<column>\" --dry-run --json".to_string(),
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type slicer --mode between --title <title> --binding \"role=Values,table=<table>,column=<numeric-or-date-column>\" --dry-run --json".to_string(),
         ],
         VisualBindingFamily::ScatterBubble => vec![format!(
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<detail-column>\" --binding \"role=X,table=<table>,measure=<x-measure>\" --binding \"role=Y,table=<table>,measure=<y-measure>\" --binding \"role=Size,table=<table>,measure=<size-measure>\" --binding \"role=Series,table=<table>,column=<color-column>\" --dry-run --json",

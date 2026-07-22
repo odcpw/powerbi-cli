@@ -8,6 +8,7 @@ mod cli_support;
 mod contract;
 mod dax_execute;
 mod desktop;
+mod desktop_session;
 mod diff;
 mod doctor;
 mod feature_catalog;
@@ -962,7 +963,7 @@ fn write_project(spec: &DashboardSpec, out_dir: &Path) -> CliResult<()> {
             });
             write_json_file(
                 &visuals_dir.join(&visual_name).join("visual.json"),
-                &visual_json(visual, visual_index)?,
+                &visual_json(spec, visual, visual_index)?,
             )?;
         }
     }
@@ -1092,7 +1093,11 @@ impl Clone for VisualBindingSpec {
     }
 }
 
-fn visual_json(visual: &VisualSpec, visual_index: usize) -> CliResult<Value> {
+fn visual_json(
+    dashboard: &DashboardSpec,
+    visual: &VisualSpec,
+    visual_index: usize,
+) -> CliResult<Value> {
     let title = visual
         .title
         .clone()
@@ -1104,7 +1109,7 @@ fn visual_json(visual: &VisualSpec, visual_index: usize) -> CliResult<Value> {
     let bindings = visual
         .bindings
         .iter()
-        .map(scaffold_visual_binding)
+        .map(|binding| scaffold_visual_binding(dashboard, binding))
         .collect::<Vec<_>>();
     report_visual_mutations::validate_binding_cardinality(&visual_type, &bindings)?;
     let slicer_mode = resolve_slicer_mode(&visual_type, visual.mode.as_deref())?;
@@ -1126,13 +1131,17 @@ fn visual_json(visual: &VisualSpec, visual_index: usize) -> CliResult<Value> {
     })
 }
 
-fn scaffold_visual_binding(binding: &VisualBindingSpec) -> VisualBindingResolved {
+fn scaffold_visual_binding(
+    dashboard: &DashboardSpec,
+    binding: &VisualBindingSpec,
+) -> VisualBindingResolved {
     if let Some(measure) = &binding.measure {
         VisualBindingResolved {
             role: binding.role.clone(),
             table: binding.table.clone(),
             field: measure.clone(),
             kind: VisualBindingKind::Measure,
+            data_type: None,
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
         }
@@ -1142,6 +1151,18 @@ fn scaffold_visual_binding(binding: &VisualBindingSpec) -> VisualBindingResolved
             table: binding.table.clone(),
             field: column.clone(),
             kind: VisualBindingKind::Column,
+            data_type: dashboard
+                .tables
+                .iter()
+                .find(|table| table.name.eq_ignore_ascii_case(&binding.table))
+                .and_then(|table| {
+                    table
+                        .columns
+                        .iter()
+                        .find(|candidate| candidate.name.eq_ignore_ascii_case(column))
+                })
+                .and_then(|column| normalize_data_type(column.data_type.as_deref()).ok())
+                .map(|data_type| data_type.tmdl.to_string()),
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
         }
@@ -1151,6 +1172,7 @@ fn scaffold_visual_binding(binding: &VisualBindingSpec) -> VisualBindingResolved
             table: binding.table.clone(),
             field: "<invalid>".to_string(),
             kind: VisualBindingKind::Column,
+            data_type: None,
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
         }

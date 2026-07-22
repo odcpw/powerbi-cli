@@ -21,6 +21,7 @@ pub(crate) struct VisualBindingResolved {
     pub(crate) table: String,
     pub(crate) field: String,
     pub(crate) kind: VisualBindingKind,
+    pub(crate) data_type: Option<String>,
     pub(crate) display_name: Option<String>,
     pub(crate) format_string: Option<String>,
 }
@@ -272,7 +273,7 @@ fn resolve_binding(
             )
             .with_suggested_command("powerbi-cli inspect --deep <project-dir-or.pbip> --json")
         })?;
-    let (kind, field) = if let Some(measure) = input.measure.as_deref() {
+    let (kind, field, data_type) = if let Some(measure) = input.measure.as_deref() {
         let measure = table
             .measures
             .iter()
@@ -287,7 +288,7 @@ fn resolve_binding(
                     "powerbi-cli model measures list --project <project-dir-or.pbip> --json",
                 )
             })?;
-        (VisualBindingKind::Measure, measure.name.clone())
+        (VisualBindingKind::Measure, measure.name.clone(), None)
     } else {
         let column = input
             .column
@@ -305,13 +306,18 @@ fn resolve_binding(
                 .with_hint("Run `inspect --deep` to discover available columns.")
                 .with_suggested_command("powerbi-cli inspect --deep <project-dir-or.pbip> --json")
             })?;
-        (VisualBindingKind::Column, column.name.clone())
+        (
+            VisualBindingKind::Column,
+            column.name.clone(),
+            column.data_type.clone(),
+        )
     };
     Ok(VisualBindingResolved {
         role,
         table: table.table.clone(),
         field,
         kind,
+        data_type,
         display_name: input.display_name.clone(),
         format_string: input.format_string.clone(),
     })

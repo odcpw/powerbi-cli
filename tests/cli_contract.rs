@@ -580,6 +580,8 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
         "--robot-triage",
         "robot-triage",
         "doctor",
+        "desktop open",
+        "desktop close",
         "desktop open-check",
         "desktop screenshot",
         "fixture normalize",
@@ -664,6 +666,150 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
             .expect("model DAX execute fields")
             .iter()
             .any(|field| field == "runtime.temporaryFilesRemoved")
+    );
+}
+
+#[test]
+fn desktop_close_is_idempotent_without_an_owned_session() {
+    let state = tempfile::tempdir().expect("Desktop session state");
+    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args(["desktop", "close", "--json"])
+        .env("POWERBI_CLI_STATE_DIR", state.path())
+        .output()
+        .expect("run desktop close");
+
+    if cfg!(windows) {
+        assert!(output.status.success());
+        let value: Value = serde_json::from_slice(&output.stdout).expect("close JSON");
+        assert_eq!(value["schema"], "powerbi-cli.desktop.close.v1");
+        assert_eq!(value["session"]["state"], "none");
+        assert_eq!(value["session"]["alreadyClosed"], true);
+        assert_eq!(value["cleanup"]["closed"], true);
+    } else {
+        assert_eq!(output.status.code(), Some(2));
+        let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
+        assert_eq!(value["error"]["code"], "unsupported_feature");
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn desktop_close_discards_a_stale_receipt_without_targeting_any_process() {
+    let state = tempfile::tempdir().expect("Desktop session state");
+    let receipt = state.path().join("desktop-session.json");
+    fs::write(
+        &receipt,
+        serde_json::to_vec_pretty(&json!({
+            "schema": "powerbi-cli.desktop.session.v1",
+            "projectName": "Stale",
+            "projectPath": "C:\\Temp\\Stale.pbip",
+            "desktopPath": "C:\\Temp\\PBIDesktop.exe",
+            "associationProcessId": 4_294_967_295_u32,
+            "observedProcessId": 4_294_967_295_u32,
+            "observedProcessCreationTimeUtc": "2000-01-01T00:00:00.0000000Z",
+            "observedExecutablePath": "C:\\Temp\\PBIDesktop.exe",
+            "baselineProcessIds": [],
+            "launchTimestampUnixMs": 946_684_800_000_u64,
+            "openedAtUnixMs": 946_684_800_000_u64
+        }))
+        .expect("serialize stale receipt"),
+    )
+    .expect("write stale receipt");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args(["desktop", "close", "--json"])
+        .env("POWERBI_CLI_STATE_DIR", state.path())
+        .output()
+        .expect("close stale Desktop session");
+
+    assert!(output.status.success());
+    let value: Value = serde_json::from_slice(&output.stdout).expect("close JSON");
+    assert_eq!(value["session"]["alreadyClosed"], true);
+    assert_eq!(value["session"]["receiptRemoved"], true);
+    assert_eq!(value["cleanup"]["attempted"], false);
+    assert_eq!(value["cleanup"]["identityMatched"], false);
+    assert_eq!(value["cleanup"]["targetedProcessIds"], json!([]));
+    assert!(!receipt.exists());
+}
+
+#[cfg(windows)]
+#[test]
+fn desktop_close_retains_an_invalid_receipt_for_explicit_recovery() {
+    let state = tempfile::tempdir().expect("Desktop session state");
+    let receipt = state.path().join("desktop-session.json");
+    fs::write(&receipt, b"not-json").expect("write invalid receipt");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args(["desktop", "close", "--json"])
+        .env("POWERBI_CLI_STATE_DIR", state.path())
+        .output()
+        .expect("close invalid Desktop session");
+
+    assert!(!output.status.success());
+    let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
+    assert_eq!(value["error"]["code"], "unexpected");
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("parse Desktop session receipt")
+    );
+    assert!(receipt.exists());
+}
+
+#[cfg(windows)]
+#[test]
+fn desktop_lifecycle_lock_refuses_concurrent_mutation() {
+    let state = tempfile::tempdir().expect("Desktop session state");
+    let lock = state.path().join("desktop-session.lock");
+    fs::write(&lock, b"other-operation").expect("write lifecycle lock");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
+        .args(["desktop", "close", "--json"])
+        .env("POWERBI_CLI_STATE_DIR", state.path())
+        .output()
+        .expect("run concurrent Desktop close");
+
+    assert_eq!(output.status.code(), Some(10));
+    let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
+    assert_eq!(value["error"]["code"], "validation_failed");
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("another managed Desktop session operation is active")
+    );
+    assert_eq!(
+        value["error"]["suggestedCommands"],
+        json!(["powerbi-cli desktop close --json"])
+    );
+    assert_eq!(
+        fs::read_to_string(lock).expect("lock retained"),
+        "other-operation"
+    );
+}
+
+#[test]
+fn desktop_leave_open_points_to_the_managed_lifecycle() {
+    let output = run_powerbi(&[
+        "desktop",
+        "open-check",
+        "report.pbip",
+        "--leave-open",
+        "--json",
+    ]);
+    assert_eq!(output.code, 2);
+    let value = stderr_json(&output);
+    assert_eq!(
+        value["error"]["message"],
+        "--leave-open has no bounded ownership lifetime"
+    );
+    assert_eq!(
+        value["error"]["suggestedCommands"],
+        json!([
+            "powerbi-cli desktop open <project-dir-or.pbip> --json",
+            "powerbi-cli desktop close --json"
+        ])
     );
 }
 

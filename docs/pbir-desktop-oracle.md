@@ -77,12 +77,12 @@ Windows file association can return a short-lived shell/proxy PID instead of
 the long-lived Desktop PID. The baseline/delta polling is therefore required
 both for observation and for scoped cleanup. Every cleanup target is reported as
 `proof.signals.cleanup.targeted[]` with its PID, ownership reason, and creation
-time. A process is eligible only as the non-baseline association PID or an owned
-descendant, an exact project-title match, or an executable-path match created
-after the recorded launch timestamp. Creation time is checked again immediately
-before `Stop-Process`; baseline, pre-launch, unknown-creation, and PID-reuse cases
-are never killed. `closed=true` means every targeted PID was verified dead and no
-ownership/stop error remained.
+time. A process is eligible only as the non-baseline association PID, the exact
+PID selected by window observation, or a verified descendant of those roots.
+Cleanup never sweeps by title or executable path. Creation time is checked again
+immediately before `Stop-Process`; baseline, pre-launch, unknown-creation, and
+PID-reuse cases are never killed. `closed=true` means every targeted PID was
+verified dead and no ownership/stop error remained.
 
 Window selection never chooses the oldest matching title. It prefers the
 association-launch PID, then an exact-title Desktop PID absent from the
@@ -109,6 +109,26 @@ capture anyway but risks recording unrelated sensitive screen content, leaves
 `proof.passed=false`, and emits a warning. Every response contains `changes`;
 successful PNG creation/replacement contributes one file change and all other
 paths return `changes: []`.
+
+### Managed Interactive Session
+
+Use `desktop open <project> --json` when Desktop must remain available for
+Bridge, bounded DAX queries, or manual review. It validates the PBIP, closes a
+previous CLI-owned session, observes the exact project window, then writes one
+ownership receipt under `%LOCALAPPDATA%\powerbi-cli`. The receipt records the
+canonical PBIP, association and observed PIDs, exact observed process creation
+time, executable identity, and pre-launch baseline. If exact ownership cannot be
+established, the command attempts bounded identity-checked cleanup and reports
+the session as `closed` only when that cleanup is verified; otherwise it reports
+`unknown` and never guesses by title or executable path.
+
+Finish with `desktop close --json`. Close is idempotent: if the process has
+already exited or the PID has been reused, the receipt is removed and no process
+is killed. Verified cleanup targets only the recorded observed PID and its
+creation-time-checked descendants. `--leave-open` is rejected because it has no
+bounded ownership lifetime. One-shot `desktop open-check` and `desktop
+screenshot` always attempt bounded identity-checked cleanup and report any
+unresolved ownership.
 
 The screenshot is evidence capture for manual or screen-agent review. The CLI
 does not crop to the Power BI window, parse pixels, identify visuals, detect a
@@ -612,14 +632,21 @@ Expected result:
 }
 ```
 
-Open in Desktop:
+Open a managed interactive Desktop session:
 
 ```powershell
-Start-Process -FilePath (Resolve-Path 'build\desktop-proof-v4\RegionalSales.pbip')
+$env:POWERBI_DESKTOP_ORACLE = '1'
+cargo run --quiet -- desktop open build\desktop-proof-v4 --json
 ```
 
 Click `Refresh now` if Desktop says some tables have incomplete or no data. The
 dummy `#table(...)` partitions should then populate the visuals.
+
+Close the owned session before the next proof:
+
+```powershell
+cargo run --quiet -- desktop close --json
+```
 
 ## What Needs To Be Added Next
 
@@ -762,6 +789,10 @@ in Desktop Store 2.155.756.0, as recorded in
 `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json`. The four
 new families are therefore `manual-desktop-canvas-refresh`; automation and
 wider formatting/PBIR readback coverage are still required.
+
+The slicer generator also accepts `--mode between`, which emits Desktop's
+`'Between'` mode literal for a numeric/date range slider. The literal is covered
+locally; a checked-in automated Desktop interaction proof remains pending.
 
 Add:
 

@@ -329,6 +329,16 @@ fn everything_acceptance_invokes_every_catalog_command() {
     );
     let desktop_oracle_exit = if cfg!(windows) { 30 } else { 2 };
     h.code(
+        "desktop open",
+        desktop_oracle_exit,
+        &svec(["desktop", "open", &project_arg, "--json"]),
+    );
+    h.code(
+        "desktop close",
+        2,
+        &svec(["desktop", "close", "unexpected", "--json"]),
+    );
+    h.code(
         "desktop open-check",
         desktop_oracle_exit,
         &svec(["desktop", "open-check", &project_arg, "--json"]),

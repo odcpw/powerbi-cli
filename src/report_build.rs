@@ -1,7 +1,9 @@
 use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes,
 };
-use crate::pbir_visual_factory::resolve_slicer_mode;
+use crate::pbir_visual_factory::{
+    SlicerMode, resolve_slicer_mode, slicer_between_data_type_is_supported,
+};
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_spec_fields::fields_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
@@ -463,7 +465,8 @@ fn compile_visuals(
             })?),
             None => None,
         };
-        if let Some(mode) = resolve_slicer_mode(&visual_type, requested_mode)? {
+        let slicer_mode = resolve_slicer_mode(&visual_type, requested_mode)?;
+        if let Some(mode) = slicer_mode {
             out.insert("mode".to_string(), Value::String(mode.as_str().to_string()));
         }
         if let Some(title) = visual.get("title").and_then(Value::as_str) {
@@ -472,6 +475,9 @@ fn compile_visuals(
         apply_layout(visual_index, visual, &mut out);
         let bindings = compile_bindings(page_index, visual_index, &visual_type, visual, model)?;
         validate_binding_contract(page_index, visual_index, &visual_type, &bindings)?;
+        if slicer_mode == Some(SlicerMode::Between) {
+            validate_between_binding(page_index, visual_index, &bindings, model)?;
+        }
         out.insert("bindings".to_string(), Value::Array(bindings));
         if visual.get("drilldown").is_some() {
             return Err(CliError::unsupported_feature(
@@ -484,6 +490,35 @@ fn compile_visuals(
         visuals.push(Value::Object(out));
     }
     Ok(visuals)
+}
+
+fn validate_between_binding(
+    page_index: usize,
+    visual_index: usize,
+    bindings: &[Value],
+    model: &ModelIndex,
+) -> CliResult<()> {
+    let binding = bindings.first().and_then(Value::as_object).ok_or_else(|| {
+        CliError::invalid_args(format!(
+            "pages[{page_index}].visuals[{visual_index}] Between slicer requires one Values column binding"
+        ))
+    })?;
+    let table = binding
+        .get("table")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let column = binding
+        .get("column")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let data_type = model.column_data_type(table, column).unwrap_or("unknown");
+    if slicer_between_data_type_is_supported(data_type) {
+        return Ok(());
+    }
+    Err(CliError::unsupported_feature(format!(
+        "pages[{page_index}].visuals[{visual_index}] Between slicer requires a numeric or date column; {table}[{column}] is {data_type}"
+    ))
+    .with_hint("Use Basic/Dropdown for text categories, or bind Between to an int64, double, decimal, or dateTime column."))
 }
 
 fn compile_bindings(
@@ -729,7 +764,7 @@ fn apply_layout(visual_index: usize, visual: &Map<String, Value>, out: &mut Map<
 
 #[derive(Debug)]
 struct ModelIndex {
-    columns: BTreeMap<String, BTreeSet<String>>,
+    columns: BTreeMap<String, BTreeMap<String, String>>,
     measures: BTreeMap<String, BTreeSet<String>>,
 }
 
@@ -769,8 +804,14 @@ impl ModelIndex {
                     .and_then(Value::as_array)
                     .into_iter()
                     .flatten()
-                    .filter_map(|column| column.get("name").and_then(Value::as_str))
-                    .map(|name| name.to_ascii_lowercase())
+                    .filter_map(|column| {
+                        let name = column.get("name").and_then(Value::as_str)?;
+                        let data_type = column
+                            .get("dataType")
+                            .and_then(Value::as_str)
+                            .unwrap_or("string");
+                        Some((name.to_ascii_lowercase(), data_type.to_string()))
+                    })
                     .collect(),
             );
             measures.insert(
@@ -799,7 +840,7 @@ impl ModelIndex {
         let is_column = self
             .columns
             .get(&table_key)
-            .is_some_and(|items| items.contains(&name_key));
+            .is_some_and(|items| items.contains_key(&name_key));
         if is_measure && is_column {
             return Err(CliError::invalid_args(format!(
                 "dashboard spec field reference is ambiguous because both a column and measure exist: {value}"
@@ -835,7 +876,7 @@ impl ModelIndex {
             FieldKind::Column => self
                 .columns
                 .get(&table_key)
-                .is_some_and(|items| items.contains(&name_key)),
+                .is_some_and(|items| items.contains_key(&name_key)),
             FieldKind::Measure => self
                 .measures
                 .get(&table_key)
@@ -849,6 +890,13 @@ impl ModelIndex {
             ))
             .with_suggested_command("powerbi-cli schema validate <schema.json> --json"))
         }
+    }
+
+    fn column_data_type(&self, table: &str, column: &str) -> Option<&str> {
+        self.columns
+            .get(&table.to_ascii_lowercase())?
+            .get(&column.to_ascii_lowercase())
+            .map(String::as_str)
     }
 }
 

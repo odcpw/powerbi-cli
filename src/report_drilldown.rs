@@ -111,6 +111,7 @@ fn build_hierarchy_plan(
                 table,
                 field: column,
                 kind: VisualBindingKind::Column,
+                data_type: None,
                 display_name: None,
                 format_string: None,
             })

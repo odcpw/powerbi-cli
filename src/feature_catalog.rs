@@ -247,15 +247,20 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "desktop.window-evidence",
-        title: "Desktop window observation and screenshot evidence",
+        title: "Managed Desktop sessions, window observation, and screenshot evidence",
         category: "desktop",
         status: "supported",
         support: "opt-in-window-observation-and-primary-display-capture",
         proof_level: "unit-smoke",
         emits_pbir: false,
-        commands: &["desktop open-check", "desktop screenshot"],
+        commands: &[
+            "desktop open",
+            "desktop close",
+            "desktop open-check",
+            "desktop screenshot",
+        ],
         refusal_code: None,
-        reason: "On an opted-in Windows oracle machine, the CLI can enforce a launch/observation watchdog, observe a non-empty Power BI Desktop window title, match it to the PBIP project name, and capture the primary display outside the project. These signals are evidence only and do not inspect the report canvas or refresh state.",
+        reason: "On an opted-in Windows oracle machine, the CLI can own exactly one interactive Desktop session by exact PID and creation time, close it idempotently, enforce a launch/observation watchdog, observe a project-matched window title, and capture the primary display outside the project. These signals are evidence only and do not inspect the report canvas or refresh state.",
         next_proof: &[
             "Detect unresolved Desktop issue dialogs and banners",
             "Detect a rendered non-blank report canvas",
@@ -957,7 +962,7 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "report.slicer-authoring",
-        title: "Generated basic and dropdown slicers",
+        title: "Generated basic, dropdown, and between slicers",
         category: "report",
         status: "supported",
         support: "generated-clean-state-desktop-golden-pending",
@@ -973,7 +978,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report slicers clear",
         ],
         refusal_code: None,
-        reason: "The CLI generates a slicer with exactly one Values column and a Basic or Dropdown mode under /visual/objects/data. It deliberately emits no general.filter or other persisted selection state. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean binding/canvas baseline. Current generated title and alt-text container bytes await Desktop re-verification.",
+        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between provides a numeric/date range slider. Generated slicers deliberately contain no general.filter or other persisted selection state. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title and alt-text container bytes await Desktop re-verification.",
         next_proof: &[
             "Automate the manual slicer canvas, refresh, and interaction assertions as the desktop-canvas-refresh proof level",
             "Widen typed slicer formatting and mode coverage with Desktop-authored fixtures and PBIR readback",

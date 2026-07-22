@@ -8,6 +8,7 @@ const VISUAL_CONTAINER_SCHEMA: &str = "https://developer.microsoft.com/json-sche
 pub(crate) enum SlicerMode {
     Basic,
     Dropdown,
+    Between,
 }
 
 impl SlicerMode {
@@ -15,6 +16,7 @@ impl SlicerMode {
         match self {
             Self::Basic => "Basic",
             Self::Dropdown => "Dropdown",
+            Self::Between => "Between",
         }
     }
 }
@@ -48,6 +50,7 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
             spec.visual_type
         )));
     }
+    validate_slicer_mode_binding(spec)?;
     let mut visual_config = Map::new();
     visual_config.insert(
         "visualType".to_string(),
@@ -117,6 +120,43 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
     }))
 }
 
+fn validate_slicer_mode_binding(spec: &VisualBuildSpec) -> CliResult<()> {
+    if spec.slicer_mode != Some(SlicerMode::Between) {
+        return Ok(());
+    }
+    validate_between_slicer_data_type(
+        spec.bindings
+            .first()
+            .and_then(|binding| binding.data_type.as_deref()),
+    )
+}
+
+pub(crate) fn validate_between_slicer_data_type(data_type: Option<&str>) -> CliResult<()> {
+    let data_type = data_type.unwrap_or_default();
+    if slicer_between_data_type_is_supported(data_type) {
+        return Ok(());
+    }
+    Err(CliError::unsupported_feature(format!(
+        "Between slicer requires a numeric or date column; resolved data type was {}",
+        if data_type.is_empty() {
+            "unknown"
+        } else {
+            data_type
+        }
+    ))
+    .with_hint("Use Basic/Dropdown for text categories, or bind Between to an int64, double, decimal, or dateTime column.")
+    .with_suggested_command(
+        "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type slicer --mode between --title <title> --binding \"role=Values,table=<table>,column=<numeric-or-date-column>\" --dry-run --json",
+    ))
+}
+
+pub(crate) fn slicer_between_data_type_is_supported(data_type: &str) -> bool {
+    matches!(
+        data_type.to_ascii_lowercase().as_str(),
+        "int64" | "double" | "decimal" | "datetime" | "date"
+    )
+}
+
 pub(crate) fn resolve_slicer_mode(
     visual_type: &str,
     requested: Option<&str>,
@@ -134,11 +174,12 @@ pub(crate) fn resolve_slicer_mode(
     match requested.unwrap_or("basic").trim().to_ascii_lowercase().as_str() {
         "basic" => Ok(Some(SlicerMode::Basic)),
         "dropdown" => Ok(Some(SlicerMode::Dropdown)),
+        "between" => Ok(Some(SlicerMode::Between)),
         other => Err(CliError::unsupported_feature(format!(
             "unsupported slicer mode: {other}"
         ))
         .with_hint(
-            "Generated slicers support only basic and dropdown modes until other modes receive Desktop golden proof.",
+            "Generated slicers support basic, dropdown, and between modes. Use between for a numeric or date range slider.",
         )
         .with_suggested_command(
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type slicer --mode basic --title <title> --binding \"role=Values,table=<table>,column=<column>\" --dry-run --json",

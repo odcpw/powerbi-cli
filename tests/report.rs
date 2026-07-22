@@ -7939,6 +7939,10 @@ fn report_visuals_catalog_advertises_generated_types_roles_and_limits() {
         slicer_json["visualTypes"][0]["bindingProofLevel"],
         "manual-desktop-canvas-refresh"
     );
+    assert_eq!(
+        slicer_json["visualTypes"][0]["modes"],
+        json!(["Basic", "Dropdown", "Between"])
+    );
     assert_eq!(slicer_json["visualTypes"][0]["roles"][0]["max"], 1);
     assert_eq!(
         slicer_json["visualTypes"][0]["roles"][0]["fieldKinds"],
@@ -9654,7 +9658,37 @@ fn report_visual_new_families_reject_invalid_bindings_and_slicer_modes() {
             .contains("exactly one Values column binding")
     );
 
-    let slicer_mode = run_powerbi(&[
+    let between_mode = run_powerbi(&[
+        "report",
+        "visuals",
+        "add",
+        "--project",
+        project_arg,
+        "--page",
+        page,
+        "--visual-type",
+        "slicer",
+        "--mode",
+        "between",
+        "--name",
+        "BetweenYearSlicer",
+        "--title",
+        "Year range",
+        "--binding",
+        "role=Values,table=CatalogFacts,column=Year",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(between_mode.code, 0, "stderr: {}", between_mode.stderr);
+    let between_json = stdout_json(&between_mode);
+    assert_eq!(between_json["target"]["mode"], "Between");
+    assert_eq!(
+        between_json["changes"][0]["after"]["visual"]["objects"]["data"][0]["properties"]["mode"]["expr"]
+            ["Literal"]["Value"],
+        "'Between'"
+    );
+
+    let between_text = run_powerbi(&[
         "report",
         "visuals",
         "add",
@@ -9667,7 +9701,36 @@ fn report_visual_new_families_reject_invalid_bindings_and_slicer_modes() {
         "--mode",
         "between",
         "--title",
-        "Invalid Mode",
+        "Invalid text range",
+        "--binding",
+        "role=Values,table=CatalogFacts,column=Category",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(between_text.code, 2);
+    let between_text_error = stderr_json(&between_text);
+    assert_eq!(between_text_error["error"]["code"], "unsupported_feature");
+    assert!(
+        between_text_error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("requires a numeric or date column")
+    );
+
+    let slicer_mode = run_powerbi(&[
+        "report",
+        "visuals",
+        "add",
+        "--project",
+        project_arg,
+        "--page",
+        page,
+        "--visual-type",
+        "slicer",
+        "--mode",
+        "relative",
+        "--title",
+        "Unsupported Mode",
         "--binding",
         "role=Values,table=CatalogFacts,column=Category",
         "--dry-run",
@@ -10137,6 +10200,85 @@ fn report_visual_set_bindings_rejects_bad_specs() {
             .as_str()
             .unwrap_or_default()
             .contains("single-value visuals accept exactly one Values binding")
+    );
+}
+
+#[test]
+fn report_visual_set_bindings_preserves_between_slicer_type_safety() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = build_catalog_proof(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let page = "page:ReportSectionLineControl";
+
+    let add = run_powerbi(&[
+        "report",
+        "visuals",
+        "add",
+        "--project",
+        project_arg,
+        "--page",
+        page,
+        "--visual-type",
+        "slicer",
+        "--mode",
+        "between",
+        "--name",
+        "BetweenRebindProof",
+        "--title",
+        "Year range",
+        "--binding",
+        "role=Values,table=CatalogFacts,column=Year",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+    let handle = stdout_json(&add)["target"]["handle"]
+        .as_str()
+        .expect("Between slicer handle")
+        .to_string();
+
+    let text_binding = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-bindings",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--binding",
+        "role=Values,table=CatalogFacts,column=Category",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(text_binding.code, 2);
+    assert_eq!(
+        stderr_json(&text_binding)["error"]["code"],
+        "unsupported_feature"
+    );
+    assert!(
+        stderr_json(&text_binding)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("requires a numeric or date column")
+    );
+
+    let numeric_binding = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-bindings",
+        "--project",
+        project_arg,
+        "--handle",
+        &handle,
+        "--binding",
+        "role=Values,table=CatalogFacts,column=Amount",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(
+        numeric_binding.code, 0,
+        "stderr: {}",
+        numeric_binding.stderr
     );
 }
 
@@ -11042,7 +11184,7 @@ fn capabilities_advertise_report_layout_commands() {
     for expected_flag in [
         "--page <page-name-or-handle>",
         "--title <title>",
-        "--mode basic|dropdown",
+        "--mode basic|dropdown|between",
         "--binding <key=value,...>",
         "--bindings-json <json>",
         "--dry-run",

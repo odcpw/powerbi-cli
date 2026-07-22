@@ -923,8 +923,36 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
         .iter()
         .map(|command| command["path"].as_str().expect("path"))
         .collect::<Vec<_>>();
+    assert!(desktop_paths.contains(&"desktop open"));
+    assert!(desktop_paths.contains(&"desktop close"));
     assert!(desktop_paths.contains(&"desktop open-check"));
     assert!(desktop_paths.contains(&"desktop screenshot"));
+    let open_command = desktop_catalog_value["commands"]
+        .as_array()
+        .expect("desktop command catalog")
+        .iter()
+        .find(|command| command["path"] == "desktop open")
+        .expect("desktop open command");
+    assert_eq!(
+        open_command["outputSchema"],
+        Value::from("powerbi-cli.desktop.open.v1")
+    );
+    assert!(
+        open_command["sessionContract"]
+            .as_str()
+            .expect("session contract")
+            .contains("exactly one CLI-owned session")
+    );
+    let close_command = desktop_catalog_value["commands"]
+        .as_array()
+        .expect("desktop command catalog")
+        .iter()
+        .find(|command| command["path"] == "desktop close")
+        .expect("desktop close command");
+    assert_eq!(
+        close_command["outputSchema"],
+        Value::from("powerbi-cli.desktop.close.v1")
+    );
     let screenshot_command = desktop_catalog_value["commands"]
         .as_array()
         .expect("desktop command catalog")
@@ -992,5 +1020,12 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
             .expect("feature commands")
             .iter()
             .any(|command| command == "desktop screenshot")
+    );
+    assert!(
+        desktop_feature["commands"]
+            .as_array()
+            .expect("feature commands")
+            .iter()
+            .any(|command| command == "desktop close")
     );
 }

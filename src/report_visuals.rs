@@ -11,6 +11,7 @@ use crate::pbir_bindings::{
     parse_bindings_json_text, resolve_visual_bindings, set_binding_status_annotation,
     visual_query_json,
 };
+use crate::pbir_visual_factory::validate_between_slicer_data_type;
 use crate::project_io::write_json_atomic;
 use crate::report_visual_clone::clone_visual;
 use crate::report_visual_delete::delete_visual;
@@ -318,6 +319,16 @@ fn set_bindings(args: &[String]) -> CliResult<Value> {
         let resolved_bindings =
             resolve_visual_bindings(&docs, &visual.visual_type, &options.bindings)?;
         validate_binding_cardinality(&visual.visual_type, &resolved_bindings)?;
+        if visual.visual_type == "slicer"
+            && persisted_slicer_mode(&visual_json)
+                .is_some_and(|mode| mode.eq_ignore_ascii_case("Between"))
+        {
+            validate_between_slicer_data_type(
+                resolved_bindings
+                    .first()
+                    .and_then(|binding| binding.data_type.as_deref()),
+            )?;
+        }
         let query = visual_query_json(&visual.visual_type, &resolved_bindings);
         set_visual_query(&mut visual_json, query)?;
         visual_json["howCreated"] = Value::String("DraggedToFieldWell".to_string());
@@ -410,6 +421,18 @@ fn set_bindings(args: &[String]) -> CliResult<Value> {
         "validateCommand": validate,
         "next": [readback, wireframe, inspect, validate]
     }))
+}
+
+fn persisted_slicer_mode(visual: &Value) -> Option<&str> {
+    visual
+        .pointer("/visual/objects/data")?
+        .as_array()?
+        .iter()
+        .find_map(|card| {
+            card.pointer("/properties/mode/expr/Literal/Value")
+                .and_then(Value::as_str)
+        })
+        .map(|value| value.trim_matches('\''))
 }
 
 fn parse_list_args(args: &[String]) -> CliResult<ListOptions> {

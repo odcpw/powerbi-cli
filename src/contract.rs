@@ -54,6 +54,8 @@ Usage:
   powerbi-cli workflow plan --project <project-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json
   powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
   powerbi-cli workflow verify --plan <plan.json> --json
+  powerbi-cli desktop open <project-dir-or.pbip> --json
+  powerbi-cli desktop close --json
   powerbi-cli desktop open-check <project-dir-or.pbip> --json
   powerbi-cli desktop screenshot <project-dir-or.pbip> --out <evidence.png> --json
   powerbi-cli desktop bridge status [--pid <pid>] --json
@@ -296,7 +298,7 @@ Rules for agents:
 - Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
-- Use `desktop open-check` and `desktop screenshot` only on an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
+- Use `desktop open` for one interactive CLI-owned Power BI Desktop session and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
 - Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features and returns proof/handoff follow-up commands.
 - Use `report spec fields --schema <schema.json> [--profile <profile.json>]` to get exact column/measure binding references before writing a dashboard spec.
 - Use `report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json>` to create a deterministic starter dashboard spec, then `report spec validate --schema <schema.json> --spec <dashboard.json>` before build.
@@ -340,6 +342,8 @@ pub(crate) fn robot_triage() -> Value {
             "guide": "powerbi-cli robot-docs guide",
             "robotTriage": "powerbi-cli robot-triage",
             "doctor": "powerbi-cli --json doctor",
+            "desktopOpen": "powerbi-cli desktop open <project-dir-or.pbip> --json",
+            "desktopClose": "powerbi-cli desktop close --json",
             "desktopOpenCheck": "powerbi-cli desktop open-check <project-dir-or.pbip> --json",
             "fixtureNormalize": "powerbi-cli fixture normalize <project-dir-or.pbip> --json",
             "fixtureVerify": "powerbi-cli fixture verify <project-dir-or.pbip> --expected <summary.json> --json",
@@ -807,9 +811,44 @@ fn command_catalog() -> Vec<Value> {
             "followUpFields": ["ok", "readOnly", "mutates", "mutatesProject", "networkRequired", "lockId", "lockFingerprint", "cachePath", "activationResult", "priorActiveVersion", "components", "changes", "next"]
         }),
         json!({
+            "path": "desktop open",
+            "usage": "powerbi-cli desktop open <project-dir-or.pbip> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] --json",
+            "summary": "Open the single CLI-owned interactive Power BI Desktop session, closing a prior owned session first",
+            "tags": ["desktop", "session", "lifecycle", "window", "windows", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "stability": "alpha-oracle",
+            "proofLevel": "unit-smoke",
+            "observedStage": "desktop-window",
+            "outputSchema": "powerbi-cli.desktop.open.v1",
+            "platforms": ["windows session when POWERBI_DESKTOP_ORACLE=1", "linux unsupported_feature", "macos unsupported_feature"],
+            "sessionContract": "exactly one CLI-owned session; ownership is persisted outside the project with the exact observed PID and creation time; opening another session first closes only that recorded process lineage",
+            "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
+            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --json"],
+            "followUpFields": ["ok", "exitCode", "project", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "proof", "validation", "diagnostics", "next"]
+        }),
+        json!({
+            "path": "desktop close",
+            "usage": "powerbi-cli desktop close --json",
+            "summary": "Idempotently close only the exact CLI-owned Power BI Desktop session and its verified descendants",
+            "tags": ["desktop", "session", "lifecycle", "cleanup", "windows", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "stability": "alpha-oracle",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.desktop.close.v1",
+            "platforms": ["windows", "linux unsupported_feature", "macos unsupported_feature"],
+            "sessionContract": "idempotent; a missing, exited, or PID-reused receipt returns alreadyClosed without killing anything; failed verified cleanup retains the receipt for retry",
+            "flags": ["--json", "--format json"],
+            "examples": ["powerbi-cli desktop close --json"],
+            "followUpFields": ["ok", "exitCode", "session.state", "session.alreadyClosed", "session.project", "session.desktopProcessId", "session.receiptPath", "session.receiptRemoved", "cleanup.attempted", "cleanup.identityMatched", "cleanup.closed", "cleanup.targeted", "cleanup.remainingProcessIds", "cleanup.errors", "next"]
+        }),
+        json!({
             "path": "desktop open-check",
-            "usage": "powerbi-cli desktop open-check <project-dir-or.pbip> [--timeout-ms <ms>] [--leave-open] [--desktop-path <PBIDesktop.exe>] --json",
-            "summary": "Attempt opt-in Power BI Desktop launch plus exact project-title observation for a PBIP project",
+            "usage": "powerbi-cli desktop open-check <project-dir-or.pbip> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] --json",
+            "summary": "Attempt one-shot Power BI Desktop launch plus exact project-title observation, then clean up",
             "tags": ["desktop", "oracle", "proof", "window", "title", "windows", "agent"],
             "readOnly": true,
             "mutates": false,
@@ -820,13 +859,13 @@ fn command_catalog() -> Vec<Value> {
             "platforms": ["windows observation when POWERBI_DESKTOP_ORACLE=1", "linux unsupported_feature", "macos unsupported_feature"],
             "ciPolicy": "never required in default CI; run only on Windows with POWERBI_DESKTOP_ORACLE=1 and Desktop installed; proof.observedStage reports launch/exact-title observations and is not a canvas/render/refresh compatibility claim",
             "timeoutContract": "timeout-ms is one watchdog budget for the bounded version probe, process baseline, file-association launch, and exact window/title polling; a timeout after confirmed launch returns exit 0 with observedStage=desktop-launch and timeout signals, while a launch timeout is oracle_failed",
-            "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--timeout-ms <ms>", "--leave-open", "--close-after", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
+            "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
             "examples": ["powerbi-cli desktop open-check build/sales --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check build/sales --desktop-path \"C:\\\\Program Files\\\\Microsoft Power BI Desktop\\\\bin\\\\PBIDesktop.exe\" --json"],
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "oracle.detection.requestedDesktopPath", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.signals.launchMethod", "proof.signals.detectionPathUsedForLaunch", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.claimedCompatibility", "proof.requiredCompatibilityLevel", "proof.unprovenSignals", "proof.manualReview", "validation", "diagnostics", "next"]
         }),
         json!({
             "path": "desktop screenshot",
-            "usage": "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <file.png> [--timeout-ms <ms>] [--leave-open] [--desktop-path <PBIDesktop.exe>] [--allow-unverified-capture] --json",
+            "usage": "powerbi-cli desktop screenshot <project-dir-or.pbip> --out <file.png> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--allow-unverified-capture] --json",
             "summary": "Capture the primary display after exact Desktop title and foreground-PID verification for manual or agent review",
             "tags": ["desktop", "oracle", "proof", "window", "title", "screenshot", "evidence", "windows", "agent"],
             "readOnly": false,
@@ -842,8 +881,8 @@ fn command_catalog() -> Vec<Value> {
             "timeoutContract": "timeout-ms is one watchdog budget for the bounded version probe, process baseline, file-association launch, and exact window/title polling; if launch succeeds but no exact project title appears, screenshot returns proof_incomplete exit 20 rather than oracle_failed",
             "outputPathPolicy": "--out must end in .png and resolve outside the PBIP project directory; capture uses a unique same-directory temporary file and creates/replaces the destination only after success",
             "captureSafety": "foreground PID must be the selected PBIDesktop process or one of its verified descendants; failure publishes no PNG. --allow-unverified-capture explicitly accepts the risk of capturing unrelated sensitive screen content",
-            "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--out <file.png>", "--timeout-ms <ms>", "--leave-open", "--close-after", "--desktop-path <PBIDesktop.exe>", "--allow-unverified-capture", "--json", "--format json"],
-            "examples": ["powerbi-cli desktop screenshot build/sales --out proof/sales.png --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop screenshot build/sales --out proof/sales.png --leave-open --json"],
+            "flags": ["<project-dir-or.pbip>", "--project <project-dir-or.pbip>", "--out <file.png>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--allow-unverified-capture", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop screenshot build/sales --out proof/sales.png --json"],
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
         }),
         json!({
@@ -2720,7 +2759,7 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "report visuals add",
             "aliases": ["report visuals create"],
-            "usage": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-name-or-handle> --title <title> [--visual-type <type>] [--mode basic|dropdown] [--name <visual-name>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file>) [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "usage": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-name-or-handle> --title <title> [--visual-type <type>] [--mode basic|dropdown|between] [--name <visual-name>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file>) [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Create a PBIR visual container on an existing page using the same minimal generated patterns as scaffold",
             "tags": ["pbir", "report", "visual", "layout", "binding", "pie", "donut", "matrix", "slicer", "mutation", "agent"],
             "readOnly": false,
@@ -2730,7 +2769,7 @@ fn command_catalog() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "desktop-golden-pending",
             "outputSchema": "powerbi-cli.report.visuals.mutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--title <title>", "--visual-type <type>", "--type <type>", "--mode basic|dropdown", "--name <visual-name>", "--x <n>", "--y <n>", "--width <n>", "--height <n>", "--z <n>", "--tab-order <n>", "--binding <key=value,...>", "--bindings-json <json>", "--bindings-file <file>", "--allow-outside-page", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--title <title>", "--visual-type <type>", "--type <type>", "--mode basic|dropdown|between", "--name <visual-name>", "--x <n>", "--y <n>", "--width <n>", "--height <n>", "--z <n>", "--tab-order <n>", "--binding <key=value,...>", "--bindings-json <json>", "--bindings-file <file>", "--allow-outside-page", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
             "examples": ["powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --title \"Revenue Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals create --project build/sales --page page:ReportSectionOverview --title \"Scratch Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --out-dir build/sales-visual --json"],
             "limitations": ["Generated --title emits a literal title with show=true under /visual/visualContainerObjects/title and keeps altText/annotation readback metadata; the Desktop-authored shape and schema goldens exist, but the changed generated bytes await Desktop open/refresh/save re-verification.", "Raw columns in measure/value roles and repeated use of one field return unsupported_feature instead of guessed PBIR."],
@@ -2928,6 +2967,8 @@ fn schema_manifest() -> Value {
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
+        "desktopOpenFields": ["ok", "exitCode", "project", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],
+        "desktopCloseFields": ["ok", "exitCode", "session.state", "session.alreadyClosed", "session.project", "session.projectName", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.receiptRemoved", "cleanup.attempted", "cleanup.closed", "cleanup.identityMatched", "cleanup.targeted", "cleanup.targetedProcessIds", "cleanup.remainingProcessIds", "cleanup.errors", "next"],
         "desktopOpenCheckFields": ["ok", "exitCode", "changes", "project", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],
         "desktopScreenshotFields": ["ok", "exitCode", "changes", "project", "oracle.available", "oracle.desktopVersion", "validation", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.timeoutMs", "proof.timeoutScope", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.format", "screenshot.display", "screenshot.width", "screenshot.height", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "screenshot.limitations", "diagnostics", "next"],
         "fixtureSummaryFields": ["schema", "summaryVersion", "fingerprint", "project", "counts", "counts.explicitInteractions", "counts.unsupportedInteractions", "counts.staleInteractionVisualReferences", "model.tables", "model.relationships", "report.interactionSemantics", "report.pages", "pbir.reportDefinitionVersion", "pbir.filters.counts", "pbir.filters.items", "validation", "lint", "verification"],
@@ -3043,6 +3084,7 @@ fn generated_visual_contract() -> Value {
         "visualTypes": visual_type_contracts(),
         "desktopGoldenPendingVisualTypes": supported_visual_type_names(),
         "bindingManualDesktopCanvasRefreshVisualTypes": ["pieChart", "donutChart", "pivotTable", "slicer"],
+        "slicerModes": ["Basic", "Dropdown", "Between"],
         "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString"],
         "bindingRules": [
             "Prefer structured bindings with table plus column or measure to avoid ambiguity.",
@@ -3051,7 +3093,7 @@ fn generated_visual_contract() -> Value {
             "Card Values, chart Y, matrix Values, and scatter X/Y/Size require measures; table Values and Tooltips may resolve to columns or measures.",
             "One model field may appear only once per visual until Desktop-authored duplicate queryRef numbering is available.",
             "Pie and donut require exactly one Category plus one or more Y measures and emit a default descending sort by the first Y binding.",
-            "Slicer mode is Basic by default; Basic and Dropdown are the only generated modes, and generated slicers contain no persisted selection filter."
+            "Slicer mode is Basic by default; Basic, Dropdown, and Between are generated, and generated slicers contain no persisted selection filter. Between is intended for numeric or date range columns."
         ]
     })
 }

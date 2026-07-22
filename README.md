@@ -118,7 +118,9 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   desktop-canvas-refresh`.
   `desktop screenshot` captures the primary display only after the foreground
   window PID is verified as the selected Desktop process or one of its process
-  descendants. Neither command
+  descendants. `desktop open` and idempotent `desktop close` provide one bounded,
+  CLI-owned interactive session for Bridge/DAX/manual inspection; opening another
+  managed session closes the prior owned session first. Neither workflow
   automates canvas or refresh proof; the `desktop-canvas-refresh` level remains
   open.
 
@@ -224,6 +226,8 @@ cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
 cargo run --bin powerbi-cli -- fixture normalize .\build\sales --out .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- fixture verify .\build\sales --expected .\testdata\golden\sales.summary.json --json
+cargo run --bin powerbi-cli -- desktop open .\build\sales --json
+cargo run --bin powerbi-cli -- desktop close --json
 cargo run --bin powerbi-cli -- desktop open-check .\build\sales --json
 cargo run --bin powerbi-cli -- desktop screenshot .\build\sales --out .\proof\sales.png --json
 cargo run --bin powerbi-cli -- report design-plan --project .\build\sales --json
@@ -389,8 +393,9 @@ three pages.
   Pie and donut use exactly one Category column plus one or more Y measures and
   emit the Desktop-authored default descending sort by the first Y field. Matrix
   uses ordered Rows, optional Columns, and one or more Values measures. Slicer
-  uses exactly one Values column and emits only Basic (default) or Dropdown mode
-  under `/visual/objects/data`; it never generates persisted selection state.
+  uses exactly one Values column and emits Basic (default), Dropdown, or Between
+  mode under `/visual/objects/data`; use Between for a numeric/date range slider.
+  It never generates persisted selection state.
   The four binding families retain `manual-desktop-canvas-refresh` evidence:
   `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` records
   refreshed Desktop canvases with exact expected values plus live slicer
@@ -543,7 +548,7 @@ three pages.
   conditional-formatting list/show` can inventory existing conditional-formatting
   signals in PBIR. Conditional-formatting authoring and data-bound color
   selectors remain Desktop-fixture gated.
-- Programmatic report slicer handling covers generated Basic/Dropdown slicers
+- Programmatic report slicer handling covers generated Basic/Dropdown/Between slicers
   through `report visuals add`/dashboard specs and inspection/state clear through
   `report slicers list/show/clear`. List output hides raw
   slicer visual JSON by default, returns both `slicer:` and underlying
@@ -553,7 +558,7 @@ three pages.
   modes while preserving bindings, layout, and formatting. Generated slicers
   contain no `general.filter` or cached selection state. Additional modes,
   default selections, selection mutation, and sync groups remain Desktop-fixture
-  gated; the generated Basic/Dropdown family is
+  gated; the generated Basic/Dropdown binding baseline is
   `manual-desktop-canvas-refresh` proven by the checked-in 2026-07-10 canvas
   proof record.
 - Programmatic report interaction authoring covers `report interactions
@@ -625,8 +630,15 @@ three pages.
   A verify mismatch includes the actual normalized JSON in
   `verification.actual` and writes nothing by default. Use
   `--write-actual <path>` only when an explicit mismatch artifact is wanted.
-- `desktop open-check` and `desktop screenshot` are opt-in Windows oracle
-  commands. `--timeout-ms` is one watchdog budget for the bounded version probe,
+- `desktop open` creates the single CLI-owned interactive Desktop session and
+  returns its exact observed PID, creation time, receipt path, and cleanup command.
+  `desktop close` is idempotent and closes only that recorded PID and verified
+  descendants. A missing, exited, or PID-reused session receipt never triggers a
+  title-wide or executable-wide kill. Opening a new managed session first closes
+  the prior owned session. Never use raw `Start-Process` for CLI-managed testing.
+  `desktop open-check` and `desktop screenshot` are one-shot opt-in Windows oracle
+  commands. They always attempt bounded identity-checked cleanup and expose any
+  unresolved ownership in the response. `--timeout-ms` is one watchdog budget for the bounded version probe,
   pre-launch process baseline, file-association launch, and window/title polling.
   `proof.level` uses the canonical `unit-smoke` level; launch and exact normalized
   project-stem matches are reported separately as `proof.observedStage`. Window
@@ -635,8 +647,9 @@ three pages.
   association-launch PID and then a new post-baseline Desktop PID. It reports
   `desktop_title_ambiguous` instead of selecting an arbitrary pre-existing
   window when neither identifies the launch.
-  Cleanup never targets baseline/pre-launch processes and reports a reason for
-  every owned PID it targets. Screenshot output must be a PNG outside the project
+  Cleanup never targets baseline/pre-launch processes, exact-title peers, or
+  unrelated processes sharing the Desktop executable; it reports a reason for
+  every explicitly owned PID it targets. Screenshot output must be a PNG outside the project
   directory. Capture uses a same-directory temporary file, verifies foreground
   ownership by the selected Desktop PID or a descendant process, and
   publishes/replaces the requested PNG only after success.

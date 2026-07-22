@@ -1,6 +1,12 @@
 use crate::bridge::desktop_bridge_command;
 #[cfg(windows)]
 use crate::contract::CONTRACT_VERSION;
+use crate::desktop_session::close_desktop_session_command;
+#[cfg(windows)]
+use crate::desktop_session::{
+    DesktopSessionDraft, DesktopSessionLock, ManagedDesktopSession, close_desktop_session,
+    open_desktop_session,
+};
 #[cfg(windows)]
 use crate::lint::lint_project;
 use crate::{CliError, CliResult, canonical_display};
@@ -38,7 +44,7 @@ const WINDOW_POLL_INTERVAL_MS: u64 = 250;
 #[cfg(windows)]
 const COMMAND_POLL_INTERVAL_MS: u64 = 25;
 #[cfg(windows)]
-const CLEANUP_TIMEOUT_MS: u64 = 15_000;
+pub(crate) const CLEANUP_TIMEOUT_MS: u64 = 15_000;
 // Budget covers foreground activation plus a canvas settle delay before the capture itself.
 #[cfg(windows)]
 const SCREENSHOT_CAPTURE_TIMEOUT_MS: u64 = 25_000;
@@ -62,6 +68,7 @@ pub(crate) struct PowerBiDesktopDetection {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DesktopOperation {
+    Open,
     OpenCheck,
     Screenshot,
 }
@@ -69,6 +76,7 @@ enum DesktopOperation {
 impl DesktopOperation {
     fn command_path(self) -> &'static str {
         match self {
+            Self::Open => "desktop open",
             Self::OpenCheck => "desktop open-check",
             Self::Screenshot => "desktop screenshot",
         }
@@ -77,6 +85,7 @@ impl DesktopOperation {
     #[cfg(windows)]
     fn output_schema(self) -> &'static str {
         match self {
+            Self::Open => "powerbi-cli.desktop.open.v1",
             Self::OpenCheck => "powerbi-cli.desktop.openCheck.v1",
             Self::Screenshot => "powerbi-cli.desktop.screenshot.v1",
         }
@@ -84,6 +93,9 @@ impl DesktopOperation {
 
     fn suggested_command(self) -> &'static str {
         match self {
+            Self::Open => {
+                "powerbi-cli desktop open <project-dir-or.pbip> --timeout-ms 120000 --json"
+            }
             Self::OpenCheck => {
                 "powerbi-cli desktop open-check <project-dir-or.pbip> --timeout-ms 120000 --json"
             }
@@ -100,7 +112,6 @@ struct DesktopOptions {
     desktop_path: Option<PathBuf>,
     out: Option<PathBuf>,
     timeout_ms: u64,
-    close_after: bool,
     allow_unverified_capture: bool,
 }
 
@@ -111,10 +122,19 @@ impl Default for DesktopOptions {
             desktop_path: None,
             out: None,
             timeout_ms: DEFAULT_TIMEOUT_MS,
-            close_after: true,
             allow_unverified_capture: false,
         }
     }
+}
+
+#[cfg(any(windows, test))]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProcessIdentity {
+    pub(crate) process_id: u32,
+    pub(crate) creation_time_utc: String,
+    #[cfg(windows)]
+    pub(crate) executable_path: Option<String>,
 }
 
 #[cfg(windows)]
@@ -278,10 +298,14 @@ enum ScreenshotCaptureOutcome {
 pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(
-            CliError::invalid_args("desktop requires a subcommand: open-check, screenshot, or bridge")
+            CliError::invalid_args(
+                "desktop requires a subcommand: open, close, open-check, screenshot, or bridge",
+            )
                 .with_hint(
                     "Run powerbi-cli --json capabilities --for desktop for supported Desktop oracle commands.",
                 )
+                .with_suggested_command("powerbi-cli desktop open <project-dir-or.pbip> --json")
+                .with_suggested_command("powerbi-cli desktop close --json")
                 .with_suggested_command(
                     "powerbi-cli desktop open-check <project-dir-or.pbip> --json",
                 )
@@ -292,6 +316,8 @@ pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
     };
 
     match action.as_str() {
+        "open" => run_desktop(DesktopOperation::Open, rest),
+        "close" => close_desktop_session_command(rest),
         "open-check" | "openCheck" => run_desktop(DesktopOperation::OpenCheck, rest),
         "screenshot" => run_desktop(DesktopOperation::Screenshot, rest),
         "bridge" => desktop_bridge_command(rest),
@@ -350,7 +376,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     })?;
     let resolved = resolve_project(project)?;
     let screenshot_out = match operation {
-        DesktopOperation::OpenCheck => None,
+        DesktopOperation::Open | DesktopOperation::OpenCheck => None,
         DesktopOperation::Screenshot => {
             let out = options.out.as_ref().ok_or_else(|| {
                 CliError::invalid_args("desktop screenshot requires --out <file.png>")
@@ -401,6 +427,12 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     let mut observed_stage = "not-attempted";
     let mut proof_status = "not-attempted".to_string();
     let mut proof_message = "Desktop oracle observation was not attempted.".to_string();
+    let mut prior_session_cleanup = Value::Null;
+    let mut managed_session_lock: Option<DesktopSessionLock> = None;
+    let mut managed_session: Option<ManagedDesktopSession> = None;
+    let mut session_persisted = false;
+    let mut association_identity: Option<ProcessIdentity> = None;
+    let mut observed_identity: Option<ProcessIdentity> = None;
 
     if !validation_ok {
         exit_code = EXIT_VALIDATION_FAILED;
@@ -446,6 +478,20 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
             "message": "Power BI Desktop was not found. Install Desktop or pass --desktop-path <PBIDesktop.exe>."
         }));
     } else if let Some(desktop_path) = detection.path_buf.clone() {
+        if operation == DesktopOperation::Open {
+            let lock = DesktopSessionLock::acquire()?;
+            prior_session_cleanup = close_desktop_session(&lock)?;
+            if prior_session_cleanup["ok"].as_bool() != Some(true) {
+                return Err(CliError::unexpected(
+                    "could not close the previous CLI-owned Power BI Desktop session",
+                )
+                .with_hint(
+                    "Inspect the desktop close response, close only the recorded owned session, and retry.",
+                )
+                .with_suggested_command("powerbi-cli desktop close --json"));
+            }
+            managed_session_lock = Some(lock);
+        }
         let watchdog = Watchdog::new(options.timeout_ms);
         let version_probe_completed = match desktop_file_version(
             Some(&desktop_path),
@@ -495,6 +541,14 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                             desktop_process_id = Some(launched_pid);
                             launched = true;
                             observed_stage = "desktop-launch";
+                            match read_process_identity(launched_pid) {
+                                Ok(identity) => association_identity = identity,
+                                Err(error) => diagnostics.push(json!({
+                                    "code": "desktop_association_identity_failed",
+                                    "severity": "error",
+                                    "message": error.message
+                                })),
+                            }
                             let launch_elapsed_ms = watchdog.elapsed_ms();
                             match observe_window(
                                 launched_pid,
@@ -505,6 +559,20 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
                             ) {
                                 Ok(observed) => {
                                     observation = observed;
+                                    if let Some(process_id) = observation.observed_process_id {
+                                        if process_id == launched_pid {
+                                            observed_identity = association_identity.clone();
+                                        } else {
+                                            match read_process_identity(process_id) {
+                                                Ok(identity) => observed_identity = identity,
+                                                Err(error) => diagnostics.push(json!({
+                                                    "code": "desktop_observed_identity_failed",
+                                                    "severity": "error",
+                                                    "message": error.message
+                                                })),
+                                            }
+                                        }
+                                    }
                                     if observation.title_matched == Some(true) {
                                         observed_stage = "desktop-window";
                                         proof_status = "window-observed".to_string();
@@ -743,16 +811,78 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         }));
     }
 
+    if operation == DesktopOperation::Open && exit_code == EXIT_SUCCESS {
+        if let Some(observed_process_id) = managed_session_process_id(
+            observation.title_matched,
+            observation.observed_process_id,
+            &baseline_process_ids,
+        ) {
+            if let Some(identity) = observed_identity.clone() {
+                let draft = DesktopSessionDraft {
+                    project_name: project_name.clone(),
+                    project_path: canonical_display(&resolved.pbip_path),
+                    desktop_path: canonical_display(&desktop_path_from_detection(&detection)?),
+                    association_process_id: desktop_process_id
+                        .expect("successful Desktop launch has an association PID"),
+                    observed_identity: identity,
+                    baseline_process_ids: baseline_process_ids.clone(),
+                    launch_timestamp_unix_ms: launch_timestamp_unix_ms
+                        .expect("successful Desktop launch has a timestamp"),
+                    opened_at_unix_ms: unix_time_ms().map_err(|error| {
+                        CliError::unexpected(format!("record Desktop session time: {error}"))
+                    })?,
+                };
+                match open_desktop_session(
+                    managed_session_lock
+                        .as_ref()
+                        .expect("managed Desktop open holds its lifecycle lock"),
+                    draft,
+                ) {
+                    Ok(session) => {
+                        managed_session = Some(session);
+                        session_persisted = true;
+                        proof_status = "managed-session-open".to_string();
+                        proof_message = "Power BI Desktop opened as the single CLI-owned interactive session. Run powerbi-cli desktop close --json when inspection is complete.".to_string();
+                    }
+                    Err(error) => {
+                        exit_code = EXIT_ORACLE_FAILED;
+                        proof_status = "session-identity-failed".to_string();
+                        proof_message =
+                            "Desktop opened, but its exact process identity could not be recorded."
+                                .to_string();
+                        diagnostics.push(json!({
+                            "code": "desktop_session_identity_failed",
+                            "severity": "error",
+                            "message": error.message
+                        }));
+                    }
+                }
+            } else {
+                exit_code = EXIT_ORACLE_FAILED;
+                proof_status = "session-identity-missing".to_string();
+                proof_message = "Desktop opened, but its exact process identity disappeared before ownership could be recorded.".to_string();
+                diagnostics.push(json!({
+                    "code": "desktop_session_identity_missing",
+                    "severity": "error",
+                    "message": format!("The exactly observed Desktop PID {observed_process_id} was no longer running when ownership was recorded.")
+                }));
+            }
+        } else {
+            exit_code = EXIT_PROOF_INCOMPLETE;
+            proof_status = "managed-session-not-owned".to_string();
+            proof_message = "Desktop launched, but the exact project window was not a new post-baseline process; the launch will be cleaned up.".to_string();
+        }
+    }
+
     let cleanup = cleanup_after_launch(
         launch_attempted,
-        desktop_process_id,
+        association_identity.as_ref(),
+        observed_identity.as_ref(),
         &baseline_process_ids,
-        options.close_after,
-        &project_name,
-        detection.path_buf.as_deref(),
+        operation != DesktopOperation::Open || !session_persisted,
         launch_timestamp_unix_ms,
     );
-    if cleanup["attempted"].as_bool() == Some(true) && cleanup["closed"].as_bool() != Some(true) {
+    if cleanup_unresolved_after_launch(launch_attempted, &cleanup) {
         exit_code = EXIT_ORACLE_FAILED;
         proof_status = "cleanup-failed".to_string();
         proof_message =
@@ -766,6 +896,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     }
 
     let proof_passed = match operation {
+        DesktopOperation::Open => session_persisted && exit_code == EXIT_SUCCESS,
         DesktopOperation::OpenCheck => launched && exit_code == EXIT_SUCCESS,
         DesktopOperation::Screenshot => {
             screenshot_captured
@@ -941,16 +1072,38 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
             "message": proof_message
         },
         "diagnostics": diagnostics,
-        "next": [
-            format!("powerbi-cli validate --strict {} --json", command_arg(&resolved.project_dir)),
-            format!("powerbi-cli fixture normalize {} --json", command_arg(&resolved.project_dir)),
-            "powerbi-cli --json capabilities --for desktop".to_string()
-        ],
+        "next": desktop_next_commands(operation, &resolved.project_dir),
         "plannedNext": [
             "desktop refresh-check",
             "desktop save-check"
         ]
     });
+
+    if operation == DesktopOperation::Open {
+        response
+            .as_object_mut()
+            .expect("desktop response is an object")
+            .insert(
+                "session".to_string(),
+                json!({
+                    "state": if session_persisted {
+                        "open"
+                    } else if cleanup["closed"].as_bool() == Some(true) {
+                        "closed"
+                    } else {
+                        "unknown"
+                    },
+                    "owned": session_persisted,
+                    "project": managed_session.as_ref().map(|_| canonical_display(&resolved.pbip_path)),
+                    "desktopProcessId": managed_session.as_ref().map(|session| session.identity.process_id),
+                    "desktopProcessCreationTimeUtc": managed_session.as_ref().map(|session| session.identity.creation_time_utc.as_str()),
+                    "desktopExecutablePath": managed_session.as_ref().and_then(|session| session.identity.executable_path.as_deref()),
+                    "receiptPath": managed_session.as_ref().map(|session| canonical_display(&session.receipt_path)),
+                    "cleanupCommand": "powerbi-cli desktop close --json",
+                    "priorSessionCleanup": prior_session_cleanup
+                }),
+            );
+    }
 
     if operation == DesktopOperation::Screenshot {
         response
@@ -985,6 +1138,13 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     Ok(response)
 }
 
+#[cfg(any(windows, test))]
+fn cleanup_unresolved_after_launch(launch_attempted: bool, cleanup: &Value) -> bool {
+    launch_attempted
+        && cleanup["requested"].as_bool() == Some(true)
+        && cleanup["closed"].as_bool() != Some(true)
+}
+
 #[cfg(not(windows))]
 fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value> {
     let _options = parse_desktop_args(operation, args)?;
@@ -992,6 +1152,31 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
     Err(CliError::unexpected(
         "Desktop oracle platform dispatch failed",
     ))
+}
+
+#[cfg(windows)]
+fn desktop_path_from_detection(detection: &PowerBiDesktopDetection) -> CliResult<PathBuf> {
+    detection.path_buf.clone().ok_or_else(|| {
+        CliError::unexpected("Desktop detection lost its executable path before session receipt")
+    })
+}
+
+#[cfg(windows)]
+fn desktop_next_commands(operation: DesktopOperation, project_dir: &Path) -> Vec<String> {
+    if operation == DesktopOperation::Open {
+        return vec!["powerbi-cli desktop close --json".to_string()];
+    }
+    vec![
+        format!(
+            "powerbi-cli validate --strict {} --json",
+            command_arg(project_dir)
+        ),
+        format!(
+            "powerbi-cli fixture normalize {} --json",
+            command_arg(project_dir)
+        ),
+        "powerbi-cli --json capabilities --for desktop".to_string(),
+    ]
 }
 
 fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult<DesktopOptions> {
@@ -1021,12 +1206,16 @@ fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult
                 options.out = Some(PathBuf::from(take_value(args, &mut i, "--out")?));
             }
             "--leave-open" | "--leaveOpen" => {
-                options.close_after = false;
-                i += 1;
-            }
-            "--close-after" | "--closeAfter" => {
-                options.close_after = true;
-                i += 1;
+                return Err(CliError::invalid_args(
+                    "--leave-open has no bounded ownership lifetime",
+                )
+                .with_hint(
+                    "Use desktop open for an interactive CLI-owned session, then desktop close when inspection is complete.",
+                )
+                .with_suggested_command(
+                    "powerbi-cli desktop open <project-dir-or.pbip> --json",
+                )
+                .with_suggested_command("powerbi-cli desktop close --json"));
             }
             "--allow-unverified-capture" if operation == DesktopOperation::Screenshot => {
                 options.allow_unverified_capture = true;
@@ -1070,7 +1259,7 @@ fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult
     Ok(options)
 }
 
-fn ensure_desktop_platform(platform: &str) -> CliResult<()> {
+pub(crate) fn ensure_desktop_platform(platform: &str) -> CliResult<()> {
     if platform == "windows" {
         return Ok(());
     }
@@ -1373,6 +1562,18 @@ fn select_window_candidate(
         exact_title_candidate_count,
         reason: selected.map(|(_, reason)| reason),
     }
+}
+
+#[cfg(any(windows, test))]
+fn managed_session_process_id(
+    title_matched: Option<bool>,
+    observed_process_id: Option<u32>,
+    baseline_process_ids: &[u32],
+) -> Option<u32> {
+    if title_matched != Some(true) {
+        return None;
+    }
+    observed_process_id.filter(|process_id| !baseline_process_ids.contains(process_id))
 }
 
 #[cfg(any(windows, test))]
@@ -1843,18 +2044,20 @@ fn remove_file_if_present(path: &Path) {
 #[cfg(windows)]
 fn cleanup_after_launch(
     launch_attempted: bool,
-    process_id: Option<u32>,
+    association_identity: Option<&ProcessIdentity>,
+    observed_identity: Option<&ProcessIdentity>,
     baseline_process_ids: &[u32],
     close_after: bool,
-    project_name: &str,
-    desktop_path: Option<&Path>,
     launch_timestamp_unix_ms: Option<u64>,
 ) -> Value {
+    let association_process_id = association_identity.map(|identity| identity.process_id);
+    let observed_process_id = observed_identity.map(|identity| identity.process_id);
     if !launch_attempted || !close_after {
         return json!({
             "requested": close_after,
             "attempted": false,
-            "associationProcessId": process_id,
+            "associationProcessId": association_process_id,
+            "observedProcessId": observed_process_id,
             "baselineProcessIds": baseline_process_ids,
             "launchTimestampUnixMs": launch_timestamp_unix_ms,
             "targeted": [],
@@ -1866,20 +2069,13 @@ fn cleanup_after_launch(
             "errors": []
         });
     }
-    let Some(process_id) = process_id else {
+    if association_identity.is_none() && observed_identity.is_none() {
         return cleanup_refused(
             baseline_process_ids,
             launch_timestamp_unix_ms,
-            "cleanup refused because the association-launch PID was not confirmed",
+            "cleanup refused because no exact launch process identity was confirmed",
         );
-    };
-    let Some(desktop_path) = desktop_path else {
-        return cleanup_refused(
-            baseline_process_ids,
-            launch_timestamp_unix_ms,
-            "cleanup refused because the launched Desktop executable path was unavailable",
-        );
-    };
+    }
     let Some(launch_timestamp_unix_ms) = launch_timestamp_unix_ms else {
         return cleanup_refused(
             baseline_process_ids,
@@ -1888,16 +2084,16 @@ fn cleanup_after_launch(
         );
     };
     match cleanup_spawned_processes(
-        process_id,
+        association_identity,
+        observed_identity,
         baseline_process_ids,
-        project_name,
-        desktop_path,
         launch_timestamp_unix_ms,
     ) {
         Ok(Timed::Completed(cleanup)) => json!({
             "requested": true,
             "attempted": true,
-            "associationProcessId": process_id,
+            "associationProcessId": association_process_id,
+            "observedProcessId": observed_process_id,
             "baselineProcessIds": baseline_process_ids,
             "launchTimestampUnixMs": launch_timestamp_unix_ms,
             "targeted": cleanup["targeted"],
@@ -1911,7 +2107,8 @@ fn cleanup_after_launch(
         Ok(Timed::TimedOut) => json!({
             "requested": true,
             "attempted": true,
-            "associationProcessId": process_id,
+            "associationProcessId": association_process_id,
+            "observedProcessId": observed_process_id,
             "baselineProcessIds": baseline_process_ids,
             "launchTimestampUnixMs": launch_timestamp_unix_ms,
             "targeted": [],
@@ -1925,7 +2122,8 @@ fn cleanup_after_launch(
         Err(err) => json!({
             "requested": true,
             "attempted": true,
-            "associationProcessId": process_id,
+            "associationProcessId": association_process_id,
+            "observedProcessId": observed_process_id,
             "baselineProcessIds": baseline_process_ids,
             "launchTimestampUnixMs": launch_timestamp_unix_ms,
             "targeted": [],
@@ -1962,18 +2160,16 @@ fn cleanup_refused(
 }
 
 #[cfg(windows)]
-fn cleanup_spawned_processes(
-    process_id: u32,
+pub(crate) fn cleanup_spawned_processes(
+    association_identity: Option<&ProcessIdentity>,
+    observed_identity: Option<&ProcessIdentity>,
     baseline_process_ids: &[u32],
-    project_name: &str,
-    desktop_path: &Path,
     launch_timestamp_unix_ms: u64,
 ) -> io::Result<Timed<Value>> {
     let script = render_cleanup_script(
-        process_id,
+        association_identity,
+        observed_identity,
         baseline_process_ids,
-        project_name,
-        &desktop_argument_path(desktop_path),
         launch_timestamp_unix_ms,
     );
     match run_powershell(&script, Duration::from_millis(CLEANUP_TIMEOUT_MS))? {
@@ -1989,8 +2185,9 @@ fn cleanup_spawned_processes(
 const CLEANUP_SCRIPT: &str = r#"
 $baseline = @(__BASELINE_IDS__)
 $associationPid = __ASSOCIATION_PID__
-$projectName = __PROJECT_NAME__
-$desktopPath = __DESKTOP_PATH__
+$associationCreationTimeUtc = __ASSOCIATION_CREATION_TIME_UTC__
+$observedPid = __OBSERVED_PID__
+$observedCreationTimeUtc = __OBSERVED_CREATION_TIME_UTC__
 $launchTimeUtc = [DateTimeOffset]::FromUnixTimeMilliseconds(__LAUNCH_TIME_UNIX_MS__).UtcDateTime
 $targetReasons = @{}
 $targetCreationUtc = @{}
@@ -2009,7 +2206,12 @@ foreach ($row in $rows) {
 }
 
 function Add-OwnedTarget {
-    param([int]$ProcessId, [string]$Reason)
+    param(
+        [int]$ProcessId,
+        [string]$Reason,
+        [string]$ExpectedCreationTimeUtc = '',
+        [bool]$RequireDesktop = $false
+    )
     if ($ProcessId -le 0 -or $targetReasons.ContainsKey($ProcessId)) {
         return $false
     }
@@ -2024,6 +2226,11 @@ function Add-OwnedTarget {
         return $false
     }
     $row = $rowsById[$ProcessId]
+    if ($RequireDesktop -and [string]$row.Name -notlike 'PBIDesktop*') {
+        [void]$skipped.Add([pscustomobject]@{ pid = $ProcessId; reason = 'owned-root-is-not-desktop' })
+        [void]$errors.Add("PID ${ProcessId} cleanup refused: recorded root is not a PBIDesktop process")
+        return $false
+    }
     if ($null -eq $row.CreationDate) {
         [void]$skipped.Add([pscustomobject]@{ pid = $ProcessId; reason = 'creation-time-unavailable' })
         [void]$errors.Add("PID ${ProcessId} ownership unresolved: CreationDate unavailable")
@@ -2041,66 +2248,33 @@ function Add-OwnedTarget {
         [void]$errors.Add("PID ${ProcessId} cleanup refused: CreationDate predates or equals launch")
         return $false
     }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedCreationTimeUtc) -and $createdAtUtc -ne ([DateTime]::Parse($ExpectedCreationTimeUtc)).ToUniversalTime()) {
+        [void]$skipped.Add([pscustomobject]@{ pid = $ProcessId; reason = 'creation-time-no-longer-matches-recorded-identity' })
+        [void]$errors.Add("PID ${ProcessId} cleanup refused: CreationDate no longer matches the recorded launch identity")
+        return $false
+    }
     $targetReasons[$ProcessId] = $Reason
     $targetCreationUtc[$ProcessId] = $createdAtUtc
     [void]$lineageRoots.Add($ProcessId)
     return $true
 }
 
-function Test-ProjectTitle {
-    param([string]$Title, [string]$ExpectedProjectName)
-    $normalizedTitle = (($Title -replace '\s+', ' ').Trim())
-    $normalizedProject = (($ExpectedProjectName -replace '\s+', ' ').Trim())
-    if ([string]::IsNullOrWhiteSpace($normalizedProject)) {
-        return $false
-    }
-    if ([string]::Equals($normalizedTitle, $normalizedProject, [StringComparison]::OrdinalIgnoreCase)) {
-        return $true
-    }
-    $match = [regex]::Match(
-        $normalizedTitle,
-        '^(?<stem>.+?)\s+[-\u2013\u2014]\s+Power BI Desktop$',
-        [Text.RegularExpressions.RegexOptions]::IgnoreCase
-    )
-    return ($match.Success -and [string]::Equals(
-        $match.Groups['stem'].Value,
-        $normalizedProject,
-        [StringComparison]::OrdinalIgnoreCase
-    ))
-}
-
 if ($associationPid -gt 0) {
-    if ($baseline -notcontains $associationPid) {
-        [void]$lineageRoots.Add($associationPid)
-    }
-    if (Get-Process -Id $associationPid -ErrorAction SilentlyContinue) {
-        [void](Add-OwnedTarget -ProcessId $associationPid -Reason 'association-launch-pid')
+    if ([string]::IsNullOrWhiteSpace($associationCreationTimeUtc)) {
+        [void]$errors.Add("PID ${associationPid} cleanup refused: recorded association creation time is unavailable")
+    } elseif (Get-Process -Id $associationPid -ErrorAction SilentlyContinue) {
+        [void](Add-OwnedTarget -ProcessId $associationPid -Reason 'association-launch-pid' -ExpectedCreationTimeUtc $associationCreationTimeUtc -RequireDesktop $true)
     } else {
         [void]$skipped.Add([pscustomobject]@{ pid = $associationPid; reason = 'association-pid-already-exited' })
     }
 }
-$tracked = @(
-    Get-Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.ProcessName -like 'PBIDesktop*' -or $_.ProcessName -eq 'msmdsrv' }
-)
-foreach ($process in $tracked) {
-    $candidateId = [int]$process.Id
-    if ($baseline -contains $candidateId) {
-        continue
-    }
-    if (-not $rowsById.ContainsKey($candidateId)) {
-        [void]$skipped.Add([pscustomobject]@{ pid = $candidateId; reason = 'creation-time-unavailable' })
-        [void]$errors.Add("PID ${candidateId} ownership unresolved: CIM process row unavailable")
-        continue
-    }
-    $row = $rowsById[$candidateId]
-    if (Test-ProjectTitle -Title ([string]$process.MainWindowTitle) -ExpectedProjectName $projectName) {
-        [void](Add-OwnedTarget -ProcessId $candidateId -Reason 'exact-project-title-match')
-    } elseif (
-        $row.ExecutablePath -and
-        [string]::Equals([string]$row.ExecutablePath, $desktopPath, [StringComparison]::OrdinalIgnoreCase)
-    ) {
-        [void](Add-OwnedTarget -ProcessId $candidateId -Reason 'executable-path-and-created-after-launch')
+if ($observedPid -gt 0 -and $observedPid -ne $associationPid) {
+    if ([string]::IsNullOrWhiteSpace($observedCreationTimeUtc)) {
+        [void]$errors.Add("PID ${observedPid} cleanup refused: recorded observed creation time is unavailable")
+    } elseif (Get-Process -Id $observedPid -ErrorAction SilentlyContinue) {
+        [void](Add-OwnedTarget -ProcessId $observedPid -Reason 'exact-observed-pid' -ExpectedCreationTimeUtc $observedCreationTimeUtc -RequireDesktop $true)
+    } else {
+        [void]$skipped.Add([pscustomobject]@{ pid = $observedPid; reason = 'observed-pid-already-exited' })
     }
 }
 $changed = $true
@@ -2177,10 +2351,9 @@ $result = [pscustomobject]@{
 
 #[cfg(any(windows, test))]
 fn render_cleanup_script(
-    process_id: u32,
+    association_identity: Option<&ProcessIdentity>,
+    observed_identity: Option<&ProcessIdentity>,
     baseline_process_ids: &[u32],
-    project_name: &str,
-    desktop_path: &str,
     launch_timestamp_unix_ms: u64,
 ) -> String {
     let baseline = baseline_process_ids
@@ -2190,13 +2363,84 @@ fn render_cleanup_script(
         .join(",");
     CLEANUP_SCRIPT
         .replace("__BASELINE_IDS__", &baseline)
-        .replace("__ASSOCIATION_PID__", &process_id.to_string())
-        .replace("__PROJECT_NAME__", &powershell_single_quoted(project_name))
-        .replace("__DESKTOP_PATH__", &powershell_single_quoted(desktop_path))
+        .replace(
+            "__ASSOCIATION_PID__",
+            &association_identity
+                .map(|identity| identity.process_id)
+                .unwrap_or_default()
+                .to_string(),
+        )
+        .replace(
+            "__ASSOCIATION_CREATION_TIME_UTC__",
+            &powershell_single_quoted(
+                association_identity
+                    .map(|identity| identity.creation_time_utc.as_str())
+                    .unwrap_or_default(),
+            ),
+        )
+        .replace(
+            "__OBSERVED_PID__",
+            &observed_identity
+                .map(|identity| identity.process_id)
+                .unwrap_or_default()
+                .to_string(),
+        )
+        .replace(
+            "__OBSERVED_CREATION_TIME_UTC__",
+            &powershell_single_quoted(
+                observed_identity
+                    .map(|identity| identity.creation_time_utc.as_str())
+                    .unwrap_or_default(),
+            ),
+        )
         .replace(
             "__LAUNCH_TIME_UNIX_MS__",
             &launch_timestamp_unix_ms.to_string(),
         )
+}
+
+#[cfg(windows)]
+pub(crate) fn read_process_identity(process_id: u32) -> CliResult<Option<ProcessIdentity>> {
+    let script = PROCESS_IDENTITY_SCRIPT.replace("__PROCESS_ID__", &process_id.to_string());
+    match run_powershell(&script, Duration::from_millis(5_000)).map_err(|error| {
+        CliError::unexpected(format!(
+            "inspect Power BI Desktop process {process_id}: {error}"
+        ))
+    })? {
+        Timed::Completed(output) => {
+            ensure_powershell_success(&output, "Power BI Desktop process identity")
+                .map_err(|error| CliError::unexpected(error.to_string()))?;
+            parse_powershell_json(&output.stdout).map_err(|error| {
+                CliError::unexpected(format!(
+                    "parse Power BI Desktop process {process_id} identity: {error}"
+                ))
+            })
+        }
+        Timed::TimedOut => Err(CliError::unexpected(format!(
+            "Power BI Desktop process {process_id} identity check exceeded 5000 ms"
+        ))),
+    }
+}
+
+#[cfg(any(windows, test))]
+const PROCESS_IDENTITY_SCRIPT: &str = r#"
+$row = @(Get-CimInstance Win32_Process -Filter "ProcessId = __PROCESS_ID__" -ErrorAction Stop)
+if ($row.Count -eq 0) {
+    [Console]::Out.Write('null')
+    return
+}
+$process = $row[0]
+$result = [pscustomobject]@{
+    processId = [int]$process.ProcessId
+    creationTimeUtc = ([DateTime]$process.CreationDate).ToUniversalTime().ToString('o')
+    executablePath = if ([string]::IsNullOrWhiteSpace([string]$process.ExecutablePath)) { $null } else { [string]$process.ExecutablePath }
+}
+[Console]::Out.Write((ConvertTo-Json -InputObject $result -Compress))
+"#;
+
+#[cfg(test)]
+fn render_process_identity_script(process_id: u32) -> String {
+    PROCESS_IDENTITY_SCRIPT.replace("__PROCESS_ID__", &process_id.to_string())
 }
 
 #[cfg(windows)]
@@ -2426,19 +2670,29 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<Strin
 #[cfg(test)]
 mod tests {
     use super::{
-        DesktopOperation, ProcessWindow, ScreenshotCaptureResult, ScreenshotDimensions,
-        capture_is_authorized, desktop_argument_path, detect_power_bi_desktop,
-        ensure_desktop_platform, is_power_bi_desktop_process, parse_desktop_args,
+        DesktopOperation, ProcessIdentity, ProcessWindow, ScreenshotCaptureResult,
+        ScreenshotDimensions, capture_is_authorized, cleanup_unresolved_after_launch,
+        desktop_argument_path, detect_power_bi_desktop, ensure_desktop_platform,
+        is_power_bi_desktop_process, managed_session_process_id, parse_desktop_args,
         path_is_within_directory, powershell_single_quoted, publish_screenshot, remaining_budget,
-        render_cleanup_script, render_launch_script, render_process_snapshot_script,
-        render_screenshot_script, render_version_script, render_window_query_script,
-        screenshot_changes, screenshot_observation_is_eligible, select_window_candidate,
-        title_matches_project,
+        render_cleanup_script, render_launch_script, render_process_identity_script,
+        render_process_snapshot_script, render_screenshot_script, render_version_script,
+        render_window_query_script, screenshot_changes, screenshot_observation_is_eligible,
+        select_window_candidate, title_matches_project,
     };
     use serde_json::json;
     use std::fs;
     use std::path::Path;
     use std::time::Duration;
+
+    fn process_identity(process_id: u32, creation_time_utc: &str) -> ProcessIdentity {
+        ProcessIdentity {
+            process_id,
+            creation_time_utc: creation_time_utc.to_string(),
+            #[cfg(windows)]
+            executable_path: Some(r"C:\Program Files\Power BI\PBIDesktop.exe".to_string()),
+        }
+    }
 
     #[test]
     fn desktop_argument_path_strips_verbatim_drive_prefix() {
@@ -2558,6 +2812,43 @@ mod tests {
     }
 
     #[test]
+    fn managed_session_never_owns_a_unique_baseline_window() {
+        assert_eq!(
+            managed_session_process_id(Some(true), Some(41), &[41]),
+            None
+        );
+        assert_eq!(
+            managed_session_process_id(Some(true), Some(42), &[41]),
+            Some(42)
+        );
+        assert_eq!(managed_session_process_id(Some(false), Some(42), &[]), None);
+    }
+
+    #[test]
+    fn launched_one_shot_requires_verified_cleanup() {
+        assert!(cleanup_unresolved_after_launch(
+            true,
+            &json!({"requested": true, "attempted": false, "closed": null})
+        ));
+        assert!(cleanup_unresolved_after_launch(
+            true,
+            &json!({"requested": true, "attempted": true, "closed": false})
+        ));
+        assert!(!cleanup_unresolved_after_launch(
+            true,
+            &json!({"requested": true, "attempted": true, "closed": true})
+        ));
+        assert!(!cleanup_unresolved_after_launch(
+            true,
+            &json!({"requested": false, "attempted": false, "closed": null})
+        ));
+        assert!(!cleanup_unresolved_after_launch(
+            false,
+            &json!({"requested": true, "attempted": false, "closed": null})
+        ));
+    }
+
+    #[test]
     fn unsupported_platform_is_rejected_before_oracle_evaluation() {
         assert!(ensure_desktop_platform("windows").is_ok());
         let error = ensure_desktop_platform("linux").expect_err("Linux is unsupported");
@@ -2605,6 +2896,33 @@ mod tests {
         .expect_err("open-check must reject capture override");
         assert_eq!(error.code, "invalid_args");
         assert!(error.message.contains("unknown desktop open-check flag"));
+    }
+
+    #[test]
+    fn leave_open_is_rejected_in_favor_of_managed_sessions() {
+        for operation in [
+            DesktopOperation::Open,
+            DesktopOperation::OpenCheck,
+            DesktopOperation::Screenshot,
+        ] {
+            let error = parse_desktop_args(
+                operation,
+                &["report.pbip".to_string(), "--leave-open".to_string()],
+            )
+            .expect_err("unbounded Desktop ownership must be rejected");
+            assert_eq!(error.code, "invalid_args");
+            assert_eq!(
+                error.message,
+                "--leave-open has no bounded ownership lifetime"
+            );
+            assert_eq!(
+                error.suggested_commands,
+                [
+                    "powerbi-cli desktop open <project-dir-or.pbip> --json",
+                    "powerbi-cli desktop close --json"
+                ]
+            );
+        }
     }
 
     #[test]
@@ -2705,9 +3023,9 @@ mod tests {
     #[test]
     fn generated_powershell_scripts_are_fully_substituted_and_safely_quoted() {
         let adversarial = r"C:\Power BI\März $facts`tick O'Brien\Sales.pbip";
-        let project_name = "Ventes d'été $Q3`final";
+        let creation_time = "2026-07-22T10:15:31.1234567Z";
         let quoted_path = powershell_single_quoted(adversarial);
-        let quoted_project = powershell_single_quoted(project_name);
+        let quoted_creation_time = powershell_single_quoted(creation_time);
         assert_eq!(
             quoted_path,
             r"'C:\Power BI\März $facts`tick O''Brien\Sales.pbip'"
@@ -2717,13 +3035,15 @@ mod tests {
         let windows = render_window_query_script();
         let launch = render_launch_script(adversarial);
         let screenshot = render_screenshot_script(adversarial, Some(4242), 4000, false);
+        let association = process_identity(4242, creation_time);
+        let observed = process_identity(5252, creation_time);
         let cleanup = render_cleanup_script(
-            4242,
+            Some(&association),
+            Some(&observed),
             &[7, 11, 4242],
-            project_name,
-            adversarial,
             1_725_000_000_123,
         );
+        let identity = render_process_identity_script(5252);
         let version = render_version_script(adversarial);
 
         for (name, script) in [
@@ -2732,6 +3052,7 @@ mod tests {
             ("launch", launch.as_str()),
             ("screenshot", screenshot.as_str()),
             ("cleanup", cleanup.as_str()),
+            ("identity", identity.as_str()),
             ("version", version.as_str()),
         ] {
             assert!(
@@ -2744,11 +3065,13 @@ mod tests {
             );
         }
 
-        for script in [&launch, &screenshot, &cleanup, &version] {
+        for script in [&launch, &screenshot, &version] {
             assert!(script.contains(&quoted_path));
         }
-        assert!(cleanup.contains(&quoted_project));
+        assert!(cleanup.contains(&quoted_creation_time));
+        assert!(cleanup.contains("$observedPid = 5252"));
         assert!(cleanup.contains("$baseline = @(7,11,4242)"));
+        assert!(identity.contains("ProcessId = 5252"));
         assert!(screenshot.contains("$allowUnverifiedCapture = $false"));
     }
 
@@ -2771,11 +3094,12 @@ mod tests {
 
     #[test]
     fn generated_cleanup_script_guards_every_kill_with_owned_creation_and_baseline_checks() {
+        let association = process_identity(501, "2026-07-22T10:15:31.1234567Z");
+        let observed = process_identity(777, "2026-07-22T10:15:32.1234567Z");
         let script = render_cleanup_script(
-            501,
+            Some(&association),
+            Some(&observed),
             &[100, 501],
-            "Sales",
-            r"C:\Program Files\Microsoft Power BI Desktop\bin\PBIDesktop.exe",
             1_725_000_000_123,
         );
         assert_eq!(script.matches("Stop-Process").count(), 1);
@@ -2791,8 +3115,14 @@ mod tests {
         assert!(script.contains("if ($baseline -contains $ProcessId)"));
         assert!(script.contains("if ($createdAtUtc -le $launchTimeUtc)"));
         assert!(script.contains("'association-launch-pid'"));
-        assert!(script.contains("'exact-project-title-match'"));
-        assert!(script.contains("'executable-path-and-created-after-launch'"));
+        assert!(script.contains("'exact-observed-pid'"));
+        assert!(script.contains("'creation-time-no-longer-matches-recorded-identity'"));
+        assert!(script.contains("$associationCreationTimeUtc"));
+        assert!(script.contains("$observedCreationTimeUtc"));
+        assert!(script.contains("-RequireDesktop $true"));
+        assert!(script.contains("[string]$row.Name -notlike 'PBIDesktop*'"));
+        assert!(!script.contains("'exact-project-title-match'"));
+        assert!(!script.contains("'executable-path-and-created-after-launch'"));
         assert!(script.contains("descendant-of-$parentId"));
         assert!(script.contains("targeted = @($targeted)"));
         assert!(!script.contains("$targetIds.Add"));
