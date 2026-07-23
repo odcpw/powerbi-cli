@@ -13,6 +13,7 @@ pub(crate) struct VisualBindingInput {
     pub(crate) measure: Option<String>,
     pub(crate) display_name: Option<String>,
     pub(crate) format_string: Option<String>,
+    pub(crate) sort_direction: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +25,7 @@ pub(crate) struct VisualBindingResolved {
     pub(crate) data_type: Option<String>,
     pub(crate) display_name: Option<String>,
     pub(crate) format_string: Option<String>,
+    pub(crate) sort_direction: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -104,6 +106,7 @@ pub(crate) fn resolve_visual_bindings(
         .map(|input| resolve_binding(docs, visual_type, input))
         .collect::<CliResult<Vec<_>>>()?;
     reject_duplicate_fields(&resolved)?;
+    validate_sort_bindings(&resolved)?;
     Ok(resolved)
 }
 
@@ -121,7 +124,20 @@ pub(crate) fn visual_query_json(visual_type: &str, bindings: &[VisualBindingReso
     }
     let mut query = Map::new();
     query.insert("queryState".to_string(), Value::Object(query_state));
-    if matches!(visual_type, "pieChart" | "donutChart")
+    if let Some(sort) = bindings
+        .iter()
+        .find(|binding| binding.sort_direction.is_some())
+    {
+        query.insert(
+            "sortDefinition".to_string(),
+            json!({
+                "sort": [{
+                    "field": visual_field_expression(sort),
+                    "direction": sort.sort_direction.as_deref().unwrap_or("Descending")
+                }]
+            }),
+        );
+    } else if matches!(visual_type, "pieChart" | "donutChart")
         && let Some(first_y) = bindings.iter().find(|binding| binding.role == "Y")
     {
         query.insert(
@@ -149,7 +165,8 @@ pub(crate) fn binding_summary(binding: &VisualBindingResolved) -> Value {
         "queryRef": format!("{}.{}", binding.table, binding.field),
         "nativeQueryRef": binding.field,
         "displayName": binding.display_name,
-        "format": binding.format_string
+        "format": binding.format_string,
+        "sortDirection": binding.sort_direction
     })
 }
 
@@ -204,11 +221,14 @@ fn set_binding_field(input: &mut VisualBindingInput, key: &str, value: String) -
         "measure" => input.measure = Some(value),
         "display" | "displayName" | "display_name" => input.display_name = Some(value),
         "format" | "formatString" | "format_string" => input.format_string = Some(value),
+        "sort" | "sortDirection" | "sort_direction" => {
+            input.sort_direction = Some(normalize_sort_direction(&value)?)
+        }
         other => {
             return Err(CliError::invalid_args(format!(
                 "unknown binding field: {other}"
             ))
-            .with_hint("Supported binding fields are role, table, column, measure, displayName, and format.")
+            .with_hint("Supported binding fields are role, table, column, measure, displayName, format, and sortDirection.")
             .with_suggested_command(
                 "powerbi-cli report visuals set-bindings --project <project> --handle <visual-handle> --bindings-json '[{\"role\":\"Values\",\"table\":\"FactSales\",\"measure\":\"Total Revenue\"}]' --dry-run --json",
             ));
@@ -320,7 +340,50 @@ fn resolve_binding(
         data_type,
         display_name: input.display_name.clone(),
         format_string: input.format_string.clone(),
+        sort_direction: input.sort_direction.clone(),
     })
+}
+
+fn normalize_sort_direction(value: &str) -> CliResult<String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "descending" | "desc" => Ok("Descending".to_string()),
+        other => Err(CliError::unsupported_feature(format!(
+            "unsupported visual sort direction: {other}"
+        ))
+        .with_hint(
+            "The first typed slice supports descending measure sort only; ascending and multi-key sort remain fixture-gated.",
+        )),
+    }
+}
+
+pub(crate) fn validate_sort_bindings(bindings: &[VisualBindingResolved]) -> CliResult<()> {
+    let sorted = bindings
+        .iter()
+        .filter(|binding| binding.sort_direction.is_some())
+        .collect::<Vec<_>>();
+    if sorted.len() > 1 {
+        return Err(CliError::unsupported_feature(
+            "generated visuals support exactly one explicit sort binding",
+        )
+        .with_hint("Remove sortDirection from all but one projected measure."));
+    }
+    let Some(binding) = sorted.first() else {
+        return Ok(());
+    };
+    if !matches!(binding.kind, VisualBindingKind::Measure) {
+        return Err(CliError::unsupported_feature(
+            "explicit visual sort is currently proven only for measures",
+        )
+        .with_hint("Sort by a projected measure, not a raw category column."));
+    }
+    if !matches!(binding.role.as_str(), "Y" | "Y2" | "Values" | "Tooltips") {
+        return Err(CliError::unsupported_feature(format!(
+            "explicit visual sort is not supported on role {}",
+            binding.role
+        ))
+        .with_hint("Use a projected measure in Y, Y2, Values, or Tooltips."));
+    }
+    Ok(())
 }
 
 fn reject_duplicate_fields(bindings: &[VisualBindingResolved]) -> CliResult<()> {

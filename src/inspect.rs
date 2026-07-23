@@ -337,6 +337,8 @@ fn inspect_visual(
 
 fn visual_bindings(visual_json: &Value) -> Vec<Value> {
     let mut bindings = Vec::new();
+    let sort_field = &visual_json["visual"]["query"]["sortDefinition"]["sort"][0]["field"];
+    let sort_direction = &visual_json["visual"]["query"]["sortDefinition"]["sort"][0]["direction"];
     if let Some(query_state) = visual_json["visual"]["query"]["queryState"].as_object() {
         for (role, role_value) in query_state {
             if let Some(projections) = role_value["projections"].as_array() {
@@ -350,7 +352,14 @@ fn visual_bindings(visual_json: &Value) -> Vec<Value> {
                         "table": projection_table(projection),
                         "field": projection_field(projection),
                         "column": projection_column(projection),
-                        "measure": projection_measure(projection)
+                        "measure": projection_measure(projection),
+                        "sortDirection": if sort_field.is_object()
+                            && &projection["field"] == sort_field
+                        {
+                            sort_direction.clone()
+                        } else {
+                            Value::Null
+                        }
                     }));
                 }
             }

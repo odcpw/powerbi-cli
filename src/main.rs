@@ -372,6 +372,8 @@ struct VisualBindingSpec {
     display_name: Option<String>,
     #[serde(default)]
     format_string: Option<String>,
+    #[serde(default)]
+    sort_direction: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1149,6 +1151,7 @@ impl Clone for VisualBindingSpec {
             measure: self.measure.clone(),
             display_name: self.display_name.clone(),
             format_string: self.format_string.clone(),
+            sort_direction: self.sort_direction.clone(),
         }
     }
 }
@@ -1172,6 +1175,7 @@ fn visual_json(
         .map(|binding| scaffold_visual_binding(dashboard, binding))
         .collect::<Vec<_>>();
     report_visual_mutations::validate_binding_cardinality(&visual_type, &bindings)?;
+    crate::pbir_bindings::validate_sort_bindings(&bindings)?;
     let slicer_mode = resolve_slicer_mode(&visual_type, visual.mode.as_deref())?;
     visual_container_json(&VisualBuildSpec {
         name: visual
@@ -1204,6 +1208,7 @@ fn scaffold_visual_binding(
             data_type: None,
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
+            sort_direction: binding.sort_direction.clone(),
         }
     } else if let Some(column) = &binding.column {
         VisualBindingResolved {
@@ -1225,6 +1230,7 @@ fn scaffold_visual_binding(
                 .map(|data_type| data_type.tmdl.to_string()),
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
+            sort_direction: binding.sort_direction.clone(),
         }
     } else {
         VisualBindingResolved {
@@ -1235,6 +1241,7 @@ fn scaffold_visual_binding(
             data_type: None,
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
+            sort_direction: binding.sort_direction.clone(),
         }
     }
 }
@@ -1835,7 +1842,8 @@ fn spec_to_json(spec: &DashboardSpec) -> Value {
                         "column": binding.column,
                         "measure": binding.measure,
                         "displayName": binding.display_name,
-                        "formatString": binding.format_string
+                        "formatString": binding.format_string,
+                        "sortDirection": binding.sort_direction
                     })).collect::<Vec<_>>(),
                     "x": visual.x,
                     "y": visual.y,

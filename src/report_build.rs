@@ -706,11 +706,31 @@ fn compile_bindings(
                     ));
                 }
             }
-            for key in ["displayName", "formatString"] {
-                if let Some(value) = binding.get(key) {
-                    out.insert(key.to_string(), value.clone());
-                }
+        }
+        for key in ["displayName", "formatString"] {
+            if let Some(value) = binding.get(key) {
+                out.insert(key.to_string(), value.clone());
             }
+        }
+        if let Some(value) = binding.get("sortDirection") {
+            let direction = value.as_str().ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].visuals[{visual_index}].bindings[{binding_index}].sortDirection must be a string"
+                ))
+            })?;
+            if !matches!(
+                direction.trim().to_ascii_lowercase().as_str(),
+                "descending" | "desc"
+            ) {
+                return Err(CliError::unsupported_feature(format!(
+                    "unsupported visual sort direction: {direction}"
+                ))
+                .with_hint("The first typed slice supports descending measure sort only."));
+            }
+            out.insert(
+                "sortDirection".to_string(),
+                Value::String("Descending".to_string()),
+            );
         }
         bindings.push(Value::Object(out));
     }
@@ -777,6 +797,26 @@ fn validate_binding_contract(
             if has_measure("Category") || has_measure("Series") {
                 return Err(CliError::invalid_args(format!(
                     "{} {visual_type} Category and Series bindings must be columns, not measures",
+                    visual_path()
+                )));
+            }
+        }
+        VisualBindingFamily::ComboCategoryY => {
+            let categories = count("Category");
+            let y = count("Y");
+            let y2 = count("Y2");
+            if categories < 1 || y < 1 || y2 < 1 {
+                return Err(CliError::invalid_args(format!(
+                    "{} {visual_type} requires at least one Category column, at least one column-axis Y measure, and at least one line-axis Y2 measure",
+                    visual_path()
+                ))
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
+                )));
+            }
+            if has_measure("Category") {
+                return Err(CliError::invalid_args(format!(
+                    "{} {visual_type} Category bindings must be columns, not measures",
                     visual_path()
                 )));
             }
@@ -863,6 +903,34 @@ fn validate_binding_contract(
                     visual_path()
                 )));
             }
+        }
+    }
+    let sorted = bindings
+        .iter()
+        .filter(|binding| binding.get("sortDirection").is_some())
+        .collect::<Vec<_>>();
+    if sorted.len() > 1 {
+        return Err(CliError::unsupported_feature(format!(
+            "{} supports exactly one explicit sort binding",
+            visual_path()
+        )));
+    }
+    if let Some(binding) = sorted.first() {
+        let role = binding
+            .get("role")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if binding.get("measure").is_none() {
+            return Err(CliError::unsupported_feature(format!(
+                "{} explicit visual sort is currently proven only for measures",
+                visual_path()
+            )));
+        }
+        if !matches!(role, "Y" | "Y2" | "Values" | "Tooltips") {
+            return Err(CliError::unsupported_feature(format!(
+                "{} explicit visual sort is not supported on role {role}",
+                visual_path()
+            )));
         }
     }
     Ok(())

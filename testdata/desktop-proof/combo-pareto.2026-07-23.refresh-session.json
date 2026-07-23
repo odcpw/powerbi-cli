@@ -1,0 +1,58 @@
+{
+  "schema": "powerbi-cli.desktop-proof.v1",
+  "date": "2026-07-23",
+  "desktop": {
+    "product": "Power BI Desktop Store",
+    "packageVersion": "2.156.951.0",
+    "platform": "windows"
+  },
+  "fixture": {
+    "schema": "examples/archetypes/catalog-proof.schema.json",
+    "profile": "examples/archetypes/catalog-proof.profile.json",
+    "dashboard": "examples/archetypes/catalog-proof.dashboard.json",
+    "page": "Combo Proof",
+    "visual": "Pareto Combo",
+    "visualType": "lineClusteredColumnComboChart"
+  },
+  "managedSession": {
+    "singleOwnedSession": true,
+    "exactTitleMatched": "VisualCatalogProof",
+    "refreshRequested": true,
+    "refreshCompleted": true,
+    "saved": true,
+    "closedByCli": true
+  },
+  "manualScreenReview": {
+    "canvasRendered": true,
+    "issueDialogObserved": false,
+    "columnSeries": "Total Amount",
+    "lineSeries": "Cumulative Share",
+    "categoryOrder": [
+      {
+        "category": "Beta",
+        "value": 45
+      },
+      {
+        "category": "Alpha",
+        "value": 25
+      }
+    ],
+    "descendingSortObserved": true
+  },
+  "desktopSaveCanonicalization": {
+    "schemaVersion": "2.11.0",
+    "explicitSortRetained": true,
+    "isDefaultSortFalseRemoved": true,
+    "referenceVisual": "docs/reference/desktop-authored-visuals/lineClusteredColumnComboChart.visual.json"
+  },
+  "claim": {
+    "proofLevel": "manual-desktop-canvas-refresh",
+    "scope": "Category + Y + Y2 with one descending measure sort",
+    "excludes": [
+      "ascending sort",
+      "multi-key sort",
+      "raw-column sort",
+      "automated pixel assertions"
+    ]
+  }
+}

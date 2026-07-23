@@ -114,6 +114,7 @@ fn build_hierarchy_plan(
                 data_type: None,
                 display_name: None,
                 format_string: None,
+                sort_direction: None,
             })
         })
         .collect::<CliResult<Vec<_>>>()?;

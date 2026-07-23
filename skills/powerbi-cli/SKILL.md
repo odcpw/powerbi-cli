@@ -653,6 +653,7 @@ pbi --json report visuals catalog
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --title "Revenue Card" --binding "role=Values,table=FactSales,measure=Total Revenue" --dry-run
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --title "Revenue Card" --binding "role=Values,table=FactSales,measure=Total Revenue" --out-dir build/sales-visual
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --visual-type pie --title "Revenue Share" --binding "role=Category,table=DimCustomer,column=Segment" --binding "role=Y,table=FactSales,measure=Total Revenue" --dry-run
+pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --visual-type combo --title "Pareto" --binding "role=Category,table=DimCustomer,column=Segment" --binding "role=Y,table=FactSales,measure=Total Revenue,sort=descending" --binding "role=Y2,table=FactSales,measure=Cumulative Revenue Share" --dry-run
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --visual-type matrix --title "Revenue Matrix" --binding "role=Rows,table=DimCustomer,column=Segment" --binding "role=Columns,table=DimDate,column=Year" --binding "role=Values,table=FactSales,measure=Total Revenue" --dry-run
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --visual-type slicer --mode basic --title "Segment Slicer" --binding "role=Values,table=DimCustomer,column=Segment" --dry-run
 pbi --json report visuals clone --project corp/template --handle "visual:<page>:<template-visual>" --title "Revenue Copy" --dry-run
@@ -675,7 +676,11 @@ more work.
 `report visuals catalog` returns the generated visual type and role contract.
 `report visuals add` creates only cataloged generated visual containers: card,
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
-matrix (PBIR `pivotTable`), and slicer. Generated titles are visible literal
+lineClusteredColumnComboChart, matrix (PBIR `pivotTable`), and slicer.
+Combo charts require Category columns, Y column measures, and Y2 line measures.
+Use `sort=descending` in binding text or `sortDirection=Descending` in JSON on
+at most one projected measure for explicit category ordering; ascending and
+multi-key sort are refused. Generated titles are visible literal
 container titles under `/visual/visualContainerObjects/title` with `show = true`.
 Pie/donut require exactly one Category column plus one or more Y measures;
 matrix requires Rows columns, optional Columns columns, and Values measures;

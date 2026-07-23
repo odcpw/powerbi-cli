@@ -4,6 +4,10 @@
 
 # Test artifacts
 *.actual
+/proof/
+
+# Local Codex desktop attachments
+/.codex-remote-attachments/
 
 # Power BI binary artifacts
 *.pbix

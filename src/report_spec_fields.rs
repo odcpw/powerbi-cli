@@ -97,12 +97,13 @@ pub(crate) fn fields_command(args: &[String]) -> CliResult<Value> {
         "profilePath": options.profile.as_ref().map(|path| canonical_display(path)),
         "profileSummary": profile.as_ref().map(profile_summary),
         "supportedVisualTypes": supported_visual_type_names(),
-        "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString"],
+        "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
         "tables": tables,
         "fields": fields,
         "rules": [
             "Use table+column for Category, Series (including scatter color grouping), and scatter Category roles.",
             "Use table+measure for DAX measures, especially when a column and measure might share a name.",
+            "Use sortDirection=Descending on at most one projected measure when explicit category ordering is required.",
             "Legacy field strings use Table[Name]; structured bindings are safer for generated specs."
         ],
         "examples": binding_examples(&schema),

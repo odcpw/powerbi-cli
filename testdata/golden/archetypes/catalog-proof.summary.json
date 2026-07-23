@@ -1,24 +1,24 @@
 {
   "counts": {
-    "boundVisuals": 5,
+    "boundVisuals": 6,
     "columns": 3,
     "explicitInteractions": 0,
-    "jsonFilesChecked": 18,
+    "jsonFilesChecked": 20,
     "lintErrors": 0,
     "lintInfo": 0,
     "lintWarnings": 0,
-    "measures": 1,
-    "pages": 5,
+    "measures": 2,
+    "pages": 6,
     "relationships": 0,
     "staleInteractionVisualReferences": 0,
     "tables": 1,
     "unsupportedInteractions": 0,
     "validationErrors": 0,
     "validationWarnings": 0,
-    "visuals": 5
+    "visuals": 6
   },
   "exitCode": 0,
-  "fingerprint": "da98a8b3e69d3135",
+  "fingerprint": "a6dd0e2576421531",
   "lint": {
     "counts": {
       "errors": 0,
@@ -67,6 +67,12 @@
             "expression": "SUM('CatalogFacts'[Amount])",
             "formatString": "#,##0.00",
             "name": "Total Amount"
+          },
+          {
+            "displayFolder": null,
+            "expression": "DIVIDE([Total Amount], CALCULATE([Total Amount], ALL('CatalogFacts'[Category])))",
+            "formatString": "0.0%",
+            "name": "Cumulative Share"
           }
         ],
         "name": "CatalogFacts",
@@ -226,6 +232,68 @@
         "width": 800.0
       },
       {
+        "displayName": "Combo Proof",
+        "displayOption": "FitToPage",
+        "height": 500.0,
+        "interactionCount": 0,
+        "interactions": [],
+        "isActive": false,
+        "name": "ReportSectionComboProof",
+        "ordinal": 2,
+        "visuals": [
+          {
+            "bindingCount": 3,
+            "bindings": [
+              {
+                "column": "Category",
+                "field": "Category",
+                "kind": "column",
+                "measure": null,
+                "role": "Category",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": null,
+                "field": "Total Amount",
+                "kind": "measure",
+                "measure": "Total Amount",
+                "role": "Y",
+                "table": "CatalogFacts"
+              },
+              {
+                "column": null,
+                "field": "Cumulative Share",
+                "kind": "measure",
+                "measure": "Cumulative Share",
+                "role": "Y2",
+                "table": "CatalogFacts"
+              }
+            ],
+            "fingerprints": {
+              "objects": "5b9bc4ba528108e4",
+              "position": "62c4d6e9597b0503",
+              "queryState": "1fa909b063b7c076",
+              "visual": "3b9e98bf40144c0b",
+              "visualContainerObjects": "442a91be6af6f203",
+              "visualJson": "919f31061dbeae74"
+            },
+            "name": "VisualContainerParetoCombo",
+            "ordinal": 0,
+            "position": {
+              "height": 400.0,
+              "tabOrder": 0,
+              "width": 720.0,
+              "x": 40.0,
+              "y": 40.0,
+              "z": 0
+            },
+            "title": "Pareto Combo",
+            "visualType": "lineClusteredColumnComboChart"
+          }
+        ],
+        "width": 800.0
+      },
+      {
         "displayName": "Matrix Proof",
         "displayOption": "FitToPage",
         "height": 500.0,
@@ -233,7 +301,7 @@
         "interactions": [],
         "isActive": false,
         "name": "ReportSectionMatrixProof",
-        "ordinal": 2,
+        "ordinal": 3,
         "visuals": [
           {
             "bindingCount": 3,
@@ -295,7 +363,7 @@
         "interactions": [],
         "isActive": false,
         "name": "ReportSectionSlicerProof",
-        "ordinal": 3,
+        "ordinal": 4,
         "visuals": [
           {
             "bindingCount": 1,
@@ -341,7 +409,7 @@
         "interactions": [],
         "isActive": false,
         "name": "ReportSectionLineControl",
-        "ordinal": 4,
+        "ordinal": 5,
         "visuals": [
           {
             "bindingCount": 2,

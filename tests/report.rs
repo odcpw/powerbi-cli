@@ -12,6 +12,83 @@ struct RunOutput {
     stderr: String,
 }
 
+#[test]
+fn report_visual_explicit_sort_refuses_unproven_shapes() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = build_catalog_proof(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let base = [
+        "report",
+        "visuals",
+        "add",
+        "--project",
+        project_arg,
+        "--page",
+        "page:ReportSectionLineControl",
+        "--visual-type",
+        "combo",
+        "--title",
+        "Sort Refusal",
+    ];
+
+    let ascending = run_powerbi(
+        &base
+            .iter()
+            .copied()
+            .chain([
+                "--binding",
+                "role=Category,table=CatalogFacts,column=Category",
+                "--binding",
+                "role=Y,table=CatalogFacts,measure=Total Amount,sort=ascending",
+                "--binding",
+                "role=Y2,table=CatalogFacts,measure=Cumulative Share",
+                "--dry-run",
+                "--json",
+            ])
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(ascending.code, 2);
+    assert_unsupported_feature(&ascending.stderr, "unsupported visual sort direction");
+
+    let category = run_powerbi(
+        &base
+            .iter()
+            .copied()
+            .chain([
+                "--binding",
+                "role=Category,table=CatalogFacts,column=Category,sort=descending",
+                "--binding",
+                "role=Y,table=CatalogFacts,measure=Total Amount",
+                "--binding",
+                "role=Y2,table=CatalogFacts,measure=Cumulative Share",
+                "--dry-run",
+                "--json",
+            ])
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(category.code, 2);
+    assert_unsupported_feature(&category.stderr, "proven only for measures");
+
+    let multi_key = run_powerbi(
+        &base
+            .iter()
+            .copied()
+            .chain([
+                "--binding",
+                "role=Category,table=CatalogFacts,column=Category",
+                "--binding",
+                "role=Y,table=CatalogFacts,measure=Total Amount,sort=descending",
+                "--binding",
+                "role=Y2,table=CatalogFacts,measure=Cumulative Share,sort=descending",
+                "--dry-run",
+                "--json",
+            ])
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(multi_key.code, 2);
+    assert_unsupported_feature(&multi_key.stderr, "exactly one explicit sort binding");
+}
+
 fn run_powerbi(args: &[&str]) -> RunOutput {
     let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
         .args(args)
@@ -8714,6 +8791,23 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             roles: &["Category", "Y"],
         },
         CatalogVisualCase {
+            slug: "combo",
+            requested_type: "combo",
+            canonical_type: "lineClusteredColumnComboChart",
+            mode: None,
+            add_bindings: &[
+                "role=Category,table=CatalogFacts,column=Category",
+                "role=Y,table=CatalogFacts,measure=Total Amount,sort=descending",
+                "role=Y2,table=CatalogFacts,measure=Cumulative Share",
+            ],
+            replacement_bindings: &[
+                "role=Category,table=CatalogFacts,column=Category",
+                "role=Y,table=CatalogFacts,measure=Total Amount,sort=descending",
+                "role=Y2,table=CatalogFacts,measure=Cumulative Share",
+            ],
+            roles: &["Category", "Y", "Y2"],
+        },
+        CatalogVisualCase {
             slug: "matrix",
             requested_type: "matrix",
             canonical_type: "pivotTable",
@@ -8846,6 +8940,20 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
                 raw["visual"]["query"]["sortDefinition"]["isDefaultSort"],
                 Value::Bool(true)
             );
+        } else if case.canonical_type == "lineClusteredColumnComboChart" {
+            assert_eq!(
+                raw["visual"]["query"]["sortDefinition"]["sort"][0]["field"]["Measure"]["Property"],
+                "Total Amount"
+            );
+            assert_eq!(
+                raw["visual"]["query"]["sortDefinition"]["sort"][0]["direction"],
+                "Descending"
+            );
+            assert!(
+                raw["visual"]["query"]["sortDefinition"]
+                    .get("isDefaultSort")
+                    .is_none()
+            );
         } else if case.canonical_type == "pivotTable" {
             assert_eq!(
                 raw["visual"]["query"]["queryState"]["Rows"]["projections"][0]["active"],
@@ -8977,6 +9085,15 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             assert_eq!(
                 bind_json["changes"][0]["after"]["sortDefinition"]["sort"][0]["field"]["Measure"]["Property"],
                 "Total Amount"
+            );
+        } else if case.canonical_type == "lineClusteredColumnComboChart" {
+            assert_eq!(
+                bind_json["changes"][0]["after"]["sortDefinition"]["sort"][0]["field"]["Measure"]["Property"],
+                "Total Amount"
+            );
+            assert_eq!(
+                bind_json["bindingPlan"]["after"][1]["sortDirection"],
+                "Descending"
             );
         }
 

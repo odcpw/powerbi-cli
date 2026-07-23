@@ -390,8 +390,9 @@ three pages.
   discovery with `report visuals catalog` and generated PBIR visual creation
   with `report visuals add` for card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
-  columnChart, scatterChart, pieChart, donutChart, matrix (emitted as PBIR
-  `pivotTable`), and slicer generated patterns, plus PBIR
+  columnChart, lineClusteredColumnComboChart, scatterChart, pieChart,
+  donutChart, matrix (emitted as PBIR `pivotTable`), and slicer generated
+  patterns, plus PBIR
   `queryState` generation, `report visuals set-bindings` replacement/clear
   operations for existing visuals, and guarded `report visuals delete` for
   simple visual containers that contain only `visual.json`. `report visuals
@@ -413,6 +414,11 @@ three pages.
   `queryState` because Desktop silently leaves that field well unbound.
   Pie and donut use exactly one Category column plus one or more Y measures and
   emit the Desktop-authored default descending sort by the first Y field. Matrix
+  and combo charts use explicit role contracts; combo requires Category plus
+  column measures in Y and line measures in Y2. Add
+  `sortDirection=Descending` (or `sort=descending` in CLI binding text) to at
+  most one projected measure when the category order must follow a measure.
+  Ascending and multi-key sorts remain deliberately unsupported. Matrix
   uses ordered Rows, optional Columns, and one or more Values measures; matrices
   with multiple row levels expose the native `+/-` expand/collapse controls. Slicer
   uses exactly one Values column and emits Basic (default), Dropdown, or Between

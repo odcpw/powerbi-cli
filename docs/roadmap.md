@@ -288,9 +288,11 @@ validation, proof, then mutation breadth.
   roles, template-only visual types, and planned visual families.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
-  columnChart, and scatterChart containers from the same generated PBIR
-  pattern used by scaffold, with optional validated bindings and guarded output
-  modes.
+  columnChart, lineClusteredColumnComboChart, and scatterChart containers from
+  the same generated PBIR pattern used by scaffold, with optional validated
+  bindings and guarded output modes. The combo slice binds column measures to Y
+  and line measures to Y2; one projected measure may request explicit
+  descending sort. Ascending and multi-key sorts remain fixture-gated.
 - Implemented visual template reuse slice: `report visuals clone` copies one
   simple visual container whose directory contains only `visual.json`, patches
   only cloned name/position/clone annotations, and preserves the visual type,

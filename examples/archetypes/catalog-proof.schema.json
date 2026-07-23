@@ -12,11 +12,16 @@
         { "name": "Amount", "dataType": "decimal", "formatString": "#,##0.00" }
       ],
       "measures": [
-        {
-          "name": "Total Amount",
-          "expression": "SUM('CatalogFacts'[Amount])",
-          "formatString": "#,##0.00"
-        }
+          {
+            "name": "Total Amount",
+            "expression": "SUM('CatalogFacts'[Amount])",
+            "formatString": "#,##0.00"
+          },
+          {
+            "name": "Cumulative Share",
+            "expression": "DIVIDE([Total Amount], CALCULATE([Total Amount], ALL('CatalogFacts'[Category])))",
+            "formatString": "0.0%"
+          }
       ],
       "rows": [
         { "Category": "Alpha", "Year": 2025, "Amount": 10.0 },

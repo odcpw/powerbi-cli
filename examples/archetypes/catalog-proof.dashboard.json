@@ -46,6 +46,24 @@
       ]
     },
     {
+      "id": "combo_proof",
+      "displayName": "Combo Proof",
+      "size": { "width": 800, "height": 500 },
+      "visuals": [
+        {
+          "id": "pareto_combo",
+          "type": "combo",
+          "title": "Pareto Combo",
+          "bindings": [
+            { "role": "Category", "field": "CatalogFacts[Category]" },
+            { "role": "Y", "field": "CatalogFacts[Total Amount]", "sortDirection": "Descending" },
+            { "role": "Y2", "field": "CatalogFacts[Cumulative Share]" }
+          ],
+          "layout": { "x": 40, "y": 40, "width": 720, "height": 400 }
+        }
+      ]
+    },
+    {
       "id": "matrix_proof",
       "displayName": "Matrix Proof",
       "size": { "width": 800, "height": 500 },

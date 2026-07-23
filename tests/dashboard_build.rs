@@ -308,8 +308,8 @@ fn catalog_proof_archetype_build_validates_handoff_and_matches_golden() {
         profile: "examples/archetypes/catalog-proof.profile.json",
         spec: "examples/archetypes/catalog-proof.dashboard.json",
         golden: "testdata/golden/archetypes/catalog-proof.summary.json",
-        expected_visuals: 5,
-        expected_bindings: 10,
+        expected_visuals: 6,
+        expected_bindings: 13,
         check_dax: false,
     });
 }
@@ -1262,6 +1262,18 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
                 ]
             }),
             "exactly one Category column binding",
+        ),
+        (
+            "combo-no-line",
+            json!({
+                "id": "bad_combo",
+                "type": "combo",
+                "bindings": [
+                    { "role": "Category", "field": "CatalogFacts[Category]" },
+                    { "role": "Y", "field": "CatalogFacts[Total Amount]" }
+                ]
+            }),
+            "at least one line-axis Y2 measure",
         ),
         (
             "matrix-no-values",

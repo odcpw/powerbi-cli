@@ -7,6 +7,7 @@ pub(crate) enum VisualBindingFamily {
     SingleValue,
     ValuesList,
     CategoryY,
+    ComboCategoryY,
     CategoryShare,
     RowsColumnsValues,
     SlicerField,
@@ -80,6 +81,18 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
         ],
         family: VisualBindingFamily::CategoryY,
         summary: "Stacked column chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
+    },
+    VisualTypeSpec {
+        visual_type: "lineClusteredColumnComboChart",
+        aliases: &[
+            "combo",
+            "combochart",
+            "lineclusteredcolumn",
+            "lineclusteredcolumnchart",
+            "lineandclusteredcolumn",
+        ],
+        family: VisualBindingFamily::ComboCategoryY,
+        summary: "Line and clustered column combo chart; accepts one or more Category columns, one or more column-axis Y measures, one or more line-axis Y2 measures, and optional Tooltips.",
     },
     VisualTypeSpec {
         visual_type: "scatterChart",
@@ -191,6 +204,15 @@ pub(crate) fn normalize_role(visual_type: &str, role: &str) -> CliResult<String>
             "tooltip" | "tooltips" => Some("Tooltips"),
             _ => None,
         },
+        VisualBindingFamily::ComboCategoryY => match lower_role.as_str() {
+            "category" | "categories" | "axis" | "x" => Some("Category"),
+            "y" | "column" | "columns" | "columny" | "column-y" | "column_y" | "columnvalues"
+            | "column-values" | "column_values" => Some("Y"),
+            "y2" | "line" | "lines" | "liney" | "line-y" | "line_y" | "linevalues"
+            | "line-values" | "line_values" => Some("Y2"),
+            "tooltip" | "tooltips" => Some("Tooltips"),
+            _ => None,
+        },
         VisualBindingFamily::CategoryShare => match lower_role.as_str() {
             "category" | "categories" | "legend" => Some("Category"),
             "y" | "values" | "value" => Some("Y"),
@@ -245,6 +267,7 @@ pub(crate) fn column_binding_is_proven(visual_type: &str, role: &str) -> CliResu
         (family, role),
         (VisualBindingFamily::SingleValue, "Values")
             | (VisualBindingFamily::CategoryY, "Y")
+            | (VisualBindingFamily::ComboCategoryY, "Y" | "Y2")
             | (VisualBindingFamily::CategoryShare, "Y")
             | (VisualBindingFamily::RowsColumnsValues, "Values")
             | (VisualBindingFamily::ScatterBubble, "X" | "Y" | "Size")
@@ -320,14 +343,25 @@ fn unsupported_visual_type_error(value: &str, normalized: &str) -> CliError {
 }
 
 fn visual_type_json(spec: &VisualTypeSpec) -> Value {
+    let (proof_level, proof_note) = if spec.family == VisualBindingFamily::ComboCategoryY {
+        (
+            "manual-desktop-canvas-refresh",
+            "Power BI Desktop Store 2.156.951.0 refreshed, rendered, sorted, and saved the generated combo fixture on 2026-07-23.",
+        )
+    } else {
+        (
+            "desktop-golden-pending",
+            "The binding family retains its recorded proof, but the current title-bearing generated visual bytes await Desktop open/refresh/save re-verification.",
+        )
+    };
     let mut contract = json!({
         "visualType": spec.visual_type,
         "aliases": spec.aliases,
         "generatedBy": "report visuals add",
         "bindingFamily": binding_family_name(spec.family),
-        "proofLevel": "desktop-golden-pending",
+        "proofLevel": proof_level,
         "bindingProofLevel": binding_proof_level(spec.family),
-        "proofNote": "The binding family retains its recorded proof, but the current title-bearing generated visual bytes await Desktop open/refresh/save re-verification.",
+        "proofNote": proof_note,
         "summary": spec.summary,
         "roles": role_specs_json(spec.family),
         "examples": example_commands(spec),
@@ -404,6 +438,44 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "fieldKinds": ["column", "measure"],
                 "aliases": ["tooltip", "tooltips"],
                 "summary": "Optional fields shown in tooltips."
+            }
+        ]),
+        VisualBindingFamily::ComboCategoryY => json!([
+            {
+                "role": "Category",
+                "required": true,
+                "min": 1,
+                "max": null,
+                "fieldKinds": ["column"],
+                "aliases": ["category", "categories", "axis", "x"],
+                "summary": "Shared category axis. Multiple projections become a hierarchy axis for Desktop drill up/down."
+            },
+            {
+                "role": "Y",
+                "required": true,
+                "min": 1,
+                "max": null,
+                "fieldKinds": ["measure"],
+                "aliases": ["y", "columnY", "column-values"],
+                "summary": "One or more clustered-column measures."
+            },
+            {
+                "role": "Y2",
+                "required": true,
+                "min": 1,
+                "max": null,
+                "fieldKinds": ["measure"],
+                "aliases": ["y2", "lineY", "line-values"],
+                "summary": "One or more line measures on the secondary value axis."
+            },
+            {
+                "role": "Tooltips",
+                "required": false,
+                "min": 0,
+                "max": null,
+                "fieldKinds": ["column", "measure"],
+                "aliases": ["tooltip", "tooltips"],
+                "summary": "Optional projected fields available to tooltips and explicit visual sorting."
             }
         ]),
         VisualBindingFamily::CategoryShare => json!([
@@ -539,6 +611,10 @@ fn example_commands(spec: &VisualTypeSpec) -> Vec<String> {
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
             spec.visual_type
         )],
+        VisualBindingFamily::ComboCategoryY => vec![format!(
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<column-measure>\" --binding \"role=Y2,table=<table>,measure=<line-measure>\" --dry-run --json",
+            spec.visual_type
+        )],
         VisualBindingFamily::CategoryShare => vec![format!(
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
             spec.visual_type
@@ -561,6 +637,7 @@ fn role_names(family: VisualBindingFamily) -> Vec<&'static str> {
     match family {
         VisualBindingFamily::SingleValue | VisualBindingFamily::ValuesList => vec!["Values"],
         VisualBindingFamily::CategoryY => vec!["Category", "Y", "Series", "Tooltips"],
+        VisualBindingFamily::ComboCategoryY => vec!["Category", "Y", "Y2", "Tooltips"],
         VisualBindingFamily::CategoryShare => vec!["Category", "Y"],
         VisualBindingFamily::RowsColumnsValues => vec!["Rows", "Columns", "Values"],
         VisualBindingFamily::SlicerField => vec!["Values"],
@@ -579,6 +656,7 @@ fn binding_family_name(family: VisualBindingFamily) -> &'static str {
         VisualBindingFamily::SingleValue => "singleValue",
         VisualBindingFamily::ValuesList => "valuesList",
         VisualBindingFamily::CategoryY => "categoryY",
+        VisualBindingFamily::ComboCategoryY => "comboCategoryY",
         VisualBindingFamily::CategoryShare => "categoryShare",
         VisualBindingFamily::RowsColumnsValues => "rowsColumnsValues",
         VisualBindingFamily::SlicerField => "slicerField",
@@ -590,7 +668,8 @@ fn binding_proof_level(family: VisualBindingFamily) -> &'static str {
     match family {
         VisualBindingFamily::CategoryShare
         | VisualBindingFamily::RowsColumnsValues
-        | VisualBindingFamily::SlicerField => "manual-desktop-canvas-refresh",
+        | VisualBindingFamily::SlicerField
+        | VisualBindingFamily::ComboCategoryY => "manual-desktop-canvas-refresh",
         _ => "unit-smoke",
     }
 }

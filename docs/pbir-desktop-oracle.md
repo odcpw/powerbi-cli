@@ -919,6 +919,33 @@ Add:
 - `plan diff`;
 - multi-step rollback guidance where safe.
 
+## Combo Chart and Explicit Sort Slice
+
+`lineClusteredColumnComboChart` is now a cataloged generated visual with the
+small field-well contract used by Pareto charts:
+
+- `Category`: one or more categorical columns;
+- `Y`: one or more column-axis measures;
+- `Y2`: one or more line-axis measures;
+- `Tooltips`: optional projected fields.
+
+A binding may set `sortDirection=Descending` (or `sort=descending` in CLI
+binding text). The generator writes the projected field into
+`visual.query.sortDefinition` and inspection round-trips the sort back onto the
+matching binding. Desktop removes `isDefaultSort: false` on save, so explicit
+generated sorts omit that property; the default pie/donut sort retains
+`isDefaultSort: true`. Only one projected measure
+and descending direction are accepted. Ascending, multi-key, and raw-column
+sorts remain refused until separately fixture-proven.
+
+Local schema goldens and command lifecycle tests cover generation, inspection,
+rebinding, cloning, and validation. On 2026-07-23, Power BI Desktop Store
+2.156.951.0 opened the generated fixture, refreshed its dummy M table, rendered
+the combo with the descending category order, saved it, and canonicalized the
+PBIR as recorded under `docs/reference/desktop-authored-visuals` and
+`testdata/desktop-proof`. Do not generalize the role or sort shapes from this
+slice.
+
 ## Regression Checklist
 
 When Desktop rejects a report:

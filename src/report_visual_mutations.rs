@@ -431,6 +431,41 @@ pub(crate) fn validate_binding_cardinality(
                 "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type lineChart --title <title> --binding \"role=Category,table=<table>,column=<year-column>\" --binding \"role=Category,table=<table>,column=<month-column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
             ))
         }
+        VisualBindingFamily::ComboCategoryY => {
+            let category_count = bindings
+                .iter()
+                .filter(|binding| binding.role == "Category")
+                .count();
+            let y_count = bindings
+                .iter()
+                .filter(|binding| binding.role == "Y")
+                .count();
+            let y2_count = bindings
+                .iter()
+                .filter(|binding| binding.role == "Y2")
+                .count();
+            let category_is_column = bindings.iter().all(|binding| {
+                binding.role != "Category" || matches!(binding.kind, VisualBindingKind::Column)
+            });
+            let only_supported_roles = bindings.iter().all(|binding| {
+                matches!(binding.role.as_str(), "Category" | "Y" | "Y2" | "Tooltips")
+            });
+            if category_count >= 1
+                && y_count >= 1
+                && y2_count >= 1
+                && category_is_column
+                && only_supported_roles
+            {
+                return Ok(());
+            }
+            Err(CliError::invalid_args(
+                "combo charts require one or more Category column bindings, at least one column-axis Y measure, at least one line-axis Y2 measure, and optional Tooltips",
+            )
+            .with_hint("Use Category for the shared axis, Y for clustered columns, Y2 for lines, and optionally set sort=descending on one projected measure.")
+            .with_suggested_command(
+                "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type lineClusteredColumnComboChart --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<column-measure>\" --binding \"role=Y2,table=<table>,measure=<line-measure>\" --dry-run --json",
+            ))
+        }
         VisualBindingFamily::CategoryShare => {
             let category_count = bindings
                 .iter()
