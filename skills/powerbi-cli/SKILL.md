@@ -679,9 +679,23 @@ matrix (PBIR `pivotTable`), and slicer. Generated titles are visible literal
 container titles under `/visual/visualContainerObjects/title` with `show = true`.
 Pie/donut require exactly one Category column plus one or more Y measures;
 matrix requires Rows columns, optional Columns columns, and Values measures;
+when matrix has more than one Rows binding, generation enables the native
+per-row `+/-` expand/collapse controls;
 slicer requires exactly one Values column and supports Basic (default),
-Dropdown, or Between mode. Use Between for numeric/date range sliders. Generated slicers write mode under
-`/visual/objects/data` and never write `general.filter` or other selection state.
+Dropdown, or Between mode. Use Between for numeric/date range sliders. Generated
+slicers write mode under `/visual/objects/data`; Between additionally writes
+`/visual/objects/slider.show = true` and requires at least 104 pixels of height
+so Desktop has room to render the visible draggable band. They
+never write `general.filter` or other selection state.
+
+Schema manifests may set `sortByColumn` on a column to preserve controlled
+display order (for example, severity labels ordered by a hidden numeric column).
+The target must be a different column in the same table.
+
+Dashboard pages may declare `interactions` using page-local visual IDs:
+`{"source":"matrix","target":"trend","type":"DataFilter"}`. `report build`
+validates the references and emits PBIR `visualInteractions`, avoiding a
+separate post-build interaction mutation.
 Pie, donut, matrix, and slicer bindings retain `manual-desktop-canvas-refresh`
 evidence:
 `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` records

@@ -689,7 +689,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "The CLI resolves matrix to the PBIR visualType pivotTable and generates ordered Rows, optional Columns, and Values projections from a Desktop-authored reference shape. Local golden and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the binding/canvas baseline. Current generated title container bytes await Desktop re-verification; validator-rejected general.altText is omitted.",
+        reason: "The CLI resolves matrix to the PBIR visualType pivotTable and generates ordered Rows, optional Columns, and Values projections from a Desktop-authored reference shape. Matrices with multiple Rows bindings also enable Desktop's native per-row +/- expand/collapse controls. Local golden and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the binding/canvas baseline. Current generated title container bytes await Desktop re-verification; validator-rejected general.altText is omitted.",
         next_proof: &[
             "Automate the manual matrix canvas and refresh assertions as the desktop-canvas-refresh proof level",
             "Widen typed matrix formatting and hierarchy coverage with Desktop-authored fixtures and PBIR readback",
@@ -853,13 +853,14 @@ const FEATURE_CATALOG: &[Feature] = &[
         proof_level: "unit-smoke",
         emits_pbir: true,
         commands: &[
+            "report build",
             "report interactions list",
             "report interactions show",
             "report interactions set",
             "report interactions disable",
         ],
         refusal_code: None,
-        reason: "DataFilter, HighlightFilter, and NoFilter rows can be inspected and upserted in page visualInteractions.",
+        reason: "DataFilter, HighlightFilter, and NoFilter rows can be declared by page-local visual ID during report build, then inspected and upserted in page visualInteractions.",
         next_proof: &["Desktop fixture for Default/reset semantics and interaction UI state"],
         reference_signals: &[
             "https://github.com/data-goblin/power-bi-agentic-development @ 9704f1d: PBIR visualInteractions references and examples",
@@ -1027,7 +1028,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report slicers clear",
         ],
         refusal_code: None,
-        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between provides a numeric/date range slider. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
+        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between also writes /visual/objects/slider.show=true so the numeric/date range is an explicit draggable band. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
         next_proof: &[
             "Automate the manual slicer canvas, refresh, and interaction assertions as the desktop-canvas-refresh proof level",
             "Widen typed slicer formatting and mode coverage with Desktop-authored fixtures and PBIR readback",

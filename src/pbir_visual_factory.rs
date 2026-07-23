@@ -3,6 +3,8 @@ use crate::{CliError, CliResult};
 use serde_json::{Map, Value, json};
 
 const VISUAL_CONTAINER_SCHEMA: &str = "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json";
+pub(crate) const SLICER_MIN_HEIGHT: f64 = 76.0;
+pub(crate) const BETWEEN_SLICER_MIN_HEIGHT: f64 = 104.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SlicerMode {
@@ -51,6 +53,7 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
         )));
     }
     validate_slicer_mode_binding(spec)?;
+    validate_slicer_height(spec)?;
     let mut visual_config = Map::new();
     visual_config.insert(
         "visualType".to_string(),
@@ -68,6 +71,33 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
             json!([{
                 "properties": {
                     "mode": literal_text_expression(mode.as_str())
+                }
+            }]),
+        );
+        if mode == SlicerMode::Between {
+            objects.insert(
+                "slider".to_string(),
+                json!([{
+                    "properties": {
+                        "show": literal_bool_expression(true)
+                    }
+                }]),
+            );
+        }
+    }
+    if spec.visual_type == "pivotTable"
+        && spec
+            .bindings
+            .iter()
+            .filter(|binding| binding.role == "Rows")
+            .count()
+            > 1
+    {
+        objects.insert(
+            "rowHeaders".to_string(),
+            json!([{
+                "properties": {
+                    "showExpandCollapseButtons": literal_bool_expression(true)
                 }
             }]),
         );
@@ -115,6 +145,32 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
             }
         ]
     }))
+}
+
+fn validate_slicer_height(spec: &VisualBuildSpec) -> CliResult<()> {
+    if spec.visual_type != "slicer" {
+        return Ok(());
+    }
+    let minimum = if spec.slicer_mode == Some(SlicerMode::Between) {
+        BETWEEN_SLICER_MIN_HEIGHT
+    } else {
+        SLICER_MIN_HEIGHT
+    };
+    if spec.height >= minimum {
+        return Ok(());
+    }
+    let qualifier = if spec.slicer_mode == Some(SlicerMode::Between) {
+        "Between slicer"
+    } else {
+        "slicer"
+    };
+    Err(CliError::invalid_args(format!(
+        "{qualifier} height {} is below the Power BI minimum of {minimum}",
+        spec.height
+    ))
+    .with_hint(format!(
+        "Increase --height to at least {minimum}; range slicers need room for both handles and the draggable band."
+    )))
 }
 
 fn validate_slicer_mode_binding(spec: &VisualBuildSpec) -> CliResult<()> {

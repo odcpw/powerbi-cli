@@ -821,8 +821,16 @@ new families are therefore `manual-desktop-canvas-refresh`; automation and
 wider formatting/PBIR readback coverage are still required.
 
 The slicer generator also accepts `--mode between`, which emits Desktop's
-`'Between'` mode literal for a numeric/date range slider. The literal is covered
-locally; a checked-in automated Desktop interaction proof remains pending.
+`'Between'` mode literal and `slider.show = true` for a numeric/date range
+slider. The authoring path enforces a 104-pixel minimum height; at the generic
+76-pixel slicer minimum, Desktop can retain accessible slider handles while
+clipping the visible band. Both properties are covered locally; a checked-in
+automated Desktop interaction proof remains pending.
+
+For a matrix with more than one `Rows` binding, the generator emits
+`rowHeaders.showExpandCollapseButtons = true`. This is Desktop's authored
+property for the native per-row `+/-` hierarchy controls; the user does not have
+to rely on the visual-header drill buttons.
 
 Add:
 

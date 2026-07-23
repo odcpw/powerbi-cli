@@ -87,7 +87,10 @@ mod workflow;
 pub(crate) use doctor::doctor_json;
 
 use crate::pbir_bindings::{VisualBindingKind, VisualBindingResolved};
-use crate::pbir_visual_factory::{VisualBuildSpec, resolve_slicer_mode, visual_container_json};
+use crate::pbir_visual_factory::{
+    BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, VisualBuildSpec, resolve_slicer_mode,
+    visual_container_json,
+};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -275,6 +278,8 @@ struct ColumnSpec {
     is_key: bool,
     #[serde(default)]
     summarize_by: Option<String>,
+    #[serde(default)]
+    sort_by_column: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -318,6 +323,17 @@ struct PageSpec {
     height: Option<f64>,
     #[serde(default)]
     visuals: Vec<VisualSpec>,
+    #[serde(default)]
+    interactions: Vec<VisualInteractionSpec>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct VisualInteractionSpec {
+    source: String,
+    target: String,
+    #[serde(rename = "type")]
+    interaction_type: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -965,23 +981,35 @@ fn write_project(spec: &DashboardSpec, out_dir: &Path) -> CliResult<()> {
                 visuals_dir.display()
             ))
         })?;
-        write_json_file(
-            &page_dir.join("page.json"),
-            &json!({
-                "$schema": PAGE_SCHEMA,
-                "name": page_name,
-                "displayName": page_display_name,
-                "displayOption": "FitToPage",
-                "height": page.height.unwrap_or(720.0),
-                "width": page.width.unwrap_or(1280.0),
-                "annotations": [
-                    {
-                        "name": "powerbi-cli.layout",
-                        "value": "Visual containers are intentionally unbound placeholders unless the source manifest supplies later binding metadata."
-                    }
-                ]
-            }),
-        )?;
+        let mut page_json = json!({
+            "$schema": PAGE_SCHEMA,
+            "name": page_name,
+            "displayName": page_display_name,
+            "displayOption": "FitToPage",
+            "height": page.height.unwrap_or(720.0),
+            "width": page.width.unwrap_or(1280.0),
+            "annotations": [
+                {
+                    "name": "powerbi-cli.layout",
+                    "value": "Visual containers are intentionally unbound placeholders unless the source manifest supplies later binding metadata."
+                }
+            ]
+        });
+        if !page.interactions.is_empty() {
+            page_json["visualInteractions"] = Value::Array(
+                page.interactions
+                    .iter()
+                    .map(|interaction| {
+                        json!({
+                            "source": interaction.source,
+                            "target": interaction.target,
+                            "type": interaction.interaction_type
+                        })
+                    })
+                    .collect(),
+            );
+        }
+        write_json_file(&page_dir.join("page.json"), &page_json)?;
 
         for (visual_index, visual) in page.visuals.iter().enumerate() {
             let visual_name = visual.name.clone().unwrap_or_else(|| {
@@ -1076,6 +1104,7 @@ fn effective_pages(spec: &DashboardSpec) -> Vec<PageSpec> {
             // A blank page is valid PBIR. Inventing data visuals without model bindings is not:
             // Microsoft's consumed report surface rejects them with PBIR_QUERY_STATE_MISSING.
             visuals: Vec::new(),
+            interactions: Vec::new(),
         }]
     } else {
         spec.pages.clone()
@@ -1090,6 +1119,7 @@ impl Clone for PageSpec {
             width: self.width,
             height: self.height,
             visuals: self.visuals.clone(),
+            interactions: self.interactions.clone(),
         }
     }
 }
@@ -1251,6 +1281,30 @@ fn table_tmdl(table: &TableSpec) -> CliResult<String> {
             "        sourceColumn: {}\n",
             tmdl_object_name(column.source_column.as_deref().unwrap_or(&column.name))
         ));
+        if let Some(sort_by_column) = column.sort_by_column.as_deref() {
+            if sort_by_column.eq_ignore_ascii_case(&column.name) {
+                return Err(CliError::invalid_args(format!(
+                    "table {} column {} cannot sort by itself",
+                    table.name, column.name
+                ))
+                .with_hint("Set sortByColumn to a different column in the same table."));
+            }
+            if !table
+                .columns
+                .iter()
+                .any(|candidate| candidate.name.eq_ignore_ascii_case(sort_by_column))
+            {
+                return Err(CliError::invalid_args(format!(
+                    "table {} column {} sortByColumn target {} does not exist",
+                    table.name, column.name, sort_by_column
+                ))
+                .with_hint("Add the sort column to the same table or correct sortByColumn."));
+            }
+            out.push_str(&format!(
+                "        sortByColumn: {}\n",
+                tmdl_object_name(sort_by_column)
+            ));
+        }
         if column.is_hidden {
             out.push_str("        isHidden\n");
         }
@@ -1577,6 +1631,54 @@ mod m_literal_tests {
             Some("#datetime(2015, 1, 23, 14, 5, 9)")
         );
     }
+
+    #[test]
+    fn table_manifest_emits_valid_sort_by_column_metadata() {
+        let spec: DashboardSpec = serde_json::from_value(json!({
+            "name": "SortProof",
+            "tables": [{
+                "name": "Severity",
+                "columns": [
+                    {
+                        "name": "Label",
+                        "dataType": "string",
+                        "sortByColumn": "Order"
+                    },
+                    {
+                        "name": "Order",
+                        "dataType": "int64"
+                    }
+                ]
+            }]
+        }))
+        .expect("manifest");
+
+        let tmdl = table_tmdl(&spec.tables[0]).expect("table TMDL");
+        assert!(tmdl.contains("sortByColumn: Order"));
+    }
+
+    #[test]
+    fn table_manifest_rejects_missing_sort_by_column_target() {
+        let spec: DashboardSpec = serde_json::from_value(json!({
+            "name": "SortProof",
+            "tables": [{
+                "name": "Severity",
+                "columns": [{
+                    "name": "Label",
+                    "dataType": "string",
+                    "sortByColumn": "Missing"
+                }]
+            }]
+        }))
+        .expect("manifest");
+
+        let error = table_tmdl(&spec.tables[0]).expect_err("missing sort target");
+        assert!(
+            error
+                .message
+                .contains("sortByColumn target Missing does not exist")
+        );
+    }
 }
 
 fn m_identifier(name: &str) -> String {
@@ -1688,7 +1790,8 @@ fn spec_to_json(spec: &DashboardSpec) -> Value {
                     "sourceColumn": column.source_column,
                     "isHidden": column.is_hidden,
                     "isKey": column.is_key,
-                    "summarizeBy": column.summarize_by
+                    "summarizeBy": column.summarize_by,
+                    "sortByColumn": column.sort_by_column
                 })).collect::<Vec<_>>(),
                 "measures": table.measures.iter().map(|measure| json!({
                     "name": measure.name,
@@ -1738,6 +1841,11 @@ fn spec_to_json(spec: &DashboardSpec) -> Value {
                     "y": visual.y,
                     "width": visual.width,
                     "height": visual.height
+                })).collect::<Vec<_>>(),
+                "interactions": page.interactions.iter().map(|interaction| json!({
+                    "source": interaction.source,
+                    "target": interaction.target,
+                    "type": interaction.interaction_type
                 })).collect::<Vec<_>>()
         })).collect::<Vec<_>>()
     })
@@ -2729,22 +2837,34 @@ fn check_visual_minimum_size(
     visual: &Value,
     report: &mut ValidationReport,
 ) {
-    const SLICER_MIN_HEIGHT: f64 = 76.0;
-
     if visual["visual"]["visualType"].as_str() != Some("slicer") {
         return;
     }
+    let is_between = visual
+        .pointer("/visual/objects/data/0/properties/mode/expr/Literal/Value")
+        .and_then(Value::as_str)
+        == Some("'Between'");
+    let minimum = if is_between {
+        BETWEEN_SLICER_MIN_HEIGHT
+    } else {
+        SLICER_MIN_HEIGHT
+    };
+    let qualifier = if is_between {
+        "Between slicer"
+    } else {
+        "slicer"
+    };
     let Some(height) = visual["position"]["height"].as_f64() else {
         report.errors.push(format!(
-            "{} slicer position.height must be a number of at least {SLICER_MIN_HEIGHT}",
-            visual_json_path.display()
+            "{} {qualifier} position.height must be a number of at least {minimum}",
+            visual_json_path.display(),
         ));
         return;
     };
-    if height < SLICER_MIN_HEIGHT {
+    if height < minimum {
         report.errors.push(format!(
-            "{} slicer height {height} is below the Power BI minimum of {SLICER_MIN_HEIGHT}",
-            visual_json_path.display()
+            "{} {qualifier} height {height} is below the Power BI minimum of {minimum}",
+            visual_json_path.display(),
         ));
     }
 }

@@ -154,6 +154,83 @@ fn generic_dashboard_build_validates_handoff_and_matches_golden() {
 }
 
 #[test]
+fn dashboard_build_emits_declared_visual_interactions() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let spec_path = temp.path().join("interactions.dashboard.json");
+    let project = temp.path().join("interaction_project");
+    let project_arg = path_arg(&project);
+    let mut spec: Value = serde_json::from_str(
+        &fs::read_to_string("examples/sales.dashboard.json").expect("sales spec"),
+    )
+    .expect("parse sales spec");
+    spec["pages"][0]["interactions"] = json!([{
+        "source": "customer_detail",
+        "target": "revenue_trend",
+        "type": "DataFilter"
+    }]);
+    fs::write(
+        &spec_path,
+        serde_json::to_vec_pretty(&spec).expect("spec json"),
+    )
+    .expect("write spec");
+    let spec_arg = path_arg(&spec_path);
+
+    let build = run_powerbi(&[
+        "report",
+        "build",
+        "--schema",
+        "examples/sales.schema.json",
+        "--spec",
+        &spec_arg,
+        "--out-dir",
+        &project_arg,
+        "--json",
+    ]);
+    assert_eq!(build.code, 0, "stderr: {}", build.stderr);
+
+    let page_path = project
+        .join("SalesOperations.Report")
+        .join("definition")
+        .join("pages")
+        .join("ReportSectionOverview")
+        .join("page.json");
+    let page: Value = serde_json::from_str(&fs::read_to_string(page_path).expect("page json"))
+        .expect("parse page");
+    assert_eq!(
+        page["visualInteractions"],
+        json!([{
+            "source": "VisualContainerCustomerDetail",
+            "target": "VisualContainerRevenueTrend",
+            "type": "DataFilter"
+        }])
+    );
+
+    spec["pages"][0]["interactions"][0]["source"] = Value::from("missing_visual");
+    fs::write(
+        &spec_path,
+        serde_json::to_vec_pretty(&spec).expect("invalid spec json"),
+    )
+    .expect("write invalid spec");
+    let invalid = run_powerbi(&[
+        "report",
+        "spec",
+        "validate",
+        "--schema",
+        "examples/sales.schema.json",
+        "--spec",
+        &spec_arg,
+        "--json",
+    ]);
+    assert_eq!(invalid.code, 10);
+    assert!(
+        stdout_json(&invalid)["errors"][0]
+            .as_str()
+            .unwrap_or_default()
+            .contains("source visual missing_visual does not exist")
+    );
+}
+
+#[test]
 fn report_build_requires_exactly_one_output_mode_and_reports_dry_run_changes() {
     let temp = tempfile::tempdir().expect("tempdir");
     let ignored_out = temp.path().join("must-not-exist");
@@ -1244,6 +1321,19 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
                 ]
             }),
             "requires a numeric or date column",
+        ),
+        (
+            "between-too-short",
+            json!({
+                "id": "bad_short_range",
+                "type": "slicer",
+                "mode": "between",
+                "layout": { "x": 20, "y": 20, "width": 600, "height": 76 },
+                "bindings": [
+                    { "role": "Values", "field": "CatalogFacts[Year]" }
+                ]
+            }),
+            "Between slicer height must be at least 104",
         ),
     ];
 

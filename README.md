@@ -320,10 +320,14 @@ Start with `examples/sales.schema.json` for a tiny star-schema smoke test, or
 exercises drillthrough chains, TopN-by-measure filters, multi-page slicers,
 and non-ASCII column/measure names. The manifest describes:
 
-- `tables`: table names, columns, types, measures, and optional dummy rows
+- `tables`: table names, columns, types, measures, optional dummy rows, and
+  optional same-table `sortByColumn` metadata for controlled display order
 - `relationships`: column-to-column model relationships
 - `pages`: report pages and visual containers
 - `bindings`: visual field-well bindings by role, table, and column/measure
+- `interactions`: optional same-page visual pairs with `DataFilter`,
+  `HighlightFilter`, or `NoFilter`; referenced visual IDs are validated and
+  compiled into PBIR `visualInteractions`
 
 Semantic-model handles percent-encode literal `%` and `:` inside table, column,
 measure, and partition components as `%25` and `%3A`; always reuse returned
@@ -409,10 +413,13 @@ three pages.
   `queryState` because Desktop silently leaves that field well unbound.
   Pie and donut use exactly one Category column plus one or more Y measures and
   emit the Desktop-authored default descending sort by the first Y field. Matrix
-  uses ordered Rows, optional Columns, and one or more Values measures. Slicer
+  uses ordered Rows, optional Columns, and one or more Values measures; matrices
+  with multiple row levels expose the native `+/-` expand/collapse controls. Slicer
   uses exactly one Values column and emits Basic (default), Dropdown, or Between
-  mode under `/visual/objects/data`; use Between for a numeric/date range slider.
-  It never generates persisted selection state.
+  mode under `/visual/objects/data`; Between also emits
+  `/visual/objects/slider.show = true` for a visible draggable range band. It
+  requires a height of at least 104 so Desktop has room to render both handles
+  and the band, and never generates persisted selection state.
   The four binding families retain `manual-desktop-canvas-refresh` evidence:
   `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` records
   refreshed Desktop canvases with exact expected values plus live slicer

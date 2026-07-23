@@ -2,7 +2,8 @@ use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes,
 };
 use crate::pbir_visual_factory::{
-    SlicerMode, resolve_slicer_mode, slicer_between_data_type_is_supported,
+    BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
+    slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_spec_fields::fields_command;
@@ -419,9 +420,98 @@ fn compile_pages(spec: &Map<String, Value>, model: &ModelIndex) -> CliResult<Vec
         }
         let visuals = compile_visuals(page_index, page, model)?;
         out.insert("visuals".to_string(), Value::Array(visuals));
+        let interactions = compile_interactions(page_index, page)?;
+        if !interactions.is_empty() {
+            out.insert("interactions".to_string(), Value::Array(interactions));
+        }
         pages.push(Value::Object(out));
     }
     Ok(pages)
+}
+
+fn compile_interactions(page_index: usize, page: &Map<String, Value>) -> CliResult<Vec<Value>> {
+    let Some(raw_interactions) = page.get("interactions") else {
+        return Ok(Vec::new());
+    };
+    let interactions = raw_interactions.as_array().ok_or_else(|| {
+        CliError::invalid_args(format!("pages[{page_index}].interactions must be an array"))
+    })?;
+    let mut visual_names = BTreeMap::new();
+    for visual in page
+        .get("visuals")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(id) = visual
+            .get("id")
+            .or_else(|| visual.get("name"))
+            .and_then(Value::as_str)
+        else {
+            continue;
+        };
+        let name = visual_name(id);
+        visual_names.insert(id.to_ascii_lowercase(), name.clone());
+        visual_names.insert(name.to_ascii_lowercase(), name);
+    }
+
+    let mut compiled = Vec::new();
+    let mut pairs = BTreeSet::new();
+    for (interaction_index, interaction) in interactions.iter().enumerate() {
+        let interaction = interaction.as_object().ok_or_else(|| {
+            CliError::invalid_args(format!(
+                "pages[{page_index}].interactions[{interaction_index}] must be an object"
+            ))
+        })?;
+        let source_ref = required_string(interaction, "source", "page interaction")?;
+        let target_ref = required_string(interaction, "target", "page interaction")?;
+        let source = visual_names
+            .get(&source_ref.to_ascii_lowercase())
+            .cloned()
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].interactions[{interaction_index}] source visual {source_ref} does not exist on the page"
+                ))
+            })?;
+        let target = visual_names
+            .get(&target_ref.to_ascii_lowercase())
+            .cloned()
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].interactions[{interaction_index}] target visual {target_ref} does not exist on the page"
+                ))
+            })?;
+        if source == target {
+            return Err(CliError::invalid_args(format!(
+                "pages[{page_index}].interactions[{interaction_index}] source and target must be different visuals"
+            )));
+        }
+        let interaction_type =
+            normalize_interaction_type(&required_string(interaction, "type", "page interaction")?)?;
+        if !pairs.insert((source.clone(), target.clone())) {
+            return Err(CliError::invalid_args(format!(
+                "pages[{page_index}] contains duplicate interactions for source {source_ref} and target {target_ref}"
+            )));
+        }
+        compiled.push(json!({
+            "source": source,
+            "target": target,
+            "type": interaction_type
+        }));
+    }
+    Ok(compiled)
+}
+
+fn normalize_interaction_type(value: &str) -> CliResult<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "datafilter" | "data-filter" | "filter" => Ok("DataFilter"),
+        "highlightfilter" | "highlight-filter" | "highlight" => Ok("HighlightFilter"),
+        "nofilter" | "no-filter" | "none" | "disabled" => Ok("NoFilter"),
+        _ => Err(CliError::invalid_args(format!(
+            "unsupported dashboard interaction type: {value}"
+        ))
+        .with_hint("Use DataFilter, HighlightFilter, or NoFilter.")),
+    }
 }
 
 fn compile_visuals(
@@ -473,7 +563,7 @@ fn compile_visuals(
             out.insert("title".to_string(), Value::String(title.to_string()));
         }
         apply_layout(visual_index, visual, &mut out);
-        validate_minimum_visual_size(page_index, visual_index, &visual_type, &out)?;
+        validate_minimum_visual_size(page_index, visual_index, &visual_type, slicer_mode, &out)?;
         let bindings = compile_bindings(page_index, visual_index, &visual_type, visual, model)?;
         validate_binding_contract(page_index, visual_index, &visual_type, &bindings)?;
         if slicer_mode == Some(SlicerMode::Between) {
@@ -497,22 +587,31 @@ fn validate_minimum_visual_size(
     page_index: usize,
     visual_index: usize,
     visual_type: &str,
+    slicer_mode: Option<SlicerMode>,
     visual: &Map<String, Value>,
 ) -> CliResult<()> {
-    const SLICER_MIN_HEIGHT: f64 = 76.0;
-
     if visual_type == "slicer" {
+        let minimum = if slicer_mode == Some(SlicerMode::Between) {
+            BETWEEN_SLICER_MIN_HEIGHT
+        } else {
+            SLICER_MIN_HEIGHT
+        };
+        let qualifier = if slicer_mode == Some(SlicerMode::Between) {
+            "Between slicer"
+        } else {
+            "slicer"
+        };
         let height = visual
             .get("height")
             .and_then(Value::as_f64)
             .ok_or_else(|| {
                 CliError::invalid_args(format!(
-                    "pages[{page_index}].visuals[{visual_index}] slicer height must be a number of at least {SLICER_MIN_HEIGHT} for Power BI compatibility"
+                    "pages[{page_index}].visuals[{visual_index}] {qualifier} height must be a number of at least {minimum} for Power BI compatibility"
                 ))
             })?;
-        if height < SLICER_MIN_HEIGHT {
+        if height < minimum {
             return Err(CliError::invalid_args(format!(
-                "pages[{page_index}].visuals[{visual_index}] slicer height must be at least {SLICER_MIN_HEIGHT} for Power BI compatibility"
+                "pages[{page_index}].visuals[{visual_index}] {qualifier} height must be at least {minimum} for Power BI compatibility"
             )));
         }
     }

@@ -8720,12 +8720,14 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             mode: None,
             add_bindings: &[
                 "role=Rows,table=CatalogFacts,column=Category",
-                "role=Columns,table=CatalogFacts,column=Year",
+                "role=Rows,table=CatalogFacts,column=Year",
+                "role=Columns,table=CatalogFacts,column=Amount",
                 "role=Values,table=CatalogFacts,measure=Total Amount",
             ],
             replacement_bindings: &[
                 "role=Rows,table=CatalogFacts,column=Category",
-                "role=Columns,table=CatalogFacts,column=Year",
+                "role=Rows,table=CatalogFacts,column=Year",
+                "role=Columns,table=CatalogFacts,column=Amount",
                 "role=Values,table=CatalogFacts,measure=Total Amount",
             ],
             roles: &["Rows", "Columns", "Values"],
@@ -8852,6 +8854,11 @@ fn report_visual_new_families_round_trip_add_format_bind_clone_and_delete() {
             assert_eq!(
                 raw["visual"]["query"]["queryState"]["Columns"]["projections"][0]["active"],
                 Value::Bool(true)
+            );
+            assert_eq!(
+                raw["visual"]["objects"]["rowHeaders"][0]["properties"]["showExpandCollapseButtons"]
+                    ["expr"]["Literal"]["Value"],
+                "true"
             );
         } else {
             assert_eq!(
@@ -9773,6 +9780,40 @@ fn report_visual_new_families_reject_invalid_bindings_and_slicer_modes() {
         between_json["changes"][0]["after"]["visual"]["objects"]["data"][0]["properties"]["mode"]["expr"]
             ["Literal"]["Value"],
         "'Between'"
+    );
+    assert_eq!(
+        between_json["changes"][0]["after"]["visual"]["objects"]["slider"][0]["properties"]["show"]
+            ["expr"]["Literal"]["Value"],
+        "true"
+    );
+
+    let between_too_short = run_powerbi(&[
+        "report",
+        "visuals",
+        "add",
+        "--project",
+        project_arg,
+        "--page",
+        page,
+        "--visual-type",
+        "slicer",
+        "--mode",
+        "between",
+        "--title",
+        "Clipped range",
+        "--binding",
+        "role=Values,table=CatalogFacts,column=Year",
+        "--height",
+        "76",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(between_too_short.code, 2);
+    assert!(
+        stderr_json(&between_too_short)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Between slicer height 76")
     );
 
     let between_text = run_powerbi(&[
