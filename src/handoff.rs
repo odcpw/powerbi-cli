@@ -148,11 +148,19 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
     let has_dummy_sources = partitions
         .iter()
         .any(|partition| partition.source_kind == "dummyMTable");
-    let source_mode = match (has_live_sources, has_dummy_sources) {
-        (true, true) => "mixed",
-        (true, false) => "live",
-        (false, true) => "dummy",
-        (false, false) => "unknown",
+    let has_model_derived_sources = partitions
+        .iter()
+        .any(|partition| partition.source_kind == "modelDerived");
+    let source_mode = match (
+        has_live_sources,
+        has_dummy_sources,
+        has_model_derived_sources,
+    ) {
+        (true, false, false) => "live",
+        (false, true, false) => "dummy",
+        (false, false, true) => "modelDerived",
+        (false, false, false) => "unknown",
+        _ => "mixed",
     };
     let project_arg = command_arg(&resolved.project_dir);
 
@@ -274,11 +282,16 @@ fn add_partition_findings(
     for finding in &partition.safety.findings {
         let accepted_live_source =
             target == HandoffTarget::Work && finding.code.starts_with("partition.real_connector.");
+        let accepted_model_derived = target == HandoffTarget::Work
+            && partition.source_kind == "modelDerived"
+            && finding.code == "partition.model_derived";
         findings.push(json!({
             "code": finding.code,
-            "severity": if accepted_live_source { "info" } else { finding.severity.as_str() },
+            "severity": if accepted_live_source || accepted_model_derived { "info" } else { finding.severity.as_str() },
             "message": if accepted_live_source {
                 format!("recognized live connector accepted for work target: {}", partition.source_kind)
+            } else if accepted_model_derived {
+                "model-derived partition accepted for work target".to_string()
             } else {
                 finding.message.clone()
             },
@@ -296,6 +309,7 @@ fn add_partition_findings(
         }));
     } else if target == HandoffTarget::Work
         && partition.source_kind != "dummyMTable"
+        && partition.source_kind != "modelDerived"
         && !is_recognized_live_source(&partition.source_kind)
     {
         findings.push(json!({
@@ -327,6 +341,11 @@ fn partition_safe_for_target(partition: &PartitionRecord, target: HandoffTarget)
                     && !finding.code.starts_with("partition.real_connector.")
             })
         }
+        HandoffTarget::Work if partition.source_kind == "modelDerived" => !partition
+            .safety
+            .findings
+            .iter()
+            .any(|finding| finding.severity == "error"),
         HandoffTarget::Work => false,
     }
 }

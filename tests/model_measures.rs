@@ -599,6 +599,65 @@ fn model_measures_update_refuses_lossy_unknown_metadata() {
 }
 
 #[test]
+fn model_measures_update_preserves_existing_hidden_flag() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let out = project.to_str().expect("project path");
+    let table_path = fact_sales_tmdl(&project);
+    let text = fs::read_to_string(&table_path).expect("FactSales.tmdl");
+    let marker = "    measure 'Total Revenue' = SUM('FactSales'[Revenue])\n";
+    let with_hidden = text.replace(marker, &format!("{marker}        isHidden\n"));
+    assert_ne!(text, with_hidden, "test fixture marker should be present");
+    fs::write(&table_path, &with_hidden).expect("write hidden measure flag");
+
+    let update = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Total Revenue",
+        "--description",
+        "Hidden measure",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(update.code, 0, "stderr: {}", update.stderr);
+
+    let updated = fs::read_to_string(&table_path).expect("FactSales.tmdl after update");
+    assert!(updated.contains("    measure 'Total Revenue' = SUM('FactSales'[Revenue])"));
+    assert_eq!(
+        updated.matches("        isHidden\n").count(),
+        1,
+        "the existing flag should be preserved exactly once"
+    );
+
+    let show = run_powerbi(&[
+        "model",
+        "measures",
+        "show",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Total Revenue",
+        "--json",
+    ]);
+    assert_eq!(show.code, 0, "stderr: {}", show.stderr);
+    assert_eq!(
+        stdout_json(&show)["measure"]["expression"],
+        Value::from("SUM('FactSales'[Revenue])")
+    );
+    assert_eq!(
+        stdout_json(&show)["measure"]["properties"]["description"],
+        Value::from("Hidden measure")
+    );
+
+    let validate = run_powerbi(&["validate", "--strict", out, "--json"]);
+    assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
+}
+
+#[test]
 fn model_measure_mutations_require_explicit_output_mode() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales_project(temp.path());

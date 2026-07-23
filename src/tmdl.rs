@@ -12,6 +12,7 @@ pub(crate) struct MeasureRecord {
     pub(crate) format_string: Option<String>,
     pub(crate) display_folder: Option<String>,
     pub(crate) description: Option<String>,
+    pub(crate) is_hidden: bool,
     pub(crate) path: PathBuf,
     pub(crate) start_line: usize,
     pub(crate) end_line: usize,
@@ -131,6 +132,7 @@ pub(crate) struct MeasureDefinition {
     pub(crate) format_string: Option<String>,
     pub(crate) display_folder: Option<String>,
     pub(crate) description: Option<String>,
+    pub(crate) is_hidden: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -718,6 +720,14 @@ pub(crate) fn parse_table_document(path: PathBuf) -> CliResult<TableDocument> {
             index += 1;
         }
     }
+    if lines.iter().any(|line| {
+        is_table_child_with_prefix(line, "annotation ")
+            && line
+                .trim_start()
+                .eq_ignore_ascii_case("annotation PowerBICli_SourceKind = ModelDerived")
+    }) {
+        classify_annotated_model_derived(&mut partitions);
+    }
 
     Ok(TableDocument {
         table,
@@ -869,8 +879,13 @@ fn parse_measure_block(
     let mut format_string = None;
     let mut display_folder = None;
     let mut description = leading_description;
+    let mut is_hidden = false;
     for line in object_lines.iter().skip(1) {
         let trimmed = line.trim_start();
+        if tmdl_indent_width(line) == 8 && trimmed.trim() == "isHidden" {
+            is_hidden = true;
+            continue;
+        }
         if let Some((key, value)) = trimmed.split_once(':') {
             let value = value.trim();
             match key.trim() {
@@ -906,6 +921,7 @@ fn parse_measure_block(
         format_string,
         display_folder,
         description,
+        is_hidden,
         path: path.to_path_buf(),
         start_line,
         end_line: start_line + lines.len(),
@@ -1032,6 +1048,9 @@ pub(crate) fn measure_block_lines(table: &str, definition: &MeasureDefinition) -
             .clone()
             .unwrap_or_else(|| stable_guid(&format!("measure:{table}:{}", definition.name)))
     ));
+    if definition.is_hidden {
+        lines.push("        isHidden".to_string());
+    }
     if let Some(format_string) = &definition.format_string {
         lines.push(format!(
             "        formatString: {}",
@@ -1108,7 +1127,7 @@ fn unsupported_measure_line(record: &MeasureRecord) -> Option<String> {
     unsupported_expression_object_line(
         &record.block,
         &["lineageTag", "formatString", "displayFolder", "description"],
-        &[],
+        &["isHidden"],
     )
 }
 
@@ -1396,6 +1415,36 @@ fn classify_partition_source(
             findings,
         },
     )
+}
+
+fn classify_annotated_model_derived(partitions: &mut [PartitionRecord]) {
+    for partition in partitions
+        .iter_mut()
+        .filter(|partition| partition.source_kind == "unknown")
+    {
+        partition.source_kind = "modelDerived".to_string();
+        partition.safety.findings.retain(|finding| {
+            !matches!(
+                finding.code.as_str(),
+                "partition.source_unknown" | "partition.dummy_table_shape_unverified"
+            )
+        });
+        partition.safety.findings.push(partition_finding(
+            "partition.model_derived",
+            "warning",
+            "table annotation declares this partition model-derived; accept it for work handoff, but not offline handoff",
+        ));
+        partition.safety.status = if partition
+            .safety
+            .findings
+            .iter()
+            .any(|finding| finding.severity == "error")
+        {
+            "unsafe".to_string()
+        } else {
+            "review".to_string()
+        };
+    }
 }
 
 fn partition_finding(code: &str, severity: &str, message: &str) -> PartitionSafetyFinding {

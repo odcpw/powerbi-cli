@@ -531,9 +531,13 @@ the model column list, supported literal types, and row arity. PII-suspect row
 literals yield `status: review`. Partition show returns redacted previews by
 default; `--include-source` is refused unless the partition status is `safe`.
 For a canonical live-source report, use `--target work`: recognized connectors
-are accepted, but credentials, caches, embedded data, and unknown partition
-sources still fail. Check `safeForWorkHandoff`, not `safeForOfflineHandoff`, in
-that workflow.
+are accepted. Unknown M can be explicitly declared model-derived with the
+table-level TMDL annotation
+`annotation PowerBICli_SourceKind = ModelDerived`; this is an author trust
+contract, remains non-home-safe, and never overrides credential or other error
+findings. Credentials, caches, embedded data, and unannotated unknown partition
+sources still fail. Check `safeForWorkHandoff`, not
+`safeForOfflineHandoff`, in that workflow.
 
 ### Prepare Source Templates And Rebind Plans
 
@@ -690,8 +694,11 @@ slicer requires exactly one Values column and supports Basic (default),
 Dropdown, or Between mode. Use Between for numeric/date range sliders. Generated
 slicers write mode under `/visual/objects/data`; Between additionally writes
 `/visual/objects/slider.show = true` and requires at least 104 pixels of height
-so Desktop has room to render the visible draggable band. They
-never write `general.filter` or other selection state.
+so Desktop has room to render the visible draggable band. In a dashboard spec,
+set `singleSelect: true` on a slicer when the downstream DAX expects exactly one
+selected value; this writes the native selection property without persisting a
+selected value. Generated slicers never write `general.filter` or other
+selection state.
 
 Schema manifests may set `sortByColumn` on a column to preserve controlled
 display order (for example, severity labels ordered by a hidden numeric column).

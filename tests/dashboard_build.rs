@@ -1311,6 +1311,30 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
             "unsupported slicer mode",
         ),
         (
+            "single-select-non-slicer",
+            json!({
+                "id": "bad_single_select_card",
+                "type": "card",
+                "singleSelect": true,
+                "bindings": [
+                    { "role": "Values", "field": "CatalogFacts[Total Amount]" }
+                ]
+            }),
+            "singleSelect is supported only for slicer visuals",
+        ),
+        (
+            "single-select-not-boolean",
+            json!({
+                "id": "bad_single_select_type",
+                "type": "slicer",
+                "singleSelect": "yes",
+                "bindings": [
+                    { "role": "Values", "field": "CatalogFacts[Category]" }
+                ]
+            }),
+            "singleSelect must be a boolean",
+        ),
+        (
             "slicer-too-short",
             json!({
                 "id": "bad_short_slicer",
@@ -1425,6 +1449,64 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
     ]);
     assert_eq!(between.code, 0, "stderr: {}", between.stderr);
     assert_eq!(stdout_json(&between)["ok"], Value::Bool(true));
+}
+
+#[test]
+fn dashboard_build_emits_single_select_slicer_property() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let spec_path = temp.path().join("single-select.dashboard.json");
+    let project = temp.path().join("single_select_project");
+    fs::write(
+        &spec_path,
+        serde_json::to_string_pretty(&json!({
+            "schema": "powerbi-cli.dashboard.v1",
+            "report": { "name": "VisualCatalogProof" },
+            "pages": [{
+                "id": "proof",
+                "visuals": [{
+                    "id": "category",
+                    "type": "slicer",
+                    "mode": "basic",
+                    "singleSelect": true,
+                    "bindings": [
+                        { "role": "Values", "field": "CatalogFacts[Category]" }
+                    ]
+                }]
+            }]
+        }))
+        .expect("serialize single-select spec"),
+    )
+    .expect("write single-select spec");
+
+    let build = run_powerbi(&[
+        "report",
+        "build",
+        "--schema",
+        "examples/archetypes/catalog-proof.schema.json",
+        "--spec",
+        &path_arg(&spec_path),
+        "--out-dir",
+        &path_arg(&project),
+        "--json",
+    ]);
+    assert_eq!(build.code, 0, "stderr: {}", build.stderr);
+
+    let visual_path = project
+        .join("VisualCatalogProof.Report")
+        .join("definition")
+        .join("pages")
+        .join("ReportSectionProof")
+        .join("visuals")
+        .join("VisualContainerCategory")
+        .join("visual.json");
+    let visual: Value =
+        serde_json::from_str(&fs::read_to_string(visual_path).expect("single-select visual.json"))
+            .expect("parse single-select visual.json");
+    assert_eq!(
+        visual["visual"]["objects"]["selection"][0]["properties"]["singleSelect"]["expr"]["Literal"]
+            ["Value"],
+        Value::from("true")
+    );
 }
 
 #[test]

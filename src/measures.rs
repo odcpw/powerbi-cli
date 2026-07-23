@@ -274,6 +274,7 @@ fn build_mutation_plan(
                 format_string: options.format_string.clone(),
                 display_folder: options.display_folder.clone(),
                 description: options.description.clone(),
+                is_hidden: false,
             };
             add_measure_plan(docs, table_name, definition)
         }
@@ -298,6 +299,7 @@ fn build_mutation_plan(
                     .description
                     .clone()
                     .or_else(|| existing.description.clone()),
+                is_hidden: existing.is_hidden,
             };
             replace_measure_plan(docs, &options.selector, definition)
         }

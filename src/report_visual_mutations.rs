@@ -134,6 +134,7 @@ pub(crate) fn add_visual(args: &[String]) -> CliResult<Value> {
         visual_type: visual_type.clone(),
         bindings: bindings.clone(),
         slicer_mode,
+        slicer_single_select: false,
         x,
         y,
         z,

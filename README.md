@@ -501,7 +501,10 @@ three pages.
   source kind, strict generated `#table(...)` shape/model-column/row-arity
   checks, redacted source previews, and offline safety findings. Full source and
   TMDL block readback requires `--include-source` and is refused for `review` or
-  `unsafe` partitions.
+  `unsafe` partitions. A table-level
+  `annotation PowerBICli_SourceKind = ModelDerived` explicitly marks unknown M
+  as model-derived: work handoff accepts it when no error finding remains, while
+  offline handoff still requires review and rejects it.
 - Programmatic advanced semantic-model readback covers
   `model advanced inventory` plus `model roles|perspectives|cultures|expressions
   list/show` for TMDL metadata already present in a project. Mutating those

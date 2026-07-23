@@ -654,6 +654,7 @@ fn extract_bracket_references(expression: &str) -> Vec<RawBracketRef> {
 
 fn extract_virtual_column_aliases(expression: &str) -> BTreeSet<String> {
     const EXTENSION_COLUMN_FUNCTIONS: &[&str] = &["ADDCOLUMNS", "SELECTCOLUMNS"];
+    const GROUPING_COLUMN_FUNCTIONS: &[&str] = &["SUMMARIZECOLUMNS"];
 
     let chars = expression.chars().collect::<Vec<_>>();
     let mut aliases = BTreeSet::new();
@@ -681,7 +682,20 @@ fn extract_virtual_column_aliases(expression: &str) -> BTreeSet<String> {
                 open += 1;
             }
             if chars.get(open) == Some(&'(') {
-                aliases.extend(extension_column_aliases_in_call(&chars, open + 1));
+                aliases.extend(virtual_column_aliases_in_call(&chars, open + 1, false));
+            }
+            break;
+        }
+        for function in GROUPING_COLUMN_FUNCTIONS {
+            if !dax_keyword_at(&chars, index, function) {
+                continue;
+            }
+            let mut open = index + function.len();
+            while chars.get(open).is_some_and(|ch| ch.is_whitespace()) {
+                open += 1;
+            }
+            if chars.get(open) == Some(&'(') {
+                aliases.extend(virtual_column_aliases_in_call(&chars, open + 1, true));
             }
             break;
         }
@@ -690,9 +704,14 @@ fn extract_virtual_column_aliases(expression: &str) -> BTreeSet<String> {
     aliases
 }
 
-fn extension_column_aliases_in_call(chars: &[char], start: usize) -> BTreeSet<String> {
+fn virtual_column_aliases_in_call(
+    chars: &[char],
+    start: usize,
+    aliases_start_at_first_quoted_argument: bool,
+) -> BTreeSet<String> {
     let mut aliases = BTreeSet::new();
     let mut argument_index = 0;
+    let mut first_alias_argument = None;
     let mut argument_start = start;
     let mut depth = 1;
     let mut index = start;
@@ -719,13 +738,23 @@ fn extension_column_aliases_in_call(chars: &[char], start: usize) -> BTreeSet<St
                         argument_start,
                         index,
                         argument_index,
+                        aliases_start_at_first_quoted_argument,
+                        &mut first_alias_argument,
                         &mut aliases,
                     );
                     break;
                 }
             }
             ',' if depth == 1 => {
-                collect_extension_alias(chars, argument_start, index, argument_index, &mut aliases);
+                collect_extension_alias(
+                    chars,
+                    argument_start,
+                    index,
+                    argument_index,
+                    aliases_start_at_first_quoted_argument,
+                    &mut first_alias_argument,
+                    &mut aliases,
+                );
                 argument_index += 1;
                 argument_start = index + 1;
             }
@@ -741,16 +770,23 @@ fn collect_extension_alias(
     start: usize,
     end: usize,
     argument_index: usize,
+    aliases_start_at_first_quoted_argument: bool,
+    first_alias_argument: &mut Option<usize>,
     aliases: &mut BTreeSet<String>,
 ) {
-    if argument_index.is_multiple_of(2) {
-        return;
-    }
     let mut index = start;
     while index < end && chars[index].is_whitespace() {
         index += 1;
     }
     if chars.get(index) != Some(&'"') {
+        return;
+    }
+    if aliases_start_at_first_quoted_argument {
+        let first = *first_alias_argument.get_or_insert(argument_index);
+        if !(argument_index - first).is_multiple_of(2) {
+            return;
+        }
+    } else if argument_index.is_multiple_of(2) {
         return;
     }
     index += 1;

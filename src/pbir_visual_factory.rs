@@ -30,6 +30,7 @@ pub(crate) struct VisualBuildSpec {
     pub(crate) visual_type: String,
     pub(crate) bindings: Vec<VisualBindingResolved>,
     pub(crate) slicer_mode: Option<SlicerMode>,
+    pub(crate) slicer_single_select: bool,
     pub(crate) x: f64,
     pub(crate) y: f64,
     pub(crate) z: u64,
@@ -84,6 +85,21 @@ pub(crate) fn visual_container_json(spec: &VisualBuildSpec) -> CliResult<Value> 
                 }]),
             );
         }
+    }
+    if spec.slicer_single_select {
+        if spec.visual_type != "slicer" {
+            return Err(CliError::invalid_args(
+                "singleSelect is supported only for slicer visuals",
+            ));
+        }
+        objects.insert(
+            "selection".to_string(),
+            json!([{
+                "properties": {
+                    "singleSelect": literal_bool_expression(true)
+                }
+            }]),
+        );
     }
     if spec.visual_type == "pivotTable"
         && spec

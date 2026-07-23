@@ -348,6 +348,8 @@ struct VisualSpec {
     #[serde(default)]
     mode: Option<String>,
     #[serde(default)]
+    single_select: bool,
+    #[serde(default)]
     bindings: Vec<VisualBindingSpec>,
     #[serde(default)]
     x: Option<f64>,
@@ -1133,6 +1135,7 @@ impl Clone for VisualSpec {
             visual_type: self.visual_type.clone(),
             title: self.title.clone(),
             mode: self.mode.clone(),
+            single_select: self.single_select,
             bindings: self.bindings.clone(),
             x: self.x,
             y: self.y,
@@ -1186,6 +1189,7 @@ fn visual_json(
         visual_type,
         bindings,
         slicer_mode,
+        slicer_single_select: visual.single_select,
         x: visual.x.unwrap_or(40.0 + (visual_index as f64 * 40.0)),
         y: visual.y.unwrap_or(40.0 + (visual_index as f64 * 40.0)),
         z: visual_index as u64,
@@ -1342,6 +1346,7 @@ fn table_tmdl(table: &TableSpec) -> CliResult<String> {
             format_string: measure.format_string.clone(),
             display_folder: measure.display_folder.clone(),
             description: measure.description.clone(),
+            is_hidden: false,
         };
         for line in tmdl::measure_block_lines(&table.name, &definition) {
             out.push_str(&line);

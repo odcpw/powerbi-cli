@@ -789,7 +789,7 @@ fn dax_dependencies_and_lint_report_static_reference_failures() {
 }
 
 #[test]
-fn dax_lint_accepts_addcolumns_and_selectcolumns_virtual_columns() {
+fn dax_lint_accepts_extension_and_grouping_virtual_columns() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());
     let project_arg = project.to_str().expect("project path");
@@ -805,7 +805,7 @@ fn dax_lint_accepts_addcolumns_and_selectcolumns_virtual_columns() {
         "--name",
         "Ranked Revenue",
         "--expression",
-        "VAR Ranked = ADDCOLUMNS(ALL('DimCustomer'[Segment]), \"__RankValue\", [Total Revenue]) VAR Projected = SELECTCOLUMNS(Ranked, \"__ProjectedValue\", [__RankValue]) RETURN MAXX(Projected, [__ProjectedValue])",
+        "VAR Grouped = SUMMARIZECOLUMNS('DimCustomer'[Segment], \"__GroupedValue\", [Total Revenue]) VAR Ranked = ADDCOLUMNS(Grouped, \"__RankValue\", [__GroupedValue]) VAR Projected = SELECTCOLUMNS(Ranked, \"__ProjectedValue\", [__RankValue]) RETURN MAXX(Projected, [__ProjectedValue])",
         "--in-place",
         "--json",
     ]);
@@ -821,6 +821,45 @@ fn dax_lint_accepts_addcolumns_and_selectcolumns_virtual_columns() {
             .expect("findings")
             .iter()
             .all(|finding| finding["code"] != "dax.reference_missing_measure")
+    );
+}
+
+#[test]
+fn dax_lint_does_not_treat_summarizecolumns_string_values_as_aliases() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+
+    let add = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--name",
+        "Broken Grouping Reference",
+        "--expression",
+        "VAR Grouped = SUMMARIZECOLUMNS('DimCustomer'[Segment], \"__GroupedValue\", \"constant\") RETURN MAXX(Grouped, [constant])",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+
+    let lint = run_powerbi(&["model", "dax", "lint", "--project", project_arg, "--json"]);
+    assert_ne!(lint.code, 0, "DAX lint should reject the missing reference");
+    assert!(
+        stdout_json(&lint)["findings"]
+            .as_array()
+            .expect("findings")
+            .iter()
+            .any(|finding| {
+                finding["code"] == "dax.reference_missing_measure"
+                    && finding["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("[constant]"))
+            })
     );
 }
 

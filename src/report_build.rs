@@ -559,6 +559,19 @@ fn compile_visuals(
         if let Some(mode) = slicer_mode {
             out.insert("mode".to_string(), Value::String(mode.as_str().to_string()));
         }
+        if let Some(single_select) = visual.get("singleSelect") {
+            let single_select = single_select.as_bool().ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].visuals[{visual_index}].singleSelect must be a boolean"
+                ))
+            })?;
+            if visual_type != "slicer" {
+                return Err(CliError::invalid_args(format!(
+                    "pages[{page_index}].visuals[{visual_index}].singleSelect is supported only for slicer visuals"
+                )));
+            }
+            out.insert("singleSelect".to_string(), Value::Bool(single_select));
+        }
         if let Some(title) = visual.get("title").and_then(Value::as_str) {
             out.insert("title".to_string(), Value::String(title.to_string()));
         }

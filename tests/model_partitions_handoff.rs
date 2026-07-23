@@ -348,6 +348,260 @@ fn work_handoff_accepts_recognized_live_connector_without_credentials() {
 }
 
 #[test]
+fn work_handoff_accepts_model_derived_m_but_offline_handoff_does_not() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let path = fact_sales_tmdl(&project);
+    let text = fs::read_to_string(&path)
+        .expect("FactSales.tmdl before")
+        .replacen(
+            "table FactSales\n",
+            "table FactSales\n    annotation PowerBICli_SourceKind = ModelDerived\n",
+            1,
+        );
+    let source_start = text.find("        source =").expect("source block");
+    let replacement = r#"        source =
+            let
+                Customers = Table.SelectColumns(DimCustomer, {"CustomerKey"}),
+                UniqueCustomers = Table.Distinct(Customers),
+                Others = #table(type table [CustomerKey = text], {{"~OTHERS"}}),
+                Source = Table.Combine({UniqueCustomers, Others})
+            in
+                Source
+
+"#;
+    fs::write(&path, format!("{}{}", &text[..source_start], replacement))
+        .expect("write model-derived source");
+
+    let list = run_powerbi(&[
+        "model",
+        "partitions",
+        "list",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--json",
+    ]);
+    assert_eq!(list.code, 0, "stderr: {}", list.stderr);
+    let partition = &stdout_json(&list)["partitions"][0];
+    assert_eq!(partition["sourceKind"], Value::from("modelDerived"));
+    assert_eq!(partition["offlineSafety"]["status"], Value::from("review"));
+    assert_eq!(
+        partition["offlineSafety"]["safeForHome"],
+        Value::Bool(false)
+    );
+
+    let offline = run_powerbi(&["handoff", "check", project_arg, "--json"]);
+    assert_eq!(offline.code, 10);
+    let offline_json = stdout_json(&offline);
+    assert_eq!(offline_json["safeForOfflineHandoff"], Value::Bool(false));
+    assert!(
+        offline_json["findings"]
+            .as_array()
+            .expect("offline findings")
+            .iter()
+            .any(|finding| finding["code"] == "handoff.partition_not_dummy")
+    );
+
+    let work = run_powerbi(&[
+        "handoff",
+        "check",
+        project_arg,
+        "--target",
+        "work",
+        "--json",
+    ]);
+    assert_eq!(work.code, 0, "stderr: {}", work.stderr);
+    let work_json = stdout_json(&work);
+    assert_eq!(work_json["safeForWorkHandoff"], Value::Bool(true));
+    assert_eq!(work_json["sourceMode"], Value::from("mixed"));
+    assert_eq!(
+        work_json["counts"]["safeForTargetPartitions"],
+        Value::from(3)
+    );
+    assert!(
+        work_json["findings"]
+            .as_array()
+            .expect("work findings")
+            .iter()
+            .any(|finding| {
+                finding["code"] == "partition.model_derived" && finding["severity"] == "info"
+            })
+    );
+}
+
+#[test]
+fn partition_level_annotation_does_not_reclassify_a_table_as_model_derived() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let path = fact_sales_tmdl(&project);
+    let text = fs::read_to_string(&path)
+        .expect("FactSales.tmdl before")
+        .replacen(
+            "    partition FactSales = m\n",
+            "    partition FactSales = m\n        annotation PowerBICli_SourceKind = ModelDerived\n",
+            1,
+        );
+    let source_start = text.find("        source =").expect("source block");
+    let replacement = r#"        source =
+            let
+                Customers = Table.SelectColumns(DimCustomer, {"CustomerKey"}),
+                Source = Table.Distinct(Customers)
+            in
+                Source
+
+"#;
+    fs::write(&path, format!("{}{}", &text[..source_start], replacement))
+        .expect("write partition-level annotation");
+
+    let list = run_powerbi(&[
+        "model",
+        "partitions",
+        "list",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--json",
+    ]);
+    assert_eq!(list.code, 0, "stderr: {}", list.stderr);
+    assert_eq!(
+        stdout_json(&list)["partitions"][0]["sourceKind"],
+        Value::from("unknown")
+    );
+
+    let work = run_powerbi(&[
+        "handoff",
+        "check",
+        project_arg,
+        "--target",
+        "work",
+        "--json",
+    ]);
+    assert_eq!(work.code, 10, "partition-level marker must not grant trust");
+    assert_eq!(stdout_json(&work)["safeForWorkHandoff"], Value::Bool(false));
+}
+
+#[test]
+fn work_handoff_still_rejects_unknown_query_and_connector_sources() {
+    for (case, replacement) in [
+        (
+            "unknown-query",
+            r#"        source =
+            let
+                Source = Table.SelectColumns(NotInTheModel, {"Revenue"})
+            in
+                Source
+
+"#,
+        ),
+        (
+            "unknown-connector",
+            r#"        source =
+            let
+                Source = AzureStorage.Blobs("work-account")
+            in
+                Source
+
+"#,
+        ),
+    ] {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let project = scaffold_sales_project(temp.path());
+        let project_arg = project.to_str().expect("project path");
+        let path = fact_sales_tmdl(&project);
+        let text = fs::read_to_string(&path).expect("FactSales.tmdl before");
+        let source_start = text.find("        source =").expect("source block");
+        fs::write(&path, format!("{}{}", &text[..source_start], replacement))
+            .expect("write unknown source");
+
+        let list = run_powerbi(&[
+            "model",
+            "partitions",
+            "list",
+            "--project",
+            project_arg,
+            "--table",
+            "FactSales",
+            "--json",
+        ]);
+        assert_eq!(list.code, 0, "{case} list stderr: {}", list.stderr);
+        assert_eq!(
+            stdout_json(&list)["partitions"][0]["sourceKind"],
+            Value::from("unknown"),
+            "{case}"
+        );
+
+        let work = run_powerbi(&[
+            "handoff",
+            "check",
+            project_arg,
+            "--target",
+            "work",
+            "--json",
+        ]);
+        assert_eq!(work.code, 10, "{case} work stderr: {}", work.stderr);
+        let work_json = stdout_json(&work);
+        assert_eq!(work_json["safeForWorkHandoff"], Value::Bool(false));
+        assert!(
+            work_json["findings"]
+                .as_array()
+                .expect("work findings")
+                .iter()
+                .any(|finding| { finding["code"] == "handoff.partition_source_unrecognized" })
+        );
+    }
+}
+
+#[test]
+fn work_handoff_rejects_credentials_in_model_derived_candidate() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let path = fact_sales_tmdl(&project);
+    let text = fs::read_to_string(&path)
+        .expect("FactSales.tmdl before")
+        .replacen(
+            "table FactSales\n",
+            "table FactSales\n    annotation PowerBICli_SourceKind = ModelDerived\n",
+            1,
+        );
+    let source_start = text.find("        source =").expect("source block");
+    let replacement = r#"        source =
+            let
+                Source = Table.SelectColumns(DimCustomer, {"CustomerKey"}),
+                Credential = "Password=secret"
+            in
+                Source
+
+"#;
+    fs::write(&path, format!("{}{}", &text[..source_start], replacement))
+        .expect("write credential-bearing source");
+
+    let work = run_powerbi(&[
+        "handoff",
+        "check",
+        project_arg,
+        "--target",
+        "work",
+        "--json",
+    ]);
+    assert_eq!(work.code, 10);
+    let work_json = stdout_json(&work);
+    assert_eq!(work_json["safeForWorkHandoff"], Value::Bool(false));
+    assert!(
+        work_json["findings"]
+            .as_array()
+            .expect("work findings")
+            .iter()
+            .any(|finding| { finding["code"] == "partition.credential_like_text" })
+    );
+}
+
+#[test]
 fn handoff_does_not_certify_arbitrary_table_substrings_or_mismatched_columns() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales_project(temp.path());

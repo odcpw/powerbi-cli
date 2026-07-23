@@ -94,8 +94,11 @@ fn slicer_record(visual: &VisualRecord) -> CliResult<ReportSlicerRecord> {
     let canonical = raw
         .as_ref()
         .and_then(|value| serde_json::to_string(value).ok());
-    let may_contain_data_values = raw.as_ref().is_some_and(slicer_may_contain_data_values);
-    let literal_count = raw
+    let state_only = raw.as_ref().map(without_native_single_select_formatting);
+    let may_contain_data_values = state_only
+        .as_ref()
+        .is_some_and(slicer_may_contain_data_values);
+    let literal_count = state_only
         .as_ref()
         .map(count_sensitive_literals)
         .unwrap_or_default();
@@ -112,7 +115,7 @@ fn slicer_record(visual: &VisualRecord) -> CliResult<ReportSlicerRecord> {
         page_name: visual.page_name.clone(),
         page_display_name: visual.page_display_name.clone(),
         page_ordinal: visual.page_ordinal,
-        state: slicer_state_summary_from_bindings(&visual.bindings, raw.as_ref()),
+        state: slicer_state_summary_from_bindings(&visual.bindings, state_only.as_ref()),
         fingerprint: canonical.map(|text| format!("fnv64:{}", fingerprint_hex(&text))),
         may_contain_data_values,
         literal_count,
@@ -192,6 +195,47 @@ fn slicer_may_contain_data_values(raw: &Value) -> bool {
             "identities",
         ],
     )
+}
+
+fn without_native_single_select_formatting(raw: &Value) -> Value {
+    let mut state_only = raw.clone();
+    for pointer in ["/visual/objects", "/objects"] {
+        let Some(objects) = state_only
+            .pointer_mut(pointer)
+            .and_then(Value::as_object_mut)
+        else {
+            continue;
+        };
+        if objects
+            .get("selection")
+            .is_some_and(is_native_single_select_formatting)
+        {
+            objects.remove("selection");
+        }
+    }
+    state_only
+}
+
+fn is_native_single_select_formatting(selection: &Value) -> bool {
+    let Some(entries) = selection.as_array().filter(|entries| !entries.is_empty()) else {
+        return false;
+    };
+    entries.iter().all(|entry| {
+        let Some(properties) = entry.get("properties").and_then(Value::as_object) else {
+            return false;
+        };
+        properties.len() == 1
+            && properties.iter().next().is_some_and(|(name, value)| {
+                name.eq_ignore_ascii_case("singleSelect")
+                    && value
+                        .pointer("/expr/Literal/Value")
+                        .and_then(Value::as_str)
+                        .is_some_and(|literal| {
+                            literal.eq_ignore_ascii_case("true")
+                                || literal.eq_ignore_ascii_case("false")
+                        })
+            })
+    })
 }
 
 fn safety_json(record: &ReportSlicerRecord, raw_included: bool) -> Value {
@@ -302,4 +346,55 @@ fn fingerprint_hex(text: &str) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_single_select_formatting_is_not_persisted_slicer_state() {
+        let raw = json!({
+            "visual": {
+                "objects": {
+                    "data": [{
+                        "properties": {
+                            "mode": { "expr": { "Literal": { "Value": "'Basic'" } } }
+                        }
+                    }],
+                    "selection": [{
+                        "properties": {
+                            "singleSelect": { "expr": { "Literal": { "Value": "true" } } }
+                        }
+                    }]
+                }
+            }
+        });
+        let state_only = without_native_single_select_formatting(&raw);
+        assert!(!slicer_may_contain_data_values(&state_only));
+        assert_eq!(count_sensitive_literals(&state_only), 0);
+        assert_eq!(
+            slicer_state_summary_from_bindings(&[], Some(&state_only))["hasSelectionState"],
+            Value::Bool(false)
+        );
+    }
+
+    #[test]
+    fn mixed_selection_state_is_not_hidden_as_formatting() {
+        let raw = json!({
+            "visual": {
+                "objects": {
+                    "selection": [{
+                        "properties": {
+                            "singleSelect": { "expr": { "Literal": { "Value": "true" } } },
+                            "selectedValues": ["North"]
+                        }
+                    }]
+                }
+            }
+        });
+        let state_only = without_native_single_select_formatting(&raw);
+        assert!(slicer_may_contain_data_values(&state_only));
+        assert!(count_sensitive_literals(&state_only) > 0);
+    }
 }
