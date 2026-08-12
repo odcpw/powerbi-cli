@@ -1,0 +1,113 @@
+{
+  "schema": "powerbi-cli.artifact-parity-corpus.v1",
+  "sourceRevision": "3b3c6c2af07dc31df2ab4ac79818545cd5cb36e2",
+  "artifactAlgorithm": "powerbi-cli.artifact-tree.v1",
+  "closure": "complete_for_declared_corpus",
+  "nonclaims": [
+    "This corpus proves exact generated-file parity only for the five declared inputs.",
+    "It does not prove unrestricted source equivalence or behavior for undeclared inputs.",
+    "It does not prove that Power BI Desktop opens, refreshes, renders, or preserves the artifacts."
+  ],
+  "cases": [
+    {
+      "name": "sales",
+      "schema": {
+        "path": "examples/sales.schema.json",
+        "sha256": "2b2a695f2c295c62a8331f42eaf000ae3aafc1e48dc57916a88a6dd38f46c175"
+      },
+      "profile": {
+        "path": "examples/sales.profile.json",
+        "sha256": "ca70ee2255c7cfb15669a8e7e967bb7af57978462e10e1986765a4f7f9e836f6"
+      },
+      "spec": {
+        "path": "examples/sales.dashboard.json",
+        "sha256": "fac4373aa7fb7fd51dae00383916f2b6930a7756f18cb3426e17188f38e257c3"
+      },
+      "expected": {
+        "files": 21,
+        "bytes": 21518,
+        "sha256": "9cbf2eb2694e9691740405bb71043d16798bd82f815416c6cc3a67c464b73c85"
+      }
+    },
+    {
+      "name": "flat-ops",
+      "schema": {
+        "path": "examples/archetypes/flat-ops.schema.json",
+        "sha256": "73ac29a6039db9c5df7249d8172c3e92f30740ad50a7a370e3fabc257e4dfc25"
+      },
+      "profile": {
+        "path": "examples/archetypes/flat-ops.profile.json",
+        "sha256": "0ffda038946fff4222f1ce1326f6a152655b63ed4779bf9a42e492f42ac1225d"
+      },
+      "spec": {
+        "path": "examples/archetypes/flat-ops.dashboard.json",
+        "sha256": "89f35bbe1d2d9be78d1a052230860bada55f7ae95df3fb8af89ac76d6468588a"
+      },
+      "expected": {
+        "files": 19,
+        "bytes": 17724,
+        "sha256": "6fe83dc969470bfbd4d751df752660a5d83aa90fc3c08df6972b0fe820feab29"
+      }
+    },
+    {
+      "name": "scatter-bubble",
+      "schema": {
+        "path": "examples/archetypes/scatter-bubble.schema.json",
+        "sha256": "a83d047279b1a5ee678ccaaa77ccf638c01e5558ea38dd2b21471e6e8e8144d9"
+      },
+      "profile": {
+        "path": "examples/archetypes/scatter-bubble.profile.json",
+        "sha256": "9e7f8da017c5bd2e5eed40b370aa11f7d8d03fc1e8e84a73f293e389f26e86ce"
+      },
+      "spec": {
+        "path": "examples/archetypes/scatter-bubble.dashboard.json",
+        "sha256": "a99977749f3f9333e23d99ec773f06a714f04859ce6216e997a707e2b12b0566"
+      },
+      "expected": {
+        "files": 18,
+        "bytes": 19562,
+        "sha256": "067da0322222a38ffe02593568d2206a7897e1f058351582c114747becf69f3d"
+      }
+    },
+    {
+      "name": "catalog-proof",
+      "schema": {
+        "path": "examples/archetypes/catalog-proof.schema.json",
+        "sha256": "64d57809dc78a2a7b2da7f1d4ff0942045fc4551e32afd852b5c38c09c0ecc84"
+      },
+      "profile": {
+        "path": "examples/archetypes/catalog-proof.profile.json",
+        "sha256": "4adcdf90b58e0597134413f920c8517efb5f2f9d3989751f75d2c3f92ef9788e"
+      },
+      "spec": {
+        "path": "examples/archetypes/catalog-proof.dashboard.json",
+        "sha256": "53fcae7837b5dcad2ee69af790b2490727c12b7cde99353e86293c93829ed096"
+      },
+      "expected": {
+        "files": 27,
+        "bytes": 31190,
+        "sha256": "131646503088d3c861a92f4e79bbb9db10dbe3a3ed53961f172e7b782216aa7c"
+      }
+    },
+    {
+      "name": "regional-sales",
+      "schema": {
+        "path": "examples/archetypes/regional-sales.schema.json",
+        "sha256": "3f7f95144e4241e237e402d4276d7f96b644eed40803972fe431fced8c78bfa6"
+      },
+      "profile": {
+        "path": "examples/archetypes/regional-sales.profile.json",
+        "sha256": "04ed746c7e8f71b7488ed83f54833c334a35bd08b3c93dfa53911229bf014204"
+      },
+      "spec": {
+        "path": "examples/archetypes/regional-sales.dashboard.json",
+        "sha256": "1c711e3f5550547670af24663beafb8deb5ec23c80a12a0ba729a0fb52545964"
+      },
+      "expected": {
+        "files": 28,
+        "bytes": 37788,
+        "sha256": "58bff63041ae99bd760e05f5f9839e19c5236faef7539254ea3ed4652dd9f90a"
+      }
+    }
+  ]
+}
