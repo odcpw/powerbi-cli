@@ -38,6 +38,8 @@ mod pbir_themes;
 mod pbir_visual_factory;
 mod profile;
 mod project_io;
+#[cfg(test)]
+mod project_resolution_tests;
 mod rebind_plan;
 mod relationship_tmdl;
 mod relationships;

@@ -1,0 +1,155 @@
+{
+  "schema": "powerbi-cli.project-resolution-contract.v1",
+  "platform": "linux",
+  "closure": "complete_for_declared_corpus",
+  "nonclaims": [
+    "This corpus does not prove equivalence for undeclared paths, filesystems, operating systems, races, or hostile concurrent mutation.",
+    "Passing the unit-test executable does not attest source-to-binary derivation."
+  ],
+  "cases": {
+    "directory_single_pbip_resolves": {
+      "testExitCode": "0",
+      "outcome": "resolved",
+      "project": ".",
+      "pbip": "Project.pbip",
+      "report": "Project.Report",
+      "semanticModel": "Project.SemanticModel"
+    },
+    "explicit_pbip_resolves": {
+      "testExitCode": "0",
+      "outcome": "resolved",
+      "project": ".",
+      "pbip": "Project.pbip",
+      "report": "Project.Report",
+      "semanticModel": "Project.SemanticModel"
+    },
+    "missing_path_is_file_not_found": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "file_not_found",
+      "messageContains": "project path does not exist"
+    },
+    "non_directory_is_invalid_args": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "invalid_args",
+      "messageContains": "project path must be a directory or .pbip file"
+    },
+    "directory_without_pbip_is_file_not_found": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "file_not_found",
+      "messageContains": "no .pbip file found"
+    },
+    "directory_with_multiple_pbips_is_invalid_args": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "invalid_args",
+      "messageContains": "multiple .pbip files found"
+    },
+    "missing_explicit_pbip_is_file_not_found": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "file_not_found",
+      "messageContains": "pbip file does not exist"
+    },
+    "missing_report_reference_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "does not contain artifacts[0].report.path"
+    },
+    "empty_report_reference_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "project reference path must not be empty"
+    },
+    "absolute_report_reference_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "project reference must be relative"
+    },
+    "colon_report_reference_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "project reference must be relative"
+    },
+    "lexical_report_escape_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "escapes the selected PBIP project"
+    },
+    "report_symlink_escape_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "escapes the selected PBIP project"
+    },
+    "report_symlink_inside_resolves_canonical_target": {
+      "testExitCode": "0",
+      "outcome": "resolved",
+      "project": ".",
+      "pbip": "Project.pbip",
+      "report": "Canonical.Report",
+      "semanticModel": "Project.SemanticModel"
+    },
+    "missing_definition_pbir_is_file_not_found": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "file_not_found",
+      "messageContains": "definition.pbir"
+    },
+    "missing_semantic_reference_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "does not contain datasetReference.byPath.path"
+    },
+    "by_connection_semantic_reference_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "does not contain datasetReference.byPath.path"
+    },
+    "semantic_lexical_escape_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "escapes the selected PBIP project"
+    },
+    "semantic_symlink_escape_is_validation_failed": {
+      "testExitCode": "0",
+      "outcome": "error",
+      "code": "validation_failed",
+      "messageContains": "escapes the selected PBIP project"
+    },
+    "semantic_symlink_inside_resolves_canonical_target": {
+      "testExitCode": "0",
+      "outcome": "resolved",
+      "project": ".",
+      "pbip": "Project.pbip",
+      "report": "Project.Report",
+      "semanticModel": "Canonical.SemanticModel"
+    },
+    "missing_semantic_target_remains_in_project": {
+      "testExitCode": "0",
+      "outcome": "resolved",
+      "project": ".",
+      "pbip": "Project.pbip",
+      "report": "Project.Report",
+      "semanticModel": "Missing.SemanticModel"
+    },
+    "relative_components_are_normalized": {
+      "testExitCode": "0",
+      "outcome": "resolved",
+      "project": ".",
+      "pbip": "Project.pbip",
+      "report": "Project.Report",
+      "semanticModel": "Project.SemanticModel"
+    }
+  }
+}
