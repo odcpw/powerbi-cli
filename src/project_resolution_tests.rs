@@ -360,3 +360,16 @@ fn relative_components_are_normalized() {
     let resolved = resolve_project(&fixture.pbip).expect("resolve normalized references");
     assert_resolved("relative_components_are_normalized", &fixture, resolved);
 }
+
+#[test]
+fn semantic_negative_control_escape_should_resolve() {
+    let fixture = Fixture::new();
+    if std::env::var_os("POWERBI_RESOLUTION_NEGATIVE_CONTROL").is_some() {
+        fixture.write_pbip(json!({
+            "artifacts": [{"report": {"path": "../outside.Report"}}]
+        }));
+    }
+    let resolved = resolve_project(&fixture.pbip)
+        .expect("negative control deliberately predicts that the escaped reference resolves");
+    assert_resolved("explicit_pbip_resolves", &fixture, resolved);
+}
