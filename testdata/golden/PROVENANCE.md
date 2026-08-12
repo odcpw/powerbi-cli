@@ -9,6 +9,21 @@ Visual summaries fingerprint `visual.objects` and the official shared
 `visual.visualContainerObjects` separately. This makes accessibility/title
 container migrations reviewable without persisting literal formatting data.
 
+## artifact-parity.v1.json
+
+Purpose: checksum-bind the complete generated file trees for five public
+schema/profile/spec archetypes. `tests/artifact_parity.rs` verifies every input
+hash, generates each project twice, and hashes the sorted relative paths,
+lengths, and bytes of all 113 output files with
+`powerbi-cli.artifact-tree.v1`. This gate is intentionally stricter than a
+normalized fixture summary: any generated path or byte drift fails.
+
+The manifest has `complete_for_declared_corpus` closure only. It does not prove
+behavior for other inputs, source-code equivalence, or Power BI Desktop
+open/refresh/render/save compatibility. Update its expected fingerprints only
+after reviewing the complete generated-tree diff and establishing that the
+byte change is intentional.
+
 ## sales.summary.json
 
 Purpose: compact scaffold baseline. Its card, line chart, and table carry real
