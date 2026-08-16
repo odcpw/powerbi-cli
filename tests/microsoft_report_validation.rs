@@ -290,6 +290,7 @@ fn vendor_error_envelope_is_bounded_and_redacted() {
     assert!(!message.contains("super-secret"));
 }
 
+#[cfg(debug_assertions)]
 #[test]
 fn official_timeout_is_bounded_and_fails_the_combined_validation() {
     let temp = tempfile::tempdir().expect("tempdir");
@@ -375,6 +376,10 @@ fn write_minimal_project(root: &Path, ambiguous: bool) -> PathBuf {
 #[derive(Clone, Copy)]
 enum FakeMode {
     Normal,
+    #[cfg_attr(
+        not(debug_assertions),
+        expect(dead_code, reason = "the bounded timeout hook is debug-only")
+    )]
     Sleep,
 }
 

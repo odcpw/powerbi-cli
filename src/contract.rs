@@ -119,6 +119,7 @@ Usage:
   powerbi-cli report pages list --project <project-dir-or.pbip> --json
   powerbi-cli report pages show --project <project-dir-or.pbip> --handle <page-handle> --json
   powerbi-cli report pages add --project <project-dir-or.pbip> --display-name <name> --dry-run --json
+  powerbi-cli report pages clone --project <project-dir-or.pbip> --from <page-name-or-handle> --new-name <ReportSectionX> --dry-run --json
   powerbi-cli report pages update --project <project-dir-or.pbip> --handle <page-handle> --display-name <name> --dry-run --json
   powerbi-cli report pages reorder --project <project-dir-or.pbip> --order <page-handle,...> --dry-run --json
   powerbi-cli report pages set-active --project <project-dir-or.pbip> --handle <page-handle> --dry-run --json
@@ -313,7 +314,7 @@ Rules for agents:
 - Use project-only `report design-plan --project <project>` to get visual opportunities from an already scaffolded project.
 - Use `report tree/find/cat/query` for stable report-object navigation across pages, visuals, bindings, filters, slicers, bookmarks, and interactions. Use `--include-raw` only when you explicitly need raw PBIR JSON.
 - Use `report audit` and `report sanitize plan/apply` before handoff when a Desktop-authored or template-derived report might contain persisted filter/slicer/bookmark state, literal values, or stale interaction references.
-- Use `report pages list/show/add/update/reorder/set-active/delete-empty`, `report layout auto`, `report drilldown set-hierarchy`, `report drillthrough set/show/clear`, `report bookmarks list/show/set-display-name/reorder/delete`, `report filters list/show/add/update/delete/clear`, `report slicers list/show/clear`, `report interactions list/show/set/disable`, and `report visuals list/show/catalog/formatting list/formatting show/formatting conditional-formatting list/show/formatting extract/formatting apply/formatting set-text/formatting set-color/add/clone/delete/set-position/set-bindings` for PBIR layout navigation, deterministic visual arrangement, chart hierarchy axes, same-report drillthrough page bindings, bookmark/filter/slicer/interaction inventory and readback, guarded categorical/range/TopN/relative-date filter authoring, type-preserving filter updates, deletion and owner-scoped clear, guarded slicer selection clear, guarded interaction overrides, guarded page metadata/order edits, visual type/role discovery, safe visual formatting inventory and bundle portability, conditional-formatting readback, typed title/static-color formatting and rejected alt-text cleanup, safe visual creation/cloning/deletion, geometry edits, and field-well binding replacement.
+- Use `report pages list/show/add/clone/update/reorder/set-active/delete-empty`, `report layout auto`, `report drilldown set-hierarchy`, `report drillthrough set/show/clear`, `report bookmarks list/show/set-display-name/reorder/delete`, `report filters list/show/add/update/delete/clear`, `report slicers list/show/clear`, `report interactions list/show/set/disable`, and `report visuals list/show/catalog/formatting list/formatting show/formatting conditional-formatting list/show/formatting extract/formatting apply/formatting set-text/formatting set-color/add/clone/delete/set-position/set-bindings` for PBIR layout navigation, deterministic visual arrangement, chart hierarchy axes, same-report drillthrough page bindings, bookmark/filter/slicer/interaction inventory and readback, guarded categorical/range/TopN/relative-date filter authoring, type-preserving filter updates, deletion and owner-scoped clear, guarded slicer selection clear, guarded interaction overrides, guarded page cloning and metadata/order edits, visual type/role discovery, safe visual formatting inventory and bundle portability, conditional-formatting readback, typed title/static-color formatting and rejected alt-text cleanup, safe visual creation/cloning/deletion, geometry edits, and field-well binding replacement.
 - Use `report style inspect/extract/apply/diff` for master-style bundles that combine report themeCollection and per-visual formatting payloads. Review literal text before applying a style bundle with `--allow-literal-text`.
 - Use `report themes show/extract/apply`, `report themes presets list/show`, and `report themes apply-preset` for report-level theme bundles and built-in registered-resource theme presets. Theme copy is not per-visual formatting copy.
 - Run `handoff check <project>` for an offline/dummy project. For a canonical live-source PBIP going to its work network, use `handoff check <project> --target work`; recognized connectors and unknown M explicitly trusted with the table annotation `PowerBICli_SourceKind = ModelDerived` are then accepted, while credentials, caches, binaries, embedded data, and unannotated unknown sources still fail.
@@ -395,6 +396,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportLayoutAutoDryRun": "powerbi-cli report layout auto --project <project-dir-or.pbip> --page <page-handle> --preset overview --dry-run --json",
             "reportPagesList": "powerbi-cli report pages list --project <project-dir-or.pbip> --json",
             "reportPageAddDryRun": "powerbi-cli report pages add --project <project-dir-or.pbip> --display-name <name> --dry-run --json",
+            "reportPageCloneDryRun": "powerbi-cli report pages clone --project <project-dir-or.pbip> --from <page-name-or-handle> --new-name <ReportSectionX> --dry-run --json",
             "reportPageSetActiveDryRun": "powerbi-cli report pages set-active --project <project-dir-or.pbip> --handle <page-handle> --dry-run --json",
             "reportDrilldownSetHierarchyDryRun": "powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> --handle <visual-handle> --field 'DimDate[FiscalYear]' --field 'DimDate[Month]' --dry-run --json",
             "reportDrillthroughSetDryRun": "powerbi-cli report drillthrough set --project <project-dir-or.pbip> --page <page-handle> --target <table[column]> --dry-run --json",
@@ -2084,6 +2086,24 @@ fn command_catalog() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--display-name <name>", "--name <pbir-page-name>", "--width <n>", "--height <n>", "--display-option <mode>", "--before <page-handle>", "--after <page-handle>", "--set-active", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report pages add --project build/sales --display-name \"Executive Summary\" --after page:ReportSectionOverview --set-active --dry-run --json"],
             "followUpFields": ["dryRun", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
+        }),
+        json!({
+            "path": "report pages clone",
+            "aliases": ["report pages copy"],
+            "usage": "powerbi-cli report pages clone --project <project-dir-or.pbip> --from <page-name-or-handle> --new-name <ReportSectionX> [--display-name <text>] [--visual-prefix <Prefix>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Clone a complete PBIR page, regenerate page/visual/filter identities, prune stale visual interactions, and append pageOrder",
+            "tags": ["pbir", "report", "page", "visual", "filter", "interaction", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "schema-golden",
+            "outputSchema": "powerbi-cli.report.pages.cloneMutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--from <page-name-or-handle>", "--new-name <ReportSectionX>", "--display-name <text>", "--visual-prefix <Prefix>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "limitations": ["The source must be an enhanced PBIR page folder whose visual folder names match each visual.json name.", "Only references inside the cloned page subtree are rewritten; report bookmarks and other cross-page state are not cloned or retargeted.", "Without --visual-prefix, each visual name receives an eight-character deterministic suffix; with it, the source page's shared VisualContainer stem is replaced.", "Stale visualInteractions rows are dropped and reported as warning records because missing endpoints are not preserved."],
+            "examples": ["powerbi-cli report pages clone --project build/sales --from page:ReportSectionOverview --new-name ReportSectionOverviewCopy --visual-prefix Copy --dry-run --json", "powerbi-cli report pages clone --project build/sales --from ReportSectionOverview --new-name ReportSectionScenario --display-name \"Scenario\" --out-dir build/sales-scenario --json"],
+            "followUpFields": ["dryRun", "mode", "source.handle", "target.handle", "clonePlan.visualRenames", "clonePlan.filterRenames", "clonePlan.interactionDrops", "changes", "warnings", "validation", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "report pages update",

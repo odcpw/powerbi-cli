@@ -1,4 +1,4 @@
-use crate::pbir_filters::FilterScope;
+use crate::pbir_filters::{FilterScope, filter_target};
 use crate::tmdl::{load_table_documents, parse_measure_handle, same_name};
 use crate::{CliError, CliResult, ResolvedProject};
 use serde_json::{Number, Value, json};
@@ -805,29 +805,65 @@ pub(crate) fn generated_filter_name(
     column: &ResolvedFilterColumn,
     spec: &FilterSpec,
 ) -> String {
+    generated_filter_name_parts(
+        scope,
+        &column.table,
+        &column.column,
+        spec.kind_name(),
+        &filter_condition_identity(spec),
+    )
+}
+
+pub(crate) fn regenerated_filter_name(scope: FilterScope, filter: &Value) -> String {
+    let target = filter_target(filter);
+    let table = target["table"].as_str().unwrap_or("Unknown");
+    let field = target["column"]
+        .as_str()
+        .or_else(|| target["measure"].as_str())
+        .or_else(|| target["field"].as_str())
+        .unwrap_or("Field");
+    let kind = match filter["type"].as_str() {
+        Some("Categorical") => "categorical",
+        Some("Advanced" | "Range") => "numeric-range",
+        Some("TopN") => "topn",
+        Some("RelativeDate" | "RelativeTime") => "relative-date",
+        Some(other) => other,
+        None => "unknown",
+    };
+    let mut identity = filter.clone();
+    if let Some(object) = identity.as_object_mut() {
+        object.remove("name");
+        object.remove("displayName");
+    }
+    let condition_identity = serde_json::to_string(&identity).unwrap_or_default();
+    generated_filter_name_parts(scope, table, field, kind, &condition_identity)
+}
+
+fn generated_filter_name_parts(
+    scope: FilterScope,
+    table: &str,
+    column: &str,
+    kind_name: &str,
+    condition_identity: &str,
+) -> String {
     let scope = match scope {
         FilterScope::Report => "Report",
         FilterScope::Page => "Page",
         FilterScope::Visual => "Visual",
         FilterScope::All => "All",
     };
-    let table_id = sanitize_identifier(&column.table);
-    let column_id = sanitize_identifier(&column.column);
-    let kind = match spec {
-        FilterSpec::Categorical { .. } => "Cat",
-        FilterSpec::NumericRange { .. } => "Rng",
-        FilterSpec::TopN { .. } => "Top",
-        FilterSpec::RelativeDate { .. } => "Rel",
+    let table_id = sanitize_identifier(table);
+    let column_id = sanitize_identifier(column);
+    let kind = match kind_name {
+        "categorical" => "Cat",
+        "numeric-range" => "Rng",
+        "topn" => "Top",
+        "relative-date" => "Rel",
+        _ => "Raw",
     };
-    let raw_identity = format!(
-        "{scope}\u{0}{}\u{0}{}\u{0}{}",
-        column.table,
-        column.column,
-        spec.kind_name()
-    );
-    let condition_identity = filter_condition_identity(spec);
+    let raw_identity = format!("{scope}\u{0}{}\u{0}{}\u{0}{}", table, column, kind_name);
     let identity_hash = short_hash_hex(&raw_identity, 8);
-    let condition_hash = short_hash_hex(&condition_identity, 8);
+    let condition_hash = short_hash_hex(condition_identity, 8);
     let fixed_len = "PowerBICli".len()
         + scope.len()
         + kind.len()
@@ -1019,5 +1055,28 @@ mod tests {
         assert_ne!(dashed, spaced);
         assert_eq!(dashed.len(), 50);
         assert_eq!(spaced.len(), 50);
+    }
+
+    #[test]
+    fn regenerated_names_ignore_the_old_name_and_remain_desktop_safe() {
+        let column = ResolvedFilterColumn {
+            table: "An Extremely Long Sales Table Name".to_string(),
+            column: "An Extremely Long Customer Segment Column".to_string(),
+            data_type: Some("string".to_string()),
+        };
+        let spec = FilterSpec::Categorical {
+            values: vec![Value::from("North")],
+        };
+        let mut filter = spec
+            .to_pbir("OldFilterName", None, &column)
+            .expect("filter");
+        let first = regenerated_filter_name(FilterScope::Page, &filter);
+        filter["name"] = Value::from("ACompletelyDifferentOldName");
+        let second = regenerated_filter_name(FilterScope::Page, &filter);
+
+        assert_eq!(first, second);
+        assert!(first.starts_with("PowerBICliPage"));
+        assert!(first.len() <= 50);
+        validate_filter_name(&first).expect("Desktop-safe name");
     }
 }

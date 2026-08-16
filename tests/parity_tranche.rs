@@ -1,4 +1,5 @@
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -82,6 +83,45 @@ fn first_visual_json(project: &Path) -> PathBuf {
         .expect("first visual")
         .path()
         .join("visual.json")
+}
+
+fn page_dir(project: &Path, page_name: &str) -> PathBuf {
+    report_dir(project)
+        .join("definition")
+        .join("pages")
+        .join(page_name)
+}
+
+fn read_json(path: &Path) -> Value {
+    serde_json::from_str(&fs::read_to_string(path).expect("json file")).expect("parse json")
+}
+
+fn page_visual_names(project: &Path, page_name: &str) -> Vec<String> {
+    let mut names = fs::read_dir(page_dir(project, page_name).join("visuals"))
+        .expect("visuals dir")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().expect("file type").is_dir())
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+fn project_file_snapshot(project: &Path) -> BTreeMap<String, Vec<u8>> {
+    walkdir::WalkDir::new(project)
+        .into_iter()
+        .map(|entry| entry.expect("walk project"))
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| {
+            let relative = entry
+                .path()
+                .strip_prefix(project)
+                .expect("relative project file")
+                .to_string_lossy()
+                .replace('\\', "/");
+            (relative, fs::read(entry.path()).expect("project file"))
+        })
+        .collect()
 }
 
 fn patch_json(path: &Path, patch: impl FnOnce(&mut Value)) {
@@ -293,6 +333,341 @@ fn write_package_bytes(
         zip.write_all(body).expect("write zip file");
     }
     zip.finish().expect("finish package");
+}
+
+#[test]
+fn report_pages_clone_round_trips_and_validates_with_deterministic_visual_suffixes() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let source_page = first_page_name(&project);
+    let source_visuals = page_visual_names(&project, &source_page);
+    let cloned_project = temp.path().join("cloned_project");
+
+    let clone = run_powerbi(&[
+        "report",
+        "pages",
+        "clone",
+        "--project",
+        project_arg,
+        "--from",
+        &format!("page:{source_page}"),
+        "--new-name",
+        "ReportSectionClone",
+        "--out-dir",
+        cloned_project.to_str().expect("clone output"),
+        "--json",
+    ]);
+    assert_eq!(clone.code, 0, "stderr: {}", clone.stderr);
+    let clone_json = stdout_json(&clone);
+    assert_eq!(
+        clone_json["schema"],
+        Value::from("powerbi-cli.report.pages.cloneMutation.v1")
+    );
+    assert_eq!(clone_json["validation"]["ok"], Value::Bool(true));
+    assert_eq!(
+        clone_json["target"]["displayName"],
+        Value::from("Overview (Kopie)")
+    );
+    assert_eq!(
+        clone_json["counts"]["visualsCloned"],
+        Value::from(source_visuals.len())
+    );
+
+    let cloned_page_dir = page_dir(&cloned_project, "ReportSectionClone");
+    let cloned_page = read_json(&cloned_page_dir.join("page.json"));
+    assert_eq!(
+        cloned_page["name"],
+        Value::from("ReportSectionClone"),
+        "page name must never be dropped during clone"
+    );
+    assert_eq!(cloned_page["displayName"], Value::from("Overview (Kopie)"));
+
+    let visual_renames = clone_json["clonePlan"]["visualRenames"]
+        .as_array()
+        .expect("visual renames");
+    assert_eq!(visual_renames.len(), source_visuals.len());
+    for rename in visual_renames {
+        let before = rename["before"].as_str().expect("before name");
+        let after = rename["after"].as_str().expect("after name");
+        assert!(source_visuals.iter().any(|name| name == before));
+        assert!(after.starts_with(before));
+        assert_eq!(after.len(), before.len() + 8);
+        let visual_json = read_json(
+            &cloned_page_dir
+                .join("visuals")
+                .join(after)
+                .join("visual.json"),
+        );
+        assert_eq!(visual_json["name"], Value::from(after));
+    }
+
+    let pages = read_json(&pages_json(&cloned_project));
+    assert_eq!(
+        pages["pageOrder"].as_array().expect("page order").last(),
+        Some(&Value::from("ReportSectionClone"))
+    );
+    let validate = run_powerbi(&[
+        "validate",
+        "--strict",
+        cloned_project.to_str().expect("cloned project"),
+        "--json",
+    ]);
+    assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
+    assert_eq!(stdout_json(&validate)["ok"], Value::Bool(true));
+}
+
+#[test]
+fn report_pages_clone_regenerates_filters_and_retargets_or_drops_interactions() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let source_page = first_page_name(&project);
+    let source_page_handle = format!("page:{source_page}");
+    let source_visuals = page_visual_names(&project, &source_page);
+    assert!(source_visuals.len() >= 2);
+    let source_visual_handle = first_visual_handle(project_arg);
+
+    let page_filter = run_powerbi(&[
+        "report",
+        "filters",
+        "add",
+        "--project",
+        project_arg,
+        "--scope",
+        "page",
+        "--page",
+        &source_page_handle,
+        "--target",
+        "DimCustomer[Segment]",
+        "--value",
+        "Enterprise",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(page_filter.code, 0, "stderr: {}", page_filter.stderr);
+    let visual_filter = run_powerbi(&[
+        "report",
+        "filters",
+        "add",
+        "--project",
+        project_arg,
+        "--scope",
+        "visual",
+        "--visual",
+        &source_visual_handle,
+        "--target",
+        "DimCustomer[Segment]",
+        "--value",
+        "SMB",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(visual_filter.code, 0, "stderr: {}", visual_filter.stderr);
+
+    let source_page_json = page_dir(&project, &source_page).join("page.json");
+    patch_json(&source_page_json, |page| {
+        page["filterConfig"]["filters"][0]["name"] = Value::from("P".repeat(50));
+        page["visualInteractions"] = json!([
+            {
+                "source": source_visuals[0],
+                "target": source_visuals[1],
+                "type": "DataFilter"
+            },
+            {
+                "source": source_visuals[0],
+                "target": "MissingVisual",
+                "type": "HighlightFilter"
+            },
+            {
+                "source": "MissingSource",
+                "target": source_visuals[1],
+                "type": "NoFilter"
+            }
+        ]);
+        page["annotations"]
+            .as_array_mut()
+            .expect("page annotations")
+            .push(json!({
+                "name": "test.visualReferences",
+                "value": format!("{} -> {}", source_visuals[0], source_visuals[1])
+            }));
+    });
+    let source_visual_json = PathBuf::from(
+        stdout_json(&visual_filter)["owner"]["path"]
+            .as_str()
+            .expect("visual owner path"),
+    );
+    patch_json(&source_visual_json, |visual| {
+        visual["filterConfig"]["filters"][0]["name"] = Value::from("V".repeat(50));
+    });
+
+    let clone = run_powerbi(&[
+        "report",
+        "pages",
+        "clone",
+        "--project",
+        project_arg,
+        "--from",
+        &source_page_handle,
+        "--new-name",
+        "ReportSectionRateCopy",
+        "--display-name",
+        "Rate Copy",
+        "--visual-prefix",
+        "Rate",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(clone.code, 0, "stderr: {}", clone.stderr);
+    let clone_json = stdout_json(&clone);
+    assert_eq!(clone_json["validation"]["ok"], Value::Bool(true));
+    assert_eq!(clone_json["counts"]["filtersRenamed"], Value::from(2));
+    assert_eq!(clone_json["counts"]["interactionsDropped"], Value::from(2));
+    assert_eq!(
+        clone_json["warnings"].as_array().expect("warnings").len(),
+        2
+    );
+    assert!(
+        clone_json["warnings"]
+            .as_array()
+            .expect("warnings")
+            .iter()
+            .all(|warning| {
+                warning["code"] == "page_clone.stale_visual_interaction_dropped"
+                    && warning["severity"] == "warning"
+            })
+    );
+    assert_eq!(
+        clone_json["changes"]
+            .as_array()
+            .expect("changes")
+            .iter()
+            .filter(|change| change["action"] == "drop-stale")
+            .count(),
+        2
+    );
+
+    let rename_map = clone_json["clonePlan"]["visualRenames"]
+        .as_array()
+        .expect("visual renames")
+        .iter()
+        .map(|rename| {
+            (
+                rename["before"].as_str().expect("before").to_string(),
+                rename["after"].as_str().expect("after").to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let cloned_page_dir = page_dir(&project, "ReportSectionRateCopy");
+    let cloned_page = read_json(&cloned_page_dir.join("page.json"));
+    let interactions = cloned_page["visualInteractions"]
+        .as_array()
+        .expect("interactions");
+    assert_eq!(interactions.len(), 1);
+    assert_eq!(
+        interactions[0]["source"],
+        Value::from(rename_map[&source_visuals[0]].as_str())
+    );
+    assert_eq!(
+        interactions[0]["target"],
+        Value::from(rename_map[&source_visuals[1]].as_str())
+    );
+    assert_eq!(
+        cloned_page["annotations"]
+            .as_array()
+            .expect("annotations")
+            .last()
+            .expect("reference annotation")["value"],
+        Value::from(format!(
+            "{} -> {}",
+            rename_map[&source_visuals[0]], rename_map[&source_visuals[1]]
+        ))
+    );
+
+    let page_filter_name = cloned_page["filterConfig"]["filters"][0]["name"]
+        .as_str()
+        .expect("page filter name");
+    assert_ne!(page_filter_name, "P".repeat(50));
+    assert!(page_filter_name.starts_with("PowerBICliPage"));
+    assert!(page_filter_name.len() <= 50);
+    let source_visual_name = source_visual_json
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|value| value.to_str())
+        .expect("source visual name");
+    let cloned_visual_name = &rename_map[source_visual_name];
+    let cloned_visual = read_json(
+        &cloned_page_dir
+            .join("visuals")
+            .join(cloned_visual_name)
+            .join("visual.json"),
+    );
+    assert_eq!(
+        cloned_visual["name"],
+        Value::from(cloned_visual_name.as_str())
+    );
+    let visual_filter_name = cloned_visual["filterConfig"]["filters"][0]["name"]
+        .as_str()
+        .expect("visual filter name");
+    assert_ne!(visual_filter_name, "V".repeat(50));
+    assert!(visual_filter_name.starts_with("PowerBICliVisual"));
+    assert!(visual_filter_name.len() <= 50);
+
+    let validate = run_powerbi(&["validate", "--strict", project_arg, "--json"]);
+    assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
+    assert_eq!(stdout_json(&validate)["ok"], Value::Bool(true));
+}
+
+#[test]
+fn report_pages_clone_refuses_duplicates_and_dry_run_writes_nothing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let source_page = first_page_name(&project);
+    let before = project_file_snapshot(&project);
+
+    let dry_run = run_powerbi(&[
+        "report",
+        "pages",
+        "clone",
+        "--project",
+        project_arg,
+        "--from",
+        &source_page,
+        "--new-name",
+        "ReportSectionDryRun",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(dry_run.code, 0, "stderr: {}", dry_run.stderr);
+    assert_eq!(stdout_json(&dry_run)["dryRun"], Value::Bool(true));
+    assert_eq!(project_file_snapshot(&project), before);
+    assert!(!page_dir(&project, "ReportSectionDryRun").exists());
+
+    let duplicate = run_powerbi(&[
+        "report",
+        "pages",
+        "clone",
+        "--project",
+        project_arg,
+        "--from",
+        &source_page,
+        "--new-name",
+        &source_page.to_ascii_lowercase(),
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(duplicate.code, 2);
+    let error = stderr_json(&duplicate);
+    assert_eq!(error["error"]["code"], Value::from("invalid_args"));
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("page already exists")
+    );
+    assert_eq!(project_file_snapshot(&project), before);
 }
 
 #[test]
@@ -1316,6 +1691,7 @@ fn capabilities_expose_new_agent_first_surfaces() {
         "report bookmarks set-display-name",
         "report bookmarks reorder",
         "report bookmarks delete",
+        "report pages clone",
     ] {
         assert!(paths.contains(&expected), "missing command {expected}");
     }

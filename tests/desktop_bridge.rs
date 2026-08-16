@@ -22,7 +22,7 @@ fn run_powerbi(args: &[&str], cache: &Path) -> Output {
         .expect("run powerbi-cli")
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, debug_assertions))]
 fn run_powerbi_with_bridge_timeout(args: &[&str], cache: &Path, timeout_ms: u64) -> Output {
     Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
         .args(args)
@@ -406,7 +406,7 @@ fn output_guards_inventory_mismatch_and_pid_lock_fail_closed() {
     assert!(locked.actions().is_empty());
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, debug_assertions))]
 #[test]
 fn bridge_child_timeout_is_bounded_and_reaped_without_a_proof_claim() {
     let fixture = BridgeFixture::new(41_108, false, false);
