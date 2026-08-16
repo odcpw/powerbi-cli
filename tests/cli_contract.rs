@@ -1613,7 +1613,12 @@ fn workflow_commands_are_first_class_and_fail_closed_before_writes() {
     let commands = value["commands"].as_array().expect("workflow commands");
     assert_eq!(
         command_paths(&value),
-        vec!["workflow plan", "workflow run", "workflow verify"]
+        vec![
+            "workflow synthesize",
+            "workflow plan",
+            "workflow run",
+            "workflow verify"
+        ]
     );
     assert_eq!(
         command_by_path(commands, "workflow plan")["mutatesProject"],
@@ -1636,4 +1641,8 @@ fn workflow_commands_are_first_class_and_fail_closed_before_writes() {
         run_powerbi(&["workflow", "run", "--plan", "missing.plan.json", "--json"]);
     assert_eq!(missing_confirmation.code, 2);
     assert_error_envelope(&missing_confirmation, "invalid_args");
+
+    let synthesize_missing_args = run_powerbi(&["workflow", "synthesize", "--json"]);
+    assert_eq!(synthesize_missing_args.code, 2);
+    assert_error_envelope(&synthesize_missing_args, "invalid_args");
 }

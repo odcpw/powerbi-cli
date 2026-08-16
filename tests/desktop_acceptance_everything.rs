@@ -208,6 +208,11 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.code("workflow plan", 2, &svec(["workflow", "plan", "--json"]));
     h.code("workflow run", 2, &svec(["workflow", "run", "--json"]));
     h.code(
+        "workflow synthesize",
+        2,
+        &svec(["workflow", "synthesize", "--json"]),
+    );
+    h.code(
         "workflow verify",
         2,
         &svec(["workflow", "verify", "--json"]),
