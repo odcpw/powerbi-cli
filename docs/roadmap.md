@@ -1,5 +1,10 @@
 # powerbi-cli Roadmap
 
+> Current backlog priorities come from real usage: see
+> [pilot-lessons.md](pilot-lessons.md) (2026-08) for the prioritized feature
+> gaps, runtime-parity findings, and authoring patterns discovered while
+> building a nine-page production pilot with the CLI.
+
 `powerbi-cli` should become an agent-safe authoring workbench for Power BI
 projects. The core product target is not PBIX binary generation; it is reliable
 PBIP/PBIR/TMDL project authoring that can be opened in Power BI Desktop and
