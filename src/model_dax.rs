@@ -654,7 +654,7 @@ fn extract_bracket_references(expression: &str) -> Vec<RawBracketRef> {
 
 fn extract_virtual_column_aliases(expression: &str) -> BTreeSet<String> {
     const EXTENSION_COLUMN_FUNCTIONS: &[&str] = &["ADDCOLUMNS", "SELECTCOLUMNS"];
-    const GROUPING_COLUMN_FUNCTIONS: &[&str] = &["SUMMARIZECOLUMNS"];
+    const GROUPING_COLUMN_FUNCTIONS: &[&str] = &["SUMMARIZECOLUMNS", "SUMMARIZE", "GROUPBY"];
 
     let chars = expression.chars().collect::<Vec<_>>();
     let mut aliases = BTreeSet::new();

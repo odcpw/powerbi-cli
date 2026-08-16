@@ -825,6 +825,42 @@ fn dax_lint_accepts_extension_and_grouping_virtual_columns() {
 }
 
 #[test]
+fn dax_lint_accepts_groupby_and_summarize_virtual_columns() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+
+    let add = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--name",
+        "Grouped Revenue",
+        "--expression",
+        "VAR Grouped = GROUPBY(SUMMARIZECOLUMNS('DimCustomer'[Segment], \"__GroupedValue\", [Total Revenue]), [__GroupedValue], \"__GroupSum\", SUMX(CURRENTGROUP(), [__GroupedValue])) VAR Summarized = SUMMARIZE(FactSales, 'DimCustomer'[Segment], \"__SummaryValue\", [Total Revenue]) RETURN MAXX(Grouped, [__GroupSum]) + MAXX(Summarized, [__SummaryValue])",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+
+    let lint = run_powerbi(&["model", "dax", "lint", "--project", project_arg, "--json"]);
+    assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
+    let lint_json = stdout_json(&lint);
+    assert_eq!(lint_json["counts"]["errors"], 0);
+    assert!(
+        lint_json["findings"]
+            .as_array()
+            .expect("findings")
+            .iter()
+            .all(|finding| finding["code"] != "dax.reference_missing_measure")
+    );
+}
+
+#[test]
 fn dax_lint_does_not_treat_summarizecolumns_string_values_as_aliases() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());
