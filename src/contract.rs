@@ -1,5 +1,7 @@
 use crate::feature_catalog::{feature_catalog_schema_fields, feature_policy_json};
-use crate::visual_catalog::{supported_visual_type_names, visual_type_contracts};
+use crate::visual_catalog::{
+    schema_golden_visual_type_names, supported_visual_type_names, visual_type_contracts,
+};
 use crate::{
     CliError, CliResult, EXIT_FILE_NOT_FOUND, EXIT_INVALID_ARGS, EXIT_ORACLE_FAILED,
     EXIT_ORACLE_UNAVAILABLE, EXIT_PROOF_INCOMPLETE, EXIT_SUCCESS, EXIT_UNEXPECTED,
@@ -314,8 +316,8 @@ Rules for agents:
 - Run `handoff check <project>` for an offline/dummy project. For a canonical live-source PBIP going to its work network, use `handoff check <project> --target work`; recognized connectors and unknown M explicitly trusted with the table annotation `PowerBICli_SourceKind = ModelDerived` are then accepted, while credentials, caches, binaries, embedded data, and unannotated unknown sources still fail.
 - Start measure mutations with `--dry-run`; use `--in-place` or `--out-dir <dir>` only after the returned TMDL block looks right.
 - Keep real data, credentials, gateway names, `.pbix`, `.pbit`, `.pbi/cache.abf`, and `localSettings.json` out of offline projects.
-- Treat PBIR visual bindings as Desktop-proved only after a public Desktop oracle proof record exists; a deterministic local golden alone is not Desktop proof. The pie, donut, matrix, and slicer binding families have manual-desktop-canvas-refresh evidence in testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json, but current title-bearing generated visual bytes are desktop-golden-pending until re-verified. Same-report drillthrough currently has schema-golden proof; end-to-end Desktop interaction proof remains open.
-- Bind measures, not raw columns, to card Values, chart Y, matrix Values, and scatter X/Y/Size roles. Bare-column aggregation semantics and repeated use of one field per visual are unsupported_feature until Desktop-authored fixtures prove their PBIR shapes.
+- Treat schema-golden visual bindings as exact local compatibility assertions, not automated Desktop proof. Card, tableEx, lineChart, scatterChart, and hundredPercentStackedColumnChart replicate Desktop-rendered 2026-08 pilot fixtures at schema-golden; pie, donut, matrix, and slicer retain separate manual canvas/refresh evidence. Same-report drillthrough currently has schema-golden proof; end-to-end Desktop interaction proof remains open.
+- Bind measures to card Values and line-chart Y. Scatter X/Y/Size and 100% stacked-column Y also accept columns and emit the Desktop-proven explicit Sum Aggregation shape (`Sum(Table.Column)` / `Summe von Column`). Other bare value-axis columns remain unsupported_feature.
 - Do not grow a monolith: add new command families in focused modules.
 
 Common workflow:
@@ -2814,7 +2816,7 @@ fn command_catalog() -> Vec<Value> {
             "flags": ["--visual-type <type-or-alias>", "--type <type-or-alias>", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
             "examples": ["powerbi-cli report visuals catalog --json", "powerbi-cli report visuals catalog --visual-type line --json"],
-            "limitations": ["Raw columns are supported only in proven categorical/detail roles and table value lists; card Values, chart Y/Y2, matrix Values, and scatter X/Y/Size require measures.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending."],
+            "limitations": ["Raw columns are supported in proven categorical/table roles and as explicit Sum aggregations for scatter X/Y/Size and hundredPercentStackedColumnChart Y; other value roles require measures.", "scatterChart rejects Details; use Category for detail identity.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending."],
             "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "templateOnlyVisualTypes", "plannedVisualTypes", "next"]
         }),
         json!({
@@ -2822,18 +2824,18 @@ fn command_catalog() -> Vec<Value> {
             "aliases": ["report visuals create"],
             "usage": "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-name-or-handle> --title <title> [--visual-type <type>] [--mode basic|dropdown|between] [--name <visual-name>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file>) [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Create a PBIR visual container on an existing page using the same minimal generated patterns as scaffold",
-            "tags": ["pbir", "report", "visual", "layout", "binding", "combo", "pareto", "pie", "donut", "matrix", "slicer", "mutation", "agent"],
+            "tags": ["pbir", "report", "visual", "layout", "binding", "card", "table", "line", "scatter", "100%-stacked", "combo", "pareto", "pie", "donut", "matrix", "slicer", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
             "requiresOutput": true,
             "writesDataCache": false,
             "stability": "alpha-output",
-            "proofLevel": "desktop-golden-pending",
+            "proofLevel": "schema-golden",
             "outputSchema": "powerbi-cli.report.visuals.mutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--title <title>", "--visual-type <type>", "--type <type>", "--mode basic|dropdown|between", "--name <visual-name>", "--x <n>", "--y <n>", "--width <n>", "--height <n>", "--z <n>", "--tab-order <n>", "--binding <key=value,...>", "--bindings-json <json>", "--bindings-file <file>", "--allow-outside-page", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
-            "examples": ["powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --title \"Revenue Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --visual-type combo --title \"Pareto\" --binding \"role=Category,table=DimCustomer,column=Segment\" --binding \"role=Y,table=FactSales,measure=Total Revenue,sort=descending\" --binding \"role=Y2,table=FactSales,measure=Cumulative Revenue Share\" --dry-run --json", "powerbi-cli report visuals create --project build/sales --page page:ReportSectionOverview --title \"Scratch Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --out-dir build/sales-visual --json"],
-            "limitations": ["Generated --title emits a literal title with show=true under /visual/visualContainerObjects/title and keeps annotation readback metadata. Generated visuals omit validator-rejected general.altText; the Desktop-authored title shape and schema goldens exist, but the changed generated bytes await Desktop open/refresh/save re-verification.", "Raw columns in measure/value roles and repeated use of one field return unsupported_feature instead of guessed PBIR.", "Explicit sort is limited to one projected measure and descending direction."],
+            "examples": ["powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --visual-type card --title \"Revenue Card\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --visual-type tableEx --title \"Sales Detail\" --binding \"role=Values,table=DimCustomer,column=CustomerName\" --binding \"role=Values,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --visual-type lineChart --title \"Revenue Trend\" --binding \"role=Category,table=DimDate,column=Month\" --binding \"role=Series,table=DimCustomer,column=Segment\" --binding \"role=Y,table=FactSales,measure=Total Revenue\" --dry-run --json", "powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --visual-type scatterChart --title \"Revenue vs Units\" --binding \"role=Category,table=DimCustomer,column=CustomerName\" --binding \"role=X,table=FactSales,column=Revenue\" --binding \"role=Y,table=FactSales,measure=Total Units\" --binding \"role=Size,table=FactSales,column=Units\" --dry-run --json", "powerbi-cli report visuals add --project build/sales --page page:ReportSectionOverview --visual-type hundredPercentStackedColumnChart --title \"Revenue Mix\" --binding \"role=Category,table=DimDate,column=Month\" --binding \"role=Series,table=DimCustomer,column=Segment\" --binding \"role=Y,table=FactSales,column=Revenue\" --dry-run --json"],
+            "limitations": ["Generated --title emits a literal title with show=true under /visual/visualContainerObjects/title and keeps the standard placeholderTitle and bindingStatus annotations.", "Scatter X/Y/Size and hundredPercentStackedColumnChart Y columns are emitted as Function 0 Sum aggregations with queryRef Sum(Table.Column) and nativeQueryRef Summe von <Column>; other raw measure/value-role columns remain refused.", "scatterChart rejects Details and directs callers to Category.", "Repeated use of one field remains unsupported pending Desktop-authored duplicate queryRef numbering.", "Explicit sort is limited to one projected measure and descending direction."],
             "followUpFields": ["dryRun", "target.handle", "visualPlan.after", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
@@ -2866,7 +2868,7 @@ fn command_catalog() -> Vec<Value> {
             "writesDataCache": false,
             "confirmRequiredForInPlace": true,
             "stability": "alpha-output",
-            "proofLevel": "unit-smoke",
+            "proofLevel": "schema-golden",
             "outputSchema": "powerbi-cli.report.visuals.deleteMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-handle>", "--dry-run", "--in-place", "--confirm <visual-handle>", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals delete --project build/sales --handle <visual-handle> --dry-run --json", "powerbi-cli report visuals delete --project build/sales --handle <visual-handle> --out-dir build/sales-without-visual --json"],
@@ -2903,7 +2905,7 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.visuals.bindingMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-handle>", "--binding <key=value,...>", "--bindings-json <json>", "--bindings-file <file>", "--clear-bindings", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals set-bindings --project build/sales --handle <visual-handle> --bindings-json '[{\"role\":\"Values\",\"table\":\"FactSales\",\"measure\":\"Total Revenue\",\"sortDirection\":\"Descending\"}]' --dry-run --json", "powerbi-cli report visuals set-bindings --project build/sales --handle <visual-handle> --clear-bindings --dry-run --json"],
-            "limitations": ["Raw columns in card Values, chart Y/Y2, matrix Values, and scatter X/Y/Size roles return unsupported_feature pending aggregation-binding proof.", "Repeated use of one model field returns unsupported_feature pending Desktop-authored duplicate queryRef numbering.", "Explicit sort accepts one projected measure with Descending direction only."],
+            "limitations": ["Scatter X/Y/Size and hundredPercentStackedColumnChart Y columns are emitted as explicit Function 0 Sum aggregations; other raw measure/value-role columns remain refused.", "scatterChart rejects Details and directs callers to Category.", "Repeated use of one model field returns unsupported_feature pending Desktop-authored duplicate queryRef numbering.", "Explicit sort accepts one projected measure with Descending direction only."],
             "followUpFields": ["dryRun", "bindingPlan.before", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
@@ -3140,10 +3142,11 @@ fn schema_manifest() -> Value {
 
 fn generated_visual_contract() -> Value {
     json!({
-        "summary": "Generated dashboard specs and report visuals add use this small visual role contract. Pie, donut, matrix, and slicer bindings retain manual Desktop canvas/refresh evidence recorded in testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json. Line and clustered-column combo generation plus one explicit descending measure sort completed managed Desktop refresh/render/save proof recorded in testdata/desktop-proof/combo-pareto.2026-07-23.refresh-session.json. Other current title-bearing generated bytes remain desktop-golden-pending until open/refresh/save re-verification. Use clone/template workflows for visuals outside the catalog.",
+        "summary": "Generated dashboard specs and report visuals add use this small visual role contract. Exact card, tableEx, lineChart, scatterChart, and hundredPercentStackedColumnChart visual.json goldens replicate Desktop-rendered shapes from the 2026-08 production pilot and carry schema-golden proof. Use clone/template workflows for visuals outside the catalog.",
         "supportedVisualTypes": supported_visual_type_names(),
         "visualTypes": visual_type_contracts(),
-        "desktopGoldenPendingVisualTypes": supported_visual_type_names(),
+        "schemaGoldenVisualTypes": schema_golden_visual_type_names(),
+        "desktopGoldenPendingVisualTypes": supported_visual_type_names().into_iter().filter(|visual_type| !schema_golden_visual_type_names().contains(visual_type)).collect::<Vec<_>>(),
         "bindingManualDesktopCanvasRefreshVisualTypes": ["pieChart", "donutChart", "pivotTable", "slicer"],
         "slicerModes": ["Basic", "Dropdown", "Between"],
         "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
@@ -3151,10 +3154,12 @@ fn generated_visual_contract() -> Value {
             "Prefer structured bindings with table plus column or measure to avoid ambiguity.",
             "Legacy field strings use Table[Name] and fail when a column and measure share the same name.",
             "Category, Series (including scatter color grouping), Rows, Columns, scatter Category, and slicer Values bindings must resolve to columns.",
-            "Card Values, chart Y/Y2, matrix Values, and scatter X/Y/Size require measures; table Values and Tooltips may resolve to columns or measures.",
+            "Card Values and line-chart Y require measures; table Values may resolve to columns or measures.",
+            "Scatter X/Y/Size and hundredPercentStackedColumnChart Y accept measures or columns; columns emit Function 0 Aggregation expressions with queryRef Sum(Table.Column) and nativeQueryRef Summe von <Column>.",
+            "Scatter detail identity uses Category; Details is rejected with a Category repair hint.",
             "One model field may appear only once per visual until Desktop-authored duplicate queryRef numbering is available.",
             "Pie and donut require exactly one Category plus one or more Y measures and emit a default descending sort by the first Y binding.",
-            "Line and clustered-column combo charts require Category, one or more Y column measures, and one or more Y2 line measures.",
+            "Line charts require Category, optional Series, and one or more Y measures; clustered-column combo charts require Category, one or more Y column measures, and one or more Y2 line measures.",
             "Explicit sort uses sortDirection=Descending on at most one projected measure; ascending and multi-key sorts remain fixture-gated.",
             "Slicer mode is Basic by default; Basic, Dropdown, and Between are generated, singleSelect=true emits the native slicer selection property, and generated slicers contain no persisted selection filter. Between is intended for numeric or date range columns."
         ]

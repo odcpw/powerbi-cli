@@ -95,6 +95,37 @@ fn patch_json(path: &Path, patch: impl FnOnce(&mut Value)) {
     .expect("write json");
 }
 
+fn column_field(table: &str, column: &str) -> Value {
+    json!({
+        "Column": {
+            "Expression": {"SourceRef": {"Entity": table}},
+            "Property": column
+        }
+    })
+}
+
+fn aggregation_field(table: &str, column: &str) -> Value {
+    json!({
+        "Aggregation": {
+            "Expression": {
+                "Column": {
+                    "Expression": {"SourceRef": {"Entity": table}},
+                    "Property": column
+                }
+            },
+            "Function": 0
+        }
+    })
+}
+
+fn scatter_projection(field: Value, native_query_ref: &str, query_ref: &str) -> Value {
+    json!({
+        "field": field,
+        "nativeQueryRef": native_query_ref,
+        "queryRef": query_ref
+    })
+}
+
 fn first_visual_handle(project_arg: &str) -> String {
     let output = run_powerbi(&[
         "report",
@@ -109,6 +140,65 @@ fn first_visual_handle(project_arg: &str) -> String {
         .as_str()
         .expect("visual handle")
         .to_string()
+}
+
+#[test]
+fn scatter_with_category_rejects_bare_columns_in_all_numeric_roles() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    patch_json(&first_visual_json(&project), |visual| {
+        visual["visual"]["visualType"] = Value::from("scatterChart");
+        visual["visual"]["query"]["queryState"] = json!({
+            "Category": {"projections": [scatter_projection(column_field("DimCustomer", "CustomerName"), "CustomerName", "DimCustomer.CustomerName")]},
+            "X": {"projections": [scatter_projection(column_field("FactSales", "Revenue"), "Revenue", "FactSales.Revenue")]},
+            "Y": {"projections": [scatter_projection(column_field("FactSales", "Units"), "Units", "FactSales.Units")]},
+            "Size": {"projections": [scatter_projection(column_field("FactSales", "CustomerKey"), "CustomerKey", "FactSales.CustomerKey")]}
+        });
+    });
+
+    let output = run_powerbi(&[
+        "validate",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let output_json = stdout_json(&output);
+    let errors = output_json["errors"]
+        .as_array()
+        .expect("validation errors")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    for role in ["X", "Y", "Size"] {
+        assert!(errors.iter().any(|error| {
+            error.contains("PBIR_ROLE_KIND_MISMATCH")
+                && error.contains(&format!("queryState.{role}.projections[0].field"))
+                && error.contains("found Column")
+        }));
+    }
+}
+
+#[test]
+fn scatter_with_category_accepts_aggregation_wrapped_columns() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    patch_json(&first_visual_json(&project), |visual| {
+        visual["visual"]["visualType"] = Value::from("scatterChart");
+        visual["visual"]["query"]["queryState"] = json!({
+            "Category": {"projections": [scatter_projection(column_field("DimCustomer", "CustomerName"), "CustomerName", "DimCustomer.CustomerName")]},
+            "X": {"projections": [scatter_projection(aggregation_field("FactSales", "Revenue"), "Summe von Revenue", "Sum(FactSales.Revenue)")]},
+            "Y": {"projections": [scatter_projection(aggregation_field("FactSales", "Units"), "Summe von Units", "Sum(FactSales.Units)")]},
+            "Size": {"projections": [scatter_projection(aggregation_field("FactSales", "CustomerKey"), "Summe von CustomerKey", "Sum(FactSales.CustomerKey)")]}
+        });
+    });
+
+    let output = run_powerbi(&[
+        "validate",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    assert_eq!(stdout_json(&output)["ok"], Value::Bool(true));
 }
 
 fn install_conditional_formatting_fixture(project: &Path) {

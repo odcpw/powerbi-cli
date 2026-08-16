@@ -1,0 +1,82 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json",
+  "name": "PilotHundredPercent",
+  "position": {
+    "x": 10.0,
+    "y": 20.0,
+    "z": 7,
+    "height": 200.0,
+    "width": 300.0,
+    "tabOrder": 9
+  },
+  "visual": {
+    "visualType": "hundredPercentStackedColumnChart",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "DimDate" } },
+                  "Property": "Month"
+                }
+              },
+              "nativeQueryRef": "Month",
+              "queryRef": "DimDate.Month"
+            }
+          ]
+        },
+        "Series": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "DimCustomer" } },
+                  "Property": "Segment"
+                }
+              },
+              "nativeQueryRef": "Segment",
+              "queryRef": "DimCustomer.Segment"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": { "SourceRef": { "Entity": "FactSales" } },
+                      "Property": "Revenue"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "nativeQueryRef": "Summe von Revenue",
+              "queryRef": "Sum(FactSales.Revenue)"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": { "expr": { "Literal": { "Value": "'Revenue Mix'" } } },
+            "show": { "expr": { "Literal": { "Value": "true" } } }
+          }
+        }
+      ]
+    }
+  },
+  "howCreated": "DraggedToFieldWell",
+  "annotations": [
+    { "name": "powerbi-cli.placeholderTitle", "value": "Revenue Mix" },
+    { "name": "powerbi-cli.bindingStatus", "value": "bound" }
+  ]
+}

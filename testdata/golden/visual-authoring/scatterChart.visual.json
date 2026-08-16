@@ -1,0 +1,101 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json",
+  "name": "PilotScatter",
+  "position": {
+    "x": 10.0,
+    "y": 20.0,
+    "z": 7,
+    "height": 200.0,
+    "width": 300.0,
+    "tabOrder": 9
+  },
+  "visual": {
+    "visualType": "scatterChart",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "DimCustomer" } },
+                  "Property": "CustomerName"
+                }
+              },
+              "nativeQueryRef": "CustomerName",
+              "queryRef": "DimCustomer.CustomerName"
+            }
+          ]
+        },
+        "X": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": { "SourceRef": { "Entity": "FactSales" } },
+                      "Property": "Revenue"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "nativeQueryRef": "Summe von Revenue",
+              "queryRef": "Sum(FactSales.Revenue)"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": { "SourceRef": { "Entity": "FactSales" } },
+                  "Property": "Total Units"
+                }
+              },
+              "nativeQueryRef": "Total Units",
+              "queryRef": "FactSales.Total Units"
+            }
+          ]
+        },
+        "Size": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": { "SourceRef": { "Entity": "FactSales" } },
+                      "Property": "Units"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "nativeQueryRef": "Summe von Units",
+              "queryRef": "Sum(FactSales.Units)"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": { "expr": { "Literal": { "Value": "'Revenue vs Units'" } } },
+            "show": { "expr": { "Literal": { "Value": "true" } } }
+          }
+        }
+      ]
+    }
+  },
+  "howCreated": "DraggedToFieldWell",
+  "annotations": [
+    { "name": "powerbi-cli.placeholderTitle", "value": "Revenue vs Units" },
+    { "name": "powerbi-cli.bindingStatus", "value": "bound" }
+  ]
+}

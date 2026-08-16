@@ -1,5 +1,7 @@
 use crate::tmdl::{TableDocument, same_name};
-use crate::visual_catalog::{column_binding_is_proven, normalize_role};
+use crate::visual_catalog::{
+    column_binding_is_aggregated, column_binding_is_proven, normalize_role, supported_roles,
+};
 use crate::{CliError, CliResult};
 use serde_json::{Map, Value, json};
 use std::fs;
@@ -31,6 +33,7 @@ pub(crate) struct VisualBindingResolved {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum VisualBindingKind {
     Column,
+    AggregatedColumn,
     Measure,
 }
 
@@ -38,6 +41,7 @@ impl VisualBindingKind {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Column => "column",
+            Self::AggregatedColumn => "aggregatedColumn",
             Self::Measure => "measure",
         }
     }
@@ -155,15 +159,16 @@ pub(crate) fn visual_query_json(visual_type: &str, bindings: &[VisualBindingReso
 }
 
 pub(crate) fn binding_summary(binding: &VisualBindingResolved) -> Value {
+    let (query_ref, native_query_ref) = visual_projection_refs(binding);
     json!({
         "role": binding.role,
         "kind": binding.kind.as_str(),
         "table": binding.table,
         "field": binding.field,
-        "column": matches!(binding.kind, VisualBindingKind::Column).then_some(binding.field.clone()),
+        "column": matches!(binding.kind, VisualBindingKind::Column | VisualBindingKind::AggregatedColumn).then_some(binding.field.clone()),
         "measure": matches!(binding.kind, VisualBindingKind::Measure).then_some(binding.field.clone()),
-        "queryRef": format!("{}.{}", binding.table, binding.field),
-        "nativeQueryRef": binding.field,
+        "queryRef": query_ref,
+        "nativeQueryRef": native_query_ref,
         "displayName": binding.display_name,
         "format": binding.format_string,
         "sortDirection": binding.sort_direction
@@ -188,6 +193,102 @@ pub(crate) fn set_binding_status_annotation(visual_json: &mut Value, status: &st
         *existing = annotation;
     } else {
         annotations.push(annotation);
+    }
+}
+
+pub(crate) fn visual_query_state_errors(visual_json_path: &Path, visual: &Value) -> Vec<String> {
+    let Some(visual_type) = visual["visual"]["visualType"].as_str() else {
+        return Vec::new();
+    };
+    let Ok(supported_roles) = supported_roles(visual_type) else {
+        return Vec::new();
+    };
+    let Some(query_state) = visual["visual"]["query"]["queryState"].as_object() else {
+        return Vec::new();
+    };
+    let mut errors = Vec::new();
+    for (role, role_value) in query_state {
+        if !role_value["projections"].is_array() || supported_roles.contains(&role.as_str()) {
+            continue;
+        }
+        if visual_type == "scatterChart" && role.eq_ignore_ascii_case("details") {
+            errors.push(format!(
+                "{} scatterChart queryState role `{role}` is rejected by Power BI Desktop; use `Category`. Reapply the visual bindings with `report visuals set-bindings`",
+                visual_json_path.display()
+            ));
+            continue;
+        }
+        match normalize_role(visual_type, role) {
+            Ok(canonical) => errors.push(format!(
+                "{} {} queryState role `{role}` is a CLI input alias, not the Desktop PBIR role; use `{canonical}`. Reapply the visual bindings with `report visuals set-bindings`",
+                visual_json_path.display(),
+                visual_type
+            )),
+            Err(_) => errors.push(format!(
+                "{} {} queryState contains unsupported role `{role}`; supported Desktop PBIR roles are: {}. Reapply the visual bindings with `report visuals set-bindings`",
+                visual_json_path.display(),
+                visual_type,
+                supported_roles.join(", ")
+            )),
+        }
+    }
+
+    if visual_type == "scatterChart" && role_has_projections(query_state, "Category") {
+        for role in ["X", "Y", "Size"] {
+            let Some(projections) = query_state
+                .get(role)
+                .and_then(|value| value["projections"].as_array())
+            else {
+                continue;
+            };
+            for (index, projection) in projections.iter().enumerate() {
+                let field = &projection["field"];
+                if field["Measure"].is_object()
+                    || field["Aggregation"]["Expression"]["Column"].is_object()
+                {
+                    continue;
+                }
+                errors.push(format!(
+                    "{} PBIR_ROLE_KIND_MISMATCH: scatterChart queryState.{role}.projections[{index}].field must be a Measure or Aggregation when Category is bound; found {}",
+                    visual_json_path.display(),
+                    visual_field_kind(field)
+                ));
+            }
+        }
+    }
+    errors
+}
+
+fn role_has_projections(query_state: &Map<String, Value>, role: &str) -> bool {
+    query_state
+        .get(role)
+        .and_then(|value| value["projections"].as_array())
+        .is_some_and(|projections| !projections.is_empty())
+}
+
+fn visual_field_kind(field: &Value) -> &'static str {
+    if field.get("Column").is_some() {
+        "Column"
+    } else if field.get("Measure").is_some() {
+        "Measure"
+    } else if field.get("Aggregation").is_some() {
+        "Aggregation"
+    } else {
+        "unknown field expression"
+    }
+}
+
+pub(crate) fn resolved_binding_kind(
+    visual_type: &str,
+    role: &str,
+    is_measure: bool,
+) -> CliResult<VisualBindingKind> {
+    if is_measure {
+        Ok(VisualBindingKind::Measure)
+    } else if column_binding_is_aggregated(visual_type, role)? {
+        Ok(VisualBindingKind::AggregatedColumn)
+    } else {
+        Ok(VisualBindingKind::Column)
     }
 }
 
@@ -269,6 +370,8 @@ fn resolve_binding(
     input: &VisualBindingInput,
 ) -> CliResult<VisualBindingResolved> {
     let role = normalize_role(visual_type, &input.role)?;
+    let aggregate_column =
+        input.column.is_some() && column_binding_is_aggregated(visual_type, &role)?;
     if input.column.is_some() && !column_binding_is_proven(visual_type, &role)? {
         return Err(CliError::unsupported_feature(format!(
             "raw column bindings are not Desktop-proven for {visual_type}.{role}"
@@ -327,7 +430,11 @@ fn resolve_binding(
                 .with_suggested_command("powerbi-cli inspect --deep <project-dir-or.pbip> --json")
             })?;
         (
-            VisualBindingKind::Column,
+            if aggregate_column {
+                VisualBindingKind::AggregatedColumn
+            } else {
+                VisualBindingKind::Column
+            },
             column.name.clone(),
             column.data_type.clone(),
         )
@@ -408,13 +515,13 @@ fn reject_duplicate_fields(bindings: &[VisualBindingResolved]) -> CliResult<()> 
 }
 
 fn visual_projection_json(binding: &VisualBindingResolved, active: bool) -> Value {
-    let query_ref = format!("{}.{}", binding.table, binding.field);
+    let (query_ref, native_query_ref) = visual_projection_refs(binding);
     let mut projection = Map::new();
     projection.insert("field".to_string(), visual_field_expression(binding));
     projection.insert("queryRef".to_string(), Value::String(query_ref));
     projection.insert(
         "nativeQueryRef".to_string(),
-        Value::String(binding.field.clone()),
+        Value::String(native_query_ref),
     );
     if let Some(display_name) = &binding.display_name {
         projection.insert(
@@ -429,6 +536,19 @@ fn visual_projection_json(binding: &VisualBindingResolved, active: bool) -> Valu
         projection.insert("active".to_string(), Value::Bool(true));
     }
     Value::Object(projection)
+}
+
+fn visual_projection_refs(binding: &VisualBindingResolved) -> (String, String) {
+    match binding.kind {
+        VisualBindingKind::AggregatedColumn => (
+            format!("Sum({}.{})", binding.table, binding.field),
+            format!("Summe von {}", binding.field),
+        ),
+        VisualBindingKind::Column | VisualBindingKind::Measure => (
+            format!("{}.{}", binding.table, binding.field),
+            binding.field.clone(),
+        ),
+    }
 }
 
 fn active_projection_role(visual_type: &str, role: &str) -> bool {
@@ -460,6 +580,18 @@ fn visual_field_expression(binding: &VisualBindingResolved) -> Value {
             "Column": {
                 "Expression": source,
                 "Property": binding.field
+            }
+        }),
+        // Replicates the Power BI Desktop-rendered 2026-08 pilot fixture shape.
+        VisualBindingKind::AggregatedColumn => json!({
+            "Aggregation": {
+                "Expression": {
+                    "Column": {
+                        "Expression": source,
+                        "Property": binding.field
+                    }
+                },
+                "Function": 0
             }
         }),
     }

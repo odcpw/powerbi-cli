@@ -91,7 +91,9 @@ mod workflow;
 pub(crate) use cli_error::*;
 pub(crate) use doctor::doctor_json;
 
-use crate::pbir_bindings::{VisualBindingKind, VisualBindingResolved};
+use crate::pbir_bindings::{
+    VisualBindingKind, VisualBindingResolved, resolved_binding_kind, visual_query_state_errors,
+};
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, VisualBuildSpec, resolve_slicer_mode,
     visual_container_json,
@@ -1054,8 +1056,8 @@ fn visual_json(
     let bindings = visual
         .bindings
         .iter()
-        .map(|binding| scaffold_visual_binding(dashboard, binding))
-        .collect::<Vec<_>>();
+        .map(|binding| scaffold_visual_binding(dashboard, &visual_type, binding))
+        .collect::<CliResult<Vec<_>>>()?;
     report_visual_mutations::validate_binding_cardinality(&visual_type, &bindings)?;
     crate::pbir_bindings::validate_sort_bindings(&bindings)?;
     let slicer_mode = resolve_slicer_mode(&visual_type, visual.mode.as_deref())?;
@@ -1080,25 +1082,26 @@ fn visual_json(
 
 fn scaffold_visual_binding(
     dashboard: &DashboardSpec,
+    visual_type: &str,
     binding: &VisualBindingSpec,
-) -> VisualBindingResolved {
+) -> CliResult<VisualBindingResolved> {
     if let Some(measure) = &binding.measure {
-        VisualBindingResolved {
+        Ok(VisualBindingResolved {
             role: binding.role.clone(),
             table: binding.table.clone(),
             field: measure.clone(),
-            kind: VisualBindingKind::Measure,
+            kind: resolved_binding_kind(visual_type, &binding.role, true)?,
             data_type: None,
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
             sort_direction: binding.sort_direction.clone(),
-        }
+        })
     } else if let Some(column) = &binding.column {
-        VisualBindingResolved {
+        Ok(VisualBindingResolved {
             role: binding.role.clone(),
             table: binding.table.clone(),
             field: column.clone(),
-            kind: VisualBindingKind::Column,
+            kind: resolved_binding_kind(visual_type, &binding.role, false)?,
             data_type: dashboard
                 .tables
                 .iter()
@@ -1114,9 +1117,9 @@ fn scaffold_visual_binding(
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
             sort_direction: binding.sort_direction.clone(),
-        }
+        })
     } else {
-        VisualBindingResolved {
+        Ok(VisualBindingResolved {
             role: binding.role.clone(),
             table: binding.table.clone(),
             field: "<invalid>".to_string(),
@@ -1125,7 +1128,7 @@ fn scaffold_visual_binding(
             display_name: binding.display_name.clone(),
             format_string: binding.format_string.clone(),
             sort_direction: binding.sort_direction.clone(),
-        }
+        })
     }
 }
 
@@ -2490,7 +2493,9 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
                 }
                 report.visuals += 1;
                 let visual = read_json_value(&visual_json)?;
-                check_visual_query_state_roles(&visual_json, &visual, report);
+                report
+                    .errors
+                    .extend(visual_query_state_errors(&visual_json, &visual));
                 check_visual_minimum_size(&visual_json, &visual, report);
                 if visual["visual"]["query"]["queryState"]
                     .as_object()
@@ -2567,40 +2572,6 @@ fn check_visual_minimum_size(
             "{} {qualifier} height {height} is below the Power BI minimum of {minimum}",
             visual_json_path.display(),
         ));
-    }
-}
-
-fn check_visual_query_state_roles(
-    visual_json_path: &Path,
-    visual: &Value,
-    report: &mut ValidationReport,
-) {
-    let Some(visual_type) = visual["visual"]["visualType"].as_str() else {
-        return;
-    };
-    let Ok(supported_roles) = visual_catalog::supported_roles(visual_type) else {
-        return;
-    };
-    let Some(query_state) = visual["visual"]["query"]["queryState"].as_object() else {
-        return;
-    };
-    for (role, role_value) in query_state {
-        if !role_value["projections"].is_array() || supported_roles.contains(&role.as_str()) {
-            continue;
-        }
-        match visual_catalog::normalize_role(visual_type, role) {
-            Ok(canonical) => report.errors.push(format!(
-                "{} {} queryState role `{role}` is a CLI input alias, not the Desktop PBIR role; use `{canonical}`. Reapply the visual bindings with `report visuals set-bindings`",
-                visual_json_path.display(),
-                visual_type
-            )),
-            Err(_) => report.errors.push(format!(
-                "{} {} queryState contains unsupported role `{role}`; supported Desktop PBIR roles are: {}. Reapply the visual bindings with `report visuals set-bindings`",
-                visual_json_path.display(),
-                visual_type,
-                supported_roles.join(", ")
-            )),
-        }
     }
 }
 
