@@ -1,34 +1,13 @@
-use serde_json::Value;
+mod common;
+
+use common::{run_powerbi, stdout_json};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-
-struct RunOutput {
-    code: i32,
-    stdout: String,
-    stderr: String,
-}
 
 struct SynthesizeFixture {
     project: PathBuf,
     pbip: PathBuf,
     expressions: PathBuf,
-}
-
-fn run_powerbi(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
-}
-
-fn stdout_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stdout.trim()).expect("stdout JSON")
 }
 
 fn scaffold_live_fixture(root: &Path) -> SynthesizeFixture {

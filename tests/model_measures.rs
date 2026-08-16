@@ -1,36 +1,10 @@
 mod common;
 
-use common::assert_unsupported_feature;
+use common::{assert_unsupported_feature, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-struct RunOutput {
-    code: i32,
-    stdout: String,
-    stderr: String,
-}
-
-fn run_powerbi(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
-}
-
-fn stdout_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stdout.trim()).expect("stdout JSON")
-}
-
-fn stderr_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stderr.trim()).expect("stderr JSON")
-}
 
 fn scaffold_sales_project(root: &Path) -> PathBuf {
     let out_dir = root.join("sales_project");
