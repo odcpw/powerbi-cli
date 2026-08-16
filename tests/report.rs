@@ -7950,6 +7950,11 @@ fn report_visuals_catalog_advertises_generated_types_roles_and_limits() {
     assert!(supported.iter().any(|value| value == "areaChart"));
     assert!(supported.iter().any(|value| value == "barChart"));
     assert!(supported.iter().any(|value| value == "scatterChart"));
+    assert!(
+        supported
+            .iter()
+            .any(|value| value == "hundredPercentStackedColumnChart")
+    );
     assert!(supported.iter().any(|value| value == "pieChart"));
     assert!(supported.iter().any(|value| value == "donutChart"));
     assert!(supported.iter().any(|value| value == "pivotTable"));
@@ -8017,7 +8022,7 @@ fn report_visuals_catalog_advertises_generated_types_roles_and_limits() {
                 .iter()
                 .find(|role| role["role"] == role_name)
                 .expect("scatter value role")["fieldKinds"],
-            json!(["measure"])
+            json!(["measure", "aggregatedColumn"])
         );
     }
     assert!(
@@ -10078,7 +10083,6 @@ fn report_visuals_reject_unproven_value_columns_and_duplicate_fields() {
                 "role=Values,table=CatalogFacts,column=Amount",
             ],
         ),
-        ("scatter", &["role=X,table=CatalogFacts,column=Amount"]),
     ];
     for (visual_type, bindings) in cases {
         let mut args = vec![

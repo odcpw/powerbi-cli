@@ -775,9 +775,9 @@ fn validate_binding_contract(
     match family {
         VisualBindingFamily::SingleValue => {
             let values = count("Values");
-            if values != 1 {
+            if values != 1 || !has_measure("Values") {
                 return Err(CliError::invalid_args(format!(
-                    "{} card requires exactly one Values binding, got {values}",
+                    "{} card requires exactly one Values measure binding, got {values}",
                     visual_path()
                 )));
             }
@@ -795,6 +795,35 @@ fn validate_binding_contract(
             }
         }
         VisualBindingFamily::CategoryY => {
+            let categories = count("Category");
+            let y = count("Y");
+            let series = count("Series");
+            if categories < 1 || y < 1 || series > 1 {
+                return Err(CliError::invalid_args(format!(
+                    "{} {visual_type} requires at least one Category, at least one Y, and at most one Series binding",
+                    visual_path()
+                ))
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
+                )));
+            }
+            if has_measure("Category") || has_measure("Series") {
+                return Err(CliError::invalid_args(format!(
+                    "{} {visual_type} Category and Series bindings must be columns, not measures",
+                    visual_path()
+                )));
+            }
+            if bindings.iter().any(|binding| {
+                binding.get("role").and_then(Value::as_str) == Some("Y")
+                    && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::invalid_args(format!(
+                    "{} {visual_type} Y bindings must be measures, not columns",
+                    visual_path()
+                )));
+            }
+        }
+        VisualBindingFamily::CategorySeriesYAggregatable => {
             let categories = count("Category");
             let y = count("Y");
             let series = count("Series");

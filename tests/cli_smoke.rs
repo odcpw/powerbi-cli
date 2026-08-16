@@ -71,11 +71,11 @@ fn capabilities_advertise_generated_visual_contract_and_proof_statuses() {
         );
     }
     assert!(
-        visual_contract["desktopGoldenPendingVisualTypes"]
+        visual_contract["schemaGoldenVisualTypes"]
             .as_array()
-            .expect("title-bearing Desktop-pending visual types")
+            .expect("schema-golden visual types")
             .iter()
-            .any(|pending| pending == "card")
+            .any(|proven| proven == "card")
     );
     let scatter = visual_contract["visualTypes"]
         .as_array()
@@ -83,6 +83,7 @@ fn capabilities_advertise_generated_visual_contract_and_proof_statuses() {
         .iter()
         .find(|visual_type| visual_type["visualType"] == "scatterChart")
         .expect("scatter contract");
+    assert_eq!(scatter["proofLevel"], "schema-golden");
     assert!(
         scatter["roles"]
             .as_array()

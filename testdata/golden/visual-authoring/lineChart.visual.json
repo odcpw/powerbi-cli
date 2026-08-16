@@ -1,0 +1,77 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json",
+  "name": "PilotLine",
+  "position": {
+    "x": 10.0,
+    "y": 20.0,
+    "z": 7,
+    "height": 200.0,
+    "width": 300.0,
+    "tabOrder": 9
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "DimDate" } },
+                  "Property": "Month"
+                }
+              },
+              "nativeQueryRef": "Month",
+              "queryRef": "DimDate.Month"
+            }
+          ]
+        },
+        "Series": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "DimCustomer" } },
+                  "Property": "Segment"
+                }
+              },
+              "nativeQueryRef": "Segment",
+              "queryRef": "DimCustomer.Segment"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": { "SourceRef": { "Entity": "FactSales" } },
+                  "Property": "Total Revenue"
+                }
+              },
+              "nativeQueryRef": "Total Revenue",
+              "queryRef": "FactSales.Total Revenue"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "text": { "expr": { "Literal": { "Value": "'Revenue Trend'" } } },
+            "show": { "expr": { "Literal": { "Value": "true" } } }
+          }
+        }
+      ]
+    }
+  },
+  "howCreated": "DraggedToFieldWell",
+  "annotations": [
+    { "name": "powerbi-cli.placeholderTitle", "value": "Revenue Trend" },
+    { "name": "powerbi-cli.bindingStatus", "value": "bound" }
+  ]
+}

@@ -7,6 +7,7 @@ pub(crate) enum VisualBindingFamily {
     SingleValue,
     ValuesList,
     CategoryY,
+    CategorySeriesYAggregatable,
     ComboCategoryY,
     CategoryShare,
     RowsColumnsValues,
@@ -83,6 +84,17 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
         summary: "Stacked column chart; accepts one or more Category columns for hierarchy axes, one or more Y measure bindings, an optional Series column, and Tooltips.",
     },
     VisualTypeSpec {
+        visual_type: "hundredPercentStackedColumnChart",
+        aliases: &[
+            "hundredpercentstackedcolumn",
+            "hundredpercentstackedcolumnchart",
+            "100percentstackedcolumn",
+            "100percentstackedcolumnchart",
+        ],
+        family: VisualBindingFamily::CategorySeriesYAggregatable,
+        summary: "100% stacked column chart; accepts Category columns, an optional Series column, and Y measures or summed columns.",
+    },
+    VisualTypeSpec {
         visual_type: "lineClusteredColumnComboChart",
         aliases: &[
             "combo",
@@ -98,7 +110,7 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
         visual_type: "scatterChart",
         aliases: &["scatter", "scatterchart", "bubble", "bubblechart"],
         family: VisualBindingFamily::ScatterBubble,
-        summary: "Scatter/bubble chart; accepts required X and Y measures plus optional Category, Size measure, Series, and Tooltips bindings.",
+        summary: "Scatter/bubble chart; accepts required X and Y measures or summed columns plus optional Category, Size measure or summed column, Series, and Tooltips bindings.",
     },
     VisualTypeSpec {
         visual_type: "pieChart",
@@ -161,7 +173,7 @@ pub(crate) fn visual_catalog_command(args: &[String]) -> CliResult<Value> {
         })).collect::<Vec<_>>(),
         "rules": [
             "Generated visuals use a deliberately small PBIR visual.json pattern.",
-            "Value-axis roles require measures until a Desktop-authored aggregation binding proves raw-column semantics.",
+            "Scatter X/Y/Size and 100% stacked-column Y accept columns by emitting the Desktop-proven explicit Sum aggregation shape; other value-axis columns require measures.",
             "The same model field cannot be projected more than once per visual until Desktop-authored duplicate queryRef numbering is available.",
             "Use `report visuals clone` for Desktop-authored visuals outside this catalog.",
             "Do not infer support for planned or template-only visual types from this catalog."
@@ -180,6 +192,14 @@ pub(crate) fn canonical_visual_type(value: &str) -> CliResult<String> {
 
 pub(crate) fn supported_visual_type_names() -> Vec<&'static str> {
     VISUAL_TYPES.iter().map(|spec| spec.visual_type).collect()
+}
+
+pub(crate) fn schema_golden_visual_type_names() -> Vec<&'static str> {
+    VISUAL_TYPES
+        .iter()
+        .map(|spec| spec.visual_type)
+        .filter(|visual_type| pilot_2026_08_schema_golden(visual_type))
+        .collect()
 }
 
 pub(crate) fn visual_type_contracts() -> Vec<Value> {
@@ -202,6 +222,12 @@ pub(crate) fn normalize_role(visual_type: &str, role: &str) -> CliResult<String>
             "y" | "values" | "value" => Some("Y"),
             "series" | "legend" | "color" | "colour" => Some("Series"),
             "tooltip" | "tooltips" => Some("Tooltips"),
+            _ => None,
+        },
+        VisualBindingFamily::CategorySeriesYAggregatable => match lower_role.as_str() {
+            "category" | "categories" | "axis" | "x" => Some("Category"),
+            "y" | "values" | "value" => Some("Y"),
+            "series" | "legend" | "color" | "colour" => Some("Series"),
             _ => None,
         },
         VisualBindingFamily::ComboCategoryY => match lower_role.as_str() {
@@ -228,10 +254,21 @@ pub(crate) fn normalize_role(visual_type: &str, role: &str) -> CliResult<String>
             "values" | "value" | "field" => Some("Values"),
             _ => None,
         },
+        VisualBindingFamily::ScatterBubble
+            if matches!(lower_role.as_str(), "details" | "detail") =>
+        {
+            return Err(CliError::unsupported_feature(
+                "scatterChart does not support the Details role",
+            )
+            .with_hint(
+                "Power BI Desktop uses the Category PBIR role for scatter detail identity; use role=Category instead of Details.",
+            )
+            .with_suggested_command(
+                "powerbi-cli report visuals catalog --visual-type scatterChart --json",
+            ));
+        }
         VisualBindingFamily::ScatterBubble => match lower_role.as_str() {
-            "category" | "categories" | "details" | "detail" | "values" | "value" => {
-                Some("Category")
-            }
+            "category" | "categories" | "values" | "value" => Some("Category"),
             "x" | "xaxis" | "x-axis" | "x_axis" => Some("X"),
             "y" | "yaxis" | "y-axis" | "y_axis" => Some("Y"),
             "size" | "bubble" | "bubblesize" | "bubble-size" | "bubble_size" => Some("Size"),
@@ -270,6 +307,14 @@ pub(crate) fn column_binding_is_proven(visual_type: &str, role: &str) -> CliResu
             | (VisualBindingFamily::ComboCategoryY, "Y" | "Y2")
             | (VisualBindingFamily::CategoryShare, "Y")
             | (VisualBindingFamily::RowsColumnsValues, "Values")
+    ) || column_binding_is_aggregated(visual_type, role)?)
+}
+
+pub(crate) fn column_binding_is_aggregated(visual_type: &str, role: &str) -> CliResult<bool> {
+    let family = binding_family(visual_type)?;
+    Ok(matches!(
+        (family, role),
+        (VisualBindingFamily::CategorySeriesYAggregatable, "Y")
             | (VisualBindingFamily::ScatterBubble, "X" | "Y" | "Size")
     ))
 }
@@ -343,7 +388,12 @@ fn unsupported_visual_type_error(value: &str, normalized: &str) -> CliError {
 }
 
 fn visual_type_json(spec: &VisualTypeSpec) -> Value {
-    let (proof_level, proof_note) = if spec.family == VisualBindingFamily::ComboCategoryY {
+    let (proof_level, proof_note) = if pilot_2026_08_schema_golden(spec.visual_type) {
+        (
+            "schema-golden",
+            "Exact visual.json output replicates a Power BI Desktop-rendered fixture from the 2026-08 production pilot.",
+        )
+    } else if spec.family == VisualBindingFamily::ComboCategoryY {
         (
             "manual-desktop-canvas-refresh",
             "Power BI Desktop Store 2.156.951.0 refreshed, rendered, sorted, and saved the generated combo fixture on 2026-07-23.",
@@ -354,20 +404,25 @@ fn visual_type_json(spec: &VisualTypeSpec) -> Value {
             "The binding family retains its recorded proof, but the current title-bearing generated visual bytes await Desktop open/refresh/save re-verification.",
         )
     };
+    let binding_proof_level = if pilot_2026_08_schema_golden(spec.visual_type) {
+        "schema-golden"
+    } else {
+        binding_proof_level(spec.family)
+    };
     let mut contract = json!({
         "visualType": spec.visual_type,
         "aliases": spec.aliases,
         "generatedBy": "report visuals add",
         "bindingFamily": binding_family_name(spec.family),
         "proofLevel": proof_level,
-        "bindingProofLevel": binding_proof_level(spec.family),
+        "bindingProofLevel": binding_proof_level,
         "proofNote": proof_note,
         "summary": spec.summary,
         "roles": role_specs_json(spec.family),
         "examples": example_commands(spec),
         "limitations": [
             "Generated PBIR is a minimal visual container plus queryState.",
-            "Raw columns are refused in value-axis roles until Desktop-authored aggregation-binding fixtures exist.",
+            "Columns in proven aggregatable roles are emitted as an explicit Sum Aggregation; other raw value-axis columns remain refused.",
             "Repeated use of one model field is refused until Desktop-authored duplicate queryRef numbering is available.",
             "Use formatting bundles, themes, or cloned Desktop-authored templates for style beyond generated defaults."
         ]
@@ -438,6 +493,35 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "fieldKinds": ["column", "measure"],
                 "aliases": ["tooltip", "tooltips"],
                 "summary": "Optional fields shown in tooltips."
+            }
+        ]),
+        VisualBindingFamily::CategorySeriesYAggregatable => json!([
+            {
+                "role": "Category",
+                "required": true,
+                "min": 1,
+                "max": null,
+                "fieldKinds": ["column"],
+                "aliases": ["category", "categories", "axis", "x"],
+                "summary": "One or more category columns."
+            },
+            {
+                "role": "Y",
+                "required": true,
+                "min": 1,
+                "max": null,
+                "fieldKinds": ["measure", "aggregatedColumn"],
+                "aliases": ["y", "values", "value"],
+                "summary": "One or more measures or columns emitted as explicit Sum aggregations."
+            },
+            {
+                "role": "Series",
+                "required": false,
+                "min": 0,
+                "max": 1,
+                "fieldKinds": ["column"],
+                "aliases": ["series", "legend", "color", "colour"],
+                "summary": "Optional legend/series grouping column."
             }
         ]),
         VisualBindingFamily::ComboCategoryY => json!([
@@ -544,18 +628,18 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "required": true,
                 "min": 1,
                 "max": 1,
-                "fieldKinds": ["measure"],
+                "fieldKinds": ["measure", "aggregatedColumn"],
                 "aliases": ["x", "xAxis"],
-                "summary": "Continuous X-axis measure."
+                "summary": "Continuous X-axis measure or explicitly summed column."
             },
             {
                 "role": "Y",
                 "required": true,
                 "min": 1,
                 "max": 1,
-                "fieldKinds": ["measure"],
+                "fieldKinds": ["measure", "aggregatedColumn"],
                 "aliases": ["y", "yAxis"],
-                "summary": "Continuous Y-axis measure."
+                "summary": "Continuous Y-axis measure or explicitly summed column."
             },
             {
                 "role": "Category",
@@ -563,7 +647,7 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "min": 0,
                 "max": 1,
                 "fieldKinds": ["column"],
-                "aliases": ["category", "details", "values"],
+                "aliases": ["category", "values"],
                 "summary": "Optional bubble identity/detail column."
             },
             {
@@ -571,9 +655,9 @@ fn role_specs_json(family: VisualBindingFamily) -> Value {
                 "required": false,
                 "min": 0,
                 "max": 1,
-                "fieldKinds": ["measure"],
+                "fieldKinds": ["measure", "aggregatedColumn"],
                 "aliases": ["size", "bubbleSize"],
-                "summary": "Optional bubble-size measure."
+                "summary": "Optional bubble-size measure or explicitly summed column."
             },
             {
                 "role": "Series",
@@ -611,6 +695,10 @@ fn example_commands(spec: &VisualTypeSpec) -> Vec<String> {
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
             spec.visual_type
         )],
+        VisualBindingFamily::CategorySeriesYAggregatable => vec![format!(
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<category-column>\" --binding \"role=Series,table=<table>,column=<series-column>\" --binding \"role=Y,table=<table>,column=<numeric-column>\" --dry-run --json",
+            spec.visual_type
+        )],
         VisualBindingFamily::ComboCategoryY => vec![format!(
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<column-measure>\" --binding \"role=Y2,table=<table>,measure=<line-measure>\" --dry-run --json",
             spec.visual_type
@@ -627,7 +715,7 @@ fn example_commands(spec: &VisualTypeSpec) -> Vec<String> {
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type slicer --mode between --title <title> --binding \"role=Values,table=<table>,column=<numeric-or-date-column>\" --dry-run --json".to_string(),
         ],
         VisualBindingFamily::ScatterBubble => vec![format!(
-            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<detail-column>\" --binding \"role=X,table=<table>,measure=<x-measure>\" --binding \"role=Y,table=<table>,measure=<y-measure>\" --binding \"role=Size,table=<table>,measure=<size-measure>\" --binding \"role=Series,table=<table>,column=<color-column>\" --dry-run --json",
+            "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type {} --title <title> --binding \"role=Category,table=<table>,column=<detail-column>\" --binding \"role=X,table=<table>,column=<x-column>\" --binding \"role=Y,table=<table>,measure=<y-measure>\" --binding \"role=Size,table=<table>,column=<size-column>\" --dry-run --json",
             spec.visual_type
         )],
     }
@@ -637,6 +725,7 @@ fn role_names(family: VisualBindingFamily) -> Vec<&'static str> {
     match family {
         VisualBindingFamily::SingleValue | VisualBindingFamily::ValuesList => vec!["Values"],
         VisualBindingFamily::CategoryY => vec!["Category", "Y", "Series", "Tooltips"],
+        VisualBindingFamily::CategorySeriesYAggregatable => vec!["Category", "Y", "Series"],
         VisualBindingFamily::ComboCategoryY => vec!["Category", "Y", "Y2", "Tooltips"],
         VisualBindingFamily::CategoryShare => vec!["Category", "Y"],
         VisualBindingFamily::RowsColumnsValues => vec!["Rows", "Columns", "Values"],
@@ -656,6 +745,7 @@ fn binding_family_name(family: VisualBindingFamily) -> &'static str {
         VisualBindingFamily::SingleValue => "singleValue",
         VisualBindingFamily::ValuesList => "valuesList",
         VisualBindingFamily::CategoryY => "categoryY",
+        VisualBindingFamily::CategorySeriesYAggregatable => "categorySeriesYAggregatable",
         VisualBindingFamily::ComboCategoryY => "comboCategoryY",
         VisualBindingFamily::CategoryShare => "categoryShare",
         VisualBindingFamily::RowsColumnsValues => "rowsColumnsValues",
@@ -672,6 +762,13 @@ fn binding_proof_level(family: VisualBindingFamily) -> &'static str {
         | VisualBindingFamily::ComboCategoryY => "manual-desktop-canvas-refresh",
         _ => "unit-smoke",
     }
+}
+
+fn pilot_2026_08_schema_golden(visual_type: &str) -> bool {
+    matches!(
+        visual_type,
+        "card" | "tableEx" | "lineChart" | "scatterChart" | "hundredPercentStackedColumnChart"
+    )
 }
 
 fn normalize_key(value: &str) -> String {

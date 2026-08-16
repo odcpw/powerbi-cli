@@ -373,13 +373,16 @@ pub(crate) fn validate_binding_cardinality(
     let family = binding_family(visual_type)?;
     match family {
         VisualBindingFamily::SingleValue => {
-            if bindings.len() == 1 && bindings[0].role == "Values" {
+            if bindings.len() == 1
+                && bindings[0].role == "Values"
+                && matches!(bindings[0].kind, VisualBindingKind::Measure)
+            {
                 return Ok(());
             }
             Err(CliError::invalid_args(
                 "single-value visuals accept exactly one Values binding",
             )
-            .with_hint("Use one measure or column in the Values role.")
+            .with_hint("Use one measure in the Values role.")
             .with_suggested_command(
                 "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type card --title <title> --binding \"role=Values,table=<table>,measure=<measure>\" --dry-run --json",
             ))
@@ -403,6 +406,9 @@ pub(crate) fn validate_binding_cardinality(
                 .filter(|binding| binding.role == "Series")
                 .count();
             let has_y = bindings.iter().any(|binding| binding.role == "Y");
+            let y_is_measure = bindings.iter().all(|binding| {
+                binding.role != "Y" || matches!(binding.kind, VisualBindingKind::Measure)
+            });
             let category_is_column = bindings.iter().all(|binding| {
                 binding.role != "Category" || matches!(binding.kind, VisualBindingKind::Column)
             });
@@ -418,6 +424,7 @@ pub(crate) fn validate_binding_cardinality(
             if category_count >= 1
                 && category_is_column
                 && has_y
+                && y_is_measure
                 && series_count <= 1
                 && series_is_column
                 && only_supported_roles
@@ -430,6 +437,42 @@ pub(crate) fn validate_binding_cardinality(
             .with_hint("Use Category for axis columns, Y for one or more values, optional Series for a legend column, and Tooltips for extra fields. Multiple Category bindings become a drill hierarchy.")
             .with_suggested_command(
                 "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type lineChart --title <title> --binding \"role=Category,table=<table>,column=<year-column>\" --binding \"role=Category,table=<table>,column=<month-column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
+            ))
+        }
+        VisualBindingFamily::CategorySeriesYAggregatable => {
+            let category_count = bindings
+                .iter()
+                .filter(|binding| binding.role == "Category")
+                .count();
+            let y_count = bindings
+                .iter()
+                .filter(|binding| binding.role == "Y")
+                .count();
+            let series_count = bindings
+                .iter()
+                .filter(|binding| binding.role == "Series")
+                .count();
+            let role_kinds_are_supported =
+                bindings.iter().all(|binding| match binding.role.as_str() {
+                    "Category" | "Series" => matches!(binding.kind, VisualBindingKind::Column),
+                    "Y" => matches!(
+                        binding.kind,
+                        VisualBindingKind::Measure | VisualBindingKind::AggregatedColumn
+                    ),
+                    _ => false,
+                });
+            if category_count >= 1 && y_count >= 1 && series_count <= 1 && role_kinds_are_supported
+            {
+                return Ok(());
+            }
+            Err(CliError::invalid_args(
+                "100% stacked column charts require one or more Category columns, one or more Y measures or summed columns, and at most one Series column",
+            )
+            .with_hint(
+                "Use Category for the axis, optional Series for the legend, and Y for measures or numeric columns that should be summed.",
+            )
+            .with_suggested_command(
+                "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type hundredPercentStackedColumnChart --title <title> --binding \"role=Category,table=<table>,column=<category-column>\" --binding \"role=Series,table=<table>,column=<series-column>\" --binding \"role=Y,table=<table>,column=<numeric-column>\" --dry-run --json",
             ))
         }
         VisualBindingFamily::ComboCategoryY => {
@@ -566,6 +609,13 @@ pub(crate) fn validate_binding_cardinality(
             let series_is_column = bindings.iter().all(|binding| {
                 binding.role != "Series" || matches!(binding.kind, VisualBindingKind::Column)
             });
+            let value_roles_are_aggregated = bindings.iter().all(|binding| {
+                !matches!(binding.role.as_str(), "X" | "Y" | "Size")
+                    || matches!(
+                        binding.kind,
+                        VisualBindingKind::Measure | VisualBindingKind::AggregatedColumn
+                    )
+            });
             if x_count == 1
                 && y_count == 1
                 && category_count <= 1
@@ -573,6 +623,7 @@ pub(crate) fn validate_binding_cardinality(
                 && series_count <= 1
                 && category_is_column
                 && series_is_column
+                && value_roles_are_aggregated
                 && only_supported_roles
             {
                 return Ok(());

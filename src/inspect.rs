@@ -387,6 +387,8 @@ fn decode_text_literal(value: &str) -> String {
 fn projection_kind(projection: &Value) -> &'static str {
     if projection["field"]["Measure"].is_object() {
         "measure"
+    } else if projection["field"]["Aggregation"]["Expression"]["Column"].is_object() {
+        "aggregatedColumn"
     } else if projection["field"]["Column"].is_object() {
         "column"
     } else {
@@ -397,6 +399,11 @@ fn projection_kind(projection: &Value) -> &'static str {
 fn projection_table(projection: &Value) -> Value {
     projection["field"]["Measure"]["Expression"]["SourceRef"]["Entity"]
         .as_str()
+        .or_else(|| {
+            projection["field"]["Aggregation"]["Expression"]["Column"]["Expression"]
+                ["SourceRef"]["Entity"]
+                .as_str()
+        })
         .or_else(|| projection["field"]["Column"]["Expression"]["SourceRef"]["Entity"].as_str())
         .map(|value| Value::String(value.to_string()))
         .unwrap_or(Value::Null)
@@ -405,6 +412,7 @@ fn projection_table(projection: &Value) -> Value {
 fn projection_field(projection: &Value) -> Value {
     projection["field"]["Measure"]["Property"]
         .as_str()
+        .or_else(|| projection["field"]["Aggregation"]["Expression"]["Column"]["Property"].as_str())
         .or_else(|| projection["field"]["Column"]["Property"].as_str())
         .map(|value| Value::String(value.to_string()))
         .unwrap_or(Value::Null)
@@ -413,6 +421,7 @@ fn projection_field(projection: &Value) -> Value {
 fn projection_column(projection: &Value) -> Value {
     projection["field"]["Column"]["Property"]
         .as_str()
+        .or_else(|| projection["field"]["Aggregation"]["Expression"]["Column"]["Property"].as_str())
         .map(|value| Value::String(value.to_string()))
         .unwrap_or(Value::Null)
 }
