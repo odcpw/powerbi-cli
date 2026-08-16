@@ -15,7 +15,7 @@ use crate::report::report_command;
 use crate::schema::schema_command;
 use crate::skill_package::skill_command;
 use crate::source_template::source_template_command;
-use crate::workflow::workflow_command;
+use crate::workflow::{workflow_command, workflow_synthesize_command};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, diff::diff_command, doctor_json,
     inspect_command, scaffold_command, validate_command,
@@ -137,6 +137,9 @@ fn run() -> CliResult<CliOutput> {
             value_output(source_template_command(&args[1..])?, flags.json)
         }
         "validate" => value_output(validate_command(&args[1..])?, flags.json),
+        "workflow" if args.get(1).is_some_and(|command| command == "synthesize") => {
+            value_output(workflow_synthesize_command(&args[2..])?, flags.json)
+        }
         "workflow" => value_output(workflow_command(&args[1..])?, flags.json),
         _ => Err(unknown_command_error(&args)),
     }

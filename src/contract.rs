@@ -56,6 +56,7 @@ Usage:
   powerbi-cli workflow plan --project <project-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json
   powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
   powerbi-cli workflow verify --plan <plan.json> --json
+  powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json
   powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json
   powerbi-cli desktop close --json
   powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json
@@ -374,6 +375,7 @@ pub(crate) fn robot_triage() -> Value {
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
             "modelDaxExecute": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
             "modelLiveExportTmdl": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read --json",
+            "workflowSynthesize": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> --json",
             "sourceTemplateList": "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
@@ -730,6 +732,24 @@ fn command_catalog() -> Vec<Value> {
             "flags": ["--json", "--format json"],
             "examples": ["powerbi-cli doctor --json"],
             "followUpFields": ["schema", "ok", "exitCode", "checks[].id", "checks[].status", "checks[].next", "checks[].instructions", "powerBiDesktop", "microsoftIntegrations", "formatAssumptions", "offlineSafety", "next"]
+        }),
+        json!({
+            "path": "workflow synthesize",
+            "usage": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json",
+            "summary": "Copy a live PBIP into a fresh offline project, install synthetic shared M expressions, and replace shared Database connector steps with one complete navigation shim",
+            "tags": ["workflow", "synthetic", "offline", "pbip", "tmdl", "partition", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": true,
+            "networkRequired": false,
+            "stability": "alpha-output",
+            "proofLevel": "schema-golden",
+            "outputSchema": "powerbi-cli.workflow-synthesize.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--expressions <expressions.tmdl>", "--out-dir <new-project-dir>", "--map <schema.item>=<ExpressionName>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --json", "powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --map sales.orders=QaOrders --json"],
+            "limitations": ["The output directory must be fresh and outside the source project tree. Source links/reparse points are refused; cache.abf and localSettings.json files are always excluded.", "Recognizes literal Database{[Schema = \"s\", Item = \"t\"]}[Data] navigation and a single-line Database = <Connector>.Database(\"server\", ...) binding in each affected partition. It preserves downstream M lines unchanged and refuses variable/computed server arguments whose source text cannot be proven removed.", "The supplied expressions file must define every discovered default or overridden expression name. This command runs native project validation and a partition-focused connector/server-string scan; it does not contact a live source or require Microsoft sidecars."],
+            "followUpFields": ["projectDir", "pbip", "expressions", "mappings", "counts", "validation", "offlineSafety", "next"]
         }),
         json!({
             "path": "workflow plan",
