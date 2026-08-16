@@ -10,6 +10,7 @@ struct Fixture {
     project: PathBuf,
     pbip: PathBuf,
     report: PathBuf,
+    #[cfg_attr(windows, allow(dead_code))]
     semantic_model: PathBuf,
 }
 

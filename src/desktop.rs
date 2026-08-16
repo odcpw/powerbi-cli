@@ -115,6 +115,8 @@ struct DesktopOptions {
     out: Option<PathBuf>,
     timeout_ms: u64,
     allow_unverified_capture: bool,
+    preflight: PreflightMode,
+    preflight_explicit: bool,
 }
 
 impl Default for DesktopOptions {
@@ -125,6 +127,40 @@ impl Default for DesktopOptions {
             out: None,
             timeout_ms: DEFAULT_TIMEOUT_MS,
             allow_unverified_capture: false,
+            preflight: PreflightMode::Strict,
+            preflight_explicit: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PreflightMode {
+    Strict,
+    Normal,
+    Skip,
+}
+
+impl PreflightMode {
+    fn parse(value: &str) -> CliResult<Self> {
+        match value {
+            "strict" => Ok(Self::Strict),
+            "normal" => Ok(Self::Normal),
+            "skip" => Ok(Self::Skip),
+            _ => Err(CliError::invalid_args(
+                "--preflight must be one of: strict, normal, skip",
+            )
+            .with_hint("Use strict by default, normal to omit lint, or skip for an explicit no-preflight launch.")
+            .with_suggested_command(
+                "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --preflight normal --json",
+            )),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Strict => "strict",
+            Self::Normal => "normal",
+            Self::Skip => "skip",
         }
     }
 }
@@ -391,12 +427,15 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         }
     };
 
-    let validation = match target.project() {
-        Some(project) => validate_project(project)?,
-        None => ValidationReport::default(),
+    let preflight_applicable = target.project().is_some();
+    let validation_performed = preflight_applicable && options.preflight != PreflightMode::Skip;
+    let validation = match (target.project(), validation_performed) {
+        (Some(project), true) => validate_project(project)?,
+        _ => ValidationReport::default(),
     };
     let validation_ok = validation.errors.is_empty();
-    let strict_preflight_enabled = target.kind == DesktopTargetKind::Pbip;
+    let strict_preflight_enabled =
+        target.kind == DesktopTargetKind::Pbip && options.preflight == PreflightMode::Strict;
     let lint = if validation_ok && strict_preflight_enabled {
         Some(lint_project(
             target.project().expect("PBIP target has a project"),
@@ -409,7 +448,28 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         .as_ref()
         .and_then(|value| value["counts"]["errors"].as_u64())
         .unwrap_or_default();
-    let strict_preflight_ok = validation_ok && lint_error_count == 0;
+    let strict_preflight_ok = !strict_preflight_enabled || (validation_ok && lint_error_count == 0);
+    let preflight_ok = match options.preflight {
+        PreflightMode::Strict => validation_ok && lint_error_count == 0,
+        PreflightMode::Normal => validation_ok,
+        PreflightMode::Skip => true,
+    };
+    let preflight = json!({
+        "mode": options.preflight.as_str(),
+        "defaulted": !options.preflight_explicit,
+        "applicable": preflight_applicable,
+        "performed": validation_performed,
+        "validationPerformed": validation_performed,
+        "lintPerformed": lint.is_some(),
+        "skipped": preflight_applicable && options.preflight == PreflightMode::Skip,
+        "ok": preflight_ok,
+        "message": match (preflight_applicable, options.preflight) {
+            (false, _) => "PBIX target resolution performs its bounded package checks separately; PBIP validation/lint preflight is not applicable.",
+            (true, PreflightMode::Strict) => "Strict PBIP validation and lint preflight performed.",
+            (true, PreflightMode::Normal) => "Normal PBIP validation performed without lint.",
+            (true, PreflightMode::Skip) => "PBIP validation and lint preflight skipped by explicit request.",
+        }
+    });
     let mut detection = detect_power_bi_desktop(options.desktop_path.as_deref());
     let oracle_enabled = oracle_enabled();
     let launch_plan = desktop_launch_plan(&options, &detection);
@@ -956,6 +1016,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         "exitCode": exit_code,
         "changes": changes,
         "document": target.artifact_json(),
+        "preflight": preflight,
         "oracle": {
             "kind": "powerBiDesktop",
             "available": detection.found && cfg!(windows) && oracle_enabled,
@@ -970,6 +1031,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
             }
         },
         "validation": {
+            "performed": validation_performed,
             "ok": validation_ok,
             "warnings": validation.warnings,
             "errors": validation.errors,
@@ -1253,6 +1315,17 @@ fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult
                             .with_suggested_command(operation.suggested_command()),
                     );
                 }
+            }
+            "--preflight" if operation == DesktopOperation::Open => {
+                if options.preflight_explicit {
+                    return Err(CliError::invalid_args(
+                        "desktop open accepts --preflight only once",
+                    )
+                    .with_suggested_command(operation.suggested_command()));
+                }
+                let value = take_value(args, &mut i, "--preflight")?;
+                options.preflight = PreflightMode::parse(&value)?;
+                options.preflight_explicit = true;
             }
             other if other.starts_with('-') => {
                 return Err(CliError::invalid_args(format!(
@@ -2691,7 +2764,7 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<Strin
 #[cfg(test)]
 mod tests {
     use super::{
-        DesktopOperation, ProcessIdentity, ProcessWindow, ScreenshotCaptureResult,
+        DesktopOperation, PreflightMode, ProcessIdentity, ProcessWindow, ScreenshotCaptureResult,
         ScreenshotDimensions, capture_is_authorized, cleanup_unresolved_after_launch,
         desktop_argument_path, detect_power_bi_desktop, ensure_desktop_platform,
         is_power_bi_desktop_process, managed_session_process_id, parse_desktop_args,
@@ -2917,6 +2990,58 @@ mod tests {
         .expect_err("open-check must reject capture override");
         assert_eq!(error.code, "invalid_args");
         assert!(error.message.contains("unknown desktop open-check flag"));
+    }
+
+    #[test]
+    fn desktop_open_preflight_defaults_to_strict_and_accepts_closed_modes() {
+        let default = parse_desktop_args(DesktopOperation::Open, &["report.pbip".to_string()])
+            .expect("default open options");
+        assert_eq!(default.preflight, PreflightMode::Strict);
+        assert!(!default.preflight_explicit);
+
+        for (value, expected) in [
+            ("strict", PreflightMode::Strict),
+            ("normal", PreflightMode::Normal),
+            ("skip", PreflightMode::Skip),
+        ] {
+            let options = parse_desktop_args(
+                DesktopOperation::Open,
+                &[
+                    "report.pbip".to_string(),
+                    "--preflight".to_string(),
+                    value.to_string(),
+                ],
+            )
+            .expect("preflight mode");
+            assert_eq!(options.preflight, expected);
+            assert!(options.preflight_explicit);
+        }
+
+        let invalid = parse_desktop_args(
+            DesktopOperation::Open,
+            &[
+                "report.pbip".to_string(),
+                "--preflight".to_string(),
+                "fast".to_string(),
+            ],
+        )
+        .expect_err("invalid preflight mode");
+        assert_eq!(invalid.code, "invalid_args");
+
+        let other_operation = parse_desktop_args(
+            DesktopOperation::OpenCheck,
+            &[
+                "report.pbip".to_string(),
+                "--preflight".to_string(),
+                "skip".to_string(),
+            ],
+        )
+        .expect_err("preflight flag is desktop-open only");
+        assert!(
+            other_operation
+                .message
+                .contains("unknown desktop open-check flag")
+        );
     }
 
     #[test]

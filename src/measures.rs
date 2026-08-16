@@ -379,6 +379,7 @@ fn parse_show_args(args: &[String]) -> CliResult<ShowOptions> {
 
 fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOptions> {
     let mut options = MutationOptions::default();
+    let mut expression_source = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -388,8 +389,12 @@ fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOpt
             "--handle" => options.selector.handle = Some(take_value(args, &mut i, "--handle")?),
             "--table" => options.selector.table = Some(take_value(args, &mut i, "--table")?),
             "--name" => options.selector.name = Some(take_value(args, &mut i, "--name")?),
-            "--expression" => options.expression = Some(take_value(args, &mut i, "--expression")?),
+            "--expression" => {
+                set_expression_source(&mut expression_source, "--expression")?;
+                options.expression = Some(take_value(args, &mut i, "--expression")?);
+            }
             "--expression-file" => {
+                set_expression_source(&mut expression_source, "--expression-file")?;
                 let path = take_value(args, &mut i, "--expression-file")?;
                 options.expression = Some(read_expression_file(&path)?);
             }
@@ -482,6 +487,20 @@ fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOpt
     Ok(options)
 }
 
+fn set_expression_source(current: &mut Option<&'static str>, next: &'static str) -> CliResult<()> {
+    if let Some(current) = current {
+        return Err(CliError::invalid_args(format!(
+            "{current} and {next} are mutually exclusive"
+        ))
+        .with_hint("Pass the DAX expression either inline or in one UTF-8 file, not both.")
+        .with_suggested_command(
+            "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression-file <path> --dry-run --json",
+        ));
+    }
+    *current = Some(next);
+    Ok(())
+}
+
 fn measure_json(measure: &MeasureRecord) -> Value {
     json!({
         "handle": measure.handle(),
@@ -555,17 +574,24 @@ fn require_selector(selector: &MeasureSelector, action: &str) -> CliResult<()> {
 }
 
 fn read_expression_file(path: &str) -> CliResult<String> {
-    let text = if path == "-" {
-        let mut text = String::new();
+    let bytes = if path == "-" {
+        let mut bytes = Vec::new();
         io::stdin()
-            .read_to_string(&mut text)
+            .read_to_end(&mut bytes)
             .map_err(|err| CliError::unexpected(format!("read expression from stdin: {err}")))?;
-        text
+        bytes
     } else {
-        fs::read_to_string(path).map_err(|err| {
+        fs::read(path).map_err(|err| {
             CliError::file_not_found(format!("read expression file {path}: {err}"))
         })?
     };
+    let text = String::from_utf8(bytes).map_err(|_| {
+        CliError::invalid_args(format!("expression file is not valid UTF-8: {path}"))
+            .with_hint("Save the DAX expression as UTF-8 text and retry.")
+            .with_suggested_command(
+                "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression-file <path> --dry-run --json",
+            )
+    })?;
     let expression = text
         .trim_start_matches('\u{feff}')
         .trim_end_matches(['\r', '\n'])

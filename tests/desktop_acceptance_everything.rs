@@ -600,6 +600,24 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    h.ok(
+        "model columns set-sort-by",
+        &svec([
+            "model",
+            "columns",
+            "set-sort-by",
+            "--project",
+            &project_arg,
+            "--table",
+            "DimDate",
+            "--column",
+            "MonthName",
+            "--by",
+            "MonthNo",
+            "--in-place",
+            "--json",
+        ]),
+    );
 
     h.ok(
         "model calculated-columns list",

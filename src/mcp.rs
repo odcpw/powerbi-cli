@@ -3395,7 +3395,10 @@ mod tests {
         )
         .expect("materialized table");
         assert!(table.contains("{{2}}"));
-        assert!(table.ends_with("\t\tannotation PBI_NavigationStepName = Navigation\n"));
+        assert_eq!(
+            table.lines().last(),
+            Some("\t\tannotation PBI_NavigationStepName = Navigation")
+        );
     }
 
     #[test]

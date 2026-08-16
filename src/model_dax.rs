@@ -1097,6 +1097,7 @@ fn calculated_column_json(column: &ColumnRecord) -> Value {
             "lineageTag": column.lineage_tag,
             "formatString": column.format_string,
             "summarizeBy": column.summarize_by,
+            "sortByColumn": column.sort_by_column,
             "sourceColumn": column.source_column,
             "displayFolder": column.display_folder,
             "description": column.description,

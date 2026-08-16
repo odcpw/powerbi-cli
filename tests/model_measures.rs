@@ -549,6 +549,86 @@ fn model_measures_add_update_delete_round_trip() {
 }
 
 #[test]
+fn model_measures_expression_file_is_utf8_trimmed_and_mutually_exclusive_with_inline_dax() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let dax_file = temp.path().join("long-measure.dax");
+    let expression = "VAR Revenue =\n    [Total Revenue]\nRETURN\n    Revenue";
+    fs::write(&dax_file, format!("{expression}\r\n")).expect("write UTF-8 DAX");
+    let dax_arg = dax_file.to_str().expect("DAX path");
+
+    let add = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        project_arg,
+        "--table",
+        "FactSales",
+        "--name",
+        "File Measure",
+        "--expression-file",
+        dax_arg,
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+    let show = run_powerbi(&[
+        "model",
+        "measures",
+        "show",
+        "--project",
+        project_arg,
+        "--handle",
+        "measure:FactSales:File Measure",
+        "--json",
+    ]);
+    assert_eq!(show.code, 0, "stderr: {}", show.stderr);
+    assert_eq!(stdout_json(&show)["measure"]["expression"], expression);
+
+    let conflicting = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        project_arg,
+        "--handle",
+        "measure:FactSales:File Measure",
+        "--expression",
+        "1",
+        "--expression-file",
+        dax_arg,
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(conflicting.code, 2);
+    assert_eq!(
+        stderr_json(&conflicting)["error"]["code"],
+        Value::from("invalid_args")
+    );
+    assert!(conflicting.stderr.contains("mutually exclusive"));
+
+    let invalid_utf8 = temp.path().join("invalid.dax");
+    fs::write(&invalid_utf8, [0xff, 0xfe, 0xfd]).expect("write invalid UTF-8");
+    let invalid = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        project_arg,
+        "--handle",
+        "measure:FactSales:File Measure",
+        "--expression-file",
+        invalid_utf8.to_str().expect("invalid DAX path"),
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(invalid.code, 2);
+    assert!(invalid.stderr.contains("not valid UTF-8"));
+}
+
+#[test]
 fn model_measures_update_refuses_lossy_unknown_metadata() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales_project(temp.path());

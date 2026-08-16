@@ -410,7 +410,12 @@ fn output_guards_inventory_mismatch_and_pid_lock_fail_closed() {
 #[test]
 fn bridge_child_timeout_is_bounded_and_reaped_without_a_proof_claim() {
     let fixture = BridgeFixture::new(41_108, false, false);
-    fs::write(fixture.temp.path().join("delay-status-ms"), "250").expect("write fake delay");
+    let delay_ms = if cfg!(debug_assertions) { 250 } else { 16_000 };
+    fs::write(
+        fixture.temp.path().join("delay-status-ms"),
+        delay_ms.to_string(),
+    )
+    .expect("write fake delay");
     let output = run_powerbi_with_bridge_timeout(
         &[
             "desktop",

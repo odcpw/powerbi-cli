@@ -9,10 +9,13 @@ use crate::static_tables::static_tables_command;
 use crate::{CliError, CliResult};
 use serde_json::Value;
 
+#[path = "model_columns.rs"]
+mod columns;
+
 pub(crate) fn model_command(args: &[String]) -> CliResult<Value> {
     let Some((family, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "model requires a subcommand: measures, calculated-columns, relationships, partitions, tables, dax, live",
+            "model requires a subcommand: measures, columns, calculated-columns, relationships, partitions, tables, dax, live",
         )
         .with_hint("Run `powerbi-cli model measures list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -24,6 +27,7 @@ pub(crate) fn model_command(args: &[String]) -> CliResult<Value> {
         "calculated-column" | "calculated-columns" | "calculatedColumn" | "calculatedColumns" => {
             calculated_columns_command(rest)
         }
+        "column" | "columns" => columns::columns_command(rest),
         "dax" => dax_command(rest),
         "live" => live_model_command(rest),
         "role" | "roles" | "rls" => advanced_model_command("roles", rest),
