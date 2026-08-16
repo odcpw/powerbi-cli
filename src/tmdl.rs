@@ -34,6 +34,7 @@ pub(crate) struct ColumnRecord {
     pub(crate) lineage_tag: Option<String>,
     pub(crate) format_string: Option<String>,
     pub(crate) summarize_by: Option<String>,
+    pub(crate) sort_by_column: Option<String>,
     pub(crate) source_column: Option<String>,
     pub(crate) display_folder: Option<String>,
     pub(crate) description: Option<String>,
@@ -246,6 +247,32 @@ pub(crate) fn find_calculated_column<'a>(
     }
 }
 
+pub(crate) fn find_column<'a>(
+    docs: &'a [TableDocument],
+    table: &str,
+    name: &str,
+) -> CliResult<&'a ColumnRecord> {
+    let matches = docs
+        .iter()
+        .flat_map(|doc| doc.columns.iter())
+        .filter(|column| same_name(&column.table, table) && same_name(&column.name, name))
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [record] => Ok(record),
+        [] => Err(CliError::validation_failed(format!(
+            "column not found: {}",
+            column_handle(table, name)
+        ))
+        .with_hint("Run `powerbi-cli inspect --deep <project> --json` to get valid column handles.")
+        .with_suggested_command("powerbi-cli inspect --deep <project-dir-or.pbip> --json")),
+        _ => Err(CliError::validation_failed(format!(
+            "column selector is ambiguous: {}",
+            column_handle(table, name)
+        ))
+        .with_hint("Use the exact table and column names returned by `inspect --deep`.")),
+    }
+}
+
 pub(crate) fn find_partition<'a>(
     docs: &'a [TableDocument],
     selector: &PartitionSelector,
@@ -390,6 +417,110 @@ pub(crate) fn delete_calculated_column_plan(
         after_block: None,
         new_text: render_lines(&lines, &doc.newline, doc.had_final_newline),
     })
+}
+
+pub(crate) fn set_column_sort_by_plan(
+    docs: &[TableDocument],
+    table: &str,
+    column: &str,
+    sort_by: Option<&str>,
+) -> CliResult<MutationPlan> {
+    let existing = find_column(docs, table, column)?;
+    let doc = find_table(docs, &existing.table)?;
+    let property_lines = doc.lines[existing.start_line..existing.end_line]
+        .iter()
+        .enumerate()
+        .filter_map(|(offset, line)| {
+            (tmdl_indent_width(line) == 8 && line.trim_start().starts_with("sortByColumn:"))
+                .then_some(existing.start_line + offset)
+        })
+        .collect::<Vec<_>>();
+    if property_lines.len() > 1 {
+        return Err(CliError::validation_failed(format!(
+            "column {} contains duplicate sortByColumn properties",
+            existing.handle()
+        ))
+        .with_hint("Remove the duplicate TMDL property before using set-sort-by."));
+    }
+
+    let mut lines = doc.lines.clone();
+    let line_delta = match (property_lines.first().copied(), sort_by) {
+        (Some(index), Some(sort_by)) => {
+            let indent = lines[index]
+                .chars()
+                .take_while(|character| matches!(character, ' ' | '\t'))
+                .collect::<String>();
+            lines[index] = format!("{indent}sortByColumn: {}", tmdl_object_name(sort_by));
+            0_isize
+        }
+        (Some(index), None) => {
+            lines.remove(index);
+            -1
+        }
+        (None, Some(sort_by)) => {
+            let insert_at = column_sort_property_insertion_index(doc, existing);
+            lines.insert(
+                insert_at,
+                format!(
+                    "{}sortByColumn: {}",
+                    column_property_indent(doc, existing),
+                    tmdl_object_name(sort_by)
+                ),
+            );
+            1
+        }
+        (None, None) => 0,
+    };
+
+    let new_text = render_lines(&lines, &doc.newline, doc.had_final_newline);
+    let new_end = existing.end_line.saturating_add_signed(line_delta);
+    let after_block = render_lines(&lines[existing.start_line..new_end], &doc.newline, true);
+    Ok(MutationPlan {
+        table: existing.table.clone(),
+        name: existing.name.clone(),
+        handle: existing.handle(),
+        path: doc.path.clone(),
+        before_block: Some(existing.block.clone()),
+        after_block: Some(after_block),
+        new_text,
+    })
+}
+
+fn column_property_indent(doc: &TableDocument, column: &ColumnRecord) -> String {
+    if let Some(indent) = doc.lines[column.start_line + 1..column.end_line]
+        .iter()
+        .find(|line| tmdl_indent_width(line) == 8 && !line.trim().is_empty())
+        .map(|line| {
+            line.chars()
+                .take_while(|character| matches!(character, ' ' | '\t'))
+                .collect()
+        })
+    {
+        return indent;
+    }
+    let object_indent = doc.lines[column.start_line]
+        .chars()
+        .take_while(|character| matches!(character, ' ' | '\t'))
+        .collect::<String>();
+    if object_indent.contains('\t') {
+        format!("{object_indent}\t")
+    } else {
+        format!("{object_indent}    ")
+    }
+}
+
+fn column_sort_property_insertion_index(doc: &TableDocument, column: &ColumnRecord) -> usize {
+    for property in ["summarizeBy:", "lineageTag:", "sourceColumn:", "dataType:"] {
+        if let Some(index) = doc.lines[column.start_line..column.end_line]
+            .iter()
+            .rposition(|line| {
+                tmdl_indent_width(line) == 8 && line.trim_start().starts_with(property)
+            })
+        {
+            return column.start_line + index + 1;
+        }
+    }
+    column.start_line + 1
 }
 
 pub(crate) fn add_measure_plan(
@@ -765,6 +896,7 @@ fn parse_column_block(
     let mut lineage_tag = None;
     let mut format_string = None;
     let mut summarize_by = None;
+    let mut sort_by_column = None;
     let mut source_column = None;
     let mut display_folder = None;
     let mut description = leading_description;
@@ -807,6 +939,13 @@ fn parse_column_block(
                     seen_property = true;
                     continue;
                 }
+                "sortByColumn" => {
+                    sort_by_column = parse_tmdl_object(value)
+                        .map(|(name, _)| name)
+                        .or_else(|| Some(tmdl_string_value(value)));
+                    seen_property = true;
+                    continue;
+                }
                 "sourceColumn" => {
                     source_column = Some(tmdl_string_value(value));
                     seen_property = true;
@@ -841,6 +980,7 @@ fn parse_column_block(
         lineage_tag,
         format_string,
         summarize_by,
+        sort_by_column,
         source_column,
         display_folder,
         description,
@@ -1594,7 +1734,7 @@ fn tmdl_string_value(value: &str) -> String {
     }
 }
 
-fn tmdl_object_name(name: &str) -> String {
+pub(crate) fn tmdl_object_name(name: &str) -> String {
     if is_simple_identifier(name) {
         name.to_string()
     } else {
@@ -1714,5 +1854,24 @@ mod tests {
         );
         assert!(!before_source.contains("annotation"));
         assert!(!before_source.contains("extendedProperty"));
+    }
+
+    #[test]
+    fn sort_by_insertion_preserves_tab_indentation_and_round_trips() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let semantic_model = temp.path().join("Synthetic.SemanticModel");
+        let tables = semantic_model.join("definition").join("tables");
+        fs::create_dir_all(&tables).expect("tables");
+        let original = "table Synthetic\r\n\r\n\tcolumn Month\r\n\t\tdataType: string\r\n\t\tsourceColumn: Month\r\n\r\n\tcolumn MonthNo\r\n\t\tdataType: int64\r\n\t\tsourceColumn: MonthNo\r\n";
+        fs::write(tables.join("Synthetic.tmdl"), original).expect("TMDL");
+        let docs = load_table_documents_from_semantic_model(&semantic_model).expect("documents");
+        let set = set_column_sort_by_plan(&docs, "Synthetic", "Month", Some("MonthNo"))
+            .expect("set plan");
+        assert!(set.new_text.contains("\t\tsortByColumn: MonthNo\r\n"));
+
+        fs::write(&set.path, &set.new_text).expect("set sort-by");
+        let docs = load_table_documents_from_semantic_model(&semantic_model).expect("documents");
+        let clear = set_column_sort_by_plan(&docs, "Synthetic", "Month", None).expect("clear plan");
+        assert_eq!(clear.new_text, original);
     }
 }

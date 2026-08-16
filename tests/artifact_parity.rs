@@ -117,7 +117,9 @@ fn build_case(case: &CorpusCase, out_dir: &Path) {
 
 fn verify_input(input: &BoundInput) {
     let bytes = fs::read(&input.path).expect("read parity input");
-    let actual = format!("{:x}", Sha256::digest(bytes));
+    let text = String::from_utf8(bytes).expect("parity inputs are UTF-8 repository text");
+    let canonical = text.replace("\r\n", "\n");
+    let actual = format!("{:x}", Sha256::digest(canonical.as_bytes()));
     assert_eq!(actual, input.sha256, "parity input drifted: {}", input.path);
 }
 

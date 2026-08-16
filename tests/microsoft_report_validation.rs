@@ -492,7 +492,12 @@ fn hex_digest(bytes: &[u8]) -> String {
 fn write_fake_node(bin: &Path, output: &Path, marker: &Path, exit_code: i32, mode: FakeMode) {
     let sleep = match mode {
         FakeMode::Normal => String::new(),
-        FakeMode::Sleep => "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -Command \"Start-Sleep -Seconds 2\"\r\n".to_string(),
+        FakeMode::Sleep => {
+            let seconds = if cfg!(debug_assertions) { 2 } else { 32 };
+            format!(
+                "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -Command \"Start-Sleep -Seconds {seconds}\"\r\n"
+            )
+        }
     };
     fs::write(
         bin.join("node.cmd"),
@@ -512,7 +517,10 @@ fn write_fake_node(bin: &Path, output: &Path, marker: &Path, exit_code: i32, mod
     use std::os::unix::fs::PermissionsExt;
     let sleep = match mode {
         FakeMode::Normal => String::new(),
-        FakeMode::Sleep => "/bin/sleep 2\n".to_string(),
+        FakeMode::Sleep => {
+            let seconds = if cfg!(debug_assertions) { 2 } else { 32 };
+            format!("/bin/sleep {seconds}\n")
+        }
     };
     let node = bin.join("node");
     fs::write(

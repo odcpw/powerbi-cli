@@ -791,6 +791,65 @@ fn desktop_open_check_refuses_strict_lint_failures_before_oracle_launch() {
 }
 
 #[test]
+#[cfg(windows)]
+fn desktop_open_preflight_normal_and_skip_bypass_strict_lint_and_report_their_mode() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    patch_json(&sales_report_version_json(&project), |version| {
+        version["version"] = Value::from("9.9.9");
+    });
+
+    let normal = run_powerbi_without_oracle(&[
+        "desktop",
+        "open",
+        project_arg,
+        "--preflight",
+        "normal",
+        "--json",
+    ]);
+    assert_eq!(normal.code, 30, "stderr: {}", normal.stderr);
+    let normal_json = stdout_json(&normal);
+    assert_eq!(normal_json["preflight"]["mode"], "normal");
+    assert_eq!(normal_json["preflight"]["performed"], true);
+    assert_eq!(normal_json["preflight"]["validationPerformed"], true);
+    assert_eq!(normal_json["preflight"]["lintPerformed"], false);
+    assert_eq!(normal_json["preflight"]["skipped"], false);
+    assert_eq!(normal_json["validation"]["strict"]["enabled"], false);
+
+    let skip = run_powerbi_without_oracle(&[
+        "desktop",
+        "open",
+        project_arg,
+        "--preflight",
+        "skip",
+        "--json",
+    ]);
+    assert_eq!(skip.code, 30, "stderr: {}", skip.stderr);
+    let skip_json = stdout_json(&skip);
+    assert_eq!(skip_json["preflight"]["mode"], "skip");
+    assert_eq!(skip_json["preflight"]["performed"], false);
+    assert_eq!(skip_json["preflight"]["validationPerformed"], false);
+    assert_eq!(skip_json["preflight"]["lintPerformed"], false);
+    assert_eq!(skip_json["preflight"]["skipped"], true);
+    assert!(
+        skip_json["preflight"]["message"]
+            .as_str()
+            .expect("preflight message")
+            .contains("skipped by explicit request")
+    );
+    assert_eq!(skip_json["validation"]["performed"], false);
+    assert_eq!(skip_json["validation"]["strict"]["lint"], Value::Null);
+    assert!(
+        skip_json["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .all(|diagnostic| diagnostic["code"] != "strict_preflight_failed")
+    );
+}
+
+#[test]
 #[cfg(not(windows))]
 fn desktop_oracle_is_an_unsupported_feature_before_opt_in_on_non_windows() {
     let output = run_powerbi_without_oracle(&["desktop", "open-check", "missing.pbip", "--json"]);

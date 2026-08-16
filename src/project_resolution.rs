@@ -63,7 +63,20 @@ fn resolve_project_from_pbip(project_dir: &Path, pbip_path: &Path) -> CliResult<
             pbip_path.display()
         )));
     }
-    let pbip = read_json_value(pbip_path)?;
+    // Keep the resolver's filesystem capabilities fully canonical. On Windows
+    // this deliberately retains the verbatim `\\?\` form needed for long-path
+    // correctness; display/output simplification happens only at the boundary
+    // through `canonical_display`.
+    let project_dir = fs::canonicalize(project_dir).map_err(|err| {
+        CliError::file_not_found(format!(
+            "resolve project root {}: {err}",
+            project_dir.display()
+        ))
+    })?;
+    let pbip_path = fs::canonicalize(pbip_path).map_err(|err| {
+        CliError::file_not_found(format!("resolve PBIP file {}: {err}", pbip_path.display()))
+    })?;
+    let pbip = read_json_value(&pbip_path)?;
     let report_rel = pbip["artifacts"]
         .as_array()
         .and_then(|artifacts| artifacts.first())
@@ -74,8 +87,12 @@ fn resolve_project_from_pbip(project_dir: &Path, pbip_path: &Path) -> CliResult<
                 pbip_path.display()
             ))
         })?;
-    let report_dir =
-        resolve_project_reference(project_dir, project_dir, report_rel, "PBIP report artifact")?;
+    let report_dir = resolve_project_reference(
+        &project_dir,
+        &project_dir,
+        report_rel,
+        "PBIP report artifact",
+    )?;
     let pbir = read_json_value(&report_dir.join("definition.pbir"))?;
     let semantic_rel = pbir["datasetReference"]["byPath"]["path"]
         .as_str()
@@ -86,17 +103,36 @@ fn resolve_project_from_pbip(project_dir: &Path, pbip_path: &Path) -> CliResult<
             ))
         })?;
     let semantic_model_dir = resolve_project_reference(
-        project_dir,
+        &project_dir,
         &report_dir,
         semantic_rel,
         "PBIR semantic-model artifact",
     )?;
     Ok(ResolvedProject {
-        project_dir: project_dir.to_path_buf(),
-        pbip_path: pbip_path.to_path_buf(),
+        project_dir,
+        pbip_path,
         report_dir,
         semantic_model_dir,
     })
+}
+
+pub(crate) fn display_path(path: &Path) -> String {
+    simplify_verbatim_path(path.as_os_str().to_string_lossy().as_ref())
+}
+
+pub(crate) fn canonical_display(path: &Path) -> String {
+    let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    display_path(&canonical)
+}
+
+fn simplify_verbatim_path(value: &str) -> String {
+    if let Some(path) = value.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{path}")
+    } else if let Some(path) = value.strip_prefix(r"\\?\") {
+        path.to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 fn clean_relative_path(value: &str) -> CliResult<PathBuf> {

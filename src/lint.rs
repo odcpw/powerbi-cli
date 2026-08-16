@@ -9,6 +9,9 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+#[path = "m_lint.rs"]
+mod m_lint;
+
 const DESKTOP_ROUND_TRIP_REPORT_VERSION: &str = "2.0.0";
 
 pub(crate) fn lint_command(args: &[String]) -> CliResult<Value> {
@@ -29,6 +32,7 @@ pub(crate) fn lint_project(
     add_report_findings(&deep, &mut findings);
     add_model_findings(&deep, &mut findings);
     add_dax_findings(resolved, &mut findings)?;
+    findings.extend(m_lint::buffer_reuse_findings(resolved)?);
 
     let error_count = findings
         .iter()

@@ -1,4 +1,5 @@
 use crate::project_io::copy_project_dir;
+use crate::project_resolution::display_path;
 use crate::{CliError, CliResult, ResolvedProject, resolve_project};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -325,9 +326,22 @@ pub(crate) fn shell_arg(value: &str) -> String {
     }
 }
 
+pub(crate) fn command_arg(path: &Path) -> String {
+    let value = display_path(path);
+    if value
+        .chars()
+        .any(|ch| ch.is_whitespace() || matches!(ch, '\'' | '"' | '&' | '(' | ')' | ';'))
+    {
+        format!("'{}'", value.replace('\'', "''"))
+    } else {
+        value
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::shell_arg;
+    use super::{command_arg, shell_arg};
+    use std::path::Path;
 
     #[test]
     fn shell_arg_keeps_allowlisted_ascii_handle_unquoted() {
@@ -358,5 +372,17 @@ mod tests {
                 "unexpected quoting for {value:?}"
             );
         }
+    }
+
+    #[test]
+    fn command_arg_simplifies_windows_verbatim_paths() {
+        assert_eq!(
+            command_arg(Path::new(r"\\?\C:\reports\Sales.pbip")),
+            r"C:\reports\Sales.pbip"
+        );
+        assert_eq!(
+            command_arg(Path::new(r"\\?\UNC\server\share\Sales.pbip")),
+            r"\\server\share\Sales.pbip"
+        );
     }
 }

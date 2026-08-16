@@ -59,7 +59,7 @@ Usage:
   powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
   powerbi-cli workflow verify --plan <plan.json> --json
   powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json
-  powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json
+  powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] --json
   powerbi-cli desktop close --json
   powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json
   powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <evidence.png> --json
@@ -74,6 +74,7 @@ Usage:
   powerbi-cli lint <project-dir-or.pbip> --json
   powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --json
   powerbi-cli model tables add-static --project <project-dir-or.pbip> --table <table> --column <column> --values-json '["One","Two"]' --dry-run --json
+  powerbi-cli model columns set-sort-by --project <project-dir-or.pbip> --table <table> --column <column> --by <sort-column> --dry-run --json
   powerbi-cli model calculated-columns list --project <project-dir-or.pbip> --json
   powerbi-cli model calculated-columns show --project <project-dir-or.pbip> --handle <column-handle> --json
   powerbi-cli model calculated-columns add --project <project-dir-or.pbip> --table <table> --name <column> --expression <dax> --data-type <type> --dry-run --json
@@ -293,7 +294,8 @@ Rules for agents:
 - For arbitrary dashboards, start with `schema validate`, `profile infer`, `report plan`, `report spec validate`, then `report build`.
 - After any scaffold, report build, or mutation, run the returned inspect and validate commands.
 - Use `diff <before> <after> --json` to verify measure-level semantic changes after mutations; pass `--scope model.calculatedColumns` for calculated columns or `--scope model.relationships` for relationships.
-- Use `model measures list/show/add/update/delete` for DAX measure authoring; updates refuse unsupported Desktop-authored TMDL metadata, local validation proves file structure, and Power BI Desktop remains the DAX compatibility oracle.
+- Use `model measures list/show/add/update/delete` for DAX measure authoring; `--expression-file <path|->` accepts UTF-8 multiline DAX as an alternative to `--expression` and trims trailing newlines. Updates refuse unsupported Desktop-authored TMDL metadata, local validation proves file structure, and Power BI Desktop remains the DAX compatibility oracle.
+- Use `model columns set-sort-by` to set or clear a same-table TMDL `sortByColumn` property with guarded output semantics.
 - Use `model calculated-columns list/show/add/update/delete` for DAX calculated column authoring; input type `date` normalizes to TMDL `dateTime` with a default `Short Date` format, updates refuse unsupported Desktop-authored TMDL metadata, and calculated columns may require refresh after Desktop opens the project.
 - Reuse returned semantic-model handles. Literal `%` and `:` inside table, column, measure, and partition components are encoded as `%25` and `%3A` so handles round-trip without ambiguity.
 - Use `model dax dependencies/lint/bridge-plan` to enumerate DAX expressions, static references, obvious broken dependencies, and validation boundaries. On an opted-in Windows oracle machine, `model dax execute` can run a bounded read-only EVALUATE query against the exact already-open PBIP or PBIX document; it never launches Desktop or returns the query text. `model live export-tmdl` uses the same exact live-engine identity and the pinned local Microsoft Modeling MCP to publish one credential-scanned semantic-model TMDL definition into a fresh output directory. It does not export report pages or claim full PBIX-to-PBIP conversion. PBIP live preflight ignores only each selected artifact's root `.pbi/` runtime directory; PBIX preflight verifies the package/report/DataModel shape. Strict offline validation, packaging, workflow, and handoff still reject PBIP runtime state.
@@ -304,7 +306,7 @@ Rules for agents:
 - Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
-- Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP retains strict source validation/lint, while PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
+- Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP preflight defaults to `strict`; use `--preflight normal` for structural validation without lint or explicit `--preflight skip` when a known lint defect must not block a Desktop proof loop. PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
 - Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features and returns proof/handoff follow-up commands.
 - Use `report spec fields --schema <schema.json> [--profile <profile.json>]` to get exact column/measure binding references before writing a dashboard spec.
 - Use `report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json>` to create a deterministic starter dashboard spec, then `report spec validate --schema <schema.json> --spec <dashboard.json>` before build.
@@ -350,7 +352,7 @@ pub(crate) fn robot_triage() -> Value {
             "doctor": "powerbi-cli --json doctor",
             "skillStatus": "powerbi-cli skill status --json",
             "skillInstall": "powerbi-cli skill install --json",
-            "desktopOpen": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> --json",
+            "desktopOpen": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] --json",
             "desktopClose": "powerbi-cli desktop close --json",
             "desktopOpenCheck": "powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json",
             "fixtureNormalize": "powerbi-cli fixture normalize <project-dir-or.pbip> --json",
@@ -371,6 +373,7 @@ pub(crate) fn robot_triage() -> Value {
             "calculatedColumnAddDryRun": "powerbi-cli model calculated-columns add --project <project-dir-or.pbip> --table <table> --name <column> --expression <dax> --data-type string --dry-run --json",
             "measureList": "powerbi-cli model measures list --project <project-dir-or.pbip> --json",
             "measureAddDryRun": "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
+            "columnSetSortByDryRun": "powerbi-cli model columns set-sort-by --project <project-dir-or.pbip> --table <table> --column <column> --by <sort-column> --dry-run --json",
             "relationshipList": "powerbi-cli model relationships list --project <project-dir-or.pbip> --json",
             "relationshipAddDryRun": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --dry-run --json",
             "partitionList": "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
@@ -873,7 +876,7 @@ fn command_catalog() -> Vec<Value> {
         }),
         json!({
             "path": "desktop open",
-            "usage": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] --json",
+            "usage": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] --json",
             "summary": "Open the single CLI-owned interactive Power BI Desktop session, closing a prior owned session first",
             "tags": ["desktop", "session", "lifecycle", "window", "windows", "agent"],
             "readOnly": false,
@@ -885,9 +888,10 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.desktop.open.v1",
             "platforms": ["windows session when POWERBI_DESKTOP_ORACLE=1", "linux unsupported_feature", "macos unsupported_feature"],
             "sessionContract": "exactly one CLI-owned session; ownership is persisted outside the project with the exact observed PID and creation time; opening another session first closes only that recorded process lineage",
-            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
-            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open SourceProfile.pbix --json"],
-            "followUpFields": ["ok", "exitCode", "document.kind", "document.path", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "proof", "validation", "diagnostics", "next"]
+            "preflightContract": "strict (default) runs PBIP validation plus lint; normal runs PBIP validation without lint; skip runs neither and reports the explicit skip in preflight",
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--preflight strict|normal|skip", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
+            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --preflight normal --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open SourceProfile.pbix --json"],
+            "followUpFields": ["ok", "exitCode", "document.kind", "document.path", "preflight.mode", "preflight.performed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "proof", "validation", "diagnostics", "next"]
         }),
         json!({
             "path": "desktop close",
@@ -1178,8 +1182,8 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "lint",
             "usage": "powerbi-cli lint <project-dir-or.pbip> --json",
-            "summary": "Run typed PBIP/PBIR/TMDL quality checks and return structured findings",
-            "tags": ["pbip", "pbir", "tmdl", "validation", "lint", "agent"],
+            "summary": "Run typed PBIP/PBIR/TMDL quality checks, including heuristic M buffer-reuse warnings, and return structured findings",
+            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
@@ -1187,6 +1191,8 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "lintResult.v1",
             "flags": ["--json", "--format json"],
             "examples": ["powerbi-cli lint build/sales --json"],
+            "diagnosticCodes": ["m.unbuffered_reuse"],
+            "limitations": ["m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps; it does not prove folding or refresh performance and never fails validation by itself."],
             "followUpFields": ["ok", "counts", "findings", "next"]
         }),
         json!({
@@ -1220,6 +1226,23 @@ fn command_catalog() -> Vec<Value> {
             "examples": ["powerbi-cli model tables add-static --project build/sales --table Metric --column Metric --values-json '[\"Count\",\"Cost\"]' --dry-run --json", "powerbi-cli model tables add-static --project build/sales --table DimSegment --columns-json '[\"Code\",\"Label\"]' --rows-json '[[\"A\",\"Alpha\"],[\"B\",\"Beta\"]]' --dry-run --json"],
             "limitations": ["Creates only a new table with 1-10 string columns and 1-100 short rows; the first column must be unique.", "Does not create relationships automatically; add the reviewed relationship separately with model relationships add.", "Refuses replacement, credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table ingestion."],
             "followUpFields": ["dryRun", "projectModified", "target.handle", "target.columns", "tablePlan.columnCount", "tablePlan.rowCount", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
+        }),
+        json!({
+            "path": "model columns set-sort-by",
+            "usage": "powerbi-cli model columns set-sort-by --project <project-dir-or.pbip> --table <table> --column <column> (--by <sort-column> | --clear) (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Set or remove one column's same-table TMDL sortByColumn property with guarded output semantics",
+            "tags": ["tmdl", "semantic-model", "column", "sort", "sortByColumn", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.model.columns.setSortBy.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--column <column>", "--by <sort-column>", "--clear", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli model columns set-sort-by --project build/sales --table DimDate --column Month --by MonthNumber --dry-run --json", "powerbi-cli model columns set-sort-by --project build/sales --table DimDate --column Month --clear --dry-run --json"],
+            "limitations": ["Both target and sort columns must exist in the same table; a column cannot sort by itself.", "The command edits only sortByColumn and preserves all other TMDL bytes."],
+            "followUpFields": ["ok", "dryRun", "mode", "projectModified", "target.handle", "target.sortByColumn", "target.previousSortByColumn", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "model calculated-columns list",
@@ -1329,7 +1352,7 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "model measures add",
             "usage": "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> (--expression <dax> | --expression-file <path|->) [--format-string <fmt>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Add a DAX measure to a TMDL table with guarded output semantics",
+            "summary": "Add a DAX measure from inline text or a UTF-8 expression file to a TMDL table with guarded output semantics",
             "tags": ["tmdl", "semantic-model", "measure", "dax", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1340,12 +1363,13 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "modelMeasuresMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--name <measure>", "--expression <dax>", "--expression-file <path|->", "--format-string <fmt>", "--display-folder <folder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli model measures add --project build/sales --table FactSales --name 'Average Revenue' --expression 'DIVIDE([Total Revenue], [Total Units])' --dry-run --json"],
+            "limitations": ["--expression and --expression-file are mutually exclusive; expression files are UTF-8 and trailing CR/LF bytes are trimmed."],
             "followUpFields": ["dryRun", "projectModified", "rollback.performed", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "model measures update",
             "usage": "powerbi-cli model measures update --project <project-dir-or.pbip> (--handle <measure-handle> | --table <table> --name <measure>) [--expression <dax> | --expression-file <path|->] [--format-string <fmt>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Update a DAX measure expression or metadata; refuses unsupported Desktop-authored TMDL lines",
+            "summary": "Update a DAX measure from inline text or a UTF-8 expression file; refuses unsupported Desktop-authored TMDL lines",
             "tags": ["tmdl", "semantic-model", "measure", "dax", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1356,6 +1380,7 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "modelMeasuresMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--handle <measure-handle>", "--table <table>", "--name <measure>", "--expression <dax>", "--expression-file <path|->", "--format-string <fmt>", "--display-folder <folder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli model measures update --project build/sales --handle 'measure:FactSales:Total Revenue' --expression 'SUM(''FactSales''[Revenue])' --dry-run --json"],
+            "limitations": ["--expression and --expression-file are mutually exclusive; expression files are UTF-8 and trailing CR/LF bytes are trimmed."],
             "followUpFields": ["dryRun", "projectModified", "rollback.performed", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
@@ -3023,7 +3048,7 @@ fn schema_manifest() -> Value {
     let mut manifest = json!({
         "fields": ["name", "displayName", "locale", "tables", "relationships", "pages"],
         "tableFields": ["name", "columns", "measures", "rows"],
-        "columnFields": ["name", "dataType", "description", "formatString", "sourceColumn", "isHidden", "isKey", "summarizeBy"],
+        "columnFields": ["name", "dataType", "description", "formatString", "sourceColumn", "isHidden", "isKey", "summarizeBy", "sortByColumn"],
         "calculatedColumnFields": ["name", "expression", "dataType", "description", "formatString", "summarizeBy", "displayFolder", "isHidden"],
         "measureFields": ["name", "expression", "description", "formatString", "displayFolder"],
         "relationshipFields": ["name", "fromTable", "fromColumn", "toTable", "toColumn", "crossFilteringBehavior", "isActive"],
@@ -3050,7 +3075,9 @@ fn schema_manifest() -> Value {
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
-        "desktopOpenFields": ["ok", "exitCode", "document", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],
+        "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
+        "lintFindingCodes": ["m.unbuffered_reuse"],
+        "desktopOpenFields": ["ok", "exitCode", "document", "preflight.mode", "preflight.defaulted", "preflight.applicable", "preflight.performed", "preflight.validationPerformed", "preflight.lintPerformed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],
         "desktopCloseFields": ["ok", "exitCode", "session.state", "session.alreadyClosed", "session.document", "session.documentKind", "session.documentName", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.receiptRemoved", "cleanup.attempted", "cleanup.closed", "cleanup.identityMatched", "cleanup.targeted", "cleanup.targetedProcessIds", "cleanup.remainingProcessIds", "cleanup.errors", "next"],
         "desktopOpenCheckFields": ["ok", "exitCode", "changes", "document", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],
         "desktopScreenshotFields": ["ok", "exitCode", "changes", "document", "oracle.available", "oracle.desktopVersion", "validation", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.timeoutMs", "proof.timeoutScope", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.format", "screenshot.display", "screenshot.width", "screenshot.height", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "screenshot.limitations", "diagnostics", "next"],

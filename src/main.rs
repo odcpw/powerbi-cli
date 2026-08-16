@@ -89,6 +89,7 @@ mod visual_catalog;
 mod workflow;
 
 pub(crate) use cli_error::*;
+pub(crate) use cli_support::command_arg;
 pub(crate) use doctor::doctor_json;
 
 use crate::pbir_bindings::{
@@ -98,7 +99,7 @@ use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, VisualBuildSpec, resolve_slicer_mode,
     visual_container_json,
 };
-pub(crate) use crate::project_resolution::{ResolvedProject, resolve_project};
+pub(crate) use crate::project_resolution::{ResolvedProject, canonical_display, resolve_project};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -3366,23 +3367,4 @@ fn hash_hex(value: &str) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
-}
-
-pub(crate) fn command_arg(path: &Path) -> String {
-    let value = path.display().to_string();
-    if value
-        .chars()
-        .any(|ch| ch.is_whitespace() || matches!(ch, '\'' | '"' | '&' | '(' | ')' | ';'))
-    {
-        format!("'{}'", value.replace('\'', "''"))
-    } else {
-        value
-    }
-}
-
-pub(crate) fn canonical_display(path: &Path) -> String {
-    fs::canonicalize(path)
-        .unwrap_or_else(|_| path.to_path_buf())
-        .display()
-        .to_string()
 }

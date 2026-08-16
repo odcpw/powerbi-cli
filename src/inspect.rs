@@ -101,6 +101,7 @@ fn inspect_table_tmdl(path: &Path, handles: &mut Vec<Value>) -> CliResult<Value>
                     "dataType": column.data_type,
                     "formatString": column.format_string,
                     "summarizeBy": column.summarize_by,
+                    "sortByColumn": column.sort_by_column,
                     "sourceColumn": column.source_column,
                     "displayFolder": column.display_folder,
                     "description": column.description,
