@@ -389,7 +389,7 @@ fn normalize_official_report_output(
         .get("result")
         .and_then(Value::as_str)
         .ok_or_else(|| protocol_error("official report validator response has no data.result"))?;
-    if !matches!(result, "succeeded" | "failed") {
+    if !matches!(result, "succeeded" | "succeededWithWarnings" | "failed") {
         return Err(protocol_error(format!(
             "official report validator returned unknown result: {result}"
         )));
@@ -410,7 +410,7 @@ fn normalize_official_report_output(
             "official validator count mismatch: declared errors={error_count}, warnings={warning_count}; normalized errors={observed_errors}, warnings={observed_warnings}"
         )));
     }
-    let ok = result == "succeeded" && error_count == 0;
+    let ok = matches!(result, "succeeded" | "succeededWithWarnings") && error_count == 0;
     if ok != output.status.success() {
         return Err(protocol_error(format!(
             "official validator result/exit mismatch: result={result}, status={:?}",
