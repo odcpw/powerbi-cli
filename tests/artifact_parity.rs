@@ -117,8 +117,28 @@ fn build_case(case: &CorpusCase, out_dir: &Path) {
 
 fn verify_input(input: &BoundInput) {
     let bytes = fs::read(&input.path).expect("read parity input");
-    let actual = format!("{:x}", Sha256::digest(bytes));
+    #[cfg(windows)]
+    let comparable = normalize_checkout_newlines(&bytes);
+    #[cfg(not(windows))]
+    let comparable = bytes;
+    let actual = format!("{:x}", Sha256::digest(comparable));
     assert_eq!(actual, input.sha256, "parity input drifted: {}", input.path);
+}
+
+#[cfg(windows)]
+fn normalize_checkout_newlines(bytes: &[u8]) -> Vec<u8> {
+    let mut normalized = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\r' && bytes.get(index + 1) == Some(&b'\n') {
+            normalized.push(b'\n');
+            index += 2;
+        } else {
+            normalized.push(bytes[index]);
+            index += 1;
+        }
+    }
+    normalized
 }
 
 fn fingerprint_tree(root: &Path) -> TreeFingerprint {

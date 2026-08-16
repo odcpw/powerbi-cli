@@ -1104,6 +1104,24 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    h.ok(
+        "report pages clone",
+        &svec([
+            "report",
+            "pages",
+            "clone",
+            "--project",
+            &project_arg,
+            "--from",
+            &overview,
+            "--new-name",
+            "ReportSectionAcceptanceClone",
+            "--visual-prefix",
+            "Acceptance",
+            "--dry-run",
+            "--json",
+        ]),
+    );
     let added_page = h.ok(
         "report pages add",
         &svec([

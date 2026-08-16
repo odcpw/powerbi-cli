@@ -10,6 +10,10 @@ struct Fixture {
     project: PathBuf,
     pbip: PathBuf,
     report: PathBuf,
+    #[cfg_attr(
+        not(unix),
+        expect(dead_code, reason = "used by Unix-only semantic symlink tests")
+    )]
     semantic_model: PathBuf,
 }
 

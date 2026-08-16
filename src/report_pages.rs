@@ -6,10 +6,15 @@ use crate::{CliError, CliResult, canonical_display, command_arg, resolve_project
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
+#[path = "report_page_clone.rs"]
+mod page_clone;
+
+use page_clone::clone_page;
+
 pub(crate) fn pages_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(
-            CliError::invalid_args("report pages requires a subcommand: list, show, add, update, reorder, set-active, delete-empty")
+            CliError::invalid_args("report pages requires a subcommand: list, show, add, clone, update, reorder, set-active, delete-empty")
                 .with_hint(
                     "Run `powerbi-cli report pages list --project <project-dir-or.pbip> --json`.",
                 )
@@ -23,6 +28,7 @@ pub(crate) fn pages_command(args: &[String]) -> CliResult<Value> {
         "list" => list_pages(rest),
         "show" => show_page(rest),
         "add" | "create" => add_page(rest),
+        "clone" | "copy" => clone_page(rest),
         "update" | "patch" => update_page(rest),
         "reorder" | "order" => reorder_pages(rest),
         "set-active" | "setActive" | "activate" => set_active_page(rest),
