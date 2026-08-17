@@ -183,6 +183,13 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 - `validate_rejects_stale_scatter_legend_role_with_series_repair`
 - `validate_reports_empty_visual_directory_with_repair_hint`
 
+### `tests/report_pages.rs`
+
+- `report_pages_and_visuals_are_readable_by_handle`
+- `report_pages_mutations_round_trip_through_out_dirs`
+- `report_pages_mutations_reject_unsafe_requests`
+- `capabilities_advertise_report_layout_commands`
+
 ## Shared-helper decisions
 
 - The local `RunOutput`, `run_powerbi`, `stdout_json`, and `stderr_json` variants were byte-identical in behavior to the existing exports in `tests/common/mod.rs`; the split binaries use the common versions and no renamed shadow variants were introduced.
@@ -239,5 +246,13 @@ Each entry records the post-commit gate: exact-name inventory, combined-family t
 - Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
 - Combined report-family run: 86 passed, 0 failed in 11.637s (ceiling 17.146s).
 - `cargo test --release --no-fail-fast`: passed; no MCP timing flake observed.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+
+### `d74f1ad` — hygiene
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: 86 passed, 0 failed in 9.566s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: all integration targets passed; `mcp::tests::graceful_root_exit_also_reaps_captured_descendants` hit the documented host-timing condition and passed its exact isolated rerun.
 - `cargo clippy --release --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: passed.
