@@ -122,6 +122,21 @@ Gate evidence is appended to this section after each family extraction.
   All six focused payloads also matched their baseline byte lengths and
   SHA-256 values.
 
+### `core`
+
+- Moved the shared envelopes, filter/path builders, diagnostics and schema
+  catalogs, proof tables, tests, and 21 remaining cross-cutting command
+  descriptors to `src/contract/core.rs`. `src/contract.rs` is now a 16-line
+  documented façade containing the six private family module declarations and
+  `pub(crate) use` re-exports for every previously visible contract item.
+- Post-commit gate: pass. Exact baseline test vector (24 suites, 438 passed,
+  0 failed, 4 ignored); clippy and fmt passed; clean release build 108.626 s
+  (37.9% of baseline, no regression); full capabilities remained 244,512
+  bytes with SHA-256
+  `27b2564e0f382ced6598fea3cd3bfbeb000e961b341d3de6bdfe245c34de8fa9`.
+  All six focused payloads also matched their baseline byte lengths and
+  SHA-256 values.
+
 ## Refuted seams
 
 None.
