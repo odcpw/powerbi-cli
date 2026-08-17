@@ -127,6 +127,18 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 - `report_filters_clear_rejects_unsafe_requests`
 - `report_filters_clear_groups_filter_config_and_legacy_arrays`
 
+### `tests/report_formatting.rs`
+
+- `report_visuals_formatting_list_and_show_summarize_objects_without_raw`
+- `report_visuals_formatting_extract_and_apply_round_trip_through_out_dir`
+- `report_visuals_formatting_set_text_round_trips_through_out_dir`
+- `report_visuals_formatting_set_text_creates_missing_cards_with_page_visual_selector`
+- `report_visuals_formatting_set_text_rejects_unsafe_requests`
+- `report_visuals_formatting_set_color_round_trips_through_out_dir`
+- `report_visuals_formatting_set_color_creates_missing_title_card_with_page_visual_selector`
+- `report_visuals_formatting_set_color_creates_numeric_data_view_wildcard`
+- `report_visuals_formatting_set_color_rejects_unsafe_requests`
+
 ## Shared-helper decisions
 
 - The local `RunOutput`, `run_powerbi`, `stdout_json`, and `stderr_json` variants were byte-identical in behavior to the existing exports in `tests/common/mod.rs`; the split binaries use the common versions and no renamed shadow variants were introduced.
@@ -137,3 +149,11 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 ## Gate evidence per commit
 
 Each entry records the post-commit gate: exact-name inventory, combined-family timing, full release suite, clippy with warnings denied, and formatting check. Known MCP timing flakes are rerun in isolation if observed.
+
+### `900c487` — filters
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: 86 passed, 0 failed in 7.853s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: passed; no MCP timing flake observed.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
