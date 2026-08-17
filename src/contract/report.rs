@@ -1162,5 +1162,22 @@ pub(super) fn commands() -> Vec<Value> {
             "limitations": ["Scatter X/Y/Size and hundredPercentStackedColumnChart Y columns are emitted as explicit Function 0 Sum aggregations; other raw measure/value-role columns remain refused.", "scatterChart rejects Details and directs callers to Category.", "Repeated use of one model field returns unsupported_feature pending Desktop-authored duplicate queryRef numbering.", "Explicit sort accepts one projected measure with Descending direction only."],
             "followUpFields": ["dryRun", "bindingPlan.before", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
+        json!({
+            "path": "report visuals set-topn-guard",
+            "aliases": ["report visuals setTopnGuard", "report visuals set-top-n-guard"],
+            "usage": "powerbi-cli report visuals set-topn-guard --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <Table.Column> --order-by <Table.Measure> --top <N> [--direction desc|asc] [--display-name <text>] [--name <filterName>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Create or update a visual-level TopN guard filter so a cheap ranking measure bounds the axis before heavy display measures evaluate",
+            "tags": ["pbir", "report", "visual", "filter", "topn", "guard", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.visuals.topnGuardMutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--field <Table.Column>", "--order-by <Table.Measure>", "--top <N>", "--direction desc|asc", "--display-name <text>", "--name <filterName>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli report visuals set-topn-guard --project build/sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by \"FactSales[Total Revenue]\" --top 28 --dry-run --json", "powerbi-cli report visuals set-topn-guard --project build/sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by \"FactSales[Total Revenue]\" --top 251 --in-place --json"],
+            "followUpFields": ["dryRun", "guard.name", "guard.top", "guard.orderBy", "changes[].before", "changes[].after", "readbackCommand", "validateCommand"]
+        }),
     ]
 }
