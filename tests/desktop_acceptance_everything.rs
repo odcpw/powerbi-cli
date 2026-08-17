@@ -1389,6 +1389,26 @@ fn everything_acceptance_invokes_every_catalog_command() {
         ]),
     );
     h.ok(
+        "report visuals set-topn-guard",
+        &svec([
+            "report",
+            "visuals",
+            "set-topn-guard",
+            "--project",
+            &project_arg,
+            "--handle",
+            &table,
+            "--field",
+            "DimBranch.Branch",
+            "--order-by",
+            "FactIncidents.Incident Rate",
+            "--top",
+            "10",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
         "report drilldown set-hierarchy",
         &svec([
             "report",

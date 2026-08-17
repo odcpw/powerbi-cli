@@ -13,6 +13,7 @@ use crate::pbir_bindings::{
 };
 use crate::pbir_visual_factory::validate_between_slicer_data_type;
 use crate::project_io::write_json_atomic;
+use crate::report_topn_guard::set_topn_guard;
 use crate::report_visual_clone::clone_visual;
 use crate::report_visual_delete::delete_visual;
 use crate::report_visual_formatting::formatting_command;
@@ -29,7 +30,7 @@ use std::path::PathBuf;
 pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "report visuals requires a subcommand: list, show, catalog, formatting, add, clone, delete, set-position, set-bindings",
+            "report visuals requires a subcommand: list, show, catalog, formatting, add, clone, delete, set-position, set-bindings, set-topn-guard",
         )
         .with_hint("Run `powerbi-cli report visuals list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -47,6 +48,7 @@ pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
         "delete" | "remove" => delete_visual(rest),
         "set-position" | "setPosition" => set_position(rest),
         "set-bindings" | "setBindings" | "bind" => set_bindings(rest),
+        "set-topn-guard" | "setTopnGuard" | "set-top-n-guard" => set_topn_guard(rest),
         _ => Err(CliError::invalid_args(format!(
             "unknown report visuals command: {action}"
         ))

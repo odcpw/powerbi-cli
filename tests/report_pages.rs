@@ -552,6 +552,7 @@ fn capabilities_advertise_report_layout_commands() {
     assert!(paths.contains(&"report visuals delete"));
     assert!(paths.contains(&"report visuals set-position"));
     assert!(paths.contains(&"report visuals set-bindings"));
+    assert!(paths.contains(&"report visuals set-topn-guard"));
     let set_position = value["commands"]
         .as_array()
         .expect("commands")
@@ -1172,6 +1173,34 @@ fn capabilities_advertise_report_layout_commands() {
             .iter()
             .any(|flag| flag == "--bindings-json <json>")
     );
+    let set_topn_guard = value["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["path"] == "report visuals set-topn-guard")
+        .expect("set-topn-guard command");
+    assert_eq!(set_topn_guard["mutates"], Value::Bool(true));
+    assert_eq!(set_topn_guard["requiresOutput"], Value::Bool(true));
+    assert_eq!(
+        set_topn_guard["outputSchema"],
+        Value::from("powerbi-cli.report.visuals.topnGuardMutation.v1")
+    );
+    for expected_flag in [
+        "--field <Table.Column>",
+        "--order-by <Table.Measure>",
+        "--top <N>",
+        "--direction desc|asc",
+        "--out-dir <dir>",
+    ] {
+        assert!(
+            set_topn_guard["flags"]
+                .as_array()
+                .expect("flags")
+                .iter()
+                .any(|flag| flag == expected_flag),
+            "missing set-topn-guard flag {expected_flag}"
+        );
+    }
     let apply_theme = value["commands"]
         .as_array()
         .expect("commands")

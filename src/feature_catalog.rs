@@ -809,9 +809,10 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report filters add",
             "report filters update",
             "report filters delete",
+            "report visuals set-topn-guard",
         ],
         refusal_code: None,
-        reason: "The CLI writes the schema-defined visual-only Type 2 subquery/In.Table TopN shape, with a TMDL-resolved measure OrderBy. Report/page TopN and type-changing updates are refused.",
+        reason: "The CLI writes the schema-defined visual-only Type 2 subquery/In.Table TopN shape, with a TMDL-resolved measure OrderBy. Report/page TopN and type-changing updates are refused. `report visuals set-topn-guard` creates or updates the same shape by field.",
         next_proof: &[
             "Capture Desktop-authored top and bottom measure-ranked visual filters and compare the OrderBy expression byte-for-byte",
             "Open, render, save, and reopen generated TopN visual filters in Power BI Desktop",

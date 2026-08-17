@@ -72,6 +72,7 @@ mod report_slicers;
 mod report_spec_fields;
 mod report_style;
 mod report_themes;
+mod report_topn_guard;
 mod report_visual_clone;
 mod report_visual_delete;
 mod report_visual_formatting;
