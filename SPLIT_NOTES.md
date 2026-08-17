@@ -65,6 +65,20 @@ Gate evidence is appended to this section after each family extraction.
   at 244,512 bytes. All six focused payloads also matched their baseline
   byte lengths and SHA-256 values.
 
+### `model`
+
+- Moved the 33 contiguous `model ...` command descriptors, from `model tables
+  add-static` through `model expressions show`, to `src/contract/model.rs`.
+  The façade inserts the returned vector at the original position between
+  `diff` and `source-template list`.
+- Post-commit gate: pass. Exact baseline test vector (24 suites, 438 passed,
+  0 failed, 4 ignored); clippy and fmt passed; clean release build 113.429 s
+  (39.6% of baseline, no regression); full capabilities remained 244,512
+  bytes with SHA-256
+  `27b2564e0f382ced6598fea3cd3bfbeb000e961b341d3de6bdfe245c34de8fa9`.
+  All six focused payloads also matched their baseline byte lengths and
+  SHA-256 values.
+
 ## Refuted seams
 
 None.
