@@ -2,7 +2,8 @@
 
 use crate::pbir_bindings::{VisualBindingKind, VisualBindingResolved, resolved_binding_kind};
 use crate::pbir_visual_factory::{VisualBuildSpec, resolve_slicer_mode, visual_container_json};
-use crate::{CliResult, DashboardSpec, normalize_data_type, object_name, report_visual_mutations};
+use crate::scaffold::{DashboardSpec, normalize_data_type, object_name};
+use crate::{CliResult, report_visual_mutations};
 use serde::Deserialize;
 use serde_json::Value;
 
