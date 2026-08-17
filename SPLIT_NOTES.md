@@ -168,6 +168,12 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 - `report_drillthrough_rejects_unproven_variants`
 - `known_unimplemented_report_features_return_structured_refusals`
 
+### `tests/report_themes.rs`
+
+- `report_themes_extract_and_apply_raw_bundle`
+- `report_theme_preset_uses_schema_three_version_object`
+- `report_themes_apply_rejects_unsafe_or_wrong_bundle`
+
 ## Shared-helper decisions
 
 - The local `RunOutput`, `run_powerbi`, `stdout_json`, and `stderr_json` variants were byte-identical in behavior to the existing exports in `tests/common/mod.rs`; the split binaries use the common versions and no renamed shadow variants were introduced.
@@ -208,5 +214,13 @@ Each entry records the post-commit gate: exact-name inventory, combined-family t
 - Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
 - Combined report-family run: 86 passed, 0 failed in 10.422s (ceiling 17.146s).
 - `cargo test --release --no-fail-fast`: passed; no MCP timing flake observed.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+
+### `4b15d8c` — drill
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: 86 passed, 0 failed in 10.608s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: all integration targets passed; `mcp::tests::child_guard_drop_terminates_the_owned_process_tree` and `mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock` hit the documented host-timing condition. The child-guard test passed its first exact isolated rerun. The fake-server timeout test missed the timing deadline on two immediate isolated attempts, then passed the same exact isolated command after the process-heavy gate activity subsided; no repository change was made between attempts.
 - `cargo clippy --release --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: passed.
