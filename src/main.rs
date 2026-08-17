@@ -17,6 +17,7 @@ mod feature_catalog;
 mod fixture;
 mod handoff;
 mod inspect;
+mod json_io;
 mod lint;
 mod live_model;
 mod mcp;
@@ -92,6 +93,7 @@ pub(crate) use cli_error::*;
 pub(crate) use cli_support::command_arg;
 pub(crate) use doctor::doctor_json;
 pub(crate) use inspect::inspect_command;
+pub(crate) use json_io::read_json_value;
 
 use crate::pbir_bindings::{
     VisualBindingKind, VisualBindingResolved, resolved_binding_kind, visual_query_state_errors,
@@ -3233,13 +3235,6 @@ fn is_three_part_numeric_version(value: &str) -> bool {
         && parts
             .into_iter()
             .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
-}
-
-pub(crate) fn read_json_value(path: &Path) -> CliResult<Value> {
-    let text = fs::read_to_string(path)
-        .map_err(|err| CliError::file_not_found(format!("read {}: {err}", path.display())))?;
-    serde_json::from_str(&text)
-        .map_err(|err| CliError::validation_failed(format!("parse JSON {}: {err}", path.display())))
 }
 
 fn object_name(prefix: &str, label: &str, index: usize) -> String {
