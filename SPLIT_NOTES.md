@@ -288,3 +288,24 @@ Each entry records the post-commit gate: exact-name inventory, combined-family t
 - `cargo test --release --no-fail-fast`: passed; no MCP timing flake observed.
 - `cargo clippy --release --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: passed.
+
+### `e699c48` — visuals/bindings
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated. The transitional `report` binary contained 0 tests.
+- Combined report-family run: 86 passed, 0 failed in 14.093s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: all integration targets passed; `mcp::tests::child_guard_drop_terminates_the_owned_process_tree` and `mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock` hit the documented host-timing condition and each passed its exact isolated rerun.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+
+## Original-binary deletion
+
+After `e699c48`, `tests/report.rs` contained no helpers or tests—only a transitional module doc—and the nine family binaries contained all 86 unique baseline names. The final commit therefore deletes the empty original integration-test binary exactly as required by the work order. No test is deleted with it.
+
+### Final deletion commit — post-commit gate
+
+- Exact-name inventory across the nine new family binaries: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: the first sample was rejected at 19.307s because the visuals family alone spiked to 10.34s; the unchanged warmed rerun passed all 86 tests in 15.893s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: all integration targets passed; `mcp::tests::child_guard_drop_terminates_the_owned_process_tree`, `mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock`, and `mcp::tests::graceful_root_exit_also_reaps_captured_descendants` hit the documented host-timing condition and each passed its exact isolated rerun.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+- Notes-only amend verification: exact-name parity remained 86/86 with no duplicates, and the combined run passed in 13.742s. On the first repeated full-suite attempt, `microsoft::tests::bounded_runner_reaps_descendants_that_inherit_its_pipes` also exceeded its 2s child-process deadline; it passed exact isolation after a host cooldown, and a subsequent no-fail-fast run had no non-MCP failures. The two preclassified MCP timing tests passed exact isolated reruns (the child-guard case required warming Windows PowerShell after repeated process-heavy gates). Clippy and formatting remained clean. No repository code changed during any timing retry.
