@@ -80,6 +80,45 @@ first-class support. It is the authoritative backlog input from real usage.
    proof loop is blocked. Add `--preflight <strict|normal|skip>` with strict
    as default.
 
+## Round-3 gaps (first real-data feedback loop, 2026-08-17)
+
+A production-data session fed photographed evidence back into the authoring
+loop and forced a rework round (exposure floors, refresh-time group ranks,
+visual polish, one cloned-and-rewired page). New gaps, prioritized:
+
+1. **M type-safety lint (highest value).** Columns produced by
+   `Table.ExpandTableColumn` are untyped and can be *loaded as text* even
+   when the TMDL column says `dataType: double`; a downstream DAX comparison
+   then errors and the visual renders blank. Cost a full Desktop
+   close→rebuild→reopen→refresh round-trip to diagnose. Lint rule: numeric
+   TMDL column whose partition's final step chain contains an expansion that
+   feeds it without a later `Table.TransformColumnTypes` → warning.
+2. **Visual formatting/objects commands.** Axis titles, category-axis
+   visibility, card fonts, word wrap, and projection display names all had
+   to be patched with hand-written JSON scripts across ~20 visuals. A
+   `report visuals set-object`/`set-display-name` family would remove the
+   riskiest hand-authoring left in the loop.
+3. **Visual scaffolding for small parts.** Cards, slicers, and textboxes
+   (reading guides) were created by copying JSON idioms from sibling
+   visuals. `report visuals add-card --measure`, `add-slicer --field`,
+   `add-textbox --paragraphs-file` would cover it.
+4. **Top-N guard filter management.** The guard subquery (order-by measure,
+   Top value) was mutated by hand, including rewiring guards on a cloned
+   page. `report visuals set-topn-guard --order-by <measure> --top <n>`.
+5. **Grouped-rank M snippet.** "Rank rows inside their group at refresh
+   time" (sort + index per group, zero for ineligible rows, final explicit
+   retype) was hand-written twice; it is the standard escape from
+   query-time RANKX at scale and deserves a generator or documented recipe.
+6. **Desktop refresh automation.** `desktop open/screenshot/dax execute`
+   are solid; the refresh click remains manual (this round: driven via OS
+   automation). The planned `desktop refresh-check` is the missing link for
+   a fully unattended canvas-refresh proof.
+
+Positive field results worth recording: `report pages clone` carried a real
+page-derivation job (identity regeneration, filter renames, zero warnings)
+and `model dax execute` against the live Desktop session turned a
+blank-visual mystery into a one-query diagnosis (the text-typed column).
+
 ## Patterns to promote into documentation
 
 - **Guard-filter pattern** for large-cardinality visuals: a cheap ranking
