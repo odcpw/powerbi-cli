@@ -15,7 +15,7 @@
 | Family | Destination | Symbols / responsibility | Status |
 |---|---|---|---|
 | Inspect command orchestration | existing `src/inspect.rs` | `inspect_command`, `parse_inspect_args` | extracted; full gate green under corrected compile threshold |
-| Native PBIP/PBIR/TMDL validation | new `src/validation.rs` | validation command/backend, project checks, `ValidationReport` | pending |
+| Native PBIP/PBIR/TMDL validation | new `src/validation.rs` | validation command/backend, project checks, `ValidationReport` | extracted; full gate green |
 | Shared JSON input | new `src/json_io.rs` | `read_json_value` | extracted; full gate green apart from documented default-thread host flakes |
 | Dashboard visual scaffolding and binding adaptation | new `src/dashboard_scaffold.rs` | page/visual schema records, effective pages, visual JSON, scaffold binding resolution | pending |
 | Schema-driven project scaffolding | new `src/scaffold.rs` | scaffold command/spec validation, cleanup, PBIP/PBIR/TMDL/M emission, deterministic names and writers | pending |
@@ -45,3 +45,6 @@ Gate results are recorded after each family commit. The accepted pass-count vect
 |---|---|---|---|---|---|---|
 | `54f0fab` inspect command | 24 suites; 436 passed; 4 ignored (green warm exact-command run) | clean | clean | byte-identical; baseline SHA-256 | `0.245s` first median; `0.226s` stabilized median vs corrected `2.179s` ceiling | green; accepted |
 | `refactor: extract shared JSON input from main (isomorphic)` | 24 suites; 436 passed; 4 ignored with `RUST_TEST_THREADS=1`; repeated default-thread exact-command runs reproduced only the three baseline-listed Windows child-process flakes, which each passed in isolation | clean | clean | 244,512 bytes; SHA-256 `27b2564e0f382ced6598fea3cd3bfbeb000e961b341d3de6bdfe245c34de8fa9`; empty stderr | five runs `0.354, 0.245, 0.254, 0.233, 0.238s`; median `0.245s` vs corrected `2.179s` ceiling | green; host flakes match baseline ledger |
+| `refactor: extract native validation from main (isomorphic)` | exact default-thread command green; 24 suites; 436 passed; 4 ignored; exact baseline vector | clean | clean | 244,512 bytes; SHA-256 `27b2564e0f382ced6598fea3cd3bfbeb000e961b341d3de6bdfe245c34de8fa9`; empty stderr | five runs `0.250, 0.185, 0.190, 0.184, 0.190s`; median `0.190s` vs corrected `2.179s` ceiling | green; validation body SHA-256 identical before/after (`0c4ea5945b398657fb191100157f23653f0cd4c88172acafd6603ce77b0daeb4`) |
+
+Validation extraction note: removing the validation block made the existing `m_literal_tests` module visible to Clippy's `items_after_test_module` lint. The unchanged test module was mechanically relocated to the end of `main.rs`; it remains in `main.rs` and will move with the scaffold family. No lint suppression or test-body edit was introduced.
