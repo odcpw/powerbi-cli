@@ -819,8 +819,8 @@ fn command_catalog() -> Vec<Value> {
         json!({
             "path": "lint",
             "usage": "powerbi-cli lint <project-dir-or.pbip> --json",
-            "summary": "Run typed PBIP/PBIR/TMDL quality checks, including heuristic M buffer-reuse warnings, and return structured findings",
-            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "agent"],
+            "summary": "Run typed PBIP/PBIR/TMDL quality checks, including heuristic M buffer-reuse and untyped-expansion warnings, and return structured findings",
+            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "expansion", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
@@ -828,8 +828,11 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "lintResult.v1",
             "flags": ["--json", "--format json"],
             "examples": ["powerbi-cli lint build/sales --json"],
-            "diagnosticCodes": ["m.unbuffered_reuse"],
-            "limitations": ["m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps; it does not prove folding or refresh performance and never fails validation by itself."],
+            "diagnosticCodes": ["m.unbuffered_reuse", "m.untyped_expansion"],
+            "limitations": [
+                "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps; it does not prove folding or refresh performance and never fails validation by itself.",
+                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself."
+            ],
             "followUpFields": ["ok", "counts", "findings", "next"]
         }),
         json!({
@@ -975,7 +978,7 @@ fn schema_manifest() -> Value {
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
-        "lintFindingCodes": ["m.unbuffered_reuse"],
+        "lintFindingCodes": ["m.unbuffered_reuse", "m.untyped_expansion"],
         "desktopOpenFields": ["ok", "exitCode", "document", "preflight.mode", "preflight.defaulted", "preflight.applicable", "preflight.performed", "preflight.validationPerformed", "preflight.lintPerformed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],
         "desktopCloseFields": ["ok", "exitCode", "session.state", "session.alreadyClosed", "session.document", "session.documentKind", "session.documentName", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.receiptRemoved", "cleanup.attempted", "cleanup.closed", "cleanup.identityMatched", "cleanup.targeted", "cleanup.targetedProcessIds", "cleanup.remainingProcessIds", "cleanup.errors", "next"],
         "desktopOpenCheckFields": ["ok", "exitCode", "changes", "document", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],

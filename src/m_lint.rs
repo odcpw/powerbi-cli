@@ -1,6 +1,7 @@
-use crate::tmdl::load_table_documents;
+use crate::tmdl::{ColumnRecord, load_table_documents};
 use crate::{CliError, CliResult, ResolvedProject, canonical_display};
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -11,16 +12,27 @@ pub(super) fn buffer_reuse_findings(resolved: &ResolvedProject) -> CliResult<Vec
         Err(error) if error.code == "file_not_found" => Vec::new(),
         Err(error) => return Err(error),
     };
-    for partition in docs.iter().flat_map(|doc| doc.partitions.iter()) {
-        let Some(source) = partition.source.as_deref() else {
-            continue;
-        };
-        findings.extend(document_findings(
-            source,
-            "partition",
-            &partition.handle(),
-            &partition.path,
-        ));
+    for doc in &docs {
+        let numeric_columns = numeric_source_columns(&doc.columns);
+        for partition in &doc.partitions {
+            let Some(source) = partition.source.as_deref() else {
+                continue;
+            };
+            let handle = partition.handle();
+            findings.extend(document_findings(
+                source,
+                "partition",
+                &handle,
+                &partition.path,
+            ));
+            findings.extend(untyped_expansion_document_findings(
+                source,
+                "partition",
+                &handle,
+                &partition.path,
+                &numeric_columns,
+            ));
+        }
     }
 
     for expression in load_named_m_expressions(&resolved.semantic_model_dir)? {
@@ -54,6 +66,55 @@ fn document_findings(source: &str, document_kind: &str, handle: &str, path: &Pat
             })
         })
         .collect()
+}
+
+fn untyped_expansion_document_findings(
+    source: &str,
+    document_kind: &str,
+    handle: &str,
+    path: &Path,
+    numeric_source_columns: &BTreeSet<String>,
+) -> Vec<Value> {
+    analyze_untyped_expansions(source, numeric_source_columns)
+        .into_iter()
+        .map(|expansion| {
+            json!({
+                "code": "m.untyped_expansion",
+                "severity": "warning",
+                "message": format!(
+                    "M step `{}` expands column `{}` without Table.TransformColumnTypes; expanded columns are untyped and can load as text despite a numeric TMDL declaration",
+                    expansion.step, expansion.column
+                ),
+                "handle": handle,
+                "path": canonical_display(path),
+                "documentKind": document_kind,
+                "step": expansion.step,
+                "column": expansion.column,
+                "analysisBoundary": "heuristic"
+            })
+        })
+        .collect()
+}
+
+fn numeric_source_columns(columns: &[ColumnRecord]) -> BTreeSet<String> {
+    columns
+        .iter()
+        .filter(|column| !column.is_calculated())
+        .filter(|column| {
+            column
+                .data_type
+                .as_deref()
+                .is_some_and(is_numeric_tmdl_type)
+        })
+        .filter_map(|column| column.source_column.clone())
+        .collect()
+}
+
+fn is_numeric_tmdl_type(data_type: &str) -> bool {
+    matches!(
+        data_type.trim().to_ascii_lowercase().as_str(),
+        "double" | "int64" | "decimal"
+    )
 }
 
 #[derive(Debug)]
@@ -140,6 +201,7 @@ fn expression_name(line: &str) -> Option<String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Token {
     Identifier(String),
+    String(String),
     Let,
     In,
     Equal,
@@ -161,12 +223,18 @@ struct Reuse {
     reference_count: usize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct UntypedExpansion {
+    step: String,
+    column: String,
+}
+
 fn analyze_let_steps(source: &str) -> Vec<Reuse> {
     let tokens = lex_m(source);
     let Some(let_index) = tokens.iter().position(|token| *token == Token::Let) else {
         return Vec::new();
     };
-    let steps = parse_steps(&tokens[let_index + 1..]);
+    let (steps, _) = parse_let_body(&tokens[let_index + 1..]);
     let mut reuse = Vec::new();
     for (index, step) in steps.iter().enumerate() {
         let later = &steps[index + 1..];
@@ -192,12 +260,50 @@ fn analyze_let_steps(source: &str) -> Vec<Reuse> {
     reuse
 }
 
-fn parse_steps(tokens: &[Token]) -> Vec<Step> {
+fn analyze_untyped_expansions(
+    source: &str,
+    numeric_source_columns: &BTreeSet<String>,
+) -> Vec<UntypedExpansion> {
+    if numeric_source_columns.is_empty() {
+        return Vec::new();
+    }
+    let tokens = lex_m(source);
+    let Some(let_index) = tokens.iter().position(|token| *token == Token::Let) else {
+        return Vec::new();
+    };
+    let (steps, in_expr) = parse_let_body(&tokens[let_index + 1..]);
+    let retyped = steps
+        .iter()
+        .flat_map(|step| transform_column_type_names(&step.rhs))
+        .chain(transform_column_type_names(&in_expr))
+        .collect::<BTreeSet<_>>();
+    let mut expansions = Vec::new();
+    for step in &steps {
+        for column in expand_output_columns(&step.rhs) {
+            if retyped.contains(&column) || !numeric_source_columns.contains(&column) {
+                continue;
+            }
+            expansions.push(UntypedExpansion {
+                step: step.name.clone(),
+                column,
+            });
+        }
+    }
+    expansions
+}
+
+fn parse_let_body(tokens: &[Token]) -> (Vec<Step>, Vec<Token>) {
     let mut chunks = Vec::<Vec<Token>>::new();
     let mut current = Vec::new();
     let mut delimiter_depth = 0_usize;
     let mut let_depth = 1_usize;
+    let mut in_expr = Vec::new();
+    let mut in_in = false;
     for token in tokens {
+        if in_in {
+            in_expr.push(token.clone());
+            continue;
+        }
         match token {
             Token::Open(_) => {
                 delimiter_depth += 1;
@@ -213,9 +319,9 @@ fn parse_steps(tokens: &[Token]) -> Vec<Step> {
             }
             Token::In if delimiter_depth == 0 && let_depth == 1 => {
                 if !current.is_empty() {
-                    chunks.push(current);
+                    chunks.push(std::mem::take(&mut current));
                 }
-                break;
+                in_in = true;
             }
             Token::In if delimiter_depth == 0 => {
                 let_depth = let_depth.saturating_sub(1);
@@ -230,7 +336,7 @@ fn parse_steps(tokens: &[Token]) -> Vec<Step> {
         }
     }
 
-    chunks
+    let steps = chunks
         .into_iter()
         .filter_map(|chunk| {
             let equal = chunk.iter().position(|token| *token == Token::Equal)?;
@@ -243,7 +349,144 @@ fn parse_steps(tokens: &[Token]) -> Vec<Step> {
                 rhs: chunk[equal + 1..].to_vec(),
             })
         })
+        .collect();
+    (steps, in_expr)
+}
+
+fn expand_output_columns(tokens: &[Token]) -> Vec<String> {
+    let mut columns = Vec::new();
+    for args in table_function_arg_lists(tokens, "ExpandTableColumn") {
+        let Some(names) = args
+            .get(3)
+            .or(args.get(2))
+            .and_then(|arg| literal_string_list(arg))
+        else {
+            continue;
+        };
+        columns.extend(names);
+    }
+    columns
+}
+
+fn transform_column_type_names(tokens: &[Token]) -> Vec<String> {
+    table_function_arg_lists(tokens, "TransformColumnTypes")
+        .into_iter()
+        .filter_map(|args| args.get(1).copied())
+        .filter_map(spec_list_column_names)
+        .flatten()
         .collect()
+}
+
+fn table_function_arg_lists<'a>(tokens: &'a [Token], function: &str) -> Vec<Vec<&'a [Token]>> {
+    let mut calls = Vec::new();
+    let mut index = 0;
+    while index + 3 < tokens.len() {
+        match (
+            &tokens[index],
+            &tokens[index + 1],
+            &tokens[index + 2],
+            &tokens[index + 3],
+        ) {
+            (Token::Identifier(table), Token::Dot, Token::Identifier(name), Token::Open('('))
+                if table.eq_ignore_ascii_case("Table") && name.eq_ignore_ascii_case(function) =>
+            {
+                if let Some(close) = matching_close(tokens, index + 3) {
+                    calls.push(split_top_level_args(&tokens[index + 4..close]));
+                    index = close + 1;
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    calls
+}
+
+fn matching_close(tokens: &[Token], open_index: usize) -> Option<usize> {
+    let Token::Open(open) = tokens.get(open_index)? else {
+        return None;
+    };
+    let close = match open {
+        '(' => ')',
+        '[' => ']',
+        '{' => '}',
+        _ => return None,
+    };
+    let mut depth = 0_usize;
+    for (offset, token) in tokens[open_index..].iter().enumerate() {
+        match token {
+            Token::Open(character) if character == open => depth += 1,
+            Token::Close(character) if *character == close => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(open_index + offset);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn split_top_level_args(tokens: &[Token]) -> Vec<&[Token]> {
+    let mut args = Vec::new();
+    let mut start = 0_usize;
+    let mut depth = 0_usize;
+    for (index, token) in tokens.iter().enumerate() {
+        match token {
+            Token::Open(_) => depth += 1,
+            Token::Close(_) => depth = depth.saturating_sub(1),
+            Token::Comma if depth == 0 => {
+                args.push(&tokens[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    if start < tokens.len() || !args.is_empty() {
+        args.push(&tokens[start..]);
+    }
+    args
+}
+
+fn wrapped_list_inner(tokens: &[Token]) -> Option<&[Token]> {
+    if !matches!(tokens.first(), Some(Token::Open('{'))) {
+        return None;
+    }
+    let close = matching_close(tokens, 0)?;
+    if close + 1 != tokens.len() {
+        return None;
+    }
+    Some(&tokens[1..close])
+}
+
+fn literal_string_list(tokens: &[Token]) -> Option<Vec<String>> {
+    let inner = wrapped_list_inner(tokens)?;
+    let mut names = Vec::new();
+    for item in split_top_level_args(inner) {
+        match item {
+            [Token::String(name)] => names.push(name.clone()),
+            [] => {}
+            _ => return None,
+        }
+    }
+    Some(names)
+}
+
+fn spec_list_column_names(tokens: &[Token]) -> Option<Vec<String>> {
+    let inner = wrapped_list_inner(tokens)?;
+    let mut names = Vec::new();
+    for item in split_top_level_args(inner) {
+        if let Some(pair_inner) = wrapped_list_inner(item) {
+            if let Some([Token::String(name)]) = split_top_level_args(pair_inner).first() {
+                names.push((*name).clone());
+            }
+        } else if let [Token::String(name)] = item {
+            names.push(name.clone());
+        }
+    }
+    Some(names)
 }
 
 fn starts_with_table_buffer(tokens: &[Token]) -> bool {
@@ -306,7 +549,9 @@ fn lex_m(source: &str) -> Vec<Token> {
             continue;
         }
         if character == '"' {
-            index = skip_quoted_text(&chars, index + 1);
+            let (value, next) = quoted_identifier(&chars, index + 1);
+            tokens.push(Token::String(value));
+            index = next;
             continue;
         }
         if character == '#' && chars.get(index + 1) == Some(&'"') {
@@ -342,21 +587,6 @@ fn lex_m(source: &str) -> Vec<Token> {
     tokens
 }
 
-fn skip_quoted_text(chars: &[char], mut index: usize) -> usize {
-    while index < chars.len() {
-        if chars[index] == '"' {
-            if chars.get(index + 1) == Some(&'"') {
-                index += 2;
-            } else {
-                return index + 1;
-            }
-        } else {
-            index += 1;
-        }
-    }
-    index
-}
-
 fn quoted_identifier(chars: &[char], mut index: usize) -> (String, usize) {
     let mut name = String::new();
     while index < chars.len() {
@@ -377,7 +607,8 @@ fn quoted_identifier(chars: &[char], mut index: usize) -> (String, usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Reuse, analyze_let_steps};
+    use super::{Reuse, UntypedExpansion, analyze_let_steps, analyze_untyped_expansions};
+    use std::collections::BTreeSet;
 
     #[test]
     fn flags_unbuffered_later_step_reuse() {
@@ -411,5 +642,84 @@ in
     Left
 "#;
         assert!(analyze_let_steps(source).is_empty());
+    }
+
+    fn numeric(columns: &[&str]) -> BTreeSet<String> {
+        columns.iter().map(|name| (*name).to_string()).collect()
+    }
+
+    #[test]
+    fn flags_expanded_numeric_column_without_retype() {
+        let source = r#"
+let
+    Source = #table(type table [DateKey = Int64.Type, Revenue = Currency.Type], {}),
+    Grouped = Table.Group(Source, {"DateKey"}, {{"Rows", each _, type table}}),
+    Expanded = Table.ExpandTableColumn(Grouped, "Rows", {"Revenue"})
+in
+    Expanded
+"#;
+        assert_eq!(
+            analyze_untyped_expansions(source, &numeric(&["Revenue"])),
+            vec![UntypedExpansion {
+                step: "Expanded".to_string(),
+                column: "Revenue".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn uses_expand_new_name_list_when_present() {
+        let source = r#"
+let
+    Source = Table.FromRows({}),
+    Expanded = Table.ExpandTableColumn(Source, "Rows", {"Revenue"}, {"Rank"})
+in
+    Expanded
+"#;
+        assert_eq!(
+            analyze_untyped_expansions(source, &numeric(&["Rank"])),
+            vec![UntypedExpansion {
+                step: "Expanded".to_string(),
+                column: "Rank".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn ignores_expanded_column_after_transform_column_types() {
+        let source = r#"
+let
+    Source = Table.FromRows({}),
+    Expanded = Table.ExpandTableColumn(Source, "Rows", {"Revenue"}),
+    Typed = Table.TransformColumnTypes(Expanded, {{"Revenue", type number}})
+in
+    Typed
+"#;
+        assert!(analyze_untyped_expansions(source, &numeric(&["Revenue"])).is_empty());
+    }
+
+    #[test]
+    fn ignores_expanded_column_outside_numeric_source_set() {
+        let source = r#"
+let
+    Source = Table.FromRows({}),
+    Expanded = Table.ExpandTableColumn(Source, "Rows", {"Segment"})
+in
+    Expanded
+"#;
+        assert!(analyze_untyped_expansions(source, &numeric(&["Revenue"])).is_empty());
+    }
+
+    #[test]
+    fn skips_expand_when_name_list_is_not_literal() {
+        let source = r#"
+let
+    Source = Table.FromRows({}),
+    Names = {"Revenue"},
+    Expanded = Table.ExpandTableColumn(Source, "Rows", Names)
+in
+    Expanded
+"#;
+        assert!(analyze_untyped_expansions(source, &numeric(&["Revenue"])).is_empty());
     }
 }

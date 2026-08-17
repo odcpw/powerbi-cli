@@ -370,6 +370,15 @@ fn capabilities_include_agent_contract_metadata() {
             {"character": ":", "encoding": "%3A"}
         ])
     );
+    assert_eq!(
+        value["schemaManifest"]["lintFindingCodes"],
+        json!(["m.unbuffered_reuse", "m.untyped_expansion"])
+    );
+    let lint = command_by_path(commands, "lint");
+    assert_eq!(
+        lint["diagnosticCodes"],
+        json!(["m.unbuffered_reuse", "m.untyped_expansion"])
+    );
     let features = commands
         .iter()
         .find(|command| command["path"] == "features list")

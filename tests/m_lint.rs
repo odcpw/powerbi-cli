@@ -34,6 +34,50 @@ fn replace_partition_source(project: &Path, source: &str) {
         .expect("replace partition source");
 }
 
+fn set_column_data_type(project: &Path, column: &str, data_type: &str) {
+    let path = fact_sales_tmdl(project);
+    let text = fs::read_to_string(&path).expect("FactSales TMDL");
+    let marker = format!("    column {column}\n        dataType: ");
+    let start = text.find(&marker).expect("column dataType");
+    let type_start = start + marker.len();
+    let type_end = type_start + text[type_start..].find('\n').expect("dataType line end");
+    let mut updated = String::new();
+    updated.push_str(&text[..type_start]);
+    updated.push_str(data_type);
+    updated.push_str(&text[type_end..]);
+    fs::write(&path, updated).expect("patch column dataType");
+}
+
+fn expand_source(retype: bool) -> String {
+    let typed = if retype {
+        ",\n                Typed = Table.TransformColumnTypes(Expanded, {{\"Revenue\", type number}})"
+    } else {
+        ""
+    };
+    let result = if retype { "Typed" } else { "Expanded" };
+    format!(
+        r#"        source =
+            let
+                Source = #table(type table [DateKey = Int64.Type, CustomerKey = Int64.Type, Revenue = Currency.Type, Units = Int64.Type], {{}}),
+                Grouped = Table.Group(Source, {{"DateKey", "CustomerKey", "Units"}}, {{{{"Rows", each _, type table}}}}),
+                Expanded = Table.ExpandTableColumn(Grouped, "Rows", {{"Revenue"}}){typed}
+            in
+                {result}"#
+    )
+}
+
+fn untyped_expansion_findings(project: &Path) -> Vec<serde_json::Value> {
+    let lint = run_powerbi(&["lint", project.to_str().expect("project path"), "--json"]);
+    assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
+    stdout_json(&lint)["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .filter(|finding| finding["code"] == "m.untyped_expansion")
+        .cloned()
+        .collect()
+}
+
 fn m_source(buffered: bool) -> String {
     let shared = if buffered { "Buffered" } else { "Source" };
     let buffer_step = if buffered {
@@ -129,4 +173,65 @@ fn lint_analyzes_named_m_expression_documents() {
     assert_eq!(finding["documentKind"], "expression");
     assert_eq!(finding["step"], "Source");
     assert_eq!(finding["referenceCount"], 2);
+}
+
+#[test]
+fn lint_warns_for_untyped_numeric_expansion_without_failing_strict_validation() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    set_column_data_type(&project, "Revenue", "double");
+    replace_partition_source(&project, &expand_source(false));
+    let project_arg = project.to_str().expect("project path");
+
+    let findings = untyped_expansion_findings(&project);
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected one untyped expansion: {findings:?}"
+    );
+    let finding = &findings[0];
+    assert_eq!(finding["severity"], "warning");
+    assert_eq!(finding["analysisBoundary"], "heuristic");
+    assert_eq!(finding["documentKind"], "partition");
+    assert_eq!(finding["step"], "Expanded");
+    assert_eq!(finding["column"], "Revenue");
+    assert_eq!(finding["handle"], "partition:FactSales:FactSales");
+    assert!(
+        finding["message"]
+            .as_str()
+            .expect("message")
+            .contains("Table.TransformColumnTypes")
+    );
+
+    let strict = run_powerbi(&["validate", "--strict", project_arg, "--json"]);
+    assert_eq!(strict.code, 0, "stderr: {}", strict.stderr);
+    assert_eq!(stdout_json(&strict)["ok"], true);
+}
+
+#[test]
+fn lint_does_not_flag_expanded_column_after_transform_column_types() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    set_column_data_type(&project, "Revenue", "double");
+    replace_partition_source(&project, &expand_source(true));
+
+    assert!(untyped_expansion_findings(&project).is_empty());
+    let project_arg = project.to_str().expect("project path");
+    let strict = run_powerbi(&["validate", "--strict", project_arg, "--json"]);
+    assert_eq!(strict.code, 0, "stderr: {}", strict.stderr);
+    assert_eq!(stdout_json(&strict)["ok"], true);
+}
+
+#[test]
+fn lint_does_not_flag_untyped_expansion_mapped_to_string_column() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    set_column_data_type(&project, "Revenue", "string");
+    replace_partition_source(&project, &expand_source(false));
+
+    assert!(untyped_expansion_findings(&project).is_empty());
+    let project_arg = project.to_str().expect("project path");
+    let strict = run_powerbi(&["validate", "--strict", project_arg, "--json"]);
+    assert_eq!(strict.code, 0, "stderr: {}", strict.stderr);
+    assert_eq!(stdout_json(&strict)["ok"], true);
 }
