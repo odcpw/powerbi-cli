@@ -139,6 +139,16 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 - `report_visuals_formatting_set_color_creates_numeric_data_view_wildcard`
 - `report_visuals_formatting_set_color_rejects_unsafe_requests`
 
+### `tests/report_slicers.rs`
+
+- `report_slicers_list_empty_scaffold_returns_zero_slicers`
+- `report_slicers_list_and_show_raw_slicer_by_handle`
+- `report_slicers_show_accepts_visual_handle_and_rejects_missing_or_unknown_handle`
+- `report_slicers_clear_round_trips_through_out_dir`
+- `report_slicers_clear_accepts_visual_selectors_and_rejects_non_slicer`
+- `report_slicers_clear_rejects_unsafe_requests`
+- `report_slicers_clear_handles_legacy_array_and_preserves_unmatched_filters`
+
 ## Shared-helper decisions
 
 - The local `RunOutput`, `run_powerbi`, `stdout_json`, and `stderr_json` variants were byte-identical in behavior to the existing exports in `tests/common/mod.rs`; the split binaries use the common versions and no renamed shadow variants were introduced.
@@ -155,5 +165,13 @@ Each entry records the post-commit gate: exact-name inventory, combined-family t
 - Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
 - Combined report-family run: 86 passed, 0 failed in 7.853s (ceiling 17.146s).
 - `cargo test --release --no-fail-fast`: passed; no MCP timing flake observed.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+
+### `a345d41` — formatting
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: 86 passed, 0 failed in 11.544s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: all integration targets passed; the unit target encountered host-timing failures in `mcp::tests::child_guard_drop_terminates_the_owned_process_tree`, `mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock`, and `mcp::tests::graceful_root_exit_also_reaps_captured_descendants`. Each passed when rerun alone with `--exact`, so they were classified as the documented MCP child-process host flakes.
 - `cargo clippy --release --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: passed.
