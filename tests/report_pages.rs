@@ -548,6 +548,9 @@ fn capabilities_advertise_report_layout_commands() {
     assert!(paths.contains(&"report visuals formatting set-text"));
     assert!(paths.contains(&"report visuals formatting set-color"));
     assert!(paths.contains(&"report visuals add"));
+    assert!(paths.contains(&"report visuals add-card"));
+    assert!(paths.contains(&"report visuals add-slicer"));
+    assert!(paths.contains(&"report visuals add-textbox"));
     assert!(paths.contains(&"report visuals clone"));
     assert!(paths.contains(&"report visuals delete"));
     assert!(paths.contains(&"report visuals set-position"));
@@ -774,6 +777,32 @@ fn capabilities_advertise_report_layout_commands() {
             .iter()
             .any(|field| field == "visualPlan.after")
     );
+    for (path, expected_flag) in [
+        ("report visuals add-card", "--measure <Table.Measure>"),
+        ("report visuals add-slicer", "--field <Table.Column>"),
+        ("report visuals add-textbox", "--paragraphs-file <path|->"),
+    ] {
+        let command = value["commands"]
+            .as_array()
+            .expect("commands")
+            .iter()
+            .find(|command| command["path"] == path)
+            .unwrap_or_else(|| panic!("{path} command"));
+        assert_eq!(command["mutates"], Value::Bool(true), "{path}");
+        assert_eq!(
+            command["outputSchema"],
+            Value::from("powerbi-cli.report.visuals.scaffoldMutation.v1"),
+            "{path}"
+        );
+        assert!(
+            command["flags"]
+                .as_array()
+                .expect("flags")
+                .iter()
+                .any(|flag| flag == expected_flag),
+            "missing {path} flag {expected_flag}"
+        );
+    }
     let clone_visual = value["commands"]
         .as_array()
         .expect("commands")

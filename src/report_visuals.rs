@@ -19,6 +19,7 @@ use crate::report_visual_delete::delete_visual;
 use crate::report_visual_formatting::formatting_command;
 use crate::report_visual_mutations::{add_visual, validate_binding_cardinality};
 use crate::report_visual_objects::{set_display_name, set_object};
+use crate::report_visual_scaffold::{add_card, add_slicer, add_textbox};
 use crate::tmdl::load_table_documents;
 use crate::visual_catalog::visual_catalog_command;
 use crate::{
@@ -31,7 +32,7 @@ use std::path::PathBuf;
 pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "report visuals requires a subcommand: list, show, catalog, formatting, add, clone, delete, set-position, set-bindings, set-topn-guard, set-object, set-display-name",
+            "report visuals requires a subcommand: list, show, catalog, formatting, add, add-card, add-slicer, add-textbox, clone, delete, set-position, set-bindings, set-topn-guard, set-object, set-display-name",
         )
         .with_hint("Run `powerbi-cli report visuals list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -45,6 +46,9 @@ pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
         "catalog" | "types" | "visual-types" => visual_catalog_command(rest),
         "formatting" | "format" => formatting_command(rest),
         "add" | "create" => add_visual(rest),
+        "add-card" | "addCard" => add_card(rest),
+        "add-slicer" | "addSlicer" => add_slicer(rest),
+        "add-textbox" | "addTextbox" => add_textbox(rest),
         "clone" | "duplicate" | "copy" => clone_visual(rest),
         "delete" | "remove" => delete_visual(rest),
         "set-position" | "setPosition" => set_position(rest),
