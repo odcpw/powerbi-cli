@@ -1,0 +1,247 @@
+//! Package, workflow, and source-template capability descriptors.
+
+use serde_json::{Value, json};
+
+pub(super) fn package_commands() -> Vec<Value> {
+    vec![
+        json!({
+            "path": "package inspect",
+            "aliases": ["package info", "packages inspect"],
+            "usage": "powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json",
+            "summary": "Inspect a PBIX/PBIT ZIP-like package and classify source/metadata/cache entries without extracting opaque data caches",
+            "tags": ["package", "pbix", "pbit", "inspect", "metadata", "no-fallback", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.package.inspect.v1",
+            "flags": ["<file.pbix|file.pbit|file.zip>", "--json", "--format json"],
+            "examples": ["powerbi-cli package inspect template.pbit --json"],
+            "followUpFields": ["package", "packageKind", "packageClass", "archive.entries", "sourceRoots", "support.canExtractSafeMetadata", "support.canImportSourceProject", "support.canWriteBinaryPackage", "entries[].category", "next"]
+        }),
+        json!({
+            "path": "package extract",
+            "aliases": ["package unpack"],
+            "usage": "powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--include-unknown] [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json",
+            "summary": "Extract selected source/metadata entries with streaming archive-bomb budgets and clean partial-output rollback",
+            "tags": ["package", "pbix", "pbit", "extract", "metadata", "safe", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.package.extract.v1",
+            "flags": ["<file.pbix|file.pbit|file.zip>", "--out-dir <dir>", "--include-unknown", "--include-unsafe", "--max-entries <n>", "--max-entry-bytes <n>", "--max-total-bytes <n>", "--max-compression-ratio <n>", "--json", "--format json"],
+            "examples": ["powerbi-cli package extract template.pbit --out-dir extracted-template --json"],
+            "limitations": ["Does not convert opaque PBIX internals into a PBIP project.", "Skips unsafe cache/binary/data-model entries by default.", "Defaults: 10000 entries, 256 MiB per entry, 2 GiB total uncompressed, and 200:1 compression ratio; overrides require explicit flags."],
+            "followUpFields": ["package", "outDir", "policy.limits", "extracted[].name", "skipped[].skipReason", "next"]
+        }),
+        json!({
+            "path": "package import",
+            "usage": "powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json",
+            "summary": "Import PBIP/PBIR/TMDL source entries only when they are actually present inside a package archive",
+            "tags": ["package", "pbix", "pbit", "pbip", "import", "metadata", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.package.import.v1",
+            "flags": ["<file.pbix|file.pbit|file.zip>", "--out-dir <project-dir>", "--source-root <archive-folder>", "--max-entries <n>", "--max-entry-bytes <n>", "--max-total-bytes <n>", "--max-compression-ratio <n>", "--json", "--format json"],
+            "examples": ["powerbi-cli package import source-bearing-template.pbit --out-dir imported-project --json", "powerbi-cli package import report-source.zip --out-dir imported-project --json"],
+            "limitations": ["Fails honestly when the package does not contain PBIP/PBIR/TMDL source files.", "Does not reverse-engineer opaque DataModel binaries."],
+            "followUpFields": ["ok", "packageClass", "sourceRoot", "outDir", "validation", "next"]
+        }),
+        json!({
+            "path": "package source-pack",
+            "aliases": ["package source-package", "package source-zip"],
+            "usage": "powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit|archive.pbix|archive.zip> [--force] [--dry-run] --json",
+            "summary": "Write a deterministic, allowlisted source archive only after credential and PII-suspect content scans pass",
+            "tags": ["package", "pbix", "pbit", "pbip", "pbir", "tmdl", "source", "handoff", "no-fallback", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.package.sourcePack.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--out <archive>", "--kind <pbit|pbix|zip>", "--force", "--dry-run", "--json", "--format json"],
+            "examples": ["powerbi-cli package source-pack --project build/sales --out build/sales-source.pbit --json"],
+            "limitations": ["Writes a ZIP-format source archive only; it does not synthesize Desktop's opaque imported-data model.", "Allows root .pbip, report PBIR/definition JSON, semantic-model PBISM/TMDL, registered/shared JSON resources, and generated .gitignore, POWERBI_HANDOFF.md, and powerbi-cli.manifest.copy.json sidecars only.", "Refuses all files in dot-directories and every unknown path before archive creation.", "Credential-like content, PII-suspect row literals, and non-dummy or unverified partition sources prevent archive creation."],
+            "followUpFields": ["ok", "changed", "dryRun", "projectDir", "pbip", "package", "packageClass", "entries[].name", "validation", "next"]
+        }),
+        json!({
+            "path": "package export-plan",
+            "aliases": ["package pbit-plan", "package template-plan"],
+            "usage": "powerbi-cli package export-plan --project <project-dir-or.pbip> --json",
+            "summary": "Return the Desktop handoff plan for producing PBIX/PBIT because powerbi-cli does not write opaque binary package containers",
+            "tags": ["package", "pbix", "pbit", "export", "plan", "desktop", "no-fallback", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.package.exportPlan.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
+            "examples": ["powerbi-cli package export-plan --project build/sales --json"],
+            "followUpFields": ["canWriteBinaryPackage", "reason", "desktopWorkflow", "next"]
+        }),
+    ]
+}
+
+pub(super) fn workflow_commands() -> Vec<Value> {
+    vec![
+        json!({
+            "path": "workflow synthesize",
+            "usage": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json",
+            "summary": "Copy a live PBIP into a fresh offline project, install synthetic shared M expressions, and replace shared Database connector steps with one complete navigation shim",
+            "tags": ["workflow", "synthetic", "offline", "pbip", "tmdl", "partition", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": true,
+            "networkRequired": false,
+            "stability": "alpha-output",
+            "proofLevel": "schema-golden",
+            "outputSchema": "powerbi-cli.workflow-synthesize.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--expressions <expressions.tmdl>", "--out-dir <new-project-dir>", "--map <schema.item>=<ExpressionName>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --json", "powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --map sales.orders=QaOrders --json"],
+            "limitations": ["The output directory must be fresh and outside the source project tree. Source links/reparse points are refused; cache.abf and localSettings.json files are always excluded.", "Recognizes literal Database{[Schema = \"s\", Item = \"t\"]}[Data] navigation and a single-line Database = <Connector>.Database(\"server\", ...) binding in each affected partition. It preserves downstream M lines unchanged and refuses variable/computed server arguments whose source text cannot be proven removed.", "The supplied expressions file must define every discovered default or overridden expression name. This command runs native project validation and a partition-focused connector/server-string scan; it does not contact a live source or require Microsoft sidecars."],
+            "followUpFields": ["projectDir", "pbip", "expressions", "mappings", "counts", "validation", "offlineSafety", "next"]
+        }),
+        json!({
+            "path": "workflow plan",
+            "usage": "powerbi-cli workflow plan --project <project-dir-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json",
+            "summary": "Create a fingerprinted deterministic plan for one selected PBIP closure and typed source-profile replacements",
+            "tags": ["workflow", "source-profile", "plan", "pbip", "mcp", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": true,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.workflow-plan.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--profile <source-profile.json>", "--out <new-plan.json>", "--out-dir <new-project-dir>", "--resource <name>=<path>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow plan --project report.pbip --profile workflow/source-profile.json --out ../powerbi-build/report.plan.json --out-dir ../powerbi-build/report --json"],
+            "limitations": ["Writes only a new plan file; it does not create the intended output directory. Plan and output paths must be outside the entire source project root, and credential-like canonical profile/template/resource/override/project/plan/output paths are refused before persistence.", "Profiles support only typed partition.replaceSource operations rooted at Excel.Workbook or PostgreSQL.Database. Resources require exact SHA-256 claims; unknown/dynamic connectors, computed/postfix invocations, and hard-coded file/URI paths are refused."],
+            "followUpFields": ["profileId", "plan", "planFingerprint", "selectedFiles", "resources", "replacements", "outputDir", "next"]
+        }),
+        json!({
+            "path": "workflow run",
+            "usage": "powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json",
+            "summary": "Recheck a fingerprinted plan, build a fresh selected-artifact closure, apply exact local MCP model edits, validate, and write a checksummed receipt",
+            "tags": ["workflow", "source-profile", "run", "pbip", "mcp", "official-validation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": true,
+            "confirmRequired": true,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.workflow-receipt.v1",
+            "flags": ["--plan <plan.json>", "--confirm <plan-fingerprint>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow run --plan ../powerbi-build/report.plan.json --confirm sha256:<fingerprint> --json"],
+            "limitations": ["Requires the exact installed modeling MCP and official report validator.", "Creates a narrow allowlisted output outside the source project; source projects are never edited and failed outputs retain an incomplete marker.", "Directory creation, create-only writes, copy readback, and marker removal are relative to the opened output-directory capability with no-follow component traversal; ambient path/FileId identity is checked separately before publication."],
+            "followUpFields": ["planFingerprint", "receiptChecksum", "outputDir", "receipt", "validation", "childrenReaped", "pumpsJoined", "next"]
+        }),
+        json!({
+            "path": "workflow verify",
+            "usage": "powerbi-cli workflow verify --plan <plan.json> --json",
+            "summary": "Reconstruct profile-derived plan and staged-model semantics, bind output and MCP readbacks, and rerun native/official validation without editing the workflow output",
+            "tags": ["workflow", "source-profile", "verify", "integrity", "validation", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.workflow-verify.v1",
+            "flags": ["--plan <plan.json>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow verify --plan ../powerbi-build/report.plan.json --json"],
+            "limitations": ["Requires the exact installed modeling MCP and official report validator.", "Creates a private temporary canonical MCP export to bind the complete staged model to evidence; all evidence TMDL is bounded UTF-8 and credential-scanned, and the workflow output remains read-only."],
+            "followUpFields": ["planFingerprint", "receiptChecksum", "outputTreeSha256", "validation", "sourceInputsUnchanged", "receiptClaimsValid", "evidenceClaimsValid"]
+        }),
+    ]
+}
+
+pub(super) fn source_template_commands() -> Vec<Value> {
+    vec![
+        json!({
+            "path": "source-template list",
+            "aliases": ["source-templates list", "sourceTemplate list", "sourceTemplates list", "source-template ls"],
+            "usage": "powerbi-cli source-template list --project <project-dir-or.pbip> [--table <table>] [--kind <sql|postgres|odbc|excel>] --json",
+            "summary": "List credential-free sidecar source templates used by handoff rebind plans",
+            "tags": ["source-template", "source", "handoff", "rebind", "partition", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.source-template.list.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--kind <sql|postgres|odbc|excel>", "--json", "--format json"],
+            "examples": ["powerbi-cli source-template list --project build/sales --json"],
+            "followUpFields": ["templates[].handle", "templates[].partitionHandle", "templates[].mTemplate", "templates[].safety", "next"]
+        }),
+        json!({
+            "path": "source-template show",
+            "aliases": ["source-templates show", "sourceTemplate show", "source-template get"],
+            "usage": "powerbi-cli source-template show --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) --json",
+            "summary": "Show one source template, its partition mapping, M template preview, and safety findings",
+            "tags": ["source-template", "source", "handoff", "rebind", "partition", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.source-template.show.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--json", "--format json"],
+            "examples": ["powerbi-cli source-template show --project build/sales --handle source-template:FactSales:FactSales --json"],
+            "followUpFields": ["sourceTemplate.handle", "sourceTemplate.partitionHandle", "sourceTemplate.mTemplate", "sourceTemplate.requirements", "sourceTemplate.safety", "next"]
+        }),
+        json!({
+            "path": "source-template add",
+            "aliases": ["source-templates add", "sourceTemplate add", "source-template create"],
+            "usage": "powerbi-cli source-template add --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> [--partition <partition-name>]) [--name <template-name>] --kind <sql|postgres|odbc|excel> [--server <placeholder> | --dsn <placeholder> | --file <workbook-or-placeholder>] [--database <placeholder>] [--schema <schema>] [--object <table-or-view>] [--item <sheet-or-table>] [--item-kind <Sheet|Table>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Add or replace a credential-free SQL Server, PostgreSQL, ODBC, or Excel source template sidecar without changing executable partitions",
+            "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.source-template.mutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <partition-handle>", "--table <table>", "--partition <partition-name-or-handle>", "--name <template-name>", "--kind <sql|postgres|odbc|excel>", "--server <placeholder>", "--dsn <placeholder>", "--database <placeholder>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <workbook-or-placeholder>", "--path <workbook-or-placeholder>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind sql --server <server> --database <database> --schema dbo --object FactSales --dry-run --json",
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind postgres --server <server> --database <database> --schema public --object <object> --dry-run --json",
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind odbc --dsn <dsn> --database <database> --schema <schema> --object <object> --dry-run --json",
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind excel --file <workbook.xlsx> --sheet FactSales --dry-run --json"
+            ],
+            "limitations": ["ODBC --dsn accepts only a bare DSN name; semicolon/equal connection attributes and embedded credentials are refused.", "Excel apply materializes an absolute workbook path; move-safe packages should reapply or patch that path on the target machine."],
+            "followUpFields": ["dryRun", "changes[].before", "changes[].after", "readbackCommand", "rebindPlanCommand", "handoffCheckCommand", "validateCommand"]
+        }),
+        json!({
+            "path": "source-template apply",
+            "aliases": ["source-template materialize", "source-templates apply", "sourceTemplate apply"],
+            "usage": "powerbi-cli source-template apply --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) [--server <server> | --dsn <dsn> | --file <workbook.xlsx>] [--database <database>] [--schema <schema>] [--object <table-or-view>] [--item <sheet-or-table>] [--item-kind <Sheet|Table>] [--replace-existing --confirm <partition-handle>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Materialize one credential-free source template into a generated dummy partition, or explicitly retarget a confirmed existing credential-free partition",
+            "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "work-machine", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.source-template.apply.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--server <server>", "--dsn <dsn>", "--database <database>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <workbook.xlsx>", "--path <workbook.xlsx>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--replace-existing", "--confirm <partition-handle>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --dry-run --json",
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server pg.example.internal:5432 --database Sales --out-dir build/sales-live --json",
+                "powerbi-cli source-template materialize --project build/sales --handle source-template:DimCustomer:DimCustomer --dsn CorpWarehouse --database Sales --in-place --json",
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --file C:\\\\data\\\\sales.xlsx --sheet FactSales --replace-existing --confirm partition:FactSales:FactSales --dry-run --json"
+            ],
+            "limitations": ["Applies one template per command.", "Existing source replacement requires --replace-existing plus the exact --confirm partition handle and is limited to recognized credential-free SQL, PostgreSQL, ODBC, and external-file sources.", "Unknown, web, and credential-bearing sources are refused.", "Credentials cannot be supplied or embedded; Power BI Desktop performs database authentication after the PBIP opens."],
+            "followUpFields": ["projectModified", "credentialsEmbedded", "requiresDesktopAuthentication", "connection.parameters", "changes[].afterSource", "readbackCommand", "validateCommand", "instructions"]
+        }),
+    ]
+}

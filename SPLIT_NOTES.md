@@ -107,6 +107,21 @@ Gate evidence is appended to this section after each family extraction.
   All six focused payloads also matched their baseline byte lengths and
   SHA-256 values.
 
+### `workflow_pkg`
+
+- Moved three order-sensitive chunks to `src/contract/workflow_pkg.rs`: five
+  `package ...` descriptors, four `workflow ...` descriptors, and four
+  `source-template ...` descriptors. Separate builders let the façade retain
+  the original intervening core, integrations, Desktop, project, and model
+  entries without reordering any command.
+- Post-commit gate: pass. Exact baseline test vector (24 suites, 438 passed,
+  0 failed, 4 ignored); clippy and fmt passed; clean release build 110.373 s
+  (38.6% of baseline, no regression); full capabilities remained 244,512
+  bytes with SHA-256
+  `27b2564e0f382ced6598fea3cd3bfbeb000e961b341d3de6bdfe245c34de8fa9`.
+  All six focused payloads also matched their baseline byte lengths and
+  SHA-256 values.
+
 ## Refuted seams
 
 None.
