@@ -190,6 +190,30 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 - `report_pages_mutations_reject_unsafe_requests`
 - `capabilities_advertise_report_layout_commands`
 
+### `tests/report_visuals_bindings.rs`
+
+- `report_visual_explicit_sort_refuses_unproven_shapes`
+- `report_visual_set_position_round_trips_through_out_dir`
+- `report_visual_set_position_rejects_unsafe_geometry`
+- `report_visuals_catalog_advertises_generated_types_roles_and_limits`
+- `report_visual_add_supports_series_and_scatter_bubble_roles`
+- `report_visual_add_round_trips_through_out_dir`
+- `report_visual_add_defaults_require_a_binding_and_create_alias_is_readable`
+- `report_visual_add_supports_catalog_chart_aliases`
+- `report_visual_new_families_round_trip_add_format_bind_clone_and_delete`
+- `report_visual_clone_round_trips_through_out_dir`
+- `report_visual_clone_preserves_desktop_authored_slicer_template_state`
+- `report_visual_clone_rejects_unsafe_requests`
+- `report_visual_add_rejects_unsafe_requests`
+- `report_visual_new_families_reject_invalid_bindings_and_slicer_modes`
+- `report_visuals_reject_unproven_value_columns_and_duplicate_fields`
+- `report_visual_set_bindings_round_trips_through_out_dir`
+- `report_visual_set_bindings_rejects_bad_specs`
+- `report_visual_set_bindings_preserves_between_slicer_type_safety`
+- `report_visual_delete_round_trips_through_out_dir`
+- `report_visual_delete_handles_read_only_visual_directories_on_windows`
+- `report_visual_delete_rejects_unsafe_requests`
+
 ## Shared-helper decisions
 
 - The local `RunOutput`, `run_powerbi`, `stdout_json`, and `stderr_json` variants were byte-identical in behavior to the existing exports in `tests/common/mod.rs`; the split binaries use the common versions and no renamed shadow variants were introduced.
@@ -254,5 +278,13 @@ Each entry records the post-commit gate: exact-name inventory, combined-family t
 - Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
 - Combined report-family run: 86 passed, 0 failed in 9.566s (ceiling 17.146s).
 - `cargo test --release --no-fail-fast`: all integration targets passed; `mcp::tests::graceful_root_exit_also_reaps_captured_descendants` hit the documented host-timing condition and passed its exact isolated rerun.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+
+### `f8598cb` — pages
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: 86 passed, 0 failed in 15.391s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: passed; no MCP timing flake observed.
 - `cargo clippy --release --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: passed.
