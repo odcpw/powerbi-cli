@@ -1,5 +1,6 @@
 //! Workflow planning command, profile validation, and selected-source manifest construction.
 
+use super::shared::*;
 use super::*;
 
 pub(super) fn workflow_plan(args: &[String]) -> CliResult<Value> {

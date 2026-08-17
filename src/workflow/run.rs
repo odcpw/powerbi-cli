@@ -1,5 +1,6 @@
 //! Workflow execution command and run-only staged-copy orchestration.
 
+use super::shared::*;
 use super::*;
 
 pub(super) fn workflow_run(args: &[String]) -> CliResult<Value> {

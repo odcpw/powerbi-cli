@@ -1,5 +1,6 @@
 //! Workflow verification command for checking receipts and staged output evidence.
 
+use super::shared::*;
 use super::*;
 
 fn parse_verify_args(args: &[String]) -> CliResult<PathBuf> {
