@@ -149,6 +149,19 @@ The map is updated as each family is extracted. Test names remain byte-for-byte 
 - `report_slicers_clear_rejects_unsafe_requests`
 - `report_slicers_clear_handles_legacy_array_and_preserves_unmatched_filters`
 
+### `tests/report_bookmarks_interactions.rs`
+
+- `report_interactions_list_empty_scaffold_returns_zero_interactions`
+- `report_interactions_list_and_show_page_visual_interactions_by_handle`
+- `report_interactions_show_accepts_endpoint_selector_and_rejects_bad_selectors`
+- `report_interactions_disable_dry_run_and_out_dir_upsert_no_filter`
+- `report_interactions_set_updates_existing_row_without_duplicates_and_supports_in_place`
+- `report_interactions_mutations_reject_unsafe_or_unproven_requests`
+- `report_bookmarks_list_empty_scaffold_returns_zero_bookmarks`
+- `report_bookmarks_list_and_show_raw_bookmarks_by_handle`
+- `report_bookmarks_show_rejects_missing_or_unknown_handle_with_suggested_list_command`
+- `report_bookmarks_list_reports_metadata_and_file_diagnostics`
+
 ## Shared-helper decisions
 
 - The local `RunOutput`, `run_powerbi`, `stdout_json`, and `stderr_json` variants were byte-identical in behavior to the existing exports in `tests/common/mod.rs`; the split binaries use the common versions and no renamed shadow variants were introduced.
@@ -173,5 +186,13 @@ Each entry records the post-commit gate: exact-name inventory, combined-family t
 - Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
 - Combined report-family run: 86 passed, 0 failed in 11.544s (ceiling 17.146s).
 - `cargo test --release --no-fail-fast`: all integration targets passed; the unit target encountered host-timing failures in `mcp::tests::child_guard_drop_terminates_the_owned_process_tree`, `mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock`, and `mcp::tests::graceful_root_exit_also_reaps_captured_descendants`. Each passed when rerun alone with `--exact`, so they were classified as the documented MCP child-process host flakes.
+- `cargo clippy --release --all-targets -- -D warnings`: passed.
+- `cargo fmt --all -- --check`: passed.
+
+### `25fe33b` — slicers
+
+- Exact-name inventory: 86 expected, 86 actual, 86 unique; 0 missing, added, or duplicated.
+- Combined report-family run: 86 passed, 0 failed in 10.197s (ceiling 17.146s).
+- `cargo test --release --no-fail-fast`: all integration targets passed; `mcp::tests::child_guard_drop_terminates_the_owned_process_tree` and `mcp::tests::fake_server_timeout_cancels_and_reaps_without_deadlock` hit the documented host-timing condition and each passed an exact isolated rerun.
 - `cargo clippy --release --all-targets -- -D warnings`: passed.
 - `cargo fmt --all -- --check`: passed.
