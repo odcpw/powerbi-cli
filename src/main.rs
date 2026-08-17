@@ -91,6 +91,7 @@ mod workflow;
 pub(crate) use cli_error::*;
 pub(crate) use cli_support::command_arg;
 pub(crate) use doctor::doctor_json;
+pub(crate) use inspect::inspect_command;
 
 use crate::pbir_bindings::{
     VisualBindingKind, VisualBindingResolved, resolved_binding_kind, visual_query_state_errors,
@@ -1787,68 +1788,6 @@ fn write_bytes(path: &Path, bytes: &[u8]) -> CliResult<()> {
             path.display(),
             tmp.display()
         ))
-    })
-}
-
-pub(crate) fn inspect_command(args: &[String]) -> CliResult<Value> {
-    let (path, deep) = parse_inspect_args(args)?;
-    let resolved = resolve_project(&path)?;
-    let report = validate_project(&resolved)?;
-    let mut output = json!({
-        "projectDir": canonical_display(&resolved.project_dir),
-        "pbip": canonical_display(&resolved.pbip_path),
-        "reportDir": canonical_display(&resolved.report_dir),
-        "semanticModelDir": canonical_display(&resolved.semantic_model_dir),
-        "valid": report.errors.is_empty(),
-        "counts": {
-            "jsonFilesChecked": report.json_files_checked,
-            "pages": report.pages,
-            "visuals": report.visuals,
-            "boundVisuals": report.bound_visuals,
-            "tables": report.tables,
-            "measures": report.measures,
-            "relationships": report.relationships
-        },
-        "warnings": report.warnings,
-        "errors": report.errors
-    });
-    if deep {
-        output["deep"] = inspect::deep_inspect(&resolved, &report)?;
-    }
-    Ok(output)
-}
-
-fn parse_inspect_args(args: &[String]) -> CliResult<(PathBuf, bool)> {
-    let mut path = None;
-    let mut deep = false;
-    for arg in args {
-        match arg.as_str() {
-            "--deep" => deep = true,
-            other if other.starts_with('-') => {
-                return Err(
-                    CliError::invalid_args(format!("unknown inspect flag: {other}"))
-                        .with_hint("Run `powerbi-cli inspect --deep <project-dir-or.pbip> --json`.")
-                        .with_suggested_command(
-                            "powerbi-cli inspect --deep <project-dir-or.pbip> --json",
-                        ),
-                );
-            }
-            other => {
-                if path.is_some() {
-                    return Err(CliError::invalid_args("inspect accepts exactly one path")
-                        .with_hint("Run `powerbi-cli inspect <project-dir-or.pbip> --json`.")
-                        .with_suggested_command(
-                            "powerbi-cli inspect <project-dir-or.pbip> --json",
-                        ));
-                }
-                path = Some(PathBuf::from(other));
-            }
-        }
-    }
-    path.map(|path| (path, deep)).ok_or_else(|| {
-        CliError::invalid_args("inspect requires a path")
-            .with_hint("Run `powerbi-cli inspect <project-dir-or.pbip> --json`.")
-            .with_suggested_command("powerbi-cli inspect <project-dir-or.pbip> --json")
     })
 }
 
