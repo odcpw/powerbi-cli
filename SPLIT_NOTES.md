@@ -93,6 +93,20 @@ Gate evidence is appended to this section after each family extraction.
   All six focused payloads also matched their baseline byte lengths and
   SHA-256 values.
 
+### `integrations`
+
+- Moved the four contiguous optional-tooling descriptors (`integrations
+  status`, `integrations install`, `skill status`, and `skill install`) to
+  `src/contract/integrations.rs`. The façade inserts the returned vector at
+  the original position between `workflow verify` and `desktop open`.
+- Post-commit gate: pass. Exact baseline test vector (24 suites, 438 passed,
+  0 failed, 4 ignored); clippy and fmt passed; clean release build 123.138 s
+  (43.0% of baseline, no regression); full capabilities remained 244,512
+  bytes with SHA-256
+  `27b2564e0f382ced6598fea3cd3bfbeb000e961b341d3de6bdfe245c34de8fa9`.
+  All six focused payloads also matched their baseline byte lengths and
+  SHA-256 values.
+
 ## Refuted seams
 
 None.
