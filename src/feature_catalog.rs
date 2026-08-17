@@ -636,6 +636,8 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report visuals add",
             "report visuals set-position",
             "report visuals set-bindings",
+            "report visuals set-object",
+            "report visuals set-display-name",
             "report visuals delete",
         ],
         refusal_code: None,

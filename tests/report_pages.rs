@@ -553,6 +553,8 @@ fn capabilities_advertise_report_layout_commands() {
     assert!(paths.contains(&"report visuals set-position"));
     assert!(paths.contains(&"report visuals set-bindings"));
     assert!(paths.contains(&"report visuals set-topn-guard"));
+    assert!(paths.contains(&"report visuals set-object"));
+    assert!(paths.contains(&"report visuals set-display-name"));
     let set_position = value["commands"]
         .as_array()
         .expect("commands")
@@ -1201,6 +1203,42 @@ fn capabilities_advertise_report_layout_commands() {
             "missing set-topn-guard flag {expected_flag}"
         );
     }
+    let set_object = value["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["path"] == "report visuals set-object")
+        .expect("set-object command");
+    assert_eq!(set_object["mutates"], Value::Bool(true));
+    assert_eq!(
+        set_object["outputSchema"],
+        Value::from("powerbi-cli.report.visuals.objectMutation.v1")
+    );
+    assert!(
+        set_object["flags"]
+            .as_array()
+            .expect("flags")
+            .iter()
+            .any(|flag| flag == "--object <name>")
+    );
+    let set_display_name = value["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["path"] == "report visuals set-display-name")
+        .expect("set-display-name command");
+    assert_eq!(set_display_name["mutates"], Value::Bool(true));
+    assert_eq!(
+        set_display_name["outputSchema"],
+        Value::from("powerbi-cli.report.visuals.displayNameMutation.v1")
+    );
+    assert!(
+        set_display_name["flags"]
+            .as_array()
+            .expect("flags")
+            .iter()
+            .any(|flag| flag == "--role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips>")
+    );
     let apply_theme = value["commands"]
         .as_array()
         .expect("commands")

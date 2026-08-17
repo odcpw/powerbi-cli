@@ -18,6 +18,7 @@ use crate::report_visual_clone::clone_visual;
 use crate::report_visual_delete::delete_visual;
 use crate::report_visual_formatting::formatting_command;
 use crate::report_visual_mutations::{add_visual, validate_binding_cardinality};
+use crate::report_visual_objects::{set_display_name, set_object};
 use crate::tmdl::load_table_documents;
 use crate::visual_catalog::visual_catalog_command;
 use crate::{
@@ -30,7 +31,7 @@ use std::path::PathBuf;
 pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "report visuals requires a subcommand: list, show, catalog, formatting, add, clone, delete, set-position, set-bindings, set-topn-guard",
+            "report visuals requires a subcommand: list, show, catalog, formatting, add, clone, delete, set-position, set-bindings, set-topn-guard, set-object, set-display-name",
         )
         .with_hint("Run `powerbi-cli report visuals list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -49,6 +50,8 @@ pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
         "set-position" | "setPosition" => set_position(rest),
         "set-bindings" | "setBindings" | "bind" => set_bindings(rest),
         "set-topn-guard" | "setTopnGuard" | "set-top-n-guard" => set_topn_guard(rest),
+        "set-object" | "setObject" => set_object(rest),
+        "set-display-name" | "setDisplayName" | "display-name" => set_display_name(rest),
         _ => Err(CliError::invalid_args(format!(
             "unknown report visuals command: {action}"
         ))

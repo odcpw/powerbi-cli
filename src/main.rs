@@ -80,6 +80,7 @@ mod report_visual_formatting_bundle;
 mod report_visual_formatting_color;
 mod report_visual_formatting_text;
 mod report_visual_mutations;
+mod report_visual_objects;
 mod report_visuals;
 mod safety_scan;
 mod scaffold;
