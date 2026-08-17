@@ -1162,5 +1162,40 @@ pub(super) fn commands() -> Vec<Value> {
             "limitations": ["Scatter X/Y/Size and hundredPercentStackedColumnChart Y columns are emitted as explicit Function 0 Sum aggregations; other raw measure/value-role columns remain refused.", "scatterChart rejects Details and directs callers to Category.", "Repeated use of one model field returns unsupported_feature pending Desktop-authored duplicate queryRef numbering.", "Explicit sort accepts one projected measure with Descending direction only."],
             "followUpFields": ["dryRun", "bindingPlan.before", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
+        json!({
+            "path": "report visuals set-object",
+            "usage": "powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw> (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Set one curated PBIR visual object property (labels, categoryLabels, categoryAxis, valueAxis, or title) using Desktop literal encoding",
+            "tags": ["pbir", "report", "visual", "formatting", "objects", "labels", "axis", "title", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.visuals.objectMutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--object <name>", "--property <name>", "--value <raw>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object title --property text --value \"Rate zuletzt (BU je 1'000 FTE)\" --in-place --json"],
+            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature."],
+            "followUpFields": ["dryRun", "mode", "target.handle", "plan.object", "plan.property", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
+        }),
+        json!({
+            "path": "report visuals set-display-name",
+            "aliases": ["report visuals display-name"],
+            "usage": "powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> [--index <n>] (--display-name <text> | --clear) (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Set or clear displayName on one existing visual queryState projection",
+            "tags": ["pbir", "report", "visual", "binding", "displayName", "queryState", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.visuals.displayNameMutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips>", "--index <n>", "--display-name <text>", "--clear", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli report visuals set-display-name --project build/sales --handle <visual-handle> --role Values --display-name \"Rate zuletzt (BU je 1'000 FTE)\" --dry-run --json", "powerbi-cli report visuals set-display-name --project build/sales --handle <visual-handle> --role Values --clear --in-place --json"],
+            "limitations": ["Targets an existing queryState.<Role>.projections[<index>] entry. Missing roles or out-of-range indexes return invalid_args and list the roles actually present on the visual."],
+            "followUpFields": ["dryRun", "mode", "target.handle", "plan.role", "plan.index", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
+        }),
     ]
 }

@@ -1389,6 +1389,44 @@ fn everything_acceptance_invokes_every_catalog_command() {
         ]),
     );
     h.ok(
+        "report visuals set-object",
+        &svec([
+            "report",
+            "visuals",
+            "set-object",
+            "--project",
+            &project_arg,
+            "--handle",
+            &total_incidents,
+            "--object",
+            "categoryLabels",
+            "--property",
+            "fontSize",
+            "--value",
+            "20",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "report visuals set-display-name",
+        &svec([
+            "report",
+            "visuals",
+            "set-display-name",
+            "--project",
+            &project_arg,
+            "--handle",
+            &total_incidents,
+            "--role",
+            "Values",
+            "--display-name",
+            "Total Incidents (display)",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
         "report drilldown set-hierarchy",
         &svec([
             "report",
