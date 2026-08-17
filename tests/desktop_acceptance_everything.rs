@@ -1638,6 +1638,95 @@ fn everything_acceptance_invokes_every_catalog_command() {
         .as_str()
         .expect("added visual")
         .to_string();
+    h.ok(
+        "report visuals add-card",
+        &svec([
+            "report",
+            "visuals",
+            "add-card",
+            "--project",
+            &project_arg,
+            "--page",
+            &overview,
+            "--measure",
+            "FactIncidents.Total Cost",
+            "--title",
+            "Scaffold KPI",
+            "--x",
+            "900",
+            "--y",
+            "32",
+            "--width",
+            "200",
+            "--height",
+            "112",
+            "--value-font-size",
+            "20",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "report visuals add-slicer",
+        &svec([
+            "report",
+            "visuals",
+            "add-slicer",
+            "--project",
+            &project_arg,
+            "--page",
+            &overview,
+            "--field",
+            "DimBranch.Branch",
+            "--title",
+            "Scaffold Slicer",
+            "--x",
+            "900",
+            "--y",
+            "160",
+            "--width",
+            "200",
+            "--height",
+            "80",
+            "--mode",
+            "Dropdown",
+            "--single-select",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    let guide = h.root.join("scaffold-guide.txt");
+    fs::write(
+        &guide,
+        "First paragraph\nSecond paragraph\nThird paragraph\n",
+    )
+    .expect("write scaffold guide");
+    h.ok(
+        "report visuals add-textbox",
+        &svec([
+            "report",
+            "visuals",
+            "add-textbox",
+            "--project",
+            &project_arg,
+            "--page",
+            &overview,
+            "--title",
+            "Scaffold Guide",
+            "--paragraphs-file",
+            &p(&guide),
+            "--x",
+            "900",
+            "--y",
+            "548",
+            "--width",
+            "340",
+            "--height",
+            "140",
+            "--in-place",
+            "--json",
+        ]),
+    );
     let cloned = h.ok(
         "report visuals clone",
         &svec([
