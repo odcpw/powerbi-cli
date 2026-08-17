@@ -10,7 +10,9 @@ use std::io;
 use std::time::Duration;
 
 #[cfg(windows)]
-use super::{Timed, Watchdog, ensure_powershell_success, parse_powershell_json, run_powershell};
+use super::launch::{
+    Timed, Watchdog, ensure_powershell_success, parse_powershell_json, run_powershell,
+};
 
 #[cfg(windows)]
 pub(super) const WINDOW_POLL_INTERVAL_MS: u64 = 250;

@@ -13,7 +13,7 @@ use std::io;
 use std::time::Duration;
 
 #[cfg(windows)]
-use super::{Timed, ensure_powershell_success, parse_powershell_json, run_powershell};
+use super::launch::{Timed, ensure_powershell_success, parse_powershell_json, run_powershell};
 
 #[cfg(windows)]
 pub(crate) const CLEANUP_TIMEOUT_MS: u64 = 15_000;
@@ -366,7 +366,7 @@ pub(super) fn render_cleanup_script(
         )
         .replace(
             "__ASSOCIATION_CREATION_TIME_UTC__",
-            &super::powershell_single_quoted(
+            &super::launch::powershell_single_quoted(
                 association_identity
                     .map(|identity| identity.creation_time_utc.as_str())
                     .unwrap_or_default(),
@@ -381,7 +381,7 @@ pub(super) fn render_cleanup_script(
         )
         .replace(
             "__OBSERVED_CREATION_TIME_UTC__",
-            &super::powershell_single_quoted(
+            &super::launch::powershell_single_quoted(
                 observed_identity
                     .map(|identity| identity.creation_time_utc.as_str())
                     .unwrap_or_default(),
@@ -444,8 +444,10 @@ mod tests {
         render_process_identity_script,
     };
     use crate::desktop::evidence::render_screenshot_script;
+    use crate::desktop::launch::{
+        powershell_single_quoted, render_launch_script, render_version_script,
+    };
     use crate::desktop::observe::{render_process_snapshot_script, render_window_query_script};
-    use crate::desktop::{powershell_single_quoted, render_launch_script, render_version_script};
     use serde_json::json;
 
     fn process_identity(process_id: u32, creation_time_utc: &str) -> ProcessIdentity {

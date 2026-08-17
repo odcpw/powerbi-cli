@@ -24,7 +24,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 #[cfg(windows)]
-use super::{Timed, run_powershell};
+use super::launch::{Timed, run_powershell};
 
 // Budget covers foreground activation plus a canvas settle delay before the capture itself.
 #[cfg(windows)]
@@ -244,7 +244,7 @@ pub(super) fn capture_primary_display(
     }
     let temp = unique_screenshot_sibling(out, "capture")?;
     let script = render_screenshot_script(
-        &super::desktop_argument_path(&temp),
+        &super::launch::desktop_argument_path(&temp),
         foreground_pid,
         SCREENSHOT_SETTLE_MS,
         allow_unverified_capture,
@@ -255,20 +255,21 @@ pub(super) fn capture_primary_display(
     )?;
     match capture {
         Timed::Completed(output) => {
-            if let Err(err) =
-                super::ensure_powershell_success(&output, "primary-display screenshot capture")
-            {
+            if let Err(err) = super::launch::ensure_powershell_success(
+                &output,
+                "primary-display screenshot capture",
+            ) {
                 remove_file_if_present(&temp);
                 return Err(err);
             }
-            let result: ScreenshotCaptureResult = match super::parse_powershell_json(&output.stdout)
-            {
-                Ok(result) => result,
-                Err(err) => {
-                    remove_file_if_present(&temp);
-                    return Err(err);
-                }
-            };
+            let result: ScreenshotCaptureResult =
+                match super::launch::parse_powershell_json(&output.stdout) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        remove_file_if_present(&temp);
+                        return Err(err);
+                    }
+                };
             if !capture_is_authorized(&result, allow_unverified_capture) {
                 remove_file_if_present(&temp);
                 return Ok(Timed::Completed(
@@ -418,7 +419,10 @@ pub(super) fn render_screenshot_script(
     allow_unverified_capture: bool,
 ) -> String {
     SCREENSHOT_SCRIPT
-        .replace("__OUT_PATH__", &super::powershell_single_quoted(out_path))
+        .replace(
+            "__OUT_PATH__",
+            &super::launch::powershell_single_quoted(out_path),
+        )
         .replace(
             "__FOREGROUND_PID__",
             &foreground_pid.unwrap_or_default().to_string(),
