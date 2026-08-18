@@ -119,6 +119,32 @@ page-derivation job (identity regeneration, filter renames, zero warnings)
 and `model dax execute` against the live Desktop session turned a
 blank-visual mystery into a one-query diagnosis (the text-typed column).
 
+## Rounds 4–6 field results (2026-08-17/18)
+
+The six commands built in the round-3 campaign all saw real use within a
+day: `add-textbox` authored a live reading-guide, `set-topn-guard` retuned
+guards, `pages clone` derived three more pages, `add-static` built two
+lookup tables, and the `m.untyped_expansion` lint caught a real latent bug
+in the shipped report on its FIRST run (the size-filter column). New
+Desktop-proven PBIR idioms that the CLI does not yet author and should
+learn (candidate `set-object` catalog extensions or new commands):
+
+1. `visual.query.sortDefinition` (`{sort:[{field,direction}],isDefaultSort}`)
+   — default descending sorts on tables/matrices; hand-patched on 8 visuals.
+2. `objects.dataPoint` with `selector.data[].scopeId.Comparison` on a series
+   column value — pinning legend colors per category (quadrant semantics);
+   Power BI otherwise deals colors by legend order.
+3. `objects.categoryAxis/valueAxis` `start`/`end` fixed ranges plus
+   `objects.plotArea.image` with a `ResourcePackageItem` URL, and the
+   report.json `resourcePackages` item `type: "Image"` registration — the
+   full offline background-map recipe (axis bounds must equal the image's
+   drawn bounds for alignment by construction).
+4. `objects.bubbles.bubbleSize` (`-50L`-style percent literal) on scatter.
+5. M anti-lesson for a future lint: duplicate let-step names across edit
+   rounds surface in Desktop as a spurious-looking "cyclic reference"
+   refresh error — a `m.duplicate_step_name` ERROR rule would catch what
+   took a full Desktop round-trip to diagnose.
+
 ## Patterns to promote into documentation
 
 - **Guard-filter pattern** for large-cardinality visuals: a cheap ranking
