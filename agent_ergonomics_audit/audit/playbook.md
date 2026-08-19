@@ -45,3 +45,16 @@ Applied via two parallel Grok executors (wo-help: R-201+R-203;
 wo-triage: R-202+R-204..207), merged on main, re-scored, fresh-eyes,
 regression-tested. Deferred (unchanged from Pass 1): transactional mutation
 manifests, DAX assertion suites, automated canvas-refresh proof.
+
+## Pass 2 closure (2026-08-19)
+
+All seven recommendations landed on main: catalog-rendered `--help`/`-h`/`help` at every
+dispatch level plus did-you-mean enrichment (35187a0); `triage` mega-command with
+`triageResult.v1`, state-aware `next[]`, and hard-parse-failure absorption (580ad7c,
+687f51c); lint `stepKind` classification silencing `m.unbuffered_reuse` on non-table
+steps; `version`/`capabilities` build identity (gitSha + buildEpoch); `guid` utility for
+lineageTag authoring; `--enable-oracle` flag. Gates: full suite green (34 binaries),
+clippy -D warnings clean, live probe battery on the merged binary confirmed every
+surface including corrupt-project triage (exit 10, ok:false, prose-free next[]).
+Re-score ceremony intentionally skipped per operator scope cut — the uplift evidence is
+the probe battery plus these commits.
