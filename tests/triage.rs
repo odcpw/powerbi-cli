@@ -25,7 +25,10 @@ fn triage_is_ok_and_byte_deterministic_on_clean_project() {
     );
 
     let second = run_powerbi(&["triage", project_arg, "--json"]);
-    assert_eq!(first.stdout, second.stdout, "triage output must be byte-deterministic");
+    assert_eq!(
+        first.stdout, second.stdout,
+        "triage output must be byte-deterministic"
+    );
 }
 
 #[test]

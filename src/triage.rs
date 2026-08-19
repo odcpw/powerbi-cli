@@ -10,8 +10,30 @@ use std::path::PathBuf;
 pub(crate) fn triage_command(args: &[String]) -> CliResult<Value> {
     let path = parse_triage_args(args)?;
     let resolved = resolve_project(&path)?;
-    let validation = validate_project(&resolved)?;
-    let mut lint = lint_project(&resolved, &validation)?;
+    let validation = match validate_project(&resolved) {
+        Ok(report) => report,
+        // A project too broken to parse still deserves a triage document: fold the
+        // hard failure into the validation errors instead of aborting the readback.
+        Err(error) if error.exit_code == EXIT_VALIDATION_FAILED => ValidationReport {
+            errors: vec![error.message],
+            warnings: Vec::new(),
+            json_files_checked: 0,
+            pages: 0,
+            visuals: 0,
+            bound_visuals: 0,
+            tables: 0,
+            measures: 0,
+            relationships: 0,
+        },
+        Err(error) => return Err(error),
+    };
+    let mut lint = match lint_project(&resolved, &validation) {
+        Ok(lint) => lint,
+        Err(_) if !validation.errors.is_empty() => {
+            json!({ "ok": false, "counts": { "findings": 0 }, "findings": [] })
+        }
+        Err(error) => return Err(error),
+    };
     if let Some(findings) = lint.get_mut("findings").and_then(Value::as_array_mut) {
         sort_findings(findings);
     }
