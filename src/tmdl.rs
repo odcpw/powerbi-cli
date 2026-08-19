@@ -10,6 +10,7 @@ pub(crate) struct MeasureRecord {
     pub(crate) expression: String,
     pub(crate) lineage_tag: Option<String>,
     pub(crate) format_string: Option<String>,
+    pub(crate) format_string_definition: Option<String>,
     pub(crate) display_folder: Option<String>,
     pub(crate) description: Option<String>,
     pub(crate) is_hidden: bool,
@@ -131,6 +132,7 @@ pub(crate) struct MeasureDefinition {
     pub(crate) expression: String,
     pub(crate) lineage_tag: Option<String>,
     pub(crate) format_string: Option<String>,
+    pub(crate) format_string_definition: Option<String>,
     pub(crate) display_folder: Option<String>,
     pub(crate) description: Option<String>,
     pub(crate) is_hidden: bool,
@@ -1017,6 +1019,7 @@ fn parse_measure_block(
 
     let mut lineage_tag = None;
     let mut format_string = None;
+    let mut format_string_definition = None;
     let mut display_folder = None;
     let mut description = leading_description;
     let mut is_hidden = false;
@@ -1024,6 +1027,17 @@ fn parse_measure_block(
         let trimmed = line.trim_start();
         if tmdl_indent_width(line) == 8 && trimmed.trim() == "isHidden" {
             is_hidden = true;
+            continue;
+        }
+        // Dynamic format strings use `=` like an expression, so this must run
+        // before the `key: value` split — the DAX may itself contain colons.
+        // Only the single-line form is extracted; multi-line definitions stay
+        // in the raw block and keep the fail-closed lossy-update guard.
+        if let Some(rest) = trimmed.strip_prefix("formatStringDefinition")
+            && let Some(value) = rest.trim_start().strip_prefix('=')
+            && !value.trim().is_empty()
+        {
+            format_string_definition = Some(value.trim().to_string());
             continue;
         }
         if let Some((key, value)) = trimmed.split_once(':') {
@@ -1059,6 +1073,7 @@ fn parse_measure_block(
         expression: expression_lines.join("\n").trim().to_string(),
         lineage_tag,
         format_string,
+        format_string_definition,
         display_folder,
         description,
         is_hidden,
@@ -1197,6 +1212,12 @@ pub(crate) fn measure_block_lines(table: &str, definition: &MeasureDefinition) -
             tmdl_string_literal(format_string)
         ));
     }
+    if let Some(format_string_definition) = &definition.format_string_definition {
+        lines.push(format!(
+            "        formatStringDefinition = {}",
+            format_string_definition.trim()
+        ));
+    }
     if let Some(display_folder) = &definition.display_folder {
         lines.push(format!(
             "        displayFolder: {}",
@@ -1268,6 +1289,7 @@ fn unsupported_measure_line(record: &MeasureRecord) -> Option<String> {
         &record.block,
         &["lineageTag", "formatString", "displayFolder", "description"],
         &["isHidden"],
+        &["formatStringDefinition"],
     )
 }
 
@@ -1284,6 +1306,7 @@ fn unsupported_calculated_column_line(record: &ColumnRecord) -> Option<String> {
             "description",
         ],
         &["isHidden"],
+        &[],
     )
 }
 
@@ -1291,6 +1314,7 @@ fn unsupported_expression_object_line(
     block: &str,
     allowed_properties: &[&str],
     allowed_flags: &[&str],
+    allowed_expression_properties: &[&str],
 ) -> Option<String> {
     let mut seen_property = false;
     let mut seen_object_declaration = false;
@@ -1307,6 +1331,20 @@ fn unsupported_expression_object_line(
             continue;
         }
         if allowed_flags.contains(&trimmed) {
+            seen_property = true;
+            continue;
+        }
+        // `name = <expr>` properties are matched before the `key: value` split
+        // because their expression may itself contain colons. Only the
+        // single-line form is preserved by the writer, so an empty remainder
+        // (the multi-line form) stays unsupported and fail-closed.
+        if allowed_expression_properties.iter().any(|prefix| {
+            trimmed.strip_prefix(prefix).is_some_and(|rest| {
+                rest.trim_start()
+                    .strip_prefix('=')
+                    .is_some_and(|value| !value.trim().is_empty())
+            })
+        }) {
             seen_property = true;
             continue;
         }

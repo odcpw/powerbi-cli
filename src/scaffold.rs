@@ -883,6 +883,7 @@ fn table_tmdl(table: &TableSpec) -> CliResult<String> {
 
     for measure in &table.measures {
         let definition = tmdl::MeasureDefinition {
+            format_string_definition: None,
             name: measure.name.clone(),
             expression: measure.expression.clone(),
             lineage_tag: Some(stable_guid(&format!(

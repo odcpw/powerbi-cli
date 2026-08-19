@@ -78,6 +78,7 @@ struct MutationOptions {
     selector: MeasureSelector,
     expression: Option<String>,
     format_string: Option<String>,
+    format_string_definition: Option<String>,
     display_folder: Option<String>,
     description: Option<String>,
     mode: Option<MutationMode>,
@@ -272,6 +273,7 @@ fn build_mutation_plan(
                 expression: options.expression.clone().expect("validated expression"),
                 lineage_tag: None,
                 format_string: options.format_string.clone(),
+                format_string_definition: options.format_string_definition.clone(),
                 display_folder: options.display_folder.clone(),
                 description: options.description.clone(),
                 is_hidden: false,
@@ -280,6 +282,21 @@ fn build_mutation_plan(
         }
         Action::Update => {
             let existing = find_measure(docs, &options.selector)?;
+            // Static and dynamic format strings are mutually exclusive in
+            // Desktop's canonical output: setting one clears the other, and
+            // passing neither preserves whichever the measure already has.
+            let (format_string, format_string_definition) = match (
+                options.format_string.clone(),
+                options.format_string_definition.clone(),
+            ) {
+                (Some(format_string), None) => (Some(format_string), None),
+                (None, Some(definition)) => (None, Some(definition)),
+                (None, None) => (
+                    existing.format_string.clone(),
+                    existing.format_string_definition.clone(),
+                ),
+                (Some(_), Some(_)) => unreachable!("rejected by parse_mutation_args"),
+            };
             let definition = MeasureDefinition {
                 name: existing.name.clone(),
                 expression: options
@@ -287,10 +304,8 @@ fn build_mutation_plan(
                     .clone()
                     .unwrap_or_else(|| existing.expression.clone()),
                 lineage_tag: existing.lineage_tag.clone(),
-                format_string: options
-                    .format_string
-                    .clone()
-                    .or_else(|| existing.format_string.clone()),
+                format_string,
+                format_string_definition,
                 display_folder: options
                     .display_folder
                     .clone()
@@ -401,6 +416,18 @@ fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOpt
             "--format-string" => {
                 options.format_string = Some(take_value(args, &mut i, "--format-string")?);
             }
+            "--format-string-definition" => {
+                let value = take_value(args, &mut i, "--format-string-definition")?;
+                if value.contains('\n') || value.contains('\r') {
+                    return Err(CliError::invalid_args(
+                        "--format-string-definition supports single-line DAX only",
+                    )
+                    .with_hint(
+                        "Collapse the SWITCH onto one line; multi-line dynamic format strings remain Desktop-authored.",
+                    ));
+                }
+                options.format_string_definition = Some(value);
+            }
             "--display-folder" => {
                 options.display_folder = Some(take_value(args, &mut i, "--display-folder")?);
             }
@@ -469,9 +496,18 @@ fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOpt
     if matches!(action, Action::Update | Action::Delete) {
         require_selector(&options.selector, action.as_str())?;
     }
+    if options.format_string.is_some() && options.format_string_definition.is_some() {
+        return Err(CliError::invalid_args(
+            "--format-string and --format-string-definition are mutually exclusive",
+        )
+        .with_hint(
+            "A measure carries either a static formatString or a dynamic formatStringDefinition, never both.",
+        ));
+    }
     if matches!(action, Action::Update)
         && options.expression.is_none()
         && options.format_string.is_none()
+        && options.format_string_definition.is_none()
         && options.display_folder.is_none()
         && options.description.is_none()
     {
@@ -510,6 +546,7 @@ fn measure_json(measure: &MeasureRecord) -> Value {
         "properties": {
             "lineageTag": measure.lineage_tag,
             "formatString": measure.format_string,
+            "formatStringDefinition": measure.format_string_definition,
             "displayFolder": measure.display_folder,
             "description": measure.description
         },

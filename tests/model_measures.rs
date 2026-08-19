@@ -832,3 +832,135 @@ fn measure_mutations_reject_confirm_on_add() {
             .contains("--confirm is only valid for model measures delete")
     );
 }
+
+#[test]
+fn model_measures_dynamic_format_string_round_trip() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let out = project.to_str().expect("project path");
+    let table_path = fact_sales_tmdl(&project);
+    let definition_dax =
+        "SWITCH(SELECTEDVALUE('DimRegion'[Region], \"Amount\"), \"Ratio\", \"0.00%\", \"#,0\")";
+
+    let add = run_powerbi(&[
+        "model",
+        "measures",
+        "add",
+        "--project",
+        out,
+        "--table",
+        "FactSales",
+        "--name",
+        "Amount Display",
+        "--expression",
+        "SUM(FactSales[Revenue])",
+        "--format-string-definition",
+        definition_dax,
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+    let text = fs::read_to_string(&table_path).expect("FactSales.tmdl");
+    assert!(
+        text.contains(&format!("formatStringDefinition = {definition_dax}")),
+        "tmdl: {text}"
+    );
+
+    let show = run_powerbi(&[
+        "model",
+        "measures",
+        "show",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Amount Display",
+        "--json",
+    ]);
+    assert_eq!(show.code, 0, "stderr: {}", show.stderr);
+    let shown = stdout_json(&show);
+    assert_eq!(
+        shown["measure"]["properties"]["formatStringDefinition"],
+        Value::from(definition_dax)
+    );
+    // The definition is a property, never part of the DAX body.
+    assert_eq!(
+        shown["measure"]["expression"],
+        Value::from("SUM(FactSales[Revenue])")
+    );
+
+    // An unrelated expression update preserves the dynamic format string.
+    let update = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Amount Display",
+        "--expression",
+        "SUMX(FactSales, FactSales[Revenue])",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(update.code, 0, "stderr: {}", update.stderr);
+    let text = fs::read_to_string(&table_path).expect("FactSales.tmdl after update");
+    assert!(
+        text.contains(&format!("formatStringDefinition = {definition_dax}")),
+        "tmdl: {text}"
+    );
+
+    // Setting a static format string clears the dynamic definition.
+    let to_static = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Amount Display",
+        "--format-string",
+        "#,0",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(to_static.code, 0, "stderr: {}", to_static.stderr);
+    let text = fs::read_to_string(&table_path).expect("FactSales.tmdl after static");
+    assert!(!text.contains("formatStringDefinition"), "tmdl: {text}");
+    assert!(text.contains("formatString: \"#,0\""), "tmdl: {text}");
+
+    let both = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Amount Display",
+        "--format-string",
+        "#,0",
+        "--format-string-definition",
+        definition_dax,
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(both.code, 2, "stderr: {}", both.stderr);
+    assert_eq!(
+        stderr_json(&both)["error"]["code"],
+        Value::from("invalid_args")
+    );
+
+    let multiline = run_powerbi(&[
+        "model",
+        "measures",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        "measure:FactSales:Amount Display",
+        "--format-string-definition",
+        "SWITCH(\n  TRUE(), \"#,0\"\n)",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(multiline.code, 2, "stderr: {}", multiline.stderr);
+}

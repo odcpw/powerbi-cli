@@ -146,7 +146,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "model measures add",
-            "usage": "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> (--expression <dax> | --expression-file <path|->) [--format-string <fmt>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "usage": "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> (--expression <dax> | --expression-file <path|->) [--format-string <fmt> | --format-string-definition <dax>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Add a DAX measure from inline text or a UTF-8 expression file to a TMDL table with guarded output semantics",
             "tags": ["tmdl", "semantic-model", "measure", "dax", "mutation", "agent"],
             "readOnly": false,
@@ -156,14 +156,14 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "modelMeasuresMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--name <measure>", "--expression <dax>", "--expression-file <path|->", "--format-string <fmt>", "--display-folder <folder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--name <measure>", "--expression <dax>", "--expression-file <path|->", "--format-string <fmt>", "--format-string-definition <dax>", "--display-folder <folder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli model measures add --project build/sales --table FactSales --name 'Average Revenue' --expression 'DIVIDE([Total Revenue], [Total Units])' --dry-run --json"],
             "limitations": ["--expression and --expression-file are mutually exclusive; expression files are UTF-8 and trailing CR/LF bytes are trimmed."],
             "followUpFields": ["dryRun", "projectModified", "rollback.performed", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "model measures update",
-            "usage": "powerbi-cli model measures update --project <project-dir-or.pbip> (--handle <measure-handle> | --table <table> --name <measure>) [--expression <dax> | --expression-file <path|->] [--format-string <fmt>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "usage": "powerbi-cli model measures update --project <project-dir-or.pbip> (--handle <measure-handle> | --table <table> --name <measure>) [--expression <dax> | --expression-file <path|->] [--format-string <fmt> | --format-string-definition <dax>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Update a DAX measure from inline text or a UTF-8 expression file; refuses unsupported Desktop-authored TMDL lines",
             "tags": ["tmdl", "semantic-model", "measure", "dax", "mutation", "agent"],
             "readOnly": false,
@@ -173,9 +173,9 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "modelMeasuresMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <measure-handle>", "--table <table>", "--name <measure>", "--expression <dax>", "--expression-file <path|->", "--format-string <fmt>", "--display-folder <folder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--handle <measure-handle>", "--table <table>", "--name <measure>", "--expression <dax>", "--expression-file <path|->", "--format-string <fmt>", "--format-string-definition <dax>", "--display-folder <folder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli model measures update --project build/sales --handle 'measure:FactSales:Total Revenue' --expression 'SUM(''FactSales''[Revenue])' --dry-run --json"],
-            "limitations": ["--expression and --expression-file are mutually exclusive; expression files are UTF-8 and trailing CR/LF bytes are trimmed."],
+            "limitations": ["--expression and --expression-file are mutually exclusive; expression files are UTF-8 and trailing CR/LF bytes are trimmed.", "--format-string and --format-string-definition are mutually exclusive; setting one clears the other. Dynamic format strings are single-line DAX."],
             "followUpFields": ["dryRun", "projectModified", "rollback.performed", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({

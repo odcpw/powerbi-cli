@@ -82,6 +82,7 @@ struct MeasureSummary {
     name: String,
     expression: String,
     format_string: Option<String>,
+    format_string_definition: Option<String>,
     display_folder: Option<String>,
     description: Option<String>,
 }
@@ -284,7 +285,7 @@ fn diff_measure_maps(
                     "handle": right.handle,
                     "table": right.table,
                     "name": right.name,
-                    "fieldsChanged": ["expression", "properties.formatString", "properties.displayFolder", "properties.description"],
+                    "fieldsChanged": ["expression", "properties.formatString", "properties.formatStringDefinition", "properties.displayFolder", "properties.description"],
                     "before": Value::Null,
                     "after": measure_json(right)
                 }));
@@ -430,6 +431,9 @@ fn modified_measure_change(before: &MeasureSummary, after: &MeasureSummary) -> V
     if before.format_string != after.format_string {
         fields.push("properties.formatString");
     }
+    if before.format_string_definition != after.format_string_definition {
+        fields.push("properties.formatStringDefinition");
+    }
     if before.display_folder != after.display_folder {
         fields.push("properties.displayFolder");
     }
@@ -572,6 +576,7 @@ fn measure_summary(measure: &MeasureRecord) -> MeasureSummary {
         name: measure.name.clone(),
         expression: measure.expression.clone(),
         format_string: measure.format_string.clone(),
+        format_string_definition: measure.format_string_definition.clone(),
         display_folder: measure.display_folder.clone(),
         description: measure.description.clone(),
     }
@@ -615,6 +620,7 @@ fn measure_json(measure: &MeasureSummary) -> Value {
         "expression": measure.expression,
         "properties": {
             "formatString": measure.format_string,
+            "formatStringDefinition": measure.format_string_definition,
             "displayFolder": measure.display_folder,
             "description": measure.description
         }

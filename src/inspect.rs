@@ -191,6 +191,7 @@ fn inspect_table_tmdl(path: &Path, handles: &mut Vec<Value>) -> CliResult<Value>
                 "properties": {
                     "lineageTag": measure.lineage_tag,
                     "formatString": measure.format_string,
+                    "formatStringDefinition": measure.format_string_definition,
                     "displayFolder": measure.display_folder,
                     "description": measure.description
                 },
