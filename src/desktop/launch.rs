@@ -20,9 +20,9 @@ use crate::{
     EXIT_VALIDATION_FAILED, ValidationReport, command_arg, validate_project,
 };
 use serde_json::Value;
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 use serde_json::json;
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 use std::io;
 use std::path::{Path, PathBuf};
 #[cfg(windows)]
@@ -139,6 +139,7 @@ impl PreflightMode {
         }
     }
 
+    #[cfg(windows)]
     fn as_str(self) -> &'static str {
         match self {
             Self::Strict => "strict",
@@ -209,7 +210,7 @@ use super::evidence::{
     SCREENSHOT_CAPTURE_TIMEOUT_MS, ScreenshotCaptureOutcome, ScreenshotDimensions,
     capture_primary_display, validate_screenshot_output,
 };
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 use super::evidence::{screenshot_changes, screenshot_observation_is_eligible};
 
 pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {

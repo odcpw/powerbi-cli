@@ -1,9 +1,10 @@
 //! Ownership verification and guarded cleanup for CLI-launched Desktop processes.
 
+#[cfg(windows)]
 use crate::{CliError, CliResult};
 #[cfg(any(windows, test))]
 use serde::Deserialize;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use serde_json::Value;
 #[cfg(windows)]
 use serde_json::json;

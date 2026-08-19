@@ -5,6 +5,7 @@ mod evidence;
 mod launch;
 mod observe;
 
+#[cfg(windows)]
 pub(crate) use cleanup::ProcessIdentity;
 #[cfg(windows)]
 pub(crate) use cleanup::{CLEANUP_TIMEOUT_MS, cleanup_spawned_processes, read_process_identity};
