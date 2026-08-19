@@ -1,6 +1,6 @@
 {
   "schema": "powerbi-cli.artifact-parity-corpus.v1",
-  "sourceRevision": "3b3c6c2af07dc31df2ab4ac79818545cd5cb36e2",
+  "sourceRevision": "a5efc1fa374575fdbee270b2b1cb2e418c2826e7",
   "artifactAlgorithm": "powerbi-cli.artifact-tree.v1",
   "closure": "complete_for_declared_corpus",
   "nonclaims": [
@@ -25,8 +25,8 @@
       },
       "expected": {
         "files": 21,
-        "bytes": 21518,
-        "sha256": "9cbf2eb2694e9691740405bb71043d16798bd82f815416c6cc3a67c464b73c85"
+        "bytes": 21350,
+        "sha256": "81201c99bea84f3180700affbcdda212de9bf1a1b70a1ce32f1ed343e70b218c"
       }
     },
     {
@@ -45,8 +45,8 @@
       },
       "expected": {
         "files": 19,
-        "bytes": 17724,
-        "sha256": "6fe83dc969470bfbd4d751df752660a5d83aa90fc3c08df6972b0fe820feab29"
+        "bytes": 17574,
+        "sha256": "482952c7d4302070ffdfe7f4b7d3dc44bbc29c204dfb338525ac359ad868bd4d"
       }
     },
     {
@@ -65,8 +65,8 @@
       },
       "expected": {
         "files": 18,
-        "bytes": 19562,
-        "sha256": "067da0322222a38ffe02593568d2206a7897e1f058351582c114747becf69f3d"
+        "bytes": 19386,
+        "sha256": "273c96bb065d4c391f20a880eef43776424afdcb0e30c9b4d5f394e05d4a6b70"
       }
     },
     {
@@ -85,8 +85,8 @@
       },
       "expected": {
         "files": 27,
-        "bytes": 31190,
-        "sha256": "131646503088d3c861a92f4e79bbb9db10dbe3a3ed53961f172e7b782216aa7c"
+        "bytes": 30956,
+        "sha256": "dd6c911d9da26421ef7848b85c92747d7236dbc227078d73743d1bb143d81ba4"
       }
     },
     {
@@ -105,8 +105,8 @@
       },
       "expected": {
         "files": 28,
-        "bytes": 37788,
-        "sha256": "58bff63041ae99bd760e05f5f9839e19c5236faef7539254ea3ed4652dd9f90a"
+        "bytes": 37452,
+        "sha256": "8d0dbac93e83f951fe905eeddfa8cb23e00188f107fc61ba9c09d5ba8600b65c"
       }
     }
   ]
