@@ -10,6 +10,8 @@ pub(crate) struct RelationshipRecord {
     pub(crate) from_column: String,
     pub(crate) to_table: String,
     pub(crate) to_column: String,
+    pub(crate) from_cardinality: String,
+    pub(crate) to_cardinality: String,
     pub(crate) cross_filtering_behavior: String,
     pub(crate) is_active: bool,
     pub(crate) path: PathBuf,
@@ -46,6 +48,8 @@ pub(crate) struct RelationshipDefinition {
     pub(crate) from_column: String,
     pub(crate) to_table: String,
     pub(crate) to_column: String,
+    pub(crate) from_cardinality: String,
+    pub(crate) to_cardinality: String,
     pub(crate) cross_filtering_behavior: String,
     pub(crate) is_active: bool,
 }
@@ -178,7 +182,14 @@ fn unsupported_relationship_line(record: &RelationshipRecord) -> Option<String> 
                 return false;
             }
             match line.split_once(':').map(|(key, _)| key.trim()) {
-                Some("fromColumn" | "toColumn" | "crossFilteringBehavior" | "isActive") => false,
+                Some(
+                    "fromColumn"
+                    | "toColumn"
+                    | "fromCardinality"
+                    | "toCardinality"
+                    | "crossFilteringBehavior"
+                    | "isActive",
+                ) => false,
                 Some(_) | None => true,
             }
         })
@@ -308,6 +319,8 @@ fn parse_relationship_block(
     let mut from_column = None;
     let mut to_table = None;
     let mut to_column = None;
+    let mut from_cardinality = "many".to_string();
+    let mut to_cardinality = "one".to_string();
     let mut cross_filtering_behavior = "oneDirection".to_string();
     let mut is_active = true;
 
@@ -328,6 +341,12 @@ fn parse_relationship_block(
                         to_column = Some(column);
                     }
                 }
+                "fromCardinality" => {
+                    from_cardinality = value.to_string();
+                }
+                "toCardinality" => {
+                    to_cardinality = value.to_string();
+                }
                 "crossFilteringBehavior" => {
                     cross_filtering_behavior = value.to_string();
                 }
@@ -345,6 +364,8 @@ fn parse_relationship_block(
         from_column: from_column?,
         to_table: to_table?,
         to_column: to_column?,
+        from_cardinality,
+        to_cardinality,
         cross_filtering_behavior,
         is_active,
         path: path.to_path_buf(),
@@ -369,6 +390,18 @@ fn relationship_block_lines(definition: &RelationshipDefinition) -> Vec<String> 
         tmdl_object_ref(&definition.to_table),
         tmdl_object_ref(&definition.to_column)
     ));
+    // TOM defaults (fromCardinality: many, toCardinality: one) are omitted so a
+    // many-to-many serializes as the single canonical `toCardinality: many`
+    // line Desktop itself writes.
+    if definition.from_cardinality != "many" {
+        lines.push(format!(
+            "    fromCardinality: {}",
+            definition.from_cardinality
+        ));
+    }
+    if definition.to_cardinality != "one" {
+        lines.push(format!("    toCardinality: {}", definition.to_cardinality));
+    }
     lines.push(format!(
         "    crossFilteringBehavior: {}",
         definition.cross_filtering_behavior
@@ -439,7 +472,26 @@ fn validate_relationship_definition(
         "toColumn",
     )?;
     normalize_cross_filtering_behavior(&definition.cross_filtering_behavior)?;
+    normalize_relationship_cardinality(&definition.from_cardinality)?;
+    normalize_relationship_cardinality(&definition.to_cardinality)?;
     Ok(())
+}
+
+pub(crate) fn normalize_relationship_cardinality(value: &str) -> CliResult<String> {
+    let normalized = match value.trim().to_ascii_lowercase().as_str() {
+        "one" => "one",
+        "many" => "many",
+        other => {
+            return Err(CliError::invalid_args(format!(
+                "invalid relationship cardinality: {other}"
+            ))
+            .with_hint("Use one of: one, many.")
+            .with_suggested_command(
+                "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --to-cardinality many --dry-run --json",
+            ));
+        }
+    };
+    Ok(normalized.to_string())
 }
 
 fn ensure_column_exists(

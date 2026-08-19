@@ -615,11 +615,11 @@ fn write_project(spec: &DashboardSpec, out_dir: &Path) -> CliResult<()> {
 
     write_json_file(
         &report_dir.join(".platform"),
-        &platform_json("Report", display_name, spec.description.as_deref()),
+        &platform_json("Report", display_name),
     )?;
     write_json_file(
         &semantic_model_dir.join(".platform"),
-        &platform_json("SemanticModel", display_name, spec.description.as_deref()),
+        &platform_json("SemanticModel", display_name),
     )?;
     write_json_file(
         &report_dir.join("definition.pbir"),
@@ -776,19 +776,16 @@ fn write_project(spec: &DashboardSpec, out_dir: &Path) -> CliResult<()> {
     Ok(())
 }
 
-fn platform_json(kind: &str, display_name: &str, description: Option<&str>) -> Value {
+// The Fabric platformProperties 2.0.0 schema defines only `type` and
+// `displayName`; a `description` here is an unknown property that risks
+// Desktop-version rejection, so schema descriptions never reach .platform.
+fn platform_json(kind: &str, display_name: &str) -> Value {
     let mut metadata = Map::new();
     metadata.insert("type".to_string(), Value::String(kind.to_string()));
     metadata.insert(
         "displayName".to_string(),
         Value::String(display_name.to_string()),
     );
-    if let Some(description) = description {
-        metadata.insert(
-            "description".to_string(),
-            Value::String(description.to_string()),
-        );
-    }
     json!({
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
         "metadata": metadata,

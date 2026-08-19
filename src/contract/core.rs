@@ -1010,7 +1010,7 @@ fn schema_manifest() -> Value {
         "columnFields": ["name", "dataType", "description", "formatString", "sourceColumn", "isHidden", "isKey", "summarizeBy", "sortByColumn"],
         "calculatedColumnFields": ["name", "expression", "dataType", "description", "formatString", "summarizeBy", "displayFolder", "isHidden"],
         "measureFields": ["name", "expression", "description", "formatString", "displayFolder"],
-        "relationshipFields": ["name", "fromTable", "fromColumn", "toTable", "toColumn", "crossFilteringBehavior", "isActive"],
+        "relationshipFields": ["name", "fromTable", "fromColumn", "toTable", "toColumn", "fromCardinality", "toCardinality", "crossFilteringBehavior", "isActive"],
         "semanticModelHandleEncoding": {
             "separator": ":",
             "componentEscapes": [

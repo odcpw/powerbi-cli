@@ -225,7 +225,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "model relationships add",
-            "usage": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> [--name <relationship-name>] [--cross-filtering-behavior <oneDirection|bothDirections|automatic>] [--inactive] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "usage": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> [--name <relationship-name>] [--from-cardinality <one|many>] [--to-cardinality <one|many>] [--cross-filtering-behavior <oneDirection|bothDirections|automatic>] [--inactive] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Add a semantic model relationship with explicit endpoints and guarded output semantics",
             "tags": ["tmdl", "semantic-model", "relationship", "model", "mutation", "agent"],
             "readOnly": false,
@@ -235,14 +235,14 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "modelRelationshipsMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--from-table <table>", "--from-column <column>", "--to-table <table>", "--to-column <column>", "--name <relationship-name>", "--cross-filtering-behavior <mode>", "--cross-filter <mode>", "--active", "--inactive", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
-            "examples": ["powerbi-cli model relationships add --project build/sales --from-table FactSales --from-column DateKey --to-table DimDate --to-column DateKey --cross-filtering-behavior oneDirection --dry-run --json"],
+            "flags": ["--project <project-dir-or.pbip>", "--from-table <table>", "--from-column <column>", "--to-table <table>", "--to-column <column>", "--name <relationship-name>", "--from-cardinality <one|many>", "--to-cardinality <one|many>", "--cross-filtering-behavior <mode>", "--cross-filter <mode>", "--active", "--inactive", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli model relationships add --project build/sales --from-table FactSales --from-column DateKey --to-table DimDate --to-column DateKey --cross-filtering-behavior oneDirection --dry-run --json", "powerbi-cli model relationships add --project build/sales --from-table FactSales --from-column RegionCode --to-table DimRegion --to-column RegionCode --to-cardinality many --dry-run --json"],
             "followUpFields": ["dryRun", "projectModified", "rollback.performed", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "model relationships update",
-            "usage": "powerbi-cli model relationships update --project <project-dir-or.pbip> (--handle <relationship-handle> | --name <relationship-name>) [--cross-filtering-behavior <oneDirection|bothDirections|automatic>] [--active|--inactive] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Update relationship active state or cross-filtering behavior; endpoint rewiring is delete+add",
+            "usage": "powerbi-cli model relationships update --project <project-dir-or.pbip> (--handle <relationship-handle> | --name <relationship-name>) [--from-cardinality <one|many>] [--to-cardinality <one|many>] [--cross-filtering-behavior <oneDirection|bothDirections|automatic>] [--active|--inactive] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Update relationship active state, cardinality, or cross-filtering behavior; endpoint rewiring is delete+add",
             "tags": ["tmdl", "semantic-model", "relationship", "model", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -251,7 +251,7 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "modelRelationshipsMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <relationship-handle>", "--name <relationship-name>", "--cross-filtering-behavior <mode>", "--cross-filter <mode>", "--active", "--inactive", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--handle <relationship-handle>", "--name <relationship-name>", "--from-cardinality <one|many>", "--to-cardinality <one|many>", "--cross-filtering-behavior <mode>", "--cross-filter <mode>", "--active", "--inactive", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli model relationships update --project build/sales --handle <relationship-handle> --cross-filtering-behavior bothDirections --dry-run --json"],
             "followUpFields": ["dryRun", "projectModified", "rollback.performed", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),

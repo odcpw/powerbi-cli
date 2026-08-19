@@ -108,6 +108,8 @@ struct RelationshipSummary {
     from_column: String,
     to_table: String,
     to_column: String,
+    from_cardinality: String,
+    to_cardinality: String,
     cross_filtering_behavior: String,
     is_active: bool,
 }
@@ -402,7 +404,7 @@ fn diff_relationship_maps(
                     "op": "added",
                     "handle": right.handle,
                     "name": right.name,
-                    "fieldsChanged": ["fromTable", "fromColumn", "toTable", "toColumn", "properties.crossFilteringBehavior", "properties.isActive"],
+                    "fieldsChanged": ["fromTable", "fromColumn", "toTable", "toColumn", "properties.fromCardinality", "properties.toCardinality", "properties.crossFilteringBehavior", "properties.isActive"],
                     "before": Value::Null,
                     "after": relationship_json(right)
                 }));
@@ -501,6 +503,12 @@ fn modified_relationship_change(
     if before.to_column != after.to_column {
         fields.push("toColumn");
     }
+    if before.from_cardinality != after.from_cardinality {
+        fields.push("properties.fromCardinality");
+    }
+    if before.to_cardinality != after.to_cardinality {
+        fields.push("properties.toCardinality");
+    }
     if before.cross_filtering_behavior != after.cross_filtering_behavior {
         fields.push("properties.crossFilteringBehavior");
     }
@@ -592,6 +600,8 @@ fn relationship_summary(relationship: &RelationshipRecord) -> RelationshipSummar
         from_column: relationship.from_column.clone(),
         to_table: relationship.to_table.clone(),
         to_column: relationship.to_column.clone(),
+        from_cardinality: relationship.from_cardinality.clone(),
+        to_cardinality: relationship.to_cardinality.clone(),
         cross_filtering_behavior: relationship.cross_filtering_behavior.clone(),
         is_active: relationship.is_active,
     }
@@ -637,6 +647,8 @@ fn relationship_json(relationship: &RelationshipSummary) -> Value {
         "toTable": relationship.to_table,
         "toColumn": relationship.to_column,
         "properties": {
+            "fromCardinality": relationship.from_cardinality,
+            "toCardinality": relationship.to_cardinality,
             "crossFilteringBehavior": relationship.cross_filtering_behavior,
             "isActive": relationship.is_active
         }

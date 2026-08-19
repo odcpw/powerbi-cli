@@ -479,3 +479,116 @@ fn relationship_mutations_reject_confirm_on_add() {
             .contains("--confirm is only valid for model relationships delete")
     );
 }
+
+#[test]
+fn model_relationships_cardinality_round_trip() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_custom_project(temp.path());
+    let out = project.to_str().expect("project path");
+    let relationship_path = relationships_tmdl(&project);
+
+    // Canonical many-to-many: only the non-default toCardinality is written.
+    let add = run_powerbi(&[
+        "model",
+        "relationships",
+        "add",
+        "--project",
+        out,
+        "--from-table",
+        "FactWork",
+        "--from-column",
+        "BKey",
+        "--to-table",
+        "DimB",
+        "--to-column",
+        "BKey",
+        "--to-cardinality",
+        "many",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(add.code, 0, "stderr: {}", add.stderr);
+    let handle = stdout_json(&add)["target"]["handle"]
+        .as_str()
+        .expect("handle")
+        .to_string();
+    let text = fs::read_to_string(&relationship_path).expect("relationships.tmdl");
+    assert!(text.contains("toCardinality: many"), "tmdl: {text}");
+    assert!(!text.contains("fromCardinality"), "tmdl: {text}");
+
+    let show = run_powerbi(&[
+        "model",
+        "relationships",
+        "show",
+        "--project",
+        out,
+        "--handle",
+        &handle,
+        "--json",
+    ]);
+    assert_eq!(show.code, 0, "stderr: {}", show.stderr);
+    let shown = stdout_json(&show);
+    assert_eq!(
+        shown["relationship"]["properties"]["fromCardinality"],
+        Value::from("many")
+    );
+    assert_eq!(
+        shown["relationship"]["properties"]["toCardinality"],
+        Value::from("many")
+    );
+
+    // An unrelated update preserves the authored cardinality.
+    let update = run_powerbi(&[
+        "model",
+        "relationships",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        &handle,
+        "--inactive",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(update.code, 0, "stderr: {}", update.stderr);
+    let text = fs::read_to_string(&relationship_path).expect("relationships.tmdl after update");
+    assert!(text.contains("toCardinality: many"), "tmdl: {text}");
+
+    // Scaffolded default relationships expose the TOM defaults.
+    let list = run_powerbi(&["model", "relationships", "list", "--project", out, "--json"]);
+    assert_eq!(list.code, 0, "stderr: {}", list.stderr);
+    let listed = stdout_json(&list);
+    let default_rel = listed["relationships"]
+        .as_array()
+        .expect("relationships array")
+        .iter()
+        .find(|rel| rel["toTable"] == "DimA")
+        .expect("scaffolded relationship");
+    assert_eq!(
+        default_rel["properties"]["fromCardinality"],
+        Value::from("many")
+    );
+    assert_eq!(
+        default_rel["properties"]["toCardinality"],
+        Value::from("one")
+    );
+
+    let invalid = run_powerbi(&[
+        "model",
+        "relationships",
+        "update",
+        "--project",
+        out,
+        "--handle",
+        &handle,
+        "--to-cardinality",
+        "both",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(invalid.code, 2, "stderr: {}", invalid.stderr);
+    assert_eq!(
+        stderr_json(&invalid)["error"]["code"],
+        Value::from("invalid_args")
+    );
+}

@@ -382,9 +382,7 @@ fn add_desktop_compat_findings(
     let tables_dir = definition_dir.join("tables");
     if tables_dir.is_dir() {
         let mut table_paths = fs::read_dir(&tables_dir)
-            .map_err(|err| {
-                CliError::unexpected(format!("read {}: {err}", tables_dir.display()))
-            })?
+            .map_err(|err| CliError::unexpected(format!("read {}: {err}", tables_dir.display())))?
             .map(|entry| crate::read_dir_entry(&tables_dir, entry, "lint table TMDL"))
             .collect::<CliResult<Vec<_>>>()?
             .into_iter()
@@ -400,7 +398,10 @@ fn add_desktop_compat_findings(
         }
         let text = fs::read_to_string(&path)
             .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
-        findings.extend(relationship_comment_findings(&text, &canonical_display(&path)));
+        findings.extend(relationship_comment_findings(
+            &text,
+            &canonical_display(&path),
+        ));
     }
     for platform_path in [
         resolved.report_dir.join(".platform"),
@@ -431,7 +432,10 @@ fn relationship_comment_findings(text: &str, path: &str) -> Vec<Value> {
         if name.is_empty() || name.contains('=') || name.contains(':') {
             continue;
         }
-        let Some(previous) = lines[..index].iter().rev().find(|prior| !prior.trim().is_empty())
+        let Some(previous) = lines[..index]
+            .iter()
+            .rev()
+            .find(|prior| !prior.trim().is_empty())
         else {
             continue;
         };
@@ -491,7 +495,8 @@ mod desktop_compat_tests {
 
     #[test]
     fn plain_comment_above_relationship_is_flagged_even_across_a_blank_line() {
-        let text = "// explains the join\n\nrelationship relX\n\tfromColumn: A.K\n\ttoColumn: B.K\n";
+        let text =
+            "// explains the join\n\nrelationship relX\n\tfromColumn: A.K\n\ttoColumn: B.K\n";
         let findings = relationship_comment_findings(text, "relationships.tmdl");
         assert_eq!(findings.len(), 1);
     }

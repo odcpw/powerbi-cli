@@ -3,7 +3,7 @@ use crate::relationship_tmdl::{
     RelationshipDefinition, RelationshipMutationPlan, RelationshipRecord, RelationshipSelector,
     add_relationship_plan, default_relationship_name, delete_relationship_plan, find_relationship,
     load_relationship_document, load_relationships_and_tables, normalize_cross_filtering_behavior,
-    replace_relationship_plan,
+    normalize_relationship_cardinality, replace_relationship_plan,
 };
 use crate::tmdl::column_handle;
 use crate::{
@@ -84,6 +84,8 @@ struct MutationOptions {
     from_column: Option<String>,
     to_table: Option<String>,
     to_column: Option<String>,
+    from_cardinality: Option<String>,
+    to_cardinality: Option<String>,
     cross_filtering_behavior: Option<String>,
     is_active: Option<bool>,
     mode: Option<MutationMode>,
@@ -284,6 +286,14 @@ fn build_mutation_plan(
                 from_column,
                 to_table,
                 to_column,
+                from_cardinality: options
+                    .from_cardinality
+                    .clone()
+                    .unwrap_or_else(|| "many".to_string()),
+                to_cardinality: options
+                    .to_cardinality
+                    .clone()
+                    .unwrap_or_else(|| "one".to_string()),
                 cross_filtering_behavior: options
                     .cross_filtering_behavior
                     .clone()
@@ -312,6 +322,14 @@ fn build_mutation_plan(
                     .to_column
                     .clone()
                     .unwrap_or_else(|| existing.to_column.clone()),
+                from_cardinality: options
+                    .from_cardinality
+                    .clone()
+                    .unwrap_or_else(|| existing.from_cardinality.clone()),
+                to_cardinality: options
+                    .to_cardinality
+                    .clone()
+                    .unwrap_or_else(|| existing.to_cardinality.clone()),
                 cross_filtering_behavior: options
                     .cross_filtering_behavior
                     .clone()
@@ -415,6 +433,14 @@ fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOpt
                 let value = take_value(args, &mut i, "--cross-filtering-behavior")?;
                 options.cross_filtering_behavior =
                     Some(normalize_cross_filtering_behavior(&value)?);
+            }
+            "--from-cardinality" => {
+                let value = take_value(args, &mut i, "--from-cardinality")?;
+                options.from_cardinality = Some(normalize_relationship_cardinality(&value)?);
+            }
+            "--to-cardinality" => {
+                let value = take_value(args, &mut i, "--to-cardinality")?;
+                options.to_cardinality = Some(normalize_relationship_cardinality(&value)?);
             }
             "--active" => {
                 options.is_active = Some(true);
@@ -526,6 +552,8 @@ fn relationship_json(relationship: &RelationshipRecord) -> Value {
             "columnHandle": column_handle(&relationship.to_table, &relationship.to_column)
         },
         "properties": {
+            "fromCardinality": relationship.from_cardinality,
+            "toCardinality": relationship.to_cardinality,
             "crossFilteringBehavior": relationship.cross_filtering_behavior,
             "isActive": relationship.is_active
         },

@@ -268,6 +268,8 @@ fn inspect_relationship(relationship: &RelationshipRecord, handles: &mut Vec<Val
             "columnHandle": column_handle(&relationship.to_table, &relationship.to_column)
         },
         "properties": {
+            "fromCardinality": relationship.from_cardinality,
+            "toCardinality": relationship.to_cardinality,
             "crossFilteringBehavior": relationship.cross_filtering_behavior,
             "isActive": relationship.is_active
         },
