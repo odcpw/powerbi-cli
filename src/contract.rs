@@ -11,6 +11,6 @@ mod report;
 mod workflow_pkg;
 
 pub(crate) use core::{
-    CONTRACT_VERSION, capabilities, command_catalog, help_json, help_text, robot_docs_json,
-    robot_docs_markdown, robot_triage, suggested_command_path,
+    CONTRACT_VERSION, build_identity, capabilities, command_catalog, help_json, help_text,
+    robot_docs_json, robot_docs_markdown, robot_triage, suggested_command_path,
 };

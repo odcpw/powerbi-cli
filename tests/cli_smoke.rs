@@ -42,6 +42,8 @@ fn capabilities_advertise_scaffold_and_validate() {
     assert!(paths.contains(&"report visuals catalog"));
     assert!(paths.contains(&"report spec fields"));
     assert!(paths.contains(&"validate"));
+    assert!(paths.contains(&"triage"));
+    assert!(paths.contains(&"guid"));
 }
 
 #[test]

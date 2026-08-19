@@ -331,6 +331,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["inspect", "--deep", &project_arg, "--json"]),
     );
     h.ok("lint", &svec(["lint", &project_arg, "--json"]));
+    h.ok("triage", &svec(["triage", &project_arg, "--json"]));
+    h.ok("guid", &svec(["guid", "--json"]));
     h.ok(
         "validate",
         &svec(["validate", "--strict", &project_arg, "--json"]),

@@ -1,0 +1,8 @@
+{"surface_id":"global--help-at-depth","kind":"flag","name":"--help/-h/help below top level","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"global--qa-loop-roundtrips","kind":"verb","name":"validate+lint composite usage","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"family--subcommand-typos","kind":"verb","name":"unknown subcommand near-miss (e.g. pages lst)","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"lint--unbuffered-reuse-noise","kind":"error message","name":"m.unbuffered_reuse on function/scalar steps","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"version--staleness","kind":"verb","name":"version payload lacks build identity","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"util--guid-absence","kind":"verb","name":"no GUID generator for lineageTags","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"desktop-open--oracle-optin","kind":"flag","name":"oracle opt-in only via env var","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}
+{"surface_id":"global--baseline-contract","kind":"verb","name":"capabilities/json/exit-code baseline","pass":2,"target_sha":"db73a29f94c3c284bbeb2087aef736539b7dd9bc","discovered_at":"2026-08-18T00:00:00Z"}

@@ -6,7 +6,7 @@ pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
             "path": "desktop open",
-            "usage": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] --json",
+            "usage": "powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json",
             "summary": "Open the single CLI-owned interactive Power BI Desktop session, closing a prior owned session first",
             "tags": ["desktop", "session", "lifecycle", "window", "windows", "agent"],
             "readOnly": false,
@@ -19,8 +19,8 @@ pub(super) fn commands() -> Vec<Value> {
             "platforms": ["windows session when POWERBI_DESKTOP_ORACLE=1", "linux unsupported_feature", "macos unsupported_feature"],
             "sessionContract": "exactly one CLI-owned session; ownership is persisted outside the project with the exact observed PID and creation time; opening another session first closes only that recorded process lineage",
             "preflightContract": "strict (default) runs PBIP validation plus lint; normal runs PBIP validation without lint; skip runs neither and reports the explicit skip in preflight",
-            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--preflight strict|normal|skip", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
-            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --preflight normal --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open SourceProfile.pbix --json"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--preflight strict|normal|skip", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--enable-oracle", "--json", "--format json"],
+            "examples": ["POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --json", "powerbi-cli desktop open build/sales --enable-oracle --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/sales --preflight normal --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open SourceProfile.pbix --json"],
             "followUpFields": ["ok", "exitCode", "document.kind", "document.path", "preflight.mode", "preflight.performed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "proof", "validation", "diagnostics", "next"]
         }),
         json!({
@@ -42,7 +42,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "desktop open-check",
-            "usage": "powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] --json",
+            "usage": "powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json",
             "summary": "Attempt one-shot Power BI Desktop launch plus exact project-title observation, then clean up",
             "tags": ["desktop", "oracle", "proof", "window", "title", "windows", "agent"],
             "readOnly": true,
@@ -54,13 +54,13 @@ pub(super) fn commands() -> Vec<Value> {
             "platforms": ["windows observation when POWERBI_DESKTOP_ORACLE=1", "linux unsupported_feature", "macos unsupported_feature"],
             "ciPolicy": "never required in default CI; run only on Windows with POWERBI_DESKTOP_ORACLE=1 and Desktop installed; proof.observedStage reports launch/exact-title observations and is not a canvas/render/refresh compatibility claim",
             "timeoutContract": "timeout-ms is one watchdog budget for the bounded version probe, process baseline, file-association launch, and exact window/title polling; a timeout after confirmed launch returns exit 0 with observedStage=desktop-launch and timeout signals, while a launch timeout is oracle_failed",
-            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--json", "--format json"],
-            "examples": ["powerbi-cli desktop open-check build/sales --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check build/sales --desktop-path \"C:\\\\Program Files\\\\Microsoft Power BI Desktop\\\\bin\\\\PBIDesktop.exe\" --json"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--enable-oracle", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop open-check build/sales --json", "powerbi-cli desktop open-check build/sales --enable-oracle --json", "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open-check build/sales --desktop-path \"C:\\\\Program Files\\\\Microsoft Power BI Desktop\\\\bin\\\\PBIDesktop.exe\" --json"],
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "oracle.detection.requestedDesktopPath", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.signals.launchMethod", "proof.signals.detectionPathUsedForLaunch", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.claimedCompatibility", "proof.requiredCompatibilityLevel", "proof.unprovenSignals", "proof.manualReview", "validation", "diagnostics", "next"]
         }),
         json!({
             "path": "desktop screenshot",
-            "usage": "powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <file.png> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--allow-unverified-capture] --json",
+            "usage": "powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <file.png> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--allow-unverified-capture] [--enable-oracle] --json",
             "summary": "Capture the primary display after exact Desktop title and foreground-PID verification for manual or agent review",
             "tags": ["desktop", "oracle", "proof", "window", "title", "screenshot", "evidence", "windows", "agent"],
             "readOnly": false,
@@ -76,7 +76,7 @@ pub(super) fn commands() -> Vec<Value> {
             "timeoutContract": "timeout-ms is one watchdog budget for the bounded version probe, process baseline, file-association launch, and exact window/title polling; if launch succeeds but no exact project title appears, screenshot returns proof_incomplete exit 20 rather than oracle_failed",
             "outputPathPolicy": "--out must end in .png and resolve outside the PBIP project directory; capture uses a unique same-directory temporary file and creates/replaces the destination only after success",
             "captureSafety": "foreground PID must be the selected PBIDesktop process or one of its verified descendants; failure publishes no PNG. --allow-unverified-capture explicitly accepts the risk of capturing unrelated sensitive screen content",
-            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--out <file.png>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--allow-unverified-capture", "--json", "--format json"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--out <file.png>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--allow-unverified-capture", "--enable-oracle", "--json", "--format json"],
             "examples": ["powerbi-cli desktop screenshot build/sales --out proof/sales.png --json"],
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
         }),

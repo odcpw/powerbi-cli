@@ -61,6 +61,7 @@ fn document_findings(source: &str, document_kind: &str, handle: &str, path: &Pat
                 "path": canonical_display(path),
                 "documentKind": document_kind,
                 "step": reuse.step,
+                "stepKind": reuse.step_kind.as_str(),
                 "referenceCount": reuse.reference_count,
                 "analysisBoundary": "heuristic"
             })
@@ -89,6 +90,7 @@ fn untyped_expansion_document_findings(
                 "path": canonical_display(path),
                 "documentKind": document_kind,
                 "step": expansion.step,
+                "stepKind": expansion.step_kind.as_str(),
                 "column": expansion.column,
                 "analysisBoundary": "heuristic"
             })
@@ -202,13 +204,44 @@ fn expression_name(line: &str) -> Option<String> {
 enum Token {
     Identifier(String),
     String(String),
+    Number,
     Let,
     In,
     Equal,
+    Arrow,
     Comma,
     Open(char),
     Close(char),
     Dot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StepKind {
+    FunctionDefinition,
+    ScalarLiteral,
+    RecordLiteral,
+    ListLiteral,
+    TableLiteral,
+    Navigation,
+    Other,
+}
+
+impl StepKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::FunctionDefinition => "functionDefinition",
+            Self::ScalarLiteral => "scalarLiteral",
+            Self::RecordLiteral => "recordLiteral",
+            Self::ListLiteral => "listLiteral",
+            Self::TableLiteral => "tableLiteral",
+            Self::Navigation => "navigation",
+            Self::Other => "other",
+        }
+    }
+
+    fn fires_unbuffered_reuse(self) -> bool {
+        matches!(self, Self::Other | Self::TableLiteral | Self::Navigation)
+    }
 }
 
 #[derive(Debug)]
@@ -221,12 +254,14 @@ struct Step {
 struct Reuse {
     step: String,
     reference_count: usize,
+    step_kind: StepKind,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct UntypedExpansion {
     step: String,
     column: String,
+    step_kind: StepKind,
 }
 
 fn analyze_let_steps(source: &str) -> Vec<Reuse> {
@@ -246,6 +281,10 @@ fn analyze_let_steps(source: &str) -> Vec<Reuse> {
         if reference_count < 2 {
             continue;
         }
+        let step_kind = classify_step_kind(&step.rhs);
+        if !step_kind.fires_unbuffered_reuse() {
+            continue;
+        }
         let buffered_definition = starts_with_table_buffer(&step.rhs);
         let buffered_later = later
             .iter()
@@ -254,6 +293,7 @@ fn analyze_let_steps(source: &str) -> Vec<Reuse> {
             reuse.push(Reuse {
                 step: step.name.clone(),
                 reference_count,
+                step_kind,
             });
         }
     }
@@ -286,6 +326,7 @@ fn analyze_untyped_expansions(
             expansions.push(UntypedExpansion {
                 step: step.name.clone(),
                 column,
+                step_kind: classify_step_kind(&step.rhs),
             });
         }
     }
@@ -489,6 +530,85 @@ fn spec_list_column_names(tokens: &[Token]) -> Option<Vec<String>> {
     Some(names)
 }
 
+fn classify_step_kind(tokens: &[Token]) -> StepKind {
+    if tokens.is_empty() {
+        return StepKind::Other;
+    }
+    if matches!(&tokens[0], Token::Identifier(name) if name == "each") {
+        return StepKind::FunctionDefinition;
+    }
+    if matches!(&tokens[0], Token::Open('('))
+        && let Some(close) = matching_close(tokens, 0)
+        && tokens.get(close + 1) == Some(&Token::Arrow)
+    {
+        return StepKind::FunctionDefinition;
+    }
+    if tokens.len() == 1 {
+        match &tokens[0] {
+            Token::Number | Token::String(_) => return StepKind::ScalarLiteral,
+            Token::Identifier(name) if name == "true" || name == "false" => {
+                return StepKind::ScalarLiteral;
+            }
+            _ => {}
+        }
+    }
+    if matches!(&tokens[0], Token::Identifier(name) if name.eq_ignore_ascii_case("#table"))
+        && tokens.get(1) == Some(&Token::Open('('))
+    {
+        return StepKind::TableLiteral;
+    }
+    if matches!(&tokens[0], Token::Open('[')) && matching_close(tokens, 0) == Some(tokens.len() - 1)
+    {
+        return StepKind::RecordLiteral;
+    }
+    if matches!(&tokens[0], Token::Open('{')) && matching_close(tokens, 0) == Some(tokens.len() - 1)
+    {
+        return StepKind::ListLiteral;
+    }
+    if is_navigation(tokens) {
+        return StepKind::Navigation;
+    }
+    StepKind::Other
+}
+
+fn is_navigation(tokens: &[Token]) -> bool {
+    let Some(item_open) = tokens.windows(2).position(|window| {
+        matches!(
+            (&window[0], &window[1]),
+            (Token::Open('{'), Token::Open('['))
+        )
+    }) else {
+        return false;
+    };
+    if item_open == 0 {
+        return false;
+    }
+    let Some(item_close) = matching_close(tokens, item_open) else {
+        return false;
+    };
+    let rest = &tokens[item_close + 1..];
+    if rest.len() < 3
+        || !matches!(rest[0], Token::Open('['))
+        || !matches!(rest[1], Token::Identifier(_))
+        || !matches!(rest[2], Token::Close(']'))
+    {
+        return false;
+    }
+    let mut index = 3;
+    while index < rest.len() {
+        if index + 2 < rest.len()
+            && matches!(rest[index], Token::Open('['))
+            && matches!(rest[index + 1], Token::Identifier(_))
+            && matches!(rest[index + 2], Token::Close(']'))
+        {
+            index += 3;
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
 fn starts_with_table_buffer(tokens: &[Token]) -> bool {
     table_buffer_calls(tokens).any(|(index, _)| index == 0)
 }
@@ -560,6 +680,41 @@ fn lex_m(source: &str) -> Vec<Token> {
             index = next;
             continue;
         }
+        if character == '#' {
+            let start = index + 1;
+            if start < chars.len() && (chars[start].is_alphabetic() || chars[start] == '_') {
+                index = start + 1;
+                while index < chars.len() && (chars[index].is_alphanumeric() || chars[index] == '_')
+                {
+                    index += 1;
+                }
+                let word = chars[start..index].iter().collect::<String>();
+                tokens.push(Token::Identifier(format!("#{word}")));
+                continue;
+            }
+        }
+        if character.is_ascii_digit() {
+            index += 1;
+            while index < chars.len() && chars[index].is_ascii_digit() {
+                index += 1;
+            }
+            if index < chars.len()
+                && chars[index] == '.'
+                && chars
+                    .get(index + 1)
+                    .is_some_and(|next| next.is_ascii_digit())
+            {
+                index += 1;
+                while index < chars.len() && chars[index].is_ascii_digit() {
+                    index += 1;
+                }
+            }
+            if index < chars.len() && matches!(chars[index], 'L' | 'D' | 'M' | 'l' | 'd' | 'm') {
+                index += 1;
+            }
+            tokens.push(Token::Number);
+            continue;
+        }
         if character.is_alphabetic() || character == '_' {
             let start = index;
             index += 1;
@@ -575,6 +730,11 @@ fn lex_m(source: &str) -> Vec<Token> {
             continue;
         }
         match character {
+            '=' if chars.get(index + 1) == Some(&'>') => {
+                tokens.push(Token::Arrow);
+                index += 2;
+                continue;
+            }
             '=' => tokens.push(Token::Equal),
             ',' => tokens.push(Token::Comma),
             '(' | '[' | '{' => tokens.push(Token::Open(character)),
@@ -607,7 +767,7 @@ fn quoted_identifier(chars: &[char], mut index: usize) -> (String, usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Reuse, UntypedExpansion, analyze_let_steps, analyze_untyped_expansions};
+    use super::{Reuse, StepKind, UntypedExpansion, analyze_let_steps, analyze_untyped_expansions};
     use std::collections::BTreeSet;
 
     #[test]
@@ -625,7 +785,8 @@ in
             analyze_let_steps(source),
             vec![Reuse {
                 step: "Changed Type".to_string(),
-                reference_count: 2
+                reference_count: 2,
+                step_kind: StepKind::Other,
             }]
         );
     }
@@ -662,7 +823,8 @@ in
             analyze_untyped_expansions(source, &numeric(&["Revenue"])),
             vec![UntypedExpansion {
                 step: "Expanded".to_string(),
-                column: "Revenue".to_string()
+                column: "Revenue".to_string(),
+                step_kind: StepKind::Other,
             }]
         );
     }
@@ -680,7 +842,8 @@ in
             analyze_untyped_expansions(source, &numeric(&["Rank"])),
             vec![UntypedExpansion {
                 step: "Expanded".to_string(),
-                column: "Rank".to_string()
+                column: "Rank".to_string(),
+                step_kind: StepKind::Other,
             }]
         );
     }
@@ -708,6 +871,58 @@ in
     Expanded
 "#;
         assert!(analyze_untyped_expansions(source, &numeric(&["Revenue"])).is_empty());
+    }
+
+    #[test]
+    fn ignores_reused_function_and_scalar_steps() {
+        let source = r#"
+let
+    Normalize = (value) => value,
+    Scale = 1.5,
+    Label = "ready",
+    Flag = true,
+    LeftFn = Normalize,
+    RightFn = Normalize,
+    LeftScale = Scale,
+    RightScale = Scale,
+    LeftLabel = Label,
+    RightLabel = Label,
+    LeftFlag = Flag,
+    RightFlag = Flag
+in
+    LeftFn
+"#;
+        assert!(analyze_let_steps(source).is_empty());
+    }
+
+    #[test]
+    fn flags_reused_table_literal_and_navigation_steps() {
+        let source = r#"
+let
+    Shared = #table(type table [Value = Int64.Type], {}),
+    Nav = Database{[Schema="dbo",Item="Sales"]}[Data],
+    LeftTable = Table.FirstN(Shared, 1),
+    RightTable = Table.LastN(Shared, 1),
+    LeftNav = Table.FirstN(Nav, 1),
+    RightNav = Table.LastN(Nav, 1)
+in
+    LeftTable
+"#;
+        assert_eq!(
+            analyze_let_steps(source),
+            vec![
+                Reuse {
+                    step: "Shared".to_string(),
+                    reference_count: 2,
+                    step_kind: StepKind::TableLiteral,
+                },
+                Reuse {
+                    step: "Nav".to_string(),
+                    reference_count: 2,
+                    step_kind: StepKind::Navigation,
+                }
+            ]
+        );
     }
 
     #[test]

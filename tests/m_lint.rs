@@ -115,6 +115,7 @@ fn lint_warns_for_unbuffered_reused_m_step_without_failing_strict_validation() {
         .unwrap_or_else(|| panic!("M buffer warning missing: {lint_json}"));
     assert_eq!(finding["severity"], "warning");
     assert_eq!(finding["step"], "Source");
+    assert_eq!(finding["stepKind"], "tableLiteral");
     assert_eq!(finding["referenceCount"], 2);
     assert!(
         finding["message"]
@@ -172,7 +173,44 @@ fn lint_analyzes_named_m_expression_documents() {
         .expect("named-expression buffer warning");
     assert_eq!(finding["documentKind"], "expression");
     assert_eq!(finding["step"], "Source");
+    assert_eq!(finding["stepKind"], "tableLiteral");
     assert_eq!(finding["referenceCount"], 2);
+}
+
+#[test]
+fn lint_suppresses_function_and_scalar_reuse_but_flags_table_steps() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    replace_partition_source(
+        &project,
+        r#"        source =
+            let
+                Normalize = (value) => value,
+                Scale = 1.5,
+                Shared = #table(type table [DateKey = Int64.Type, CustomerKey = Int64.Type, Revenue = Currency.Type, Units = Int64.Type], {}),
+                LeftFn = Normalize,
+                RightFn = Normalize,
+                LeftScale = Scale,
+                RightScale = Scale,
+                Left = Table.SelectRows(Shared, each [Units] >= 0),
+                Right = Table.SelectRows(Shared, each [Units] < 0),
+                Result = Table.Combine({Left, Right})
+            in
+                Result"#,
+    );
+
+    let lint = run_powerbi(&["lint", project.to_str().expect("project path"), "--json"]);
+    assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
+    let findings = stdout_json(&lint)["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .filter(|finding| finding["code"] == "m.unbuffered_reuse")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(findings.len(), 1, "expected only table reuse: {findings:?}");
+    assert_eq!(findings[0]["step"], "Shared");
+    assert_eq!(findings[0]["stepKind"], "tableLiteral");
 }
 
 #[test]
@@ -194,6 +232,7 @@ fn lint_warns_for_untyped_numeric_expansion_without_failing_strict_validation() 
     assert_eq!(finding["analysisBoundary"], "heuristic");
     assert_eq!(finding["documentKind"], "partition");
     assert_eq!(finding["step"], "Expanded");
+    assert_eq!(finding["stepKind"], "other");
     assert_eq!(finding["column"], "Revenue");
     assert_eq!(finding["handle"], "partition:FactSales:FactSales");
     assert!(

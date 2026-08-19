@@ -14,3 +14,34 @@
 12. Use `desktop open` only for an explicit interactive session and always pair it with idempotent `desktop close`.
 13. Treat PID plus creation time as the minimum process-ownership identity; never recover ownership by title or executable sweep.
 14. Use Between slicers only for numeric/date columns and preserve that invariant during rebinding.
+
+---
+
+# Pass 2 playbook (2026-08-18)
+
+Scope decision: full mode; evidence source = two days of intensive live agent
+use (an intensive real dashboard-authoring campaign) + a fresh probe battery. The tool's baseline
+contract (capabilities catalog, JSON-only stdout, error envelopes, exit
+dictionary, byte-deterministic capabilities, fuzzy --for, global-flag
+did-you-mean, bare-invocation usage) scored 850-950 — the strongest baseline
+this methodology has seen. Seven gaps survived, all evidence-backed:
+
+1. **R-201 help-at-depth (P0).** `--help` below top level is an exit-2 error.
+   The redirect hint is good; actual help is better. Render from the catalog
+   so it can never drift.
+2. **R-202 triage mega-command (P0).** The observed QA loop is
+   validate → lint → external filtering, dozens of times. One call.
+3. **R-203 did-you-mean parity (P1).** Global flags have it; subcommand values
+   and per-command flags don't (`pages lst`, `--strick`).
+4. **R-204 lint noise (P1).** 28/52 unbuffered_reuse findings on the real
+   project are function/scalar steps the agent filtered by hand every round.
+5. **R-205 version identity (P2).** Stale-binary phantom-results incident;
+   gitSha + buildEpoch make staleness detectable.
+6. **R-206 guid util (P2).** lineageTag GUIDs needed constantly; host lacks
+   uuidgen.
+7. **R-207 oracle flag (P2).** Env-var-only opt-in cost a launch cycle.
+
+Applied via two parallel Grok executors (wo-help: R-201+R-203;
+wo-triage: R-202+R-204..207), merged on main, re-scored, fresh-eyes,
+regression-tested. Deferred (unchanged from Pass 1): transactional mutation
+manifests, DAX assertion suites, automated canvas-refresh proof.

@@ -3,6 +3,7 @@ use crate::desktop_target::ResolvedDesktopTarget;
 use crate::{CliError, CliResult, EXIT_ORACLE_UNAVAILABLE};
 #[cfg(windows)]
 use serde::Deserialize;
+use std::cell::Cell;
 #[cfg(windows)]
 use std::path::Path;
 #[cfg(windows)]
@@ -86,10 +87,19 @@ struct DiscoveryResult {
     model_workspace: Option<PathBuf>,
 }
 
+thread_local! {
+    static INVOCATION_ENABLE_ORACLE: Cell<bool> = const { Cell::new(false) };
+}
+
+pub(crate) fn enable_oracle_for_invocation() {
+    INVOCATION_ENABLE_ORACLE.with(|flag| flag.set(true));
+}
+
 pub(crate) fn desktop_oracle_enabled() -> bool {
-    std::env::var("POWERBI_DESKTOP_ORACLE")
-        .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
-        .unwrap_or(false)
+    INVOCATION_ENABLE_ORACLE.with(Cell::get)
+        || std::env::var("POWERBI_DESKTOP_ORACLE")
+            .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
+            .unwrap_or(false)
 }
 
 pub(crate) fn resolve_live_model_endpoint(
@@ -110,8 +120,9 @@ pub(crate) fn resolve_live_model_endpoint(
         return Err(CliError::new(
             "oracle_unavailable",
             EXIT_ORACLE_UNAVAILABLE,
-            "set POWERBI_DESKTOP_ORACLE=1 to opt in to the local Desktop model bridge",
-        ));
+            "Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle to opt in to the local Desktop model bridge",
+        )
+        .with_hint("Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle"));
     }
     target.require_live_model()?;
     if timeout.is_zero() {

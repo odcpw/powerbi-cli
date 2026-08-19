@@ -1,10 +1,10 @@
 use crate::cli_support::{required_project, take_value};
 use crate::desktop_target::{ResolvedDesktopTarget, resolve_desktop_target};
-use crate::live_model::desktop_oracle_enabled;
 #[cfg(windows)]
 use crate::live_model::{
     LiveModelEndpoint, OperationDeadline, resolve_live_model_endpoint, windows_argument_path,
 };
+use crate::live_model::{desktop_oracle_enabled, enable_oracle_for_invocation};
 use crate::{
     CliError, CliResult, EXIT_ORACLE_UNAVAILABLE, EXIT_VALIDATION_FAILED, canonical_display,
     validate_desktop_runtime_project,
@@ -43,6 +43,7 @@ struct ExecuteOptions {
     query: Option<String>,
     query_file: Option<PathBuf>,
     allow_data_read: bool,
+    enable_oracle: bool,
     max_rows: u64,
     max_cell_chars: u64,
     timeout_ms: u64,
@@ -55,6 +56,7 @@ impl Default for ExecuteOptions {
             query: None,
             query_file: None,
             allow_data_read: false,
+            enable_oracle: false,
             max_rows: DEFAULT_MAX_ROWS,
             max_cell_chars: DEFAULT_MAX_CELL_CHARS,
             timeout_ms: DEFAULT_TIMEOUT_MS,
@@ -112,6 +114,9 @@ struct BridgeResult {
 
 pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
     let options = parse_args(args)?;
+    if options.enable_oracle {
+        enable_oracle_for_invocation();
+    }
     if !options.allow_data_read {
         return Err(CliError::invalid_args(
             "model dax execute requires --allow-data-read",
@@ -197,7 +202,8 @@ pub(crate) fn execute(args: &[String]) -> CliResult<Value> {
             "oracle-opt-in",
             json!({
                 "code": "oracle_disabled",
-                "message": "Set POWERBI_DESKTOP_ORACLE=1 to opt in to the local Desktop bridge."
+                "message": "Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle to opt in to the local Desktop bridge.",
+                "hint": "Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle"
             }),
         ));
     }
@@ -545,6 +551,10 @@ fn parse_args(args: &[String]) -> CliResult<ExecuteOptions> {
             }
             "--allow-data-read" => {
                 options.allow_data_read = true;
+                i += 1;
+            }
+            "--enable-oracle" | "--enableOracle" => {
+                options.enable_oracle = true;
                 i += 1;
             }
             "--max-rows" => {

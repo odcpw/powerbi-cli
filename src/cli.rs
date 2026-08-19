@@ -1,10 +1,11 @@
 use crate::contract::{
-    CONTRACT_VERSION, capabilities, help_json, help_text, robot_docs_json, robot_docs_markdown,
-    robot_triage, suggested_command_path,
+    CONTRACT_VERSION, build_identity, capabilities, help_json, help_text, robot_docs_json,
+    robot_docs_markdown, robot_triage, suggested_command_path,
 };
 use crate::desktop::desktop_command;
 use crate::feature_catalog::features_command;
 use crate::fixture::fixture_command;
+use crate::guid_util::guid_command;
 use crate::handoff::handoff_command;
 use crate::help::{HelpDocument, edit_distance, enrich_did_you_mean, help_path, render_help};
 use crate::lint::lint_command;
@@ -16,6 +17,7 @@ use crate::report::report_command;
 use crate::schema::schema_command;
 use crate::skill_package::skill_command;
 use crate::source_template::source_template_command;
+use crate::triage::triage_command;
 use crate::workflow::{workflow_command, workflow_synthesize_command};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, diff::diff_command, doctor_json,
@@ -89,16 +91,21 @@ fn dispatch(flags: &GlobalFlags, args: &[String]) -> CliResult<CliOutput> {
     match args[0].as_str() {
         "version" => {
             require_no_args(&args[1..], "version")?;
+            let (git_sha, build_epoch) = build_identity();
             value_output(
                 json!({
                     "tool": "powerbi-cli",
                     "binary": "powerbi-cli",
                     "version": env!("CARGO_PKG_VERSION"),
-                    "contractVersion": CONTRACT_VERSION
+                    "contractVersion": CONTRACT_VERSION,
+                    "gitSha": git_sha,
+                    "buildEpoch": build_epoch
                 }),
                 flags.json,
             )
         }
+        "triage" => value_output(triage_command(&args[1..])?, flags.json),
+        "guid" => value_output(guid_command(&args[1..])?, flags.json),
         "capabilities" => value_output(capabilities(&args[1..])?, flags.json),
         "features" | "feature" => value_output(features_command(&args[1..])?, flags.json),
         "robot-docs" => robot_docs_output(&args[1..], flags.json),
@@ -304,6 +311,7 @@ fn unknown_command_error(args: &[String]) -> CliError {
         "diff",
         "desktop",
         "fixture",
+        "guid",
         "scaffold",
         "schema",
         "profile",
@@ -313,6 +321,7 @@ fn unknown_command_error(args: &[String]) -> CliError {
         "model",
         "report",
         "source-template",
+        "triage",
         "validate",
         "version",
     ];

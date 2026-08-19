@@ -1,0 +1,10 @@
+{"pass":2,"invocation":"powerbi-cli report pages --help","outcome":"useful_hint","note":"exit 2 + capabilities redirect; should render help (R-201)"}
+{"pass":2,"invocation":"powerbi-cli report --help","outcome":"useful_hint","note":"same"}
+{"pass":2,"invocation":"powerbi-cli report pages list --help","outcome":"useful_hint","note":"usage hint names exact invocation; still exit 2"}
+{"pass":2,"invocation":"powerbi-cli help","outcome":"inferred_and_acted","note":"top-level help works"}
+{"pass":2,"invocation":"powerbi-cli --version","outcome":"useful_hint","note":"did-you-mean version"}
+{"pass":2,"invocation":"powerbi-cli scaffold --jsno","outcome":"useful_hint","note":"did-you-mean --json with placement note"}
+{"pass":2,"invocation":"powerbi-cli report pages lst --project x --json","outcome":"useful_hint","note":"generic redirect; NO did-you-mean list (R-203)"}
+{"pass":2,"invocation":"powerbi-cli validate --strick x --json","outcome":"useful_hint","note":"usage named; explicit near-miss upgrade possible (R-203)"}
+{"pass":2,"invocation":"powerbi-cli report pages show --json (missing --project)","outcome":"useful_hint","note":"exact flag named; exemplary"}
+{"pass":2,"invocation":"powerbi-cli (bare)","outcome":"inferred_and_acted","note":"prints usage, exit 0, no TUI"}
