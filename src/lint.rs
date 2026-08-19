@@ -7,6 +7,7 @@ use crate::{
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::PathBuf;
 
 #[path = "m_lint.rs"]
@@ -33,6 +34,7 @@ pub(crate) fn lint_project(
     add_model_findings(&deep, &mut findings);
     add_dax_findings(resolved, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
+    add_desktop_compat_findings(resolved, &mut findings)?;
 
     let error_count = findings
         .iter()
@@ -358,4 +360,159 @@ fn finding(
         "handle": handle,
         "path": path
     })
+}
+
+/// Desktop Store 2.156 refuses to open a PBIP whose TMDL carries a comment
+/// directly above a `relationship` declaration: `///` doc comments compile to
+/// a `description` property that relationships do not have in TOM, and plain
+/// `//` comments fail the same way. The dialog reads "Property 'description'
+/// is unknown and is not expected in the situation it appears" and Desktop
+/// falls back to an empty Untitled session. Newer Desktop builds tolerate the
+/// comment, which makes this a silent cross-version trap the oracle only
+/// reveals on the older machine.
+fn add_desktop_compat_findings(
+    resolved: &ResolvedProject,
+    findings: &mut Vec<Value>,
+) -> CliResult<()> {
+    let definition_dir = resolved.semantic_model_dir.join("definition");
+    let mut tmdl_paths = vec![
+        definition_dir.join("model.tmdl"),
+        definition_dir.join("relationships.tmdl"),
+    ];
+    let tables_dir = definition_dir.join("tables");
+    if tables_dir.is_dir() {
+        let mut table_paths = fs::read_dir(&tables_dir)
+            .map_err(|err| {
+                CliError::unexpected(format!("read {}: {err}", tables_dir.display()))
+            })?
+            .map(|entry| crate::read_dir_entry(&tables_dir, entry, "lint table TMDL"))
+            .collect::<CliResult<Vec<_>>>()?
+            .into_iter()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("tmdl"))
+            .collect::<Vec<_>>();
+        table_paths.sort();
+        tmdl_paths.extend(table_paths);
+    }
+    for path in tmdl_paths {
+        if !path.is_file() {
+            continue;
+        }
+        let text = fs::read_to_string(&path)
+            .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+        findings.extend(relationship_comment_findings(&text, &canonical_display(&path)));
+    }
+    for platform_path in [
+        resolved.report_dir.join(".platform"),
+        resolved.semantic_model_dir.join(".platform"),
+    ] {
+        if !platform_path.is_file() {
+            continue;
+        }
+        let value = read_json_value(&platform_path)?;
+        findings.extend(platform_metadata_findings(
+            &value,
+            &canonical_display(&platform_path),
+        ));
+    }
+    Ok(())
+}
+
+fn relationship_comment_findings(text: &str, path: &str) -> Vec<Value> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut findings = Vec::new();
+    for (index, line) in lines.iter().enumerate() {
+        let Some(rest) = line.trim_start().strip_prefix("relationship ") else {
+            continue;
+        };
+        let name = rest.trim();
+        // Property assignments inside M or DAX bodies can start with the same
+        // word; a declaration's remainder is a bare object name.
+        if name.is_empty() || name.contains('=') || name.contains(':') {
+            continue;
+        }
+        let Some(previous) = lines[..index].iter().rev().find(|prior| !prior.trim().is_empty())
+        else {
+            continue;
+        };
+        if previous.trim_start().starts_with("//") {
+            findings.push(finding(
+                "model.relationship_comment_unsupported",
+                "error",
+                &format!(
+                    "comment above relationship '{name}': relationships have no description in TOM, so Power BI Desktop 2.156 refuses to open the project (\"Property 'description' is unknown and is not expected in the situation it appears\"); delete the comment lines and keep the prose in the commit message"
+                ),
+                Some(&format!("relationship:{name}")),
+                Some(path),
+            ));
+        }
+    }
+    findings
+}
+
+fn platform_metadata_findings(value: &Value, path: &str) -> Vec<Value> {
+    const KNOWN_METADATA_PROPERTIES: [&str; 2] = ["type", "displayName"];
+    let mut findings = Vec::new();
+    if let Some(metadata) = value["metadata"].as_object() {
+        for key in metadata.keys() {
+            if !KNOWN_METADATA_PROPERTIES.contains(&key.as_str()) {
+                findings.push(finding(
+                    "platform.unknown_metadata_property",
+                    "warning",
+                    &format!(
+                        "unknown .platform metadata property '{key}': the Fabric platformProperties 2.0.0 schema defines only type and displayName, and unknown properties risk Desktop-version rejection"
+                    ),
+                    None,
+                    Some(path),
+                ));
+            }
+        }
+    }
+    findings
+}
+
+#[cfg(test)]
+mod desktop_compat_tests {
+    use super::{platform_metadata_findings, relationship_comment_findings};
+    use serde_json::json;
+
+    #[test]
+    fn doc_comment_above_relationship_is_an_error() {
+        let text = "/// Many-to-many on the canton code.\nrelationship relAgenturKanton\n\tfromColumn: A.K\n\ttoColumn: B.K\n";
+        let findings = relationship_comment_findings(text, "relationships.tmdl");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0]["code"],
+            "model.relationship_comment_unsupported"
+        );
+        assert_eq!(findings[0]["severity"], "error");
+        assert_eq!(findings[0]["handle"], "relationship:relAgenturKanton");
+    }
+
+    #[test]
+    fn plain_comment_above_relationship_is_flagged_even_across_a_blank_line() {
+        let text = "// explains the join\n\nrelationship relX\n\tfromColumn: A.K\n\ttoColumn: B.K\n";
+        let findings = relationship_comment_findings(text, "relationships.tmdl");
+        assert_eq!(findings.len(), 1);
+    }
+
+    #[test]
+    fn comments_on_supported_objects_and_property_lines_pass() {
+        let text = "/// Table docs are legal TOM descriptions.\ntable DimJahr\n\n\tcolumn Jahr\n\t\tdataType: int64\n\nrelationship relClean\n\tfromColumn: A.K\n\ttoColumn: B.K\n\npartition p = m\n\tsource =\n\t\tlet\n\t\t\trelationship = 1\n\t\tin\n\t\t\trelationship\n";
+        assert!(relationship_comment_findings(text, "tables/DimJahr.tmdl").is_empty());
+    }
+
+    #[test]
+    fn platform_description_is_a_warning_and_known_keys_pass() {
+        let with_description = json!({
+            "metadata": {"type": "Report", "displayName": "Contoso", "description": "x"}
+        });
+        let findings = platform_metadata_findings(&with_description, ".platform");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0]["code"], "platform.unknown_metadata_property");
+        assert_eq!(findings[0]["severity"], "warning");
+
+        let clean = json!({"metadata": {"type": "Report", "displayName": "Contoso"}});
+        assert!(platform_metadata_findings(&clean, ".platform").is_empty());
+    }
 }
