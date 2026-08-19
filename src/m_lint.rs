@@ -539,9 +539,19 @@ fn classify_step_kind(tokens: &[Token]) -> StepKind {
     }
     if matches!(&tokens[0], Token::Open('('))
         && let Some(close) = matching_close(tokens, 0)
-        && tokens.get(close + 1) == Some(&Token::Arrow)
     {
-        return StepKind::FunctionDefinition;
+        // A lambda may carry a return-type ascription between the parameter
+        // list and the arrow: `(value as any) as nullable text => ...`.
+        let mut index = close + 1;
+        if matches!(tokens.get(index), Some(Token::Identifier(name)) if name == "as") {
+            index += 1;
+            while matches!(tokens.get(index), Some(Token::Identifier(_))) {
+                index += 1;
+            }
+        }
+        if tokens.get(index) == Some(&Token::Arrow) {
+            return StepKind::FunctionDefinition;
+        }
     }
     if tokens.len() == 1 {
         match &tokens[0] {
