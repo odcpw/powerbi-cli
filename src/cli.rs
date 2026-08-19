@@ -6,6 +6,7 @@ use crate::desktop::desktop_command;
 use crate::feature_catalog::features_command;
 use crate::fixture::fixture_command;
 use crate::handoff::handoff_command;
+use crate::help::{HelpDocument, edit_distance, enrich_did_you_mean, help_path, render_help};
 use crate::lint::lint_command;
 use crate::microsoft::integrations_command;
 use crate::model::model_command;
@@ -71,18 +72,18 @@ pub(crate) fn main_entry() {
 fn run() -> CliResult<CliOutput> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     let (flags, args) = parse_global_flags(&raw_args)?;
-    if args.is_empty() || is_help_request(&args) {
-        let body = if flags.json {
-            OutputBody::Json(help_json())
-        } else {
-            OutputBody::Text(help_text())
-        };
-        return Ok(output(body, EXIT_SUCCESS));
-    }
+    dispatch(&flags, &args).map_err(|err| enrich_did_you_mean(err, &args))
+}
 
-    if args[0] == "help" && args.len() == 2 {
-        let filter_arg = vec!["--for".to_string(), args[1].clone()];
-        return value_output(capabilities(&filter_arg)?, flags.json);
+fn dispatch(flags: &GlobalFlags, args: &[String]) -> CliResult<CliOutput> {
+    if args.is_empty() {
+        return top_level_help(flags.json);
+    }
+    if let Some(path) = help_path(args) {
+        if path.is_empty() {
+            return top_level_help(flags.json);
+        }
+        return catalog_help(&path, flags.json).map_err(|err| enrich_did_you_mean(err, &path));
     }
 
     match args[0].as_str() {
@@ -141,8 +142,25 @@ fn run() -> CliResult<CliOutput> {
             value_output(workflow_synthesize_command(&args[2..])?, flags.json)
         }
         "workflow" => value_output(workflow_command(&args[1..])?, flags.json),
-        _ => Err(unknown_command_error(&args)),
+        _ => Err(unknown_command_error(args)),
     }
+}
+
+fn top_level_help(json: bool) -> CliResult<CliOutput> {
+    let body = if json {
+        OutputBody::Json(help_json())
+    } else {
+        OutputBody::Text(help_text())
+    };
+    Ok(output(body, EXIT_SUCCESS))
+}
+
+fn catalog_help(path: &[String], json: bool) -> CliResult<CliOutput> {
+    let body = match render_help(path, json)? {
+        HelpDocument::Json(value) => OutputBody::Json(value),
+        HelpDocument::Text(text) => OutputBody::Text(text),
+    };
+    Ok(output(body, EXIT_SUCCESS))
 }
 
 fn output(body: OutputBody, exit_code: i32) -> CliOutput {
@@ -248,10 +266,6 @@ fn parse_global_flags(raw_args: &[String]) -> CliResult<(GlobalFlags, Vec<String
     Ok((flags, args))
 }
 
-fn is_help_request(args: &[String]) -> bool {
-    matches!(args, [one] if one == "--help" || one == "-h" || one == "help")
-}
-
 fn looks_like_json_flag(flag: &str) -> bool {
     flag.starts_with("--j") && edit_distance(flag, "--json") <= 2
 }
@@ -333,20 +347,6 @@ fn require_no_args(args: &[String], command: &str) -> CliResult<()> {
     ))
     .with_hint(format!("Run `{command}` without trailing arguments."))
     .with_suggested_command(format!("powerbi-cli {command} --json")))
-}
-
-fn edit_distance(a: &str, b: &str) -> usize {
-    let b_chars = b.chars().collect::<Vec<_>>();
-    let mut prev = (0..=b_chars.len()).collect::<Vec<_>>();
-    for (i, ca) in a.chars().enumerate() {
-        let mut curr = vec![i + 1];
-        for (j, cb) in b_chars.iter().enumerate() {
-            let cost = usize::from(ca != *cb);
-            curr.push((prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost));
-        }
-        prev = curr;
-    }
-    prev[b_chars.len()]
 }
 
 fn error_json(err: &CliError) -> Value {

@@ -563,7 +563,7 @@ fn command_paths() -> Vec<String> {
         .collect()
 }
 
-fn command_catalog() -> Vec<Value> {
+pub(crate) fn command_catalog() -> Vec<Value> {
     let mut commands = vec![
         json!({
             "path": "capabilities",

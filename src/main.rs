@@ -17,6 +17,7 @@ mod doctor;
 mod feature_catalog;
 mod fixture;
 mod handoff;
+mod help;
 mod inspect;
 mod json_io;
 mod lint;
