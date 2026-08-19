@@ -1,8 +1,8 @@
 use crate::cli_support::take_value;
 use crate::desktop_target::resolve_desktop_target;
 use crate::live_model::{
-    OperationDeadline, desktop_oracle_enabled, resolve_live_model_endpoint,
-    revalidate_live_model_endpoint,
+    OperationDeadline, desktop_oracle_enabled, enable_oracle_for_invocation,
+    resolve_live_model_endpoint, revalidate_live_model_endpoint,
 };
 use crate::mcp::execute_live_tmdl_export;
 use crate::microsoft::{MicrosoftComponent, resolve_installed_component};
@@ -27,6 +27,7 @@ struct ExportOptions {
     document: Option<PathBuf>,
     out_dir: Option<PathBuf>,
     allow_model_read: bool,
+    enable_oracle: bool,
     timeout_ms: u64,
 }
 
@@ -36,6 +37,7 @@ impl Default for ExportOptions {
             document: None,
             out_dir: None,
             allow_model_read: false,
+            enable_oracle: false,
             timeout_ms: DEFAULT_TIMEOUT_MS,
         }
     }
@@ -65,6 +67,9 @@ pub(crate) fn live_model_command(args: &[String]) -> CliResult<Value> {
 
 fn export_tmdl(args: &[String]) -> CliResult<Value> {
     let options = parse_export_args(args)?;
+    if options.enable_oracle {
+        enable_oracle_for_invocation();
+    }
     if !options.allow_model_read {
         return Err(CliError::invalid_args(
             "model live export-tmdl requires --allow-model-read",
@@ -126,8 +131,9 @@ fn export_tmdl(args: &[String]) -> CliResult<Value> {
         return Err(CliError::new(
             "oracle_unavailable",
             EXIT_ORACLE_UNAVAILABLE,
-            "set POWERBI_DESKTOP_ORACLE=1 to opt in to exact local Desktop model access",
-        ));
+            "Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle to opt in to exact local Desktop model access",
+        )
+        .with_hint("Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle"));
     }
 
     let deadline = OperationDeadline::new(Duration::from_millis(options.timeout_ms));
@@ -248,6 +254,10 @@ fn parse_export_args(args: &[String]) -> CliResult<ExportOptions> {
             }
             "--allow-model-read" => {
                 options.allow_model_read = true;
+                i += 1;
+            }
+            "--enable-oracle" | "--enableOracle" => {
+                options.enable_oracle = true;
                 i += 1;
             }
             "--timeout-ms" => {

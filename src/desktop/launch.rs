@@ -96,6 +96,7 @@ struct DesktopOptions {
     out: Option<PathBuf>,
     timeout_ms: u64,
     allow_unverified_capture: bool,
+    enable_oracle: bool,
     preflight: PreflightMode,
     preflight_explicit: bool,
 }
@@ -108,6 +109,7 @@ impl Default for DesktopOptions {
             out: None,
             timeout_ms: DEFAULT_TIMEOUT_MS,
             allow_unverified_capture: false,
+            enable_oracle: false,
             preflight: PreflightMode::Strict,
             preflight_explicit: false,
         }
@@ -348,7 +350,7 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         }
     });
     let mut detection = detect_power_bi_desktop(options.desktop_path.as_deref());
-    let oracle_enabled = oracle_enabled();
+    let oracle_enabled = oracle_enabled(options.enable_oracle);
     let launch_plan = desktop_launch_plan(&options, &detection);
     let project_name = target.name.clone();
 
@@ -401,15 +403,16 @@ fn run_desktop(operation: DesktopOperation, args: &[String]) -> CliResult<Value>
         exit_code = EXIT_ORACLE_UNAVAILABLE;
         proof_status = "oracle-disabled".to_string();
         proof_message =
-            "Desktop oracle launch is disabled; set POWERBI_DESKTOP_ORACLE=1 to opt in."
+            "Desktop oracle launch is disabled; set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle to opt in."
                 .to_string();
         diagnostics.push(json!({
             "code": "oracle_disabled",
             "severity": "error",
             "message": format!(
-                "Set POWERBI_DESKTOP_ORACLE=1 on a Windows machine with Power BI Desktop installed to run {}.",
+                "Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle on a Windows machine with Power BI Desktop installed to run {}.",
                 operation.command_path()
-            )
+            ),
+            "hint": "Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle"
         }));
     } else if !detection.found {
         exit_code = EXIT_ORACLE_UNAVAILABLE;
@@ -1171,6 +1174,10 @@ fn parse_desktop_args(operation: DesktopOperation, args: &[String]) -> CliResult
                 options.allow_unverified_capture = true;
                 i += 1;
             }
+            "--enable-oracle" | "--enableOracle" => {
+                options.enable_oracle = true;
+                i += 1;
+            }
             "--timeout-ms" | "--timeoutMs" => {
                 let value = take_value(args, &mut i, "--timeout-ms")?;
                 options.timeout_ms = value.parse::<u64>().map_err(|_| {
@@ -1520,9 +1527,14 @@ pub(super) fn render_version_script(desktop_path: &str) -> String {
 }
 
 #[cfg(windows)]
-fn oracle_enabled() -> bool {
+fn oracle_enabled(flag: bool) -> bool {
+    flag || env_oracle_enabled()
+}
+
+#[cfg(windows)]
+fn env_oracle_enabled() -> bool {
     std::env::var("POWERBI_DESKTOP_ORACLE")
-        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
         .unwrap_or(false)
 }
 
@@ -1610,6 +1622,13 @@ mod tests {
         )
         .expect("screenshot options");
         assert!(options.allow_unverified_capture);
+
+        let enabled = parse_desktop_args(
+            DesktopOperation::Open,
+            &["report.pbip".to_string(), "--enable-oracle".to_string()],
+        )
+        .expect("open options");
+        assert!(enabled.enable_oracle);
 
         let error = parse_desktop_args(
             DesktopOperation::OpenCheck,

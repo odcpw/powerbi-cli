@@ -15,6 +15,15 @@ use serde_json::{Value, json};
 
 pub(crate) const CONTRACT_VERSION: &str = "powerbi-cli.agent-capabilities.v1";
 
+pub(crate) fn build_identity() -> (&'static str, u64) {
+    (
+        option_env!("POWERBI_CLI_GIT_SHA").unwrap_or("unknown"),
+        option_env!("POWERBI_CLI_BUILD_EPOCH")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0),
+    )
+}
+
 const PROOF_LEVELS: &[(&str, &str)] = &[
     (
         "unit-smoke",
@@ -43,6 +52,7 @@ pub(crate) fn help_text() -> String {
 
 Usage:
   powerbi-cli version --json
+  powerbi-cli triage <project-dir-or.pbip> --json
   powerbi-cli --json capabilities [--for <filter>]
   powerbi-cli features list [--for <feature-filter>] --json
   powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json
@@ -235,10 +245,13 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         })
     });
 
+    let (git_sha, build_epoch) = build_identity();
     Ok(json!({
         "tool": "powerbi-cli",
         "binary": "powerbi-cli",
         "version": env!("CARGO_PKG_VERSION"),
+        "gitSha": git_sha,
+        "buildEpoch": build_epoch,
         "contractVersion": CONTRACT_VERSION,
         "stability": "alpha-agent-contract",
         "primaryUser": "AI agents authoring offline-safe Power BI projects",
@@ -316,7 +329,7 @@ Rules for agents:
 - Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
-- Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP preflight defaults to `strict`; use `--preflight normal` for structural validation without lint or explicit `--preflight skip` when a known lint defect must not block a Desktop proof loop. PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
+- Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP preflight defaults to `strict`; use `--preflight normal` for structural validation without lint or explicit `--preflight skip` when a known lint defect must not block a Desktop proof loop. PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1` or `--enable-oracle`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
 - Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features and returns proof/handoff follow-up commands.
 - Use `report spec fields --schema <schema.json> [--profile <profile.json>]` to get exact column/measure binding references before writing a dashboard spec.
 - Use `report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json>` to create a deterministic starter dashboard spec, then `report spec validate --schema <schema.json> --spec <dashboard.json>` before build.
@@ -356,6 +369,8 @@ pub(crate) fn robot_triage() -> Value {
         "quickRef": {
             "discover": "powerbi-cli --json capabilities",
             "version": "powerbi-cli version --json",
+            "triage": "powerbi-cli triage <project-dir-or.pbip> --json",
+            "guid": "powerbi-cli guid --json",
             "featureCatalog": "powerbi-cli features list --json",
             "guide": "powerbi-cli robot-docs guide",
             "robotTriage": "powerbi-cli robot-triage",
@@ -591,7 +606,37 @@ fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.version.v1",
             "flags": ["--json", "--format json"],
             "examples": ["powerbi-cli version --json", "powerbi-cli --json version"],
-            "followUpFields": ["tool", "binary", "version", "contractVersion"]
+            "followUpFields": ["tool", "binary", "version", "contractVersion", "gitSha", "buildEpoch"]
+        }),
+        json!({
+            "path": "triage",
+            "usage": "powerbi-cli triage <project-dir-or.pbip> --json",
+            "summary": "Run strict validation and lint together and return ranked findings plus the next copy-paste command",
+            "tags": ["agent", "triage", "validation", "lint", "qa", "mega-command"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "triageResult.v1",
+            "flags": ["<project-dir-or.pbip>", "--json", "--format json"],
+            "examples": ["powerbi-cli triage build/sales --json", "powerbi-cli --json triage build/sales"],
+            "followUpFields": ["ok", "exitCode", "validation", "lint", "lint.findings[].stepKind", "topFindings", "next"]
+        }),
+        json!({
+            "path": "guid",
+            "usage": "powerbi-cli guid [--count <1..100>] --json",
+            "summary": "Generate lowercase UUIDv4 values for TMDL lineageTag authoring when hand-adding columns or measures",
+            "tags": ["agent", "tmdl", "lineageTag", "guid", "utility"],
+            "readOnly": true,
+            "mutates": false,
+            "deterministic": false,
+            "stability": "stable-shape",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "guidResult.v1",
+            "flags": ["--count <1..100>", "--json", "--format json"],
+            "examples": ["powerbi-cli guid --json", "powerbi-cli guid --count 5 --json"],
+            "limitations": ["Intentionally non-deterministic: each invocation emits fresh rand-based UUIDv4 values so the determinism contract stays honest."],
+            "followUpFields": ["guids", "count"]
         }),
         json!({
             "path": "features list",
@@ -842,10 +887,10 @@ fn command_catalog() -> Vec<Value> {
             "examples": ["powerbi-cli lint build/sales --json"],
             "diagnosticCodes": ["m.unbuffered_reuse", "m.untyped_expansion"],
             "limitations": [
-                "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps; it does not prove folding or refresh performance and never fails validation by itself.",
-                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself."
+                "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps. It fires only for table-producing step kinds `other` and `tableLiteral`, plus `navigation` steps that can be expensive. Function definitions (`(args) =>` / `each`), scalar literals, record literals, and list literals are classified via `stepKind` and suppressed. It does not prove folding or refresh performance and never fails validation by itself.",
+                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`."
             ],
-            "followUpFields": ["ok", "counts", "findings", "next"]
+            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "next"]
         }),
         json!({
             "path": "diff",

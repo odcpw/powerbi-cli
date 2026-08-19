@@ -614,8 +614,77 @@ fn desktop_open_check_is_structured_when_oracle_is_disabled() {
             .as_array()
             .expect("diagnostics")
             .iter()
-            .any(|diagnostic| diagnostic["code"] == "oracle_disabled")
+            .any(|diagnostic| diagnostic["code"] == "oracle_disabled"
+                && diagnostic["message"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle")
+                && diagnostic["hint"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("Set POWERBI_DESKTOP_ORACLE=1 or pass --enable-oracle"))
     );
+}
+
+#[test]
+#[cfg(windows)]
+fn desktop_open_check_enable_oracle_without_env_is_not_oracle_disabled() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let missing_desktop = temp.path().join("missing-desktop").join("PBIDesktop.exe");
+
+    let output = run_powerbi_without_oracle(&[
+        "desktop",
+        "open-check",
+        project_arg,
+        "--enable-oracle",
+        "--desktop-path",
+        missing_desktop.to_str().expect("desktop path"),
+        "--timeout-ms",
+        "1000",
+        "--json",
+    ]);
+    assert_ne!(output.code, 2, "stderr: {}", output.stderr);
+    let value = stdout_json(&output);
+    assert!(
+        value["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .all(|diagnostic| diagnostic["code"] != "oracle_disabled"),
+        "enable-oracle should opt in: {value}"
+    );
+    assert_ne!(value["proof"]["status"], Value::from("oracle-disabled"));
+}
+
+#[test]
+fn desktop_enable_oracle_is_a_known_flag() {
+    let output = run_powerbi(&[
+        "desktop",
+        "open-check",
+        "missing-project",
+        "--enable-oracle",
+        "--json",
+    ]);
+    assert_ne!(output.code, 0);
+    if !output.stdout.trim().is_empty() {
+        let value = stdout_json(&output);
+        assert!(
+            value["diagnostics"]
+                .as_array()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .all(|diagnostic| diagnostic["code"] != "oracle_disabled")
+                || value["error"]["code"] != "invalid_args"
+        );
+    } else {
+        let error = stderr_json(&output);
+        assert_ne!(
+            error["error"]["message"].as_str().unwrap_or_default(),
+            "unknown desktop open-check flag: --enable-oracle"
+        );
+    }
 }
 
 #[test]
