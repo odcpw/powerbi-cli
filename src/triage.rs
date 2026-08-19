@@ -262,8 +262,15 @@ fn extract_page_name(error: &str) -> Option<String> {
     let marker = "/pages/";
     let pages = normalized.find(marker)?;
     let after_pages = &normalized[pages + marker.len()..];
-    let page = after_pages.split('/').next().unwrap_or_default();
-    if page.is_empty() || page == "pages.json" {
+    let segment = after_pages.split('/').next().unwrap_or_default();
+    // Error text may continue after the path (": key must be a string …");
+    // keep only the path segment so prose never leaks into a suggested command.
+    let page = segment
+        .split([':', ' '])
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches(|c: char| !c.is_alphanumeric());
+    if page.is_empty() || page == "pages" || segment.starts_with("pages.json") {
         return None;
     }
     Some(page.to_string())
