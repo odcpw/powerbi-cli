@@ -46,3 +46,9 @@ redirect
 
 # bv (beads viewer) lock file
 .bv.lock
+
+# fsqlite sidecars written by br (local DB state, never shared)
+*.db-fsqlite-*
+*.db-wal-cert
+*.db-wal-cert-head
+*.fsqlite-migration-state
