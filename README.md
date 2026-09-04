@@ -157,6 +157,15 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   automates canvas or refresh proof; the `desktop-canvas-refresh` level remains
   open.
 
+  `desktop harvest-reference` archives a visual, page, or report JSON fragment
+  from an already-saved PBIP into a provenance-stamped wrapper. It records the
+  source path, source-project SHA-256 fingerprint, harvest date, license note,
+  and Desktop version when supplied. The selected fragment is read through the
+  bounded harvested-fragment safety contract; persisted selection/filter values
+  are refused rather than silently stripped. Linux archives record
+  `desktopVersion: "unknown"` and remain `desktop-golden-pending` until explicit
+  Desktop canvas/refresh evidence exists.
+
 Two additional Desktop-discovered guardrails are enforced locally. Scatter
 color grouping is stored under PBIR `queryState.Series`, even though Desktop's
 field well is labelled Legend; CLI inputs `legend`, `series`, `color`, and

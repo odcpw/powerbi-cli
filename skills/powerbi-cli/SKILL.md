@@ -151,7 +151,8 @@ list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
 PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive rebind metadata,
 handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
-one-shot desktop open-check/screenshot,
+one-shot desktop open-check/screenshot and Linux-capable desktop
+harvest-reference,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
@@ -1082,6 +1083,25 @@ acceptance. Default cleanup reports every targeted PID with its ownership reason
 follows only the exact observed PID and verified descendants, never sweeps by
 title or executable path, and verifies targeted PIDs are dead. `--leave-open` is
 rejected; use the managed `desktop open`/`desktop close` pair.
+
+Use `desktop harvest-reference` to archive a Desktop-saved `visual.json`,
+`page.json`, or `report.json` fragment by stable handle:
+
+```bash
+pbi --json desktop harvest-reference \
+  --project build/sales \
+  --visual visual:ReportSectionOverview:VisualContainer1 \
+  --out docs/reference/desktop-authored-visuals/sales-card.json
+```
+
+The archive wraps the fragment under `fragment` and records `provenance` with
+the source path, source-project SHA-256 fingerprint, date, license note, and
+Desktop version (`unknown` when none is supplied). The command calls the
+shared harvested-fragment input guard and refuses persisted selection/filter
+values, malformed or oversized files, links, and invalid UTF-8; it never
+silently strips rejected state. Already-saved Linux projects remain
+`desktop-golden-pending` because this path does not prove a Desktop canvas or
+refresh.
 
 When duplicate Desktop windows share the project title, selection prefers the
 association-launch PID and then a new post-baseline Desktop PID. If only
