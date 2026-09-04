@@ -21,6 +21,7 @@ mod add_relationship;
 mod add_visual;
 mod apply_theme_preset;
 mod filter_kernels;
+mod formatting_kernels;
 mod handles;
 mod io;
 mod legacy;
@@ -45,6 +46,7 @@ pub(crate) use add_relationship::*;
 pub(crate) use add_visual::*;
 pub(crate) use apply_theme_preset::*;
 pub(crate) use filter_kernels::*;
+pub(crate) use formatting_kernels::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
@@ -98,10 +100,10 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         Op::UpdateFilter(_) | Op::DeleteFilter(_) | Op::ClearFilter(_) | Op::SlicerClear(_) => {
             Some(Box::new(FilterKernel))
         }
-        Op::SetText(_)
-        | Op::SetColor(_)
-        | Op::FormattingApply(_)
-        | Op::ApplyThemeBundle(_)
+        Op::SetText(_) | Op::SetColor(_) | Op::FormattingApply(_) => {
+            Some(Box::new(FormattingKernel))
+        }
+        Op::ApplyThemeBundle(_)
         | Op::ApplyStyleBundle(_)
         | Op::BookmarkMetadata(_)
         | Op::SanitizeAction(_) => None,

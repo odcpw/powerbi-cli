@@ -374,6 +374,15 @@ mod tests {
             Op::SlicerClear(MutationPayload {
                 fields: BTreeMap::new(),
             }),
+            Op::SetText(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::SetColor(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::FormattingApply(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
         ];
         for operation in operations {
             let value = serde_json::to_value(&operation).expect("serialize operation");
