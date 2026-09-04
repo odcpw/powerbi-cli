@@ -1,5 +1,6 @@
 //! Desktop command dispatch, preflight validation, and bounded launch orchestration.
 
+use super::harvest_reference::harvest_reference_command;
 use crate::bridge::desktop_bridge_command;
 #[cfg(windows)]
 use crate::contract::CONTRACT_VERSION;
@@ -218,7 +219,7 @@ pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(
             CliError::invalid_args(
-                "desktop requires a subcommand: open, close, open-check, screenshot, refresh-check, canvas-check, or bridge",
+                "desktop requires a subcommand: open, close, open-check, screenshot, refresh-check, canvas-check, harvest-reference, or bridge",
             )
                 .with_hint(
                     "Run powerbi-cli --json capabilities --for desktop for supported Desktop oracle commands.",
@@ -247,6 +248,7 @@ pub(crate) fn desktop_command(args: &[String]) -> CliResult<Value> {
         "canvas-check" | "canvasCheck" => {
             Err(unsupported_feature_error("desktop.canvas-check"))
         }
+        "harvest-reference" | "harvestReference" => harvest_reference_command(rest),
         "bridge" => desktop_bridge_command(rest),
         _ => Err(CliError::invalid_args(format!(
             "unknown desktop command: {action}"

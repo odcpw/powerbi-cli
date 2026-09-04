@@ -78,7 +78,9 @@ Required contract rules:
   manifest before building a report.
 - `profile infer|validate|summarize`: derive or check schema/profile metadata
   from schema manifests and embedded dummy/profile rows without connecting to
-  live sources.
+  live sources. `profile infer --rows <rows.csv|rows.json>` now emits profile
+  v2 statistics under bounded input-safety limits; top literals stay redacted
+  unless explicitly opted in with `--include-data-values`.
 - `inspect <project|pbip>`: summarize PBIP, report, semantic model, pages,
   visuals, tables, columns, measures, relationships, and offline hazards.
 - `validate <project|pbip>`: parse required files, validate known schemas, check
@@ -101,8 +103,10 @@ Required contract rules:
 
 ### Semantic Model
 
-- `model tables list/show/add/update/delete`
-- `model columns list/show/add/update/delete`
+- `model tables list/show/add/rename/delete` (shipped guarded TMDL CRUD;
+  rename can rewrite references explicitly)
+- `model columns list/show/add/update/delete` (shipped guarded base and
+  calculated-column CRUD with unknown-metadata refusal)
 - `model measures list/show/add/update/delete`
 - `model dax dependencies|lint`
 - `model relationships list/show/add/update/delete`
@@ -122,10 +126,13 @@ object-specific writers and fixtures exist.
 
 ### Report Authoring
 
-- `report spec validate`: check a declarative dashboard spec against the schema
-  and visual catalog before writing files. The spec key walker is strict at
-  every supported node and reports `spec.unknown_field` with an RFC 6901
-  pointer; `report spec fields` publishes the same versioned allowed-key
+- `report spec validate|normalize`: check or canonicalize a declarative
+  dashboard spec against the schema before writing files. Both commands resolve
+  bounded relative `$include` fragments and expose deterministic
+  `normalizedFrom[]` provenance. The spec key walker is strict at every
+  supported node and reports `spec.unknown_field` with an RFC 6901 pointer;
+  validation also checks the visual catalog before writing files. `report spec
+  fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
@@ -181,6 +188,8 @@ visual binding is too strict to invent by memory.
 - `handoff check`: verify a project is safe to take home.
 - `handoff rebind-plan`: produce work-machine instructions mapping dummy
   partitions to real source templates without storing credentials.
+- `handoff rebind-check`: verify every rebound partition offline (connector
+  syntax and local path readability only) before the separate Desktop refresh.
 
 ### Proof
 
@@ -189,6 +198,11 @@ visual binding is too strict to invent by memory.
   save the project without corrupting it.
 - `desktop export-snapshot <project|pbip> --out-dir <dir>`: capture a
   Desktop-saved version for golden comparison.
+- `desktop harvest-reference --project <saved.pbip> --visual <handle> --out
+  docs/reference/desktop-authored-visuals/<name>.json`: archive one safe
+  Desktop-saved visual, page, or report fragment with source fingerprint and
+  provenance. Linux runs remain `desktop-golden-pending`; persisted selection
+  and filter values are refused by the shared input-safety guard.
 
 These commands should be optional. CI should run them only on Windows machines
 that explicitly opt in with Power BI Desktop installed.
@@ -391,8 +405,11 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
-  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
+- Source-template support covers SQL Server, PostgreSQL, ODBC, Excel, CSV,
+  folder, SharePoint/OneDrive, and generic M expressions. Generic M uses the
+  workflow/source-profile closed connector grammar with complete placeholder
+  tokens and refuses credentials, hard-coded paths, unknown functions, and
+  computed/postfix calls with an M-text pointer.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
@@ -414,6 +431,12 @@ frozen until proven.
   Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
+- Implemented offline `handoff rebind-check`: it reports deterministic,
+  per-partition materialization state and registered findings for placeholders,
+  incomplete connector syntax, unknown sources, and missing/unreadable local
+  paths. It runs strict native validation and deliberately never opens a source
+  or Desktop connection; `refresh.status` remains `not-run` until the returned
+  Desktop handoff command is performed on the work machine.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
   applies raw report-level theme bundles from `themeCollection` and already
   present registered theme JSON resources. Per-visual raw formatting bundle
@@ -502,6 +525,10 @@ frozen until proven.
 ### Phase 8: Agent Batch Operations
 
 - Add `diff` and `apply --ops` once individual commands are stable.
+- The internal `powerbi-cli.ops.v1` spine now provides typed operation JSON,
+  pointer-rich plan validation, deterministic handles, and a temporary-tree
+  transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
+  public `apply --ops` command only after the individual kernels are converted.
 - Make operation JSON durable enough for another agent to inspect and replay.
 - Include generated proof commands in mutation outputs. `report build` now
   compiles v2 `proof` requirements into a deterministic `proofPlan` and
@@ -620,10 +647,13 @@ coverage only from Desktop-authored or Desktop-proved fixtures.
    title/data-label/legend/axis typed defaults, style lint, and conditional
    formatting once fixtures exist.
 10. **Version and compose schema manifests.**
-    Add required `schemaVersion`, `$include` or directory-based manifests,
-    `schema validate`, and `schema normalize`. Large real-world schema
-    manifests will eventually be too big for a single JSON file, and agents
-    will want composition.
+    `schema validate` and `schema normalize` now accept bounded relative
+    `$include` fragments, reject traversal/symlink/cycle and resource-budget
+    violations, and expose deterministic `normalizedFrom[]` provenance.
+    `schemaVersion` is warning-only for one compatibility release before it
+    becomes required. `report spec normalize` provides the corresponding
+    canonicalization for v2 dashboard specs; report build consumes normalized
+    documents so include-composed and inline-equivalent inputs preserve parity.
 11. **Broaden semantic model authoring.**
     Add tables/columns CRUD beyond scaffold, calculated tables, named
     expressions, date-table helpers, roles/RLS, perspectives, translations,

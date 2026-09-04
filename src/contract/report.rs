@@ -38,13 +38,34 @@ pub(super) fn commands() -> Vec<Value> {
             "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec validate --schema examples/sales.schema.json --spec examples/sales.dashboard.json --json", "powerbi-cli report spec validate --spec examples/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "next"],
+            "followUpFields": ["ok", "exitCode", "validationLevel", "normalizedFrom", "compiled.counts", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "next"],
             "validationLevels": [
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
             ],
-            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args"],
-            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
+            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args", "include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
+            "supportedIncludes": ["model", "pages[]", "style"]
+        }),
+        json!({
+            "path": "report spec normalize",
+            "usage": "powerbi-cli report spec normalize [--spec <dashboard.json> | <dashboard.json>] --out <canonical.json> --json",
+            "summary": "Resolve supported dashboard-spec includes and write one deterministic canonical JSON document",
+            "tags": ["report", "dashboard", "spec", "normalize", "include", "golden", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesArtifact": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.normalize.v1",
+            "flags": ["--spec <dashboard.json>", "<dashboard.json>", "--out <canonical.json>", "--json", "--format json"],
+            "examples": ["powerbi-cli report spec normalize examples/sales.dashboard.json --out build/sales.dashboard.normalized.json --json"],
+            "followUpFields": ["ok", "specPath", "normalizedOut", "normalizedFrom", "specVersion", "next"],
+            "supportedIncludes": ["model", "pages[]", "style"],
+            "diagnosticCodes": ["include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"]
         }),
         json!({
             "path": "report spec fields",

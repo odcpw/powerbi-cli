@@ -157,6 +157,15 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   automates canvas or refresh proof; the `desktop-canvas-refresh` level remains
   open.
 
+  `desktop harvest-reference` archives a visual, page, or report JSON fragment
+  from an already-saved PBIP into a provenance-stamped wrapper. It records the
+  source path, source-project SHA-256 fingerprint, harvest date, license note,
+  and Desktop version when supplied. The selected fragment is read through the
+  bounded harvested-fragment safety contract; persisted selection/filter values
+  are refused rather than silently stripped. Linux archives record
+  `desktopVersion: "unknown"` and remain `desktop-golden-pending` until explicit
+  Desktop canvas/refresh evidence exists.
+
 Two additional Desktop-discovered guardrails are enforced locally. Scatter
 color grouping is stored under PBIR `queryState.Series`, even though Desktop's
 field well is labelled Legend; CLI inputs `legend`, `series`, `color`, and
@@ -187,6 +196,18 @@ schema validation, snapshots, and harvested PBIR fragments. See
 numbers and the APIs future command owners must call. Package archives and the
 staged workflow retain their stronger specialized streaming/identity policies.
 
+`profile infer --rows <rows.csv|rows.json>` emits a `powerbi-cli.dataProfile.v2`
+document with bounded null rates, distinct counts, numeric/date ranges, time
+coverage, duplicate-key grain conflicts, and type-coercion diagnostics. CSV
+uses its first row as the header; JSON accepts an array of objects or an array
+whose first item is a header row. Top-value counts and cardinality are always
+available, while literal top values are replaced with `[REDACTED]` by default.
+`--include-data-values` is an explicit opt-in for a maximum of five bounded
+values per column and is refused when credential/PII scanning flags a column.
+`--redact` remains a deprecated no-op alias. Profiles stamped
+`dataValues:true` are data-bearing: `handoff check` reports them and
+`package source-pack` refuses to write an archive.
+
 ## JSON Response Contract
 
 Successful JSON is family-specific; there is no mandatory five-field success
@@ -204,6 +225,12 @@ stdout. CLI errors are written to stderr with required `code`, `exitCode`, and
 Every `next[]` or `suggestedCommands[]` string is an executable `powerbi-cli`
 command template; prose belongs in `instructions[]` or `notes[]`. The exact
 machine-readable contract is available at `capabilities.responseShapes`.
+
+The internal operation-plan spine uses the durable `powerbi-cli.ops.v1` JSON
+shape. It is intentionally not a public command yet: converted mutation
+kernels will consume typed `op` records through a temporary-directory
+transaction, validate the staged PBIP tree, and publish only through explicit
+dry-run, out-dir, or snapshotted in-place modes.
 
 ## Build
 
@@ -244,11 +271,15 @@ cargo run --bin powerbi-cli -- package source-pack --project .\build\sales --out
 cargo run --bin powerbi-cli -- package work-pack --project .\build\sales-live --json
 cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
+cargo run --bin powerbi-cli -- schema normalize .\examples\sales.schema.json --out .\build\sales.schema.normalized.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
+# Bounded CSV/JSON profile inference keeps top literals redacted by default.
+cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --rows .\build\sales-rows.csv --out .\build\sales.profile.v2.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
+cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
 cargo run --bin powerbi-cli -- validate --strict .\build\generic-sales --json
@@ -292,9 +323,11 @@ cargo run --bin powerbi-cli -- source-template add --project .\build\sales --tab
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind generic-m --m-template 'let Source = Sql.Database("{{powerbi-cli.placeholder:server}}", "{{powerbi-cli.placeholder:database}}") in Source' --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
+cargo run --bin powerbi-cli -- handoff rebind-check .\build\sales-live --partition partition:FactSales:FactSales --json
 cargo run --bin powerbi-cli -- fixture normalize .\build\sales --out .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- fixture verify .\build\sales --expected .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- desktop open .\build\sales --json
@@ -407,6 +440,19 @@ and non-ASCII column/measure names. The manifest describes:
   `HighlightFilter`, or `NoFilter`; referenced visual IDs are validated and
   compiled into PBIR `visualInteractions`
 
+Schema manifests may declare a non-empty `schemaVersion` (missing values emit
+a compatibility warning for one release before becoming an error) and compose
+bounded JSON fragments with `$include`. Includes are resolved relative to the
+including file and are supported at the schema root, table entries, and the
+v2 dashboard spec's `model`, `pages[]`, and `style` sections. The input-safety
+guard rejects traversal, canonical paths outside the root, symlinks, cycles,
+fragments deeper than eight levels, more than 200 fragments, or fragments
+larger than 8 MiB. Run `schema normalize` or `report spec normalize` to write
+a canonical, byte-stable document; the JSON response records sorted,
+root-relative `normalizedFrom[]` provenance. Schema validation and report build
+consume the same normalized values, so an inline document and an equivalent
+include tree produce the same artifact output and parity fingerprint.
+
 Semantic-model handles percent-encode literal `%` and `:` inside table, column,
 measure, and partition components as `%25` and `%3A`; always reuse returned
 handles instead of constructing them by hand. Manifest and calculated-column input type `date` emits TMDL
@@ -424,6 +470,16 @@ partition. Lookup keys in the first column are unique; relationships are added
 separately with `model relationships add`. The command refuses replacement,
 credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table
 ingestion, and validates the project after every write.
+
+The generic semantic-model surface covers `model tables list/show/add/rename/delete`
+and `model columns list/show/add/update/delete`. Table handles use the form
+`table:<name>`; column handles use `column:<table>:<name>`. Literal `%` and `:`
+inside each component are encoded as `%25` and `%3A`. Table rename refuses when
+relationships, DAX, or variation metadata still reference the old name unless
+`--rename-references` is supplied. Column updates refuse unknown
+Desktop-authored properties in the targeted block, so annotations and
+extended properties are never silently dropped. All mutating commands support
+`--dry-run`, guarded `--in-place`, and isolated `--out-dir` output.
 
 The `regional-sales` archetype is deliberately dummy data, but keeps the
 column names and shape close enough to exercise a non-ASCII column
@@ -471,7 +527,8 @@ three pages.
   safe metadata/source entries by default, `package import` succeeds only when
   real allowlisted PBIP/PBIR/TMDL source files exist inside the archive,
   `package source-pack` first refuses unknown files and files in dot-directories,
-  then scans every included file for credentials and PII-suspect row literals;
+  then scans every included file for credentials, PII-suspect row literals, and
+  data-bearing profile v2 documents;
   non-dummy or unverified partition sources are also refused. The separate
   `package work-pack` uses the same allowlist and scans, but requires every
   partition to be a recognized credential-free materialized live source
@@ -490,7 +547,8 @@ three pages.
   `definition.pbir`/definition JSON, semantic-model `.platform`/
   `definition.pbism`/definition TMDL, registered/shared JSON resources, and the
   generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-  `powerbi-cli.manifest.copy.json` sidecars. A work-pack additionally contains
+  `powerbi-cli.manifest.copy.json` sidecars and root `profile*.json`/`*.profile*.json`
+  metadata files. A work-pack additionally contains
   the generated `powerbi-cli.work-pack.json` class marker. Other files—including every file
   below `.git`, `.vscode`, `.powerbi-cli`, or another dot-directory—cause a
   deterministic refusal listing and no archive is written.
@@ -595,12 +653,20 @@ three pages.
   only after the MCP process tree is reaped. The output contains only a
   `definition/` TMDL tree; it is not a report export or full PBIX-to-PBIP
   conversion.
+- Programmatic semantic-model authoring covers `model tables list/show/add/rename/delete`
+  and `model columns list/show/add/update/delete` with stable percent-encoded
+  table/column handles, guarded output modes, and readback/validate commands.
+  Rename rewrites relationship, DAX, and variation references only when
+  `--rename-references` is explicit; otherwise it refuses with the reference
+  list. Column updates refuse unknown Desktop-authored properties instead of
+  dropping annotations or extended properties. `diff --scope model.tables` and
+  `diff --scope model.columns` provide semantic table/column changes.
 - Programmatic static-table authoring covers `model tables add-static` for a
   new disconnected single-string-column selector or a small 1-10-column string
   lookup dimension backed by a generated inline `#table` partition. Cells are
   bounded, short, and screened for credential-like text; the first column is a
-  unique key. Broader table/column CRUD, automatic relationships, and arbitrary
-  fact-table ingestion remain outside this guarded surface.
+  unique key. Automatic relationships and arbitrary fact-table ingestion remain
+  outside this guarded surface.
 - Programmatic DAX calculated column authoring covers `model calculated-columns
   list/show/add/update/delete` with explicit data types, guarded output modes,
   readback commands, and `diff --scope model.calculatedColumns`. Updates refuse
@@ -656,7 +722,17 @@ three pages.
   templates to partitions and can write a self-contained Markdown runbook with
   `--out <file.md>` (existing files require `--force`). Credential detection
   redacts JSON/Markdown excerpts and suppresses runbook creation. CSV and
-  generic M template kinds remain planned and refused.
+  generic M templates are accepted only when their direct connector root and
+  transformation calls stay within the workflow/source-profile closed grammar;
+  credential-like text, hard-coded paths, unknown functions, and computed calls
+  are refused with a pointer into the M text.
+- `handoff rebind-check` is the offline, credential-free gate after a work-machine
+  rebind. It checks every selected partition for a concrete supported connector,
+  validates SQL/PostgreSQL/ODBC/SharePoint syntax, probes only local file/folder
+  paths for existence and readability, and reports per-partition findings plus
+  strict native validation. It never opens a database, SharePoint, or Desktop
+  connection; use the returned `desktop open` command for separate refresh and
+  canvas proof.
 - Programmatic report layout authoring covers `report pages
   list/show/add/update/reorder/set-active/delete-empty`, `report visuals
   list/show/add/clone/delete`, guarded `report visuals set-position`, and guarded
@@ -782,6 +858,10 @@ three pages.
   files, and unknown partition sources. The result reports `target`,
   `sourceMode`, `safeForOfflineHandoff`, and `safeForWorkHandoff` explicitly.
   Structurally valid literal tables with PII-suspect rows remain `review`.
+- `handoff rebind-check` verifies that a rebinding is materialized and
+  credential-free without evaluating Power Query. It returns `safe`, `review`,
+  or `unsafe`, stable partition handles, registered finding codes, and a
+  `refresh.status` of `not-run` to make the Desktop boundary explicit.
 - Dashboard specs and strict PBIR validation reject slicers shorter than Power
   BI's 76-pixel minimum, preventing a common source of clipped controls before
   the report reaches Desktop.

@@ -345,14 +345,17 @@ would reveal candidates. No guessing.
 
 ### T2.4 Composition, versioning, scale
 
-Roadmap item 10, never started: large schemas and specs will not fit one
-file. Add `schemaVersion` to the schema manifest, `$include` for both schema
-and spec (relative paths only, no traversal outside the spec directory, cycle
-detection), and `schema normalize`/`report spec normalize` to flatten into
-one canonical file for reproducibility and fingerprinting. The artifact-parity
-fingerprint must be computed on the normalized form. Perf target: a
-100-table schema with 50 included fragments normalizes and builds within the
-limits in the targets table.
+Implemented by `pbi-t2-dashboard-spec-v2-dsd.4`: large schemas and specs can be
+composed from bounded relative `$include` fragments. `schemaVersion` is
+warning-only for one compatibility release, while `schema normalize` and
+`report spec normalize` flatten the supported composition points into
+deterministic canonical JSON with sorted `normalizedFrom[]` provenance.
+Traversal, canonical-root escape, symlink, cycle, depth, fragment-count, and
+fragment-size violations are refused by `IncludeGuard`. Report build consumes
+the normalized form, so artifact parity is based on equivalent normalized
+documents. The perf test covers a 100-table schema assembled from 50
+fragments and enforces the ten-second target; the 512 MiB target remains part
+of the CI resource budget.
 
 ### T2.5 Spec extraction and spec diff
 
@@ -633,10 +636,11 @@ applying the emitted plan drives design lint to zero on each fixture.
 Planner v2 must make decisions that visibly depend on the data shape and the
 intent, explain each decision, and refuse to guess when signals are weak.
 
-- T6.1 Profile v2: `profile infer --rows <csv|json>` (advertised as planned;
-  implement) computing null rates, distinct counts, min/max, top values, time
-  coverage, and grain conflicts. Only bounded top values leave the rows, and
-  `--redact` replaces literals with counts for sensitive columns.
+- T6.1 Profile v2: `profile infer --rows <csv|json>` computes null rates,
+  distinct counts, min/max, bounded top-value counts, time coverage, and grain
+  conflicts with type-coercion diagnostics. Only bounded top values leave the
+  rows after an explicit `--include-data-values` opt-in and credential/PII
+  scan; default output is redacted and `--redact` is a deprecated no-op alias.
 - T6.2 Shape classification: single flat table, star, snowflake, multi-fact;
   candidate facts/dimensions/date tables; high-cardinality noise; key
   candidates. Emitted in `decisions[]` with evidence. Proposes a date table
@@ -825,13 +829,15 @@ The locked-down corporate workflow is central and still SQL/Excel shaped.
 
 - T13.1 Source templates for CSV file and folder, and SharePoint/OneDrive
   path placeholders, credential-free, with the same `apply` gate.
-- T13.2 Generic M template kind with an explicit closed grammar (connector
-  allowlist, no credential tokens, placeholder resolution), refused outside
-  the grammar.
+- T13.2 Implemented: generic M source-template kind with an explicit closed
+  grammar (connector allowlist, no credential tokens, placeholder resolution),
+  refused outside the grammar with a pointer into the M text.
 - T13.3 `handoff rebind-check`: on the work machine, after `source-template
-  apply`, validate that every partition resolves, run strict validation, and
-  optionally use the Desktop bridge to confirm refresh; report which
-  partitions are still placeholders.
+  apply`, validate that every partition resolves, run strict native validation,
+  and report which partitions are still placeholders. The check is deliberately
+  offline and credential-free (connector syntax plus local path readability); it
+  never opens a source or Desktop connection. Use its returned Desktop command
+  for the separate authenticated refresh and canvas proof.
 - T13.4 Handoff runbook gains the design scorecard and proof level so the
   reviewer at work knows what was and was not proven at home.
 

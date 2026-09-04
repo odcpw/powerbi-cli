@@ -1,6 +1,6 @@
 mod common;
 
-use common::{run_powerbi, stderr_json, stdout_json};
+use common::{assert_json_snapshot, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
@@ -20,6 +20,477 @@ fn minimal_spec() -> Value {
         "report": {"name": "StrictSpec"},
         "pages": []
     })
+}
+
+#[test]
+fn schema_version_missing_warns_during_the_compatibility_release() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let schema_path = temp.path().join("legacy.schema.json");
+    write_spec(
+        &schema_path,
+        &json!({
+            "name": "LegacySchema",
+            "tables": [{"name": "Fact", "columns": [{"name": "Value", "dataType": "int64"}]}]
+        }),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        schema_path.to_str().expect("schema path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 0, "stderr: {}", output.stderr);
+    let response = stdout_json(&output);
+    assert_eq!(response["ok"], true);
+    assert!(
+        response["warnings"][0]
+            .as_str()
+            .unwrap_or_default()
+            .contains("schemaVersion")
+    );
+}
+
+#[test]
+fn schema_version_must_be_a_non_empty_string_when_present() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let schema_path = temp.path().join("invalid-version.schema.json");
+    write_spec(
+        &schema_path,
+        &json!({
+            "schemaVersion": 1,
+            "name": "InvalidVersion",
+            "tables": [{"name": "Fact", "columns": [{"name": "Value", "dataType": "int64"}]}]
+        }),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        schema_path.to_str().expect("schema path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let response = stdout_json(&output);
+    assert_eq!(response["ok"], false);
+    assert!(
+        response["errors"][0]
+            .as_str()
+            .unwrap_or_default()
+            .contains("non-empty string")
+    );
+}
+
+#[test]
+fn schema_and_spec_includes_normalize_deterministically_and_build_with_parity() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let parts = temp.path().join("parts");
+    fs::create_dir_all(&parts).expect("parts directory");
+
+    let fact = json!({
+        "name": "Fact",
+        "columns": [
+            {"name": "Category", "dataType": "string"},
+            {"name": "Value", "dataType": "int64"}
+        ],
+        "rows": [{"Category": "Synthetic", "Value": 1}]
+    });
+    write_spec(&parts.join("fact.json"), &fact);
+    write_spec(
+        &parts.join("schema-part.json"),
+        &json!({
+            "tables": [{"$include": "fact.json"}],
+            "relationships": []
+        }),
+    );
+    let dimension = json!({
+        "name": "Dim",
+        "columns": [{"name": "Category", "dataType": "string"}],
+        "rows": [{"Category": "Synthetic"}]
+    });
+    let schema = json!({
+        "schemaVersion": "1",
+        "name": "IncludeParity",
+        "displayName": "Include Parity",
+        "$include": "parts/schema-part.json",
+        "tables": [dimension.clone()],
+        "relationships": []
+    });
+    let inline_schema = json!({
+        "schemaVersion": "1",
+        "name": "IncludeParity",
+        "displayName": "Include Parity",
+        "tables": [fact.clone(), dimension],
+        "relationships": []
+    });
+    let schema_path = temp.path().join("include.schema.json");
+    let inline_schema_path = temp.path().join("inline.schema.json");
+    write_spec(&schema_path, &schema);
+    write_spec(&inline_schema_path, &inline_schema);
+
+    let validation = run_powerbi(&[
+        "schema",
+        "validate",
+        schema_path.to_str().expect("schema path"),
+        "--json",
+    ]);
+    assert_eq!(validation.exit, 0, "stderr: {}", validation.stderr);
+    let validation_json = stdout_json(&validation);
+    assert_eq!(
+        validation_json["normalizedFrom"],
+        json!(["parts/fact.json", "parts/schema-part.json"])
+    );
+    assert_eq!(validation_json["counts"]["tables"], 2);
+
+    let normalized_one = temp.path().join("schema.normalized.one.json");
+    let normalized_two = temp.path().join("schema.normalized.two.json");
+    for output_path in [&normalized_one, &normalized_two] {
+        let output = run_powerbi(&[
+            "schema",
+            "normalize",
+            schema_path.to_str().expect("schema path"),
+            "--out",
+            output_path.to_str().expect("normalized path"),
+            "--json",
+        ]);
+        assert_eq!(output.exit, 0, "stderr: {}", output.stderr);
+    }
+    assert_eq!(
+        fs::read(&normalized_one).expect("normalized one"),
+        fs::read(&normalized_two).expect("normalized two")
+    );
+    let normalized_schema: Value =
+        serde_json::from_slice(&fs::read(&normalized_one).expect("read normalized schema"))
+            .expect("parse normalized schema");
+    assert!(normalized_schema.get("$include").is_none());
+    assert_eq!(normalized_schema["tables"][0]["name"], "Fact");
+    assert_eq!(normalized_schema["tables"][1]["name"], "Dim");
+
+    let spec_parts = temp.path().join("spec-parts");
+    fs::create_dir_all(&spec_parts).expect("spec parts directory");
+    write_spec(
+        &spec_parts.join("model.json"),
+        &json!({
+            "measures": [{"table": "Fact", "name": "Total", "expression": "SUM(Fact[Value])"}]
+        }),
+    );
+    write_spec(
+        &spec_parts.join("page.json"),
+        &json!({"id": "overview", "displayName": "Overview", "visuals": []}),
+    );
+    write_spec(
+        &spec_parts.join("style.json"),
+        &json!({"tokens": {"palette": ["#123456"]}}),
+    );
+    let spec = json!({
+        "schema": "powerbi-cli.dashboard.v2",
+        "report": {"name": "IncludeSpec", "displayName": "Include Spec"},
+        "model": {"$include": "spec-parts/model.json"},
+        "pages": [{"$include": "spec-parts/page.json"}],
+        "style": {"$include": "spec-parts/style.json"}
+    });
+    let spec_path = temp.path().join("include.dashboard.json");
+    write_spec(&spec_path, &spec);
+    let normalized_spec_one = temp.path().join("spec.normalized.one.json");
+    let normalized_spec_two = temp.path().join("spec.normalized.two.json");
+    for output_path in [&normalized_spec_one, &normalized_spec_two] {
+        let output = run_powerbi(&[
+            "report",
+            "spec",
+            "normalize",
+            spec_path.to_str().expect("spec path"),
+            "--out",
+            output_path.to_str().expect("normalized spec path"),
+            "--json",
+        ]);
+        assert_eq!(output.exit, 0, "stderr: {}", output.stderr);
+    }
+    assert_eq!(
+        fs::read(&normalized_spec_one).expect("normalized spec one"),
+        fs::read(&normalized_spec_two).expect("normalized spec two")
+    );
+    let normalized_spec: Value =
+        serde_json::from_slice(&fs::read(&normalized_spec_one).expect("read normalized spec"))
+            .expect("parse normalized spec");
+    assert!(normalized_spec.get("$include").is_none());
+    assert_eq!(normalized_spec["model"]["measures"][0]["name"], "Total");
+    assert_eq!(normalized_spec["pages"][0]["displayName"], "Overview");
+    assert_eq!(normalized_spec["style"]["tokens"]["palette"][0], "#123456");
+
+    let normalized_response = run_powerbi(&[
+        "report",
+        "spec",
+        "normalize",
+        spec_path.to_str().expect("spec path"),
+        "--out",
+        normalized_spec_one.to_str().expect("normalized spec path"),
+        "--json",
+    ]);
+    assert_eq!(normalized_response.exit, 0);
+    let response_json = stdout_json(&normalized_response);
+    assert_json_snapshot(
+        "schema-spec-include-normalize",
+        &json!({
+            "schema": {
+                "normalizedFrom": validation_json["normalizedFrom"],
+                "tableNames": normalized_schema["tables"].as_array().expect("tables").iter().map(|table| table["name"].clone()).collect::<Vec<_>>()
+            },
+            "spec": {
+                "normalizedFrom": response_json["normalizedFrom"],
+                "specVersion": response_json["specVersion"],
+                "measure": normalized_spec["model"]["measures"][0]["name"],
+                "page": normalized_spec["pages"][0]["displayName"]
+            }
+        }),
+    );
+
+    let spec_for_build = temp.path().join("build.dashboard.json");
+    write_spec(
+        &spec_for_build,
+        &json!({
+            "schema": "powerbi-cli.dashboard.v1",
+            "report": {"name": "IncludeParity", "displayName": "Include Parity"},
+            "pages": []
+        }),
+    );
+    let included_project = temp.path().join("included-project");
+    let inline_project = temp.path().join("inline-project");
+    for (schema_input, project) in [
+        (&schema_path, &included_project),
+        (&inline_schema_path, &inline_project),
+    ] {
+        let output = run_powerbi(&[
+            "report",
+            "build",
+            "--schema",
+            schema_input.to_str().expect("build schema path"),
+            "--spec",
+            spec_for_build.to_str().expect("build spec path"),
+            "--out-dir",
+            project.to_str().expect("project path"),
+            "--json",
+        ]);
+        assert_eq!(output.exit, 0, "stderr: {}", output.stderr);
+    }
+    assert_eq!(read_tree(&included_project), read_tree(&inline_project));
+}
+
+#[test]
+fn include_path_escape_and_unsupported_location_are_refused_before_writing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let schema_path = temp.path().join("escape.schema.json");
+    write_spec(
+        &schema_path,
+        &json!({"schemaVersion": "1", "name": "Escape", "$include": "../outside.json"}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        schema_path.to_str().expect("schema path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "include.path_escape");
+    assert_eq!(error["pointer"], "/$include");
+    assert!(error["suggestedCommands"].as_array().is_some());
+
+    let spec_path = temp.path().join("unsupported.dashboard.json");
+    write_spec(
+        &spec_path,
+        &json!({
+            "schema": "powerbi-cli.dashboard.v1",
+            "report": {"name": "Unsupported"},
+            "pages": [{"id": "overview", "visuals": [{"$include": "fragment.json"}]}]
+        }),
+    );
+    write_spec(&temp.path().join("fragment.json"), &json!({"id": "visual"}));
+    let output = run_powerbi(&[
+        "report",
+        "spec",
+        "validate",
+        "--spec",
+        spec_path.to_str().expect("spec path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stderr: {}", output.stderr);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "include.unsupported_location");
+    assert_eq!(error["pointer"], "/pages/0/visuals/0/$include");
+}
+
+#[test]
+fn include_scalar_fragment_is_refused_instead_of_being_dropped() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path().join("scalar.schema.json");
+    write_spec(&temp.path().join("scalar.json"), &json!(null));
+    write_spec(
+        &root,
+        &json!({"schemaVersion": "1", "name": "Scalar", "$include": "scalar.json"}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        root.to_str().expect("root path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "include.invalid");
+    assert_eq!(error["pointer"], "/$include");
+}
+
+#[test]
+fn include_cycle_is_refused_with_the_active_chain() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path().join("root.schema.json");
+    write_spec(
+        &root,
+        &json!({"schemaVersion": "1", "name": "Cycle", "$include": "a.json"}),
+    );
+    write_spec(&temp.path().join("a.json"), &json!({"$include": "b.json"}));
+    write_spec(
+        &temp.path().join("b.json"),
+        &json!({"$include": "root.schema.json"}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        root.to_str().expect("root path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "include.cycle");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("cycle")
+    );
+    assert!(error["hint"].is_string());
+}
+
+#[test]
+fn include_depth_budget_is_refused_before_parsing_more_fragments() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path().join("depth-root.schema.json");
+    for index in 0..=9 {
+        let path = temp.path().join(format!("depth-{index}.schema.json"));
+        let value = if index < 9 {
+            json!({"$include": format!("depth-{}.schema.json", index + 1)})
+        } else {
+            json!({"tables": []})
+        };
+        write_spec(&path, &value);
+    }
+    write_spec(
+        &root,
+        &json!({"schemaVersion": "1", "name": "Depth", "$include": "depth-0.schema.json"}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        root.to_str().expect("root path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "input_safety_violation");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("depth")
+    );
+}
+
+#[test]
+fn include_fragment_count_budget_is_refused_for_many_siblings() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let mut includes = Vec::new();
+    for index in 0..201 {
+        let name = format!("fragment-{index:03}.json");
+        write_spec(&temp.path().join(&name), &json!({"tables": []}));
+        includes.push(name);
+    }
+    let root = temp.path().join("count.schema.json");
+    write_spec(
+        &root,
+        &json!({"schemaVersion": "1", "name": "Count", "$include": includes}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        root.to_str().expect("root path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "input_safety_violation");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("count")
+    );
+}
+
+#[test]
+fn include_fragment_size_budget_is_refused_before_json_parse() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let large = temp.path().join("large.json");
+    fs::write(&large, vec![b' '; 8 * 1024 * 1024 + 1]).expect("large fragment");
+    let root = temp.path().join("size.schema.json");
+    write_spec(
+        &root,
+        &json!({"schemaVersion": "1", "name": "Size", "$include": "large.json"}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        root.to_str().expect("root path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "input_safety_violation");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("maximum")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn include_symlink_is_refused_before_canonical_containment() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let real = temp.path().join("real.json");
+    write_spec(&real, &json!({"tables": []}));
+    let link = temp.path().join("link.json");
+    symlink(&real, &link).expect("include symlink");
+    let root = temp.path().join("symlink.schema.json");
+    write_spec(
+        &root,
+        &json!({"schemaVersion": "1", "name": "Link", "$include": "link.json"}),
+    );
+    let output = run_powerbi(&[
+        "schema",
+        "validate",
+        root.to_str().expect("root path"),
+        "--json",
+    ]);
+    assert_eq!(output.exit, 10, "stdout: {}", output.stdout);
+    let error = stderr_json(&output)["error"].clone();
+    assert_eq!(error["code"], "input_safety_violation");
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("symlink")
+    );
 }
 
 #[test]

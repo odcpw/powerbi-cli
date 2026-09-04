@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "normalizedFrom": [
+      "parts/fact.json",
+      "parts/schema-part.json"
+    ],
+    "tableNames": [
+      "Fact",
+      "Dim"
+    ]
+  },
+  "spec": {
+    "measure": "Total",
+    "normalizedFrom": [
+      "spec-parts/model.json",
+      "spec-parts/page.json",
+      "spec-parts/style.json"
+    ],
+    "page": "Overview",
+    "specVersion": "powerbi-cli.dashboard.v2"
+  }
+}

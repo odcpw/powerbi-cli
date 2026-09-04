@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes,
 };
 use crate::input_safety::{InputKind, read_utf8};
+use crate::json_composition::normalize_spec_file;
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
     slicer_between_data_type_is_supported,
@@ -9,6 +10,7 @@ use crate::pbir_visual_factory::{
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_fields::fields_command;
+use crate::report_spec_normalize::normalize_command;
 use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
@@ -140,10 +142,11 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
 pub(crate) fn spec_command(args: &[String]) -> CliResult<Value> {
     match args {
         [action, rest @ ..] if action == "validate" => spec_validate(rest),
+        [action, rest @ ..] if action == "normalize" => normalize_command(rest),
         [action, rest @ ..] if action == "fields" => fields_command(rest),
         [action, rest @ ..] if action == "upgrade" => upgrade_command(rest),
         [] => Err(CliError::invalid_args(
-            "report spec requires a subcommand: validate, fields, or upgrade",
+            "report spec requires a subcommand: validate, normalize, fields, or upgrade",
         )
             .with_suggested_command(
                 "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
@@ -172,7 +175,8 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
                 "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
             )
     })?;
-    let spec_value = load_json_value(&spec_path, "dashboard spec")?;
+    let normalized_spec = normalize_spec_file(&spec_path)?;
+    let spec_value = normalized_spec.value;
     let known_fields = validate_known_fields(&spec_value);
     let proof_plan_result = if known_fields.is_ok() {
         compile_proof_plan(Some(&spec_value), None)
@@ -242,6 +246,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         "specPath": canonical_display(&spec_path),
         "schemaPath": schema_path.as_ref().map(|path| canonical_display(path)),
         "profilePath": options.profile.as_ref().map(|path| canonical_display(path)),
+        "normalizedFrom": normalized_spec.normalized_from,
         "profileSummary": profile_value.as_ref().map(profile_summary),
         "compiled": compiled.as_ref().map(compiled_summary),
         "proofPlan": proof_plan_result
@@ -1445,7 +1450,14 @@ fn next_for_spec_validate(
 }
 
 fn load_optional_value(path: Option<&Path>, label: &str) -> CliResult<Option<Value>> {
-    path.map(|path| load_json_value(path, label)).transpose()
+    path.map(|path| {
+        if label == "dashboard spec" {
+            Ok(normalize_spec_file(path)?.value)
+        } else {
+            load_json_value(path, label)
+        }
+    })
+    .transpose()
 }
 
 fn load_json_value(path: &Path, label: &str) -> CliResult<Value> {
@@ -1579,7 +1591,7 @@ fn required_string(object: &Map<String, Value>, field: &str, owner: &str) -> Cli
         .ok_or_else(|| CliError::invalid_args(format!("{owner} requires {field}")))
 }
 
-fn page_name(value: &str) -> String {
+pub(crate) fn page_name(value: &str) -> String {
     if value.starts_with("ReportSection") {
         value.to_string()
     } else {
@@ -1587,7 +1599,7 @@ fn page_name(value: &str) -> String {
     }
 }
 
-fn visual_name(value: &str) -> String {
+pub(crate) fn visual_name(value: &str) -> String {
     if value.starts_with("VisualContainer") {
         value.to_string()
     } else {

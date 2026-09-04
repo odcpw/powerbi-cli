@@ -189,5 +189,27 @@ pub(super) fn commands() -> Vec<Value> {
             "limitations": ["Capture inventory must equal the bounded status inventory. Dirty-instance captures are diagnostic and cannot represent on-disk workflow output. Screenshots do not prove refresh, save/reopen, interactions, drill behavior, issue-dialog absence, or semantic correctness."],
             "followUpFields": ["ok", "exitCode", "project", "pid", "hasUnsavedChanges", "pageInventory", "screenshots[].pageId", "screenshots[].file.path", "screenshots[].file.width", "screenshots[].file.height", "screenshots[].file.sha256", "outputDirectory", "ownership", "desktop.desktopVersion", "backend", "proof", "next"]
         }),
+        json!({
+            "path": "desktop harvest-reference",
+            "usage": "powerbi-cli desktop harvest-reference --project <saved.pbip> --visual <visual:<page>:<name>|page:<name>|report:main> --out docs/reference/desktop-authored-visuals/<name>.json [--desktop-version <version>] [--license-note <text>] [--dry-run] --json",
+            "summary": "Archive one Desktop-saved visual, page, or report fragment with source fingerprint, date, license note, and honest pending proof",
+            "tags": ["desktop", "oracle", "fixture", "reference", "provenance", "offline", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesReferenceArtifact": true,
+            "networkRequired": false,
+            "stability": "alpha-output",
+            "proofLevel": "desktop-golden-pending",
+            "observedStage": "reference-archived",
+            "outputSchema": "powerbi-cli.desktop.harvestReference.v1",
+            "platforms": ["linux already-saved PBIP", "macos already-saved PBIP", "windows already-saved PBIP; Desktop execution evidence is optional and never inferred"],
+            "inputSafety": "The selected visual.json, page.json, or report.json is read through input_safety::read_harvested_fragment. Persisted selection/filter values, symlinks, invalid UTF-8, oversized files, and malformed JSON are refused; no rejected value is silently stripped.",
+            "proofContract": "Linux and non-oracle runs record desktopVersion=unknown and proofLevel=desktop-golden-pending. A harvested reference is never promoted to a Desktop canvas/refresh proof without explicit evidence.",
+            "flags": ["--project <saved.pbip>", "--visual <visual:<page>:<name>|page:<name>|report:main>", "--out <reference.json>", "--desktop-version <version>", "--license-note <text>", "--dry-run", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop harvest-reference --project build/sales --visual visual:ReportSectionOverview:VisualContainer1 --out docs/reference/desktop-authored-visuals/sales-card.json --json", "powerbi-cli desktop harvest-reference --project build/sales.pbip --visual page:ReportSectionOverview --out docs/reference/desktop-authored-visuals/overview-page.json --dry-run --json"],
+            "limitations": ["The archive wraps the source fragment under fragment and keeps provenance separate from PBIR fields.", "Already-saved Linux projects have no Desktop version or canvas evidence unless supplied explicitly; the output remains desktop-golden-pending.", "Persisted slicer/filter values are refused rather than silently removed; use a clean saved fragment or clear state in Desktop before retrying."],
+            "followUpFields": ["ok", "exitCode", "action", "dryRun", "projectDir", "pbip", "reportDir", "out", "source.kind", "source.handle", "source.path", "source.sha256", "source.sourceFingerprint", "destination.path", "destination.name", "destination.created", "provenance.sourcePath", "provenance.sourceProject", "provenance.desktopVersion", "provenance.date", "provenance.sourceFingerprint", "provenance.fragmentSha256", "provenance.licenseNote", "proofLevel", "proof.schema", "proof.fixture", "proof.signals.featureIds", "proof.signals.desktopReferencePresent", "proof.signals.schemaGolden", "safety.persistedDataValues", "safety.silentStripping", "changes", "next", "notes", "warnings", "errors"]
+        }),
     ]
 }
