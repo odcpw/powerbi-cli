@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
 };
 use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
+use crate::ops::AddMeasure;
 use crate::project_io::write_text_atomic_validated;
 use crate::tmdl::{
     MeasureDefinition, MeasureRecord, MeasureSelector, MutationPlan, TableDocument,
@@ -248,6 +249,44 @@ fn mutate_measure(action: Action, args: &[String]) -> CliResult<Value> {
         "validateCommand": validate,
         "next": [readback, inspect, validate]
     }))
+}
+
+/// Parse the add command's operation payload while retaining the command's
+/// existing validation, error text, and output-mode contract. The project
+/// path is intentionally not part of the typed operation: callers provide the
+/// resolved project to [`ops::Transaction`] separately.
+pub(crate) fn parse_add_operation_args(args: &[String]) -> CliResult<(AddMeasure, MutationMode)> {
+    let options = parse_mutation_args(Action::Add, args)?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "model measures add",
+        "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+        "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
+    )?;
+    let table =
+        options.selector.table.clone().ok_or_else(|| {
+            CliError::invalid_args("model measures add requires --table and --name")
+        })?;
+    let name =
+        options.selector.name.clone().ok_or_else(|| {
+            CliError::invalid_args("model measures add requires --table and --name")
+        })?;
+    let expression = options.expression.clone().ok_or_else(|| {
+        CliError::invalid_args("model measures add requires --expression or --expression-file")
+    })?;
+    Ok((
+        AddMeasure {
+            handle: crate::tmdl::measure_handle(&table, &name),
+            table,
+            name,
+            expression,
+            format_string: options.format_string,
+            format_string_definition: options.format_string_definition,
+            description: options.description,
+            display_folder: options.display_folder,
+        },
+        mode,
+    ))
 }
 
 fn build_mutation_plan(

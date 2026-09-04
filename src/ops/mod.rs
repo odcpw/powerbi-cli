@@ -16,11 +16,14 @@
 // consumers are registered without weakening clippy's correctness lints.
 #![allow(dead_code)]
 
+mod add_measure;
 mod handles;
 mod io;
 mod plan;
 mod transaction;
 
+#[allow(unused_imports)]
+pub(crate) use add_measure::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
