@@ -1,16 +1,29 @@
 //! Shared test harness helpers. Each test binary includes this module via
 //! `mod common;`, so helpers unused by a given binary are expected dead code.
 #![allow(dead_code)]
+#![allow(unused_imports)]
 
 use serde_json::{Value, json};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+mod artifact_tree;
 mod fixtures;
+mod operations;
 mod run;
 mod snapshots;
 
+pub use artifact_tree::{
+    TreeFingerprint, assert_tree_equal, assert_tree_equal_with_ignored, first_difference,
+    first_difference_with_ignored, hash_tree, hash_tree_with_ignored, tree_files,
+    tree_files_with_ignored,
+};
+pub use operations::{
+    DirectOperationRun, MetamorphicCase, MetamorphicExecution, OperationEquivalenceCase,
+    OperationExecution, build_fixture_with_spec, run_direct_operation, run_metamorphic_cases,
+    run_operation_equivalence, scaffold_fixture,
+};
 pub type ArchetypeFixture = fixtures::ArchetypeFixture;
 pub type DashboardSpecBuilder = fixtures::DashboardSpecBuilder;
 pub type CliCommand = run::CliCommand;
