@@ -85,6 +85,26 @@ private metadata, unregistered data, links, and credential-bearing source text.
 See [`docs/source-profile-workflow.md`](docs/source-profile-workflow.md) for the
 complete profile shape and command contract.
 
+For offline Desktop refresh and performance QA, `workflow synthesize` can call
+shared M generator functions with an exact row scale and seed while replacing
+the live database root in a fresh project copy:
+
+```bash
+powerbi-cli workflow synthesize \
+  --project Report.pbip \
+  --expressions qa/generators.tmdl \
+  --out-dir ../powerbi-build/Report-QA-100x \
+  --row-scale 100 \
+  --seed 42 \
+  --json
+```
+
+Each mapped expression in a scaled run is invoked positionally as
+`Expression(rowScale, seed)`. Supplying only one option uses `1` for row scale
+or `0` for seed. Both values must be exact non-negative M integers and row scale
+must be positive. Re-run with the same pair for byte-identical partition M; vary
+the scale to reproduce load behavior without moving real data or credentials.
+
 This project does not generate `.pbix` or `.pbit` binaries directly. It can
 inspect and safely extract metadata/source files from PBIX/PBIT archives when
 those entries are present, and it can import PBIP/PBIR/TMDL source folders from
@@ -220,6 +240,7 @@ cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model perspectives list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model cultures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model expressions list --project .\build\sales --json
+cargo run --bin powerbi-cli -- workflow synthesize --project .\Report.pbip --expressions .\qa\generators.tmdl --out-dir .\build\Report-QA --row-scale 100 --seed 42 --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --dry-run --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --out-dir .\build\sales-v2 --json
 cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-v2 --json

@@ -584,6 +584,23 @@ const FEATURE_CATALOG: &[Feature] = &[
         tags: &["workflow", "source-profile", "mcp", "pbip", "validation"],
     },
     Feature {
+        id: "workflow.synthetic-source",
+        title: "Offline deterministic synthetic source swap",
+        category: "workflow",
+        status: "supported",
+        support: "shared-m-expressions-with-scale-and-seed",
+        proof_level: "schema-golden",
+        emits_pbir: false,
+        commands: &["workflow synthesize"],
+        refusal_code: None,
+        reason: "A fresh project copy replaces recognized Database connector roots with shared M expressions; optional exact integer row-scale and seed values invoke deterministic generator functions.",
+        next_proof: &[
+            "Refresh multiple row scales in Power BI Desktop and record wall-time/canvas evidence",
+        ],
+        reference_signals: &[],
+        tags: &["workflow", "synthetic", "m", "scale", "seed", "offline"],
+    },
+    Feature {
         id: "report.pages",
         title: "Report pages and layout metadata",
         category: "report",

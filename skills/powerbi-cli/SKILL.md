@@ -111,6 +111,7 @@ pbi --json capabilities --for "model live export-tmdl"
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
+pbi --json capabilities --for "workflow synthesize"
 pbi --json capabilities --for source-template
 pbi --json capabilities --for rebind
 pbi --json capabilities --for theme
@@ -850,6 +851,21 @@ branch. `model dax lint` and `validate --strict` catch common direct uses, but
 they are not a complete DAX engine.
 
 ### Handoff Between Home And Work
+
+For deterministic offline refresh/performance fixtures, supply shared M
+generator functions that accept positional `(rowScale, seed)` numeric
+arguments, then synthesize a fresh project outside the source tree:
+
+```bash
+pbi --json workflow synthesize --project Report.pbip --expressions qa/generators.tmdl --out-dir ../powerbi-build/Report-QA-100x --row-scale 100 --seed 42
+pbi --json lint ../powerbi-build/Report-QA-100x
+pbi --json validate --strict ../powerbi-build/Report-QA-100x
+```
+
+The same scale/seed pair emits byte-identical partition M. Supplying only one
+option uses row scale `1` or seed `0`; row scale must remain positive. Use this
+copy for Desktop refresh timing and canvas QA without carrying live connector
+text, credentials, or real rows.
 
 For a deterministic resource/source reorientation, prefer the fingerprinted workflow:
 

@@ -371,6 +371,10 @@ frozen until proven.
   formatting payloads, applies them by visual type and ordinal, and refuses
   copied literal text unless `--allow-literal-text` is explicit. Field bindings
   and data roles are never copied by style apply.
+- Offline QA synthesis accepts exact `--row-scale` and `--seed` values and
+  passes them to shared M generator functions, so the same seed is
+  byte-deterministic while multiple scales reproduce Desktop refresh cost
+  without live data or credentials.
 - Implemented first filter slice: `report filters list/show` inventories raw
   report/page/visual PBIR filter containers, returns stable filter handles, and
   warns when filter metadata may contain selected semantic-model values.
