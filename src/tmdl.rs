@@ -153,6 +153,27 @@ pub(crate) struct CalculatedColumnDefinition {
     pub(crate) is_hidden: bool,
 }
 
+/// A complete column definition used by the generic model column CRUD
+/// surface.  `expression = None` denotes a source/base column; an expression
+/// denotes a calculated column.  The parser intentionally keeps the raw block
+/// on `ColumnRecord`, while this definition is only used for deterministic
+/// writes after the unsupported-metadata guard has passed.
+#[derive(Debug, Clone)]
+pub(crate) struct ColumnDefinition {
+    pub(crate) name: String,
+    pub(crate) expression: Option<String>,
+    pub(crate) data_type: Option<String>,
+    pub(crate) lineage_tag: Option<String>,
+    pub(crate) format_string: Option<String>,
+    pub(crate) summarize_by: Option<String>,
+    pub(crate) sort_by_column: Option<String>,
+    pub(crate) source_column: Option<String>,
+    pub(crate) display_folder: Option<String>,
+    pub(crate) description: Option<String>,
+    pub(crate) is_hidden: bool,
+    pub(crate) is_key: bool,
+}
+
 #[derive(Debug)]
 pub(crate) struct MutationPlan {
     pub(crate) table: String,
@@ -162,6 +183,81 @@ pub(crate) struct MutationPlan {
     pub(crate) before_block: Option<String>,
     pub(crate) after_block: Option<String>,
     pub(crate) new_text: String,
+}
+
+impl TableDocument {
+    pub(crate) fn table_header_replaced(&self, new_name: &str) -> CliResult<String> {
+        let mut lines = self.lines.clone();
+        let header_index = lines
+            .iter()
+            .position(|line| line.trim_start().starts_with("table "))
+            .ok_or_else(|| {
+                CliError::validation_failed(format!(
+                    "table document has no table declaration: {}",
+                    self.path.display()
+                ))
+            })?;
+        let indent = lines[header_index]
+            .chars()
+            .take_while(|character| matches!(character, ' ' | '\t'))
+            .collect::<String>();
+        lines[header_index] = format!("{indent}table {}", tmdl_object_name(new_name));
+        // Desktop normally names the default import partition after its
+        // table.  Keep that convention when renaming; unrelated partitions
+        // (including custom names and their unknown metadata) remain byte
+        // untouched.
+        for line in lines.iter_mut().skip(header_index + 1) {
+            let trimmed = line.trim_start();
+            let Some(rest) = trimmed.strip_prefix("partition ") else {
+                continue;
+            };
+            let Some((partition_name, tail)) = parse_tmdl_object(rest) else {
+                continue;
+            };
+            if !same_name(&partition_name, &self.table) {
+                continue;
+            }
+            let partition_indent = line
+                .chars()
+                .take_while(|character| matches!(character, ' ' | '\t'))
+                .collect::<String>();
+            *line = format!(
+                "{partition_indent}partition {}{}",
+                tmdl_object_name(new_name),
+                tail
+            );
+        }
+        Ok(render_lines(&lines, &self.newline, self.had_final_newline))
+    }
+
+    pub(crate) fn unsupported_table_line(&self) -> Option<String> {
+        let Some(header_index) = self
+            .lines
+            .iter()
+            .position(|line| line.trim_start().starts_with("table "))
+        else {
+            return Some("missing table declaration".to_string());
+        };
+        for line in self.lines.iter().skip(header_index + 1) {
+            if is_column_start(line) || is_measure_start(line) || is_partition_start(line) {
+                break;
+            }
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("///") {
+                continue;
+            }
+            if tmdl_indent_width(line) == 4
+                && (trimmed.starts_with("lineageTag:") || trimmed.starts_with("description:"))
+            {
+                continue;
+            }
+            if is_table_child_start(line) {
+                return Some(trimmed.to_string());
+            }
+            return Some(trimmed.to_string());
+        }
+        None
+    }
 }
 
 pub(crate) fn load_table_documents(resolved: &ResolvedProject) -> CliResult<Vec<TableDocument>> {
@@ -277,6 +373,14 @@ pub(crate) fn find_column<'a>(
     }
 }
 
+pub(crate) fn find_column_by_selector<'a>(
+    docs: &'a [TableDocument],
+    selector: &ColumnSelector,
+) -> CliResult<&'a ColumnRecord> {
+    let (table, name) = column_selector_parts(selector)?;
+    find_column(docs, &table, &name)
+}
+
 pub(crate) fn find_partition<'a>(
     docs: &'a [TableDocument],
     selector: &PartitionSelector,
@@ -366,6 +470,98 @@ pub(crate) fn add_calculated_column_plan(
         path: doc.path.clone(),
         before_block: None,
         after_block: Some(after_block),
+        new_text: render_lines(&lines, &doc.newline, doc.had_final_newline),
+    })
+}
+
+pub(crate) fn add_column_plan(
+    docs: &[TableDocument],
+    table_name: &str,
+    definition: ColumnDefinition,
+) -> CliResult<MutationPlan> {
+    let doc = find_table(docs, table_name)?;
+    if doc
+        .columns
+        .iter()
+        .any(|column| same_name(&column.name, &definition.name))
+    {
+        return Err(CliError::invalid_args(format!(
+            "column already exists: {}",
+            column_handle(&doc.table, &definition.name)
+        ))
+        .with_hint("Choose a new column name or use `model columns update` for an existing column.")
+        .with_suggested_command(format!(
+            "powerbi-cli model columns show --project <project-dir-or.pbip> --handle {} --json",
+            shell_arg(&column_handle(&doc.table, &definition.name))
+        )));
+    }
+
+    let after_lines = column_block_lines(&doc.table, &definition);
+    let after_block = render_lines(&after_lines, &doc.newline, true);
+    let mut lines = doc.lines.clone();
+    let insert_at = column_insertion_index(doc);
+    lines.splice(insert_at..insert_at, after_lines);
+
+    Ok(MutationPlan {
+        table: doc.table.clone(),
+        name: definition.name.clone(),
+        handle: column_handle(&doc.table, &definition.name),
+        path: doc.path.clone(),
+        before_block: None,
+        after_block: Some(after_block),
+        new_text: render_lines(&lines, &doc.newline, doc.had_final_newline),
+    })
+}
+
+pub(crate) fn replace_column_plan(
+    docs: &[TableDocument],
+    selector: &ColumnSelector,
+    definition: ColumnDefinition,
+) -> CliResult<MutationPlan> {
+    let existing = find_column_by_selector(docs, selector)?;
+    if let Some(line) = unsupported_column_line(existing) {
+        return Err(CliError::unsupported_feature(format!(
+            "column update would drop unsupported TMDL line: {line}"
+        ))
+        .with_hint("This column contains Desktop-authored metadata this writer does not model; inspect the block and recreate only generated columns.")
+        .with_suggested_command(format!(
+            "powerbi-cli model columns show --project <project-dir-or.pbip> --handle {} --json",
+            shell_arg(&existing.handle())
+        )));
+    }
+    let doc = find_table(docs, &existing.table)?;
+    let after_lines = column_block_lines(&doc.table, &definition);
+    let after_block = render_lines(&after_lines, &doc.newline, true);
+    let mut lines = doc.lines.clone();
+    lines.splice(existing.start_line..existing.end_line, after_lines);
+
+    Ok(MutationPlan {
+        table: doc.table.clone(),
+        name: existing.name.clone(),
+        handle: existing.handle(),
+        path: doc.path.clone(),
+        before_block: Some(existing.block.clone()),
+        after_block: Some(after_block),
+        new_text: render_lines(&lines, &doc.newline, doc.had_final_newline),
+    })
+}
+
+pub(crate) fn delete_column_plan(
+    docs: &[TableDocument],
+    selector: &ColumnSelector,
+) -> CliResult<MutationPlan> {
+    let existing = find_column_by_selector(docs, selector)?;
+    let doc = find_table(docs, &existing.table)?;
+    let mut lines = doc.lines.clone();
+    lines.drain(existing.start_line..existing.end_line);
+
+    Ok(MutationPlan {
+        table: doc.table.clone(),
+        name: existing.name.clone(),
+        handle: existing.handle(),
+        path: doc.path.clone(),
+        before_block: Some(existing.block.clone()),
+        after_block: None,
         new_text: render_lines(&lines, &doc.newline, doc.had_final_newline),
     })
 }
@@ -955,7 +1151,7 @@ fn parse_column_block(
                     continue;
                 }
                 "sourceColumn" => {
-                    source_column = Some(tmdl_string_value(value));
+                    source_column = Some(tmdl_object_or_string_value(value));
                     seen_property = true;
                     continue;
                 }
@@ -1234,6 +1430,87 @@ pub(crate) fn measure_block_lines(table: &str, definition: &MeasureDefinition) -
     lines
 }
 
+pub(crate) fn column_block_lines(table: &str, definition: &ColumnDefinition) -> Vec<String> {
+    let mut lines = Vec::new();
+    let name = tmdl_object_name(&definition.name);
+    push_tmdl_description(&mut lines, "    ", definition.description.as_deref());
+    let expression = definition.expression.as_deref().map(|value| {
+        value
+            .trim_start_matches('\u{feff}')
+            .trim_end_matches(['\r', '\n'])
+            .to_string()
+    });
+    if let Some(expression) = expression.as_deref() {
+        if expression.contains('\n') || expression.contains('\r') {
+            lines.push(format!("    column {name} ="));
+            for line in expression.replace("\r\n", "\n").replace('\r', "\n").lines() {
+                lines.push(format!("            {}", line.trim_end()));
+            }
+        } else {
+            lines.push(format!("    column {name} = {}", expression.trim()));
+        }
+    } else {
+        lines.push(format!("    column {name}"));
+    }
+
+    let data_type = definition
+        .data_type
+        .clone()
+        .unwrap_or_else(|| "string".to_string());
+    lines.push(format!("        dataType: {data_type}"));
+    lines.push(format!(
+        "        lineageTag: {}",
+        definition
+            .lineage_tag
+            .clone()
+            .unwrap_or_else(|| { stable_guid(&format!("column:{table}:{}", definition.name)) })
+    ));
+    lines.push(format!(
+        "        summarizeBy: {}",
+        definition
+            .summarize_by
+            .clone()
+            .unwrap_or_else(|| "none".to_string())
+    ));
+    if definition.is_hidden {
+        lines.push("        isHidden".to_string());
+    }
+    if definition.is_key {
+        lines.push("        isKey".to_string());
+    }
+    if let Some(format_string) = &definition.format_string {
+        lines.push(format!(
+            "        formatString: {}",
+            tmdl_string_literal(format_string)
+        ));
+    }
+    if let Some(sort_by_column) = &definition.sort_by_column {
+        lines.push(format!(
+            "        sortByColumn: {}",
+            tmdl_object_name(sort_by_column)
+        ));
+    }
+    if expression.is_none() || definition.source_column.is_some() {
+        lines.push(format!(
+            "        sourceColumn: {}",
+            tmdl_object_name(
+                definition
+                    .source_column
+                    .as_deref()
+                    .unwrap_or(&definition.name),
+            )
+        ));
+    }
+    if let Some(display_folder) = &definition.display_folder {
+        lines.push(format!(
+            "        displayFolder: {}",
+            tmdl_string_literal(display_folder)
+        ));
+    }
+    lines.push(String::new());
+    lines
+}
+
 fn calculated_column_block_lines(
     table: &str,
     definition: &CalculatedColumnDefinition,
@@ -1316,6 +1593,29 @@ fn unsupported_calculated_column_line(record: &ColumnRecord) -> Option<String> {
     )
 }
 
+pub(crate) fn unsupported_column_line(record: &ColumnRecord) -> Option<String> {
+    // Generic column CRUD can emit every property represented by
+    // `ColumnRecord`.  Anything else (annotations, extended properties,
+    // variations, future Desktop fields, or nested children) is refused so a
+    // round trip never silently drops Desktop-authored metadata.
+    unsupported_expression_object_line(
+        &record.block,
+        &[
+            "dataType",
+            "datatype",
+            "lineageTag",
+            "formatString",
+            "summarizeBy",
+            "sortByColumn",
+            "sourceColumn",
+            "displayFolder",
+            "description",
+        ],
+        &["isHidden", "isKey"],
+        &[],
+    )
+}
+
 fn unsupported_expression_object_line(
     block: &str,
     allowed_properties: &[&str],
@@ -1324,6 +1624,7 @@ fn unsupported_expression_object_line(
 ) -> Option<String> {
     let mut seen_property = false;
     let mut seen_object_declaration = false;
+    let mut declaration_has_expression = false;
     for line in block.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
@@ -1334,7 +1635,19 @@ fn unsupported_expression_object_line(
         }
         if !seen_object_declaration {
             seen_object_declaration = true;
+            // A calculated column/measure declaration is followed by
+            // free-form DAX lines until the first known TMDL property.  Base
+            // columns have no such expression body, so any unrecognised
+            // non-empty line in that shape must be treated as unsupported
+            // metadata rather than silently discarded by the writer.
+            declaration_has_expression = trimmed.contains(" =") || trimmed.ends_with('=');
             continue;
+        }
+        // Comments are not emitted by the canonical writer.  Refuse them in
+        // the targeted block so a Desktop-authored comment cannot disappear
+        // during an otherwise successful update.
+        if trimmed.starts_with("//") {
+            return Some(trimmed.to_string());
         }
         if allowed_flags.contains(&trimmed) {
             seen_property = true;
@@ -1360,12 +1673,12 @@ fn unsupported_expression_object_line(
                 seen_property = true;
                 continue;
             }
-            if seen_property || looks_like_tmdl_property_key(key) {
+            if seen_property || !declaration_has_expression || looks_like_tmdl_property_key(key) {
                 return Some(trimmed.to_string());
             }
             continue;
         }
-        if seen_property || looks_like_tmdl_child_line(trimmed) {
+        if seen_property || !declaration_has_expression || looks_like_tmdl_child_line(trimmed) {
             return Some(trimmed.to_string());
         }
     }
@@ -1783,6 +2096,19 @@ fn tmdl_string_value(value: &str) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+fn tmdl_object_or_string_value(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.starts_with('"') {
+        return tmdl_string_value(trimmed);
+    }
+    if let Some((name, tail)) = parse_tmdl_object(trimmed)
+        && tail.trim().is_empty()
+    {
+        return name;
+    }
+    tmdl_string_value(trimmed)
 }
 
 pub(crate) fn tmdl_object_name(name: &str) -> String {

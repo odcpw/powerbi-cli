@@ -517,19 +517,19 @@ fn validate_rejects_dangling_variation_references() {
     assert_eq!(code, 10, "stdout: {stdout:?}\nstderr: {stderr}");
     let errors = stdout["errors"].as_array().expect("validation errors");
     assert!(errors.iter().any(|error| {
-        error
+        error["message"]
             .as_str()
             .unwrap_or_default()
             .contains("missing relationship: missingAutoDateRelationship")
     }));
     assert!(errors.iter().any(|error| {
-        error
+        error["message"]
             .as_str()
             .unwrap_or_default()
             .contains("missing table: MissingAutoDateTable")
     }));
     assert!(errors.iter().any(|error| {
-        error
+        error["message"]
             .as_str()
             .unwrap_or_default()
             .contains("missing hierarchy: DimDate.Missing Hierarchy")
@@ -582,7 +582,7 @@ fn validate_rejects_slicers_below_power_bi_minimum_height() {
             .as_array()
             .expect("validation errors")
             .iter()
-            .filter_map(Value::as_str)
+            .filter_map(|error| error["message"].as_str())
             .any(|error| error.contains("slicer height 68") && error.contains("minimum of 76"))
     );
 
@@ -606,7 +606,7 @@ fn validate_rejects_slicers_below_power_bi_minimum_height() {
             .as_array()
             .expect("validation errors")
             .iter()
-            .filter_map(Value::as_str)
+            .filter_map(|error| error["message"].as_str())
             .any(|error| error.contains("position.height must be a number of at least 76"))
     );
 }

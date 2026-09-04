@@ -203,8 +203,20 @@ fn load_object_context(project: &Path) -> CliResult<(ObjectContext, Vec<Value>)>
             pbip: canonical_display(&resolved.pbip_path),
             report_dir: canonical_display(&resolved.report_dir),
             validation_ok: validation.errors.is_empty(),
-            warnings: Value::Array(validation.warnings.into_iter().map(Value::String).collect()),
-            errors: Value::Array(validation.errors.into_iter().map(Value::String).collect()),
+            warnings: Value::Array(
+                validation
+                    .warnings
+                    .into_iter()
+                    .map(|finding| json!(finding))
+                    .collect(),
+            ),
+            errors: Value::Array(
+                validation
+                    .errors
+                    .into_iter()
+                    .map(|finding| json!(finding))
+                    .collect(),
+            ),
         },
         objects,
     ))

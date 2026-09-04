@@ -135,11 +135,15 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let schema = h.root.join("everything.schema.json");
     let normalized_schema = h.root.join("everything.schema.normalized.json");
     let profile = h.root.join("everything.profile.json");
+    let profile_with_values = h.root.join("everything.profile.with-values.json");
+    let profile_rows = h.root.join("everything.profile.rows.csv");
     let spec = h.root.join("everything.dashboard.json");
+    let normalized_spec = h.root.join("everything.dashboard.normalized.json");
     let upgraded_spec = h.root.join("everything.dashboard.v2.json");
     let planned_spec = h.root.join("everything.planned.dashboard.json");
     let project = h.root.join("EverythingAcceptance");
     let scaffold_project = h.root.join("ScaffoldSmoke");
+    let generic_model_project = h.root.join("GenericModelAcceptance");
     let package = h.root.join("source-bearing-template.pbit");
     let work_schema = h.root.join("work-pack.schema.json");
     let work_project = h.root.join("WorkPackAcceptance");
@@ -154,6 +158,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let wireframe = h.root.join("wireframe.json");
     let dax_file = h.root.join("average-cost.dax");
     let desktop_screenshot = h.root.join("everything-desktop.png");
+    let desktop_reference = h.root.join("everything-reference.json");
     let live_model_export = h.root.join("live-model-export");
 
     write_json(&schema, &acceptance_schema());
@@ -175,6 +180,11 @@ fn everything_acceptance_invokes_every_catalog_command() {
         "DIVIDE(\n    [Total Cost],\n    [Total Incidents]\n)\n",
     )
     .expect("write dax file");
+    fs::write(
+        &profile_rows,
+        "IncidentId,DateKey,AccidentCount,Cost,Cause\n1,20250101,2,2400,synthetic-a\n2,20260101,1,1200,synthetic-b\n3,,1,,synthetic-a\n",
+    )
+    .expect("write profile rows");
 
     h.ok("capabilities", &svec(["capabilities", "--json"]));
     h.ok("version", &svec(["version", "--json"]));
@@ -252,8 +262,25 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "infer",
             "--schema",
             &p(&schema),
+            "--rows",
+            &p(&profile_rows),
             "--out",
             &p(&profile),
+            "--json",
+        ]),
+    );
+    h.ok(
+        "profile infer",
+        &svec([
+            "profile",
+            "infer",
+            "--schema",
+            &p(&schema),
+            "--rows",
+            &p(&profile_rows),
+            "--include-data-values",
+            "--out",
+            &p(&profile_with_values),
             "--json",
         ]),
     );
@@ -296,6 +323,18 @@ fn everything_acceptance_invokes_every_catalog_command() {
     assert_eq!(upgraded["targetVersion"], "powerbi-cli.dashboard.v2");
     assert_eq!(upgraded["transformedPointers"], json!(["/schema"]));
     assert!(upgraded_spec.is_file());
+    h.ok(
+        "report spec normalize",
+        &svec([
+            "report",
+            "spec",
+            "normalize",
+            &p(&spec),
+            "--out",
+            &p(&normalized_spec),
+            "--json",
+        ]),
+    );
     h.ok(
         "report spec fields",
         &svec([
@@ -600,6 +639,157 @@ fn everything_acceptance_invokes_every_catalog_command() {
     );
 
     h.ok(
+        "model tables list",
+        &svec([
+            "model",
+            "tables",
+            "list",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables show",
+        &svec([
+            "model",
+            "tables",
+            "show",
+            "--project",
+            &project_arg,
+            "--handle",
+            "table:DimDate",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables add",
+        &svec([
+            "model",
+            "tables",
+            "add",
+            "--project",
+            &project_arg,
+            "--table",
+            "TransientTable",
+            "--column",
+            "Value",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables rename",
+        &svec([
+            "model",
+            "tables",
+            "rename",
+            "--project",
+            &project_arg,
+            "--handle",
+            "table:DimDate",
+            "--new-name",
+            "Calendar",
+            "--rename-references",
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables delete",
+        &svec([
+            "model",
+            "tables",
+            "delete",
+            "--project",
+            &project_arg,
+            "--handle",
+            "table:TransientTable",
+            "--in-place",
+            "--confirm",
+            "table:TransientTable",
+            "--json",
+        ]),
+    );
+
+    h.ok(
+        "model columns list",
+        &svec([
+            "model",
+            "columns",
+            "list",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns show",
+        &svec([
+            "model",
+            "columns",
+            "show",
+            "--project",
+            &project_arg,
+            "--handle",
+            "column:FactIncidents:Cost",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns add",
+        &svec([
+            "model",
+            "columns",
+            "add",
+            "--project",
+            &project_arg,
+            "--table",
+            "FactIncidents",
+            "--name",
+            "Transient Generic Column",
+            "--expression",
+            "1",
+            "--data-type",
+            "int64",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns update",
+        &svec([
+            "model",
+            "columns",
+            "update",
+            "--project",
+            &project_arg,
+            "--handle",
+            "column:FactIncidents:Transient Generic Column",
+            "--description",
+            "Temporary generic column",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns delete",
+        &svec([
+            "model",
+            "columns",
+            "delete",
+            "--project",
+            &project_arg,
+            "--handle",
+            "column:FactIncidents:Transient Generic Column",
+            "--in-place",
+            "--confirm",
+            "column:FactIncidents:Transient Generic Column",
+            "--json",
+        ]),
+    );
+
+    h.ok(
         "model measures list",
         &svec([
             "model",
@@ -693,6 +883,252 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+
+    // Exercise every generic table/column CRUD path on an isolated copy so
+    // the acceptance project remains available to the later report and
+    // relationship commands.  Keep these calls through Harness::ok so the
+    // catalog coverage set records the exact command paths, and assert each
+    // response schema to catch drift in the public contract.
+    let generic_add = h.ok(
+        "model tables add",
+        &svec([
+            "model",
+            "tables",
+            "add",
+            "--project",
+            &project_arg,
+            "--table",
+            "CrudProbe",
+            "--column",
+            "Code",
+            "--data-type",
+            "string",
+            "--out-dir",
+            &p(&generic_model_project),
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_add["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(generic_add["action"], Value::from("add"));
+    assert_eq!(generic_add["projectModified"], Value::Bool(true));
+
+    let generic_project_arg = p(&generic_model_project);
+    let generic_tables = h.ok(
+        "model tables list",
+        &svec([
+            "model",
+            "tables",
+            "list",
+            "--project",
+            &generic_project_arg,
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_tables["schema"],
+        Value::from("powerbi-cli.model.tables.list.v1")
+    );
+    assert!(generic_tables["tables"].as_array().is_some_and(|tables| {
+        tables
+            .iter()
+            .any(|table| table["handle"] == "table:CrudProbe")
+    }));
+
+    let generic_table_show = h.ok(
+        "model tables show",
+        &svec([
+            "model",
+            "tables",
+            "show",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CrudProbe",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_table_show["schema"],
+        Value::from("powerbi-cli.model.tables.show.v1")
+    );
+    assert!(
+        generic_table_show["block"]
+            .as_str()
+            .is_some_and(|block| block.contains("table CrudProbe"))
+    );
+
+    let generic_columns = h.ok(
+        "model columns list",
+        &svec([
+            "model",
+            "columns",
+            "list",
+            "--project",
+            &generic_project_arg,
+            "--table",
+            "CrudProbe",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_columns["schema"],
+        Value::from("powerbi-cli.model.columns.list.v1")
+    );
+    assert!(
+        generic_columns["columns"]
+            .as_array()
+            .is_some_and(|columns| {
+                columns
+                    .iter()
+                    .any(|column| column["handle"] == "column:CrudProbe:Code")
+            })
+    );
+
+    let generic_column_show = h.ok(
+        "model columns show",
+        &svec([
+            "model",
+            "columns",
+            "show",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "column:CrudProbe:Code",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_show["schema"],
+        Value::from("powerbi-cli.model.columns.show.v1")
+    );
+    assert!(
+        generic_column_show["block"]
+            .as_str()
+            .is_some_and(|block| block.contains("column Code"))
+    );
+
+    let generic_column_add = h.ok(
+        "model columns add",
+        &svec([
+            "model",
+            "columns",
+            "add",
+            "--project",
+            &generic_project_arg,
+            "--table",
+            "CrudProbe",
+            "--name",
+            "Amount",
+            "--data-type",
+            "decimal",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_add["schema"],
+        Value::from("powerbi-cli.model.columns.mutation.v1")
+    );
+    assert_eq!(generic_column_add["action"], Value::from("add"));
+    assert_eq!(
+        generic_column_add["target"]["handle"],
+        Value::from("column:CrudProbe:Amount")
+    );
+
+    let generic_column_update = h.ok(
+        "model columns update",
+        &svec([
+            "model",
+            "columns",
+            "update",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "column:CrudProbe:Amount",
+            "--format-string",
+            "#,##0.00",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_update["schema"],
+        Value::from("powerbi-cli.model.columns.mutation.v1")
+    );
+    assert_eq!(generic_column_update["action"], Value::from("update"));
+
+    let generic_column_delete = h.ok(
+        "model columns delete",
+        &svec([
+            "model",
+            "columns",
+            "delete",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "column:CrudProbe:Amount",
+            "--in-place",
+            "--confirm",
+            "column:CrudProbe:Amount",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_delete["schema"],
+        Value::from("powerbi-cli.model.columns.mutation.v1")
+    );
+    assert_eq!(generic_column_delete["action"], Value::from("delete"));
+
+    let generic_table_rename = h.ok(
+        "model tables rename",
+        &svec([
+            "model",
+            "tables",
+            "rename",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CrudProbe",
+            "--new-name",
+            "CrudRenamed",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_table_rename["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(generic_table_rename["action"], Value::from("rename"));
+    assert_eq!(
+        generic_table_rename["target"]["handle"],
+        Value::from("table:CrudRenamed")
+    );
+
+    let generic_table_delete = h.ok(
+        "model tables delete",
+        &svec([
+            "model",
+            "tables",
+            "delete",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CrudRenamed",
+            "--in-place",
+            "--confirm",
+            "table:CrudRenamed",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_table_delete["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(generic_table_delete["action"], Value::from("delete"));
 
     h.ok(
         "model tables add-static",
@@ -1429,6 +1865,32 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let table = handles["Company Detail"].clone();
     let scatter = handles["Branch Injury Cost Bubble"].clone();
     let catalog_column = handles["Stacked Column by Year"].clone();
+    let harvested_reference = h.ok(
+        "desktop harvest-reference",
+        &svec([
+            "desktop",
+            "harvest-reference",
+            "--project",
+            &project_arg,
+            "--visual",
+            &line,
+            "--out",
+            &p(&desktop_reference),
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        harvested_reference["proofLevel"],
+        Value::from("desktop-golden-pending")
+    );
+    assert_eq!(
+        harvested_reference["provenance"]["desktopVersion"],
+        Value::from("unknown")
+    );
+    assert!(
+        desktop_reference.is_file(),
+        "harvested reference was not written"
+    );
     let slicer = slicer_handle(&h.ok(
         "report slicers list",
         &svec([

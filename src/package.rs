@@ -1,4 +1,5 @@
 use crate::input_safety::{InputKind, read_utf8};
+use crate::profile::text_is_data_bearing_profile;
 use crate::project_io::copy_project_dir;
 use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect_text};
 use crate::tmdl::load_table_documents;
@@ -490,7 +491,12 @@ fn project_pack(args: &[String], kind: ProjectPackKind) -> CliResult<Value> {
         return Err(CliError::validation_failed(format!(
             "project is not valid for {}: {}",
             kind.validation_label(),
-            validation.errors.join("; ")
+            validation
+                .errors
+                .iter()
+                .map(|finding| finding.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
         ))
         .with_suggested_command(format!(
             "powerbi-cli validate --strict {} --json",
@@ -586,6 +592,8 @@ fn project_pack(args: &[String], kind: ProjectPackKind) -> CliResult<Value> {
         "packageClass": kind.package_class(),
         "canWriteBinaryPackage": false,
         "desktopBinaryCompatible": false,
+        "dataBearing": false,
+        "profileDataBearing": false,
         "noFakeFallbacks": true,
         "counts": {
             "entries": archive_entries.len() + generated_entries.len(),
@@ -1050,6 +1058,12 @@ fn source_pack_file_category(relative_name: &str) -> Option<EntryCategory> {
             "powerbi-cli.work-pack.json" => Some(EntryCategory::MetadataJson),
             ".gitignore" | "powerbi_handoff.md" => Some(EntryCategory::Unknown),
             "powerbi-cli.manifest.copy.json" => Some(EntryCategory::MetadataJson),
+            name if name == "profile.json"
+                || (name.ends_with(".json")
+                    && (name.starts_with("profile.") || name.contains(".profile."))) =>
+            {
+                Some(EntryCategory::MetadataJson)
+            }
             _ => None,
         };
     }
@@ -1186,8 +1200,12 @@ fn scan_project_archive_content(
     let mut pii_review_files = BTreeSet::new();
     let mut non_dummy_partition_files = BTreeSet::new();
     let mut embedded_row_partition_files = BTreeSet::new();
+    let mut data_bearing_profile_files = BTreeSet::new();
     for (name, path) in entries {
         let text = read_utf8(path, InputKind::ProjectText)?;
+        if text_is_data_bearing_profile(&text) {
+            data_bearing_profile_files.insert(name.clone());
+        }
         if contains_credential_like_text_str(&text) {
             credential_files.insert(name.clone());
         }
@@ -1240,6 +1258,7 @@ fn scan_project_archive_content(
         && pii_review_files.is_empty()
         && non_dummy_partition_files.is_empty()
         && embedded_row_partition_files.is_empty()
+        && data_bearing_profile_files.is_empty()
     {
         return Ok(());
     }
@@ -1279,6 +1298,15 @@ fn scan_project_archive_content(
                 .join(", ")
         ));
     }
+    if !data_bearing_profile_files.is_empty() {
+        reasons.push(format!(
+            "data-bearing profile with opted-in values in {}",
+            data_bearing_profile_files
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     Err(CliError::validation_failed(format!(
         "{} content scan failed: {}",
         kind.content_label(),
@@ -1288,7 +1316,11 @@ fn scan_project_archive_content(
         "Remove credentials and real row data, replace external or unverified partitions with generated dummy tables, then rerun handoff check before creating the archive."
     } else {
         "Remove credentials, caches, and embedded rows; materialize every partition with a recognized live connector; then run handoff check --target work before creating the archive."
-    }))
+    })
+    .with_suggested_command(format!(
+        "powerbi-cli handoff check {} --json",
+        command_arg(&resolved.project_dir)
+    )))
 }
 
 fn contains_embedded_m_rows(source: &str) -> bool {

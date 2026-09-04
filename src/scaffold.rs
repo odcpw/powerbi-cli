@@ -157,7 +157,12 @@ pub(crate) fn scaffold_schema_value(
     if !validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
             "generated project failed validation: {}",
-            validation.errors.join("; ")
+            validation
+                .errors
+                .iter()
+                .map(|finding| finding.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
         )));
     }
 
