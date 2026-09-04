@@ -8,9 +8,9 @@ use crate::visual_catalog::{
     visual_type_role_rules,
 };
 use crate::{
-    CliError, CliResult, EXIT_FILE_NOT_FOUND, EXIT_INVALID_ARGS, EXIT_ORACLE_FAILED,
-    EXIT_ORACLE_UNAVAILABLE, EXIT_PROOF_INCOMPLETE, EXIT_SUCCESS, EXIT_UNEXPECTED,
-    EXIT_VALIDATION_FAILED, PBIP_SCHEMA, REPORT_DEFINITION_SCHEMA,
+    CliError, CliResult, EXIT_DOCS_DRIFT, EXIT_FILE_NOT_FOUND, EXIT_INVALID_ARGS,
+    EXIT_ORACLE_FAILED, EXIT_ORACLE_UNAVAILABLE, EXIT_PROOF_INCOMPLETE, EXIT_SUCCESS,
+    EXIT_UNEXPECTED, EXIT_VALIDATION_FAILED, PBIP_SCHEMA, REPORT_DEFINITION_SCHEMA,
     SEMANTIC_MODEL_DEFINITION_SCHEMA,
 };
 use serde_json::{Value, json};
@@ -64,6 +64,7 @@ Usage:
   powerbi-cli package work-pack --project <project-dir-or.pbip> [--out <archive.pbit>] --json
   powerbi-cli package export-plan --project <project-dir-or.pbip> --json
   powerbi-cli robot-docs guide [--json]
+  powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]
   powerbi-cli --robot-triage
   powerbi-cli robot-triage
   powerbi-cli --json doctor
@@ -242,6 +243,7 @@ pub(crate) fn help_json() -> Value {
             "powerbi-cli --json capabilities",
             "powerbi-cli features list --json",
             "powerbi-cli robot-docs guide",
+            "powerbi-cli robot-docs render --check",
             "powerbi-cli --json doctor",
             "powerbi-cli schema validate <schema.json> --json",
             "powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] --out <profile.json> --json",
@@ -789,6 +791,25 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "followUpFields": ["markdown", "followUpCommands"]
         }),
         json!({
+            "path": "robot-docs render",
+            "usage": "powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]",
+            "summary": "Render marker-delimited README and SKILL sections from the live capabilities and feature catalogs, or check for documentation drift",
+            "tags": ["agent", "docs", "contract", "generated", "check"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "requiresOutput": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.robot-docs.render.v1",
+            "diagnosticCodes": ["invalid_args", "file_not_found", "validation_failed", "docs_drift"],
+            "flags": ["--section commands|limits|features", "--check", "--root <repo-dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli robot-docs render --section commands --json", "powerbi-cli robot-docs render --check --json"],
+            "limitations": ["The command updates only marker-delimited regions in README.md and skills/powerbi-cli/SKILL.md; surrounding prose remains hand-owned.", "Run from the repository root or pass --root <repo-dir>."],
+            "followUpFields": ["schema", "ok", "exitCode", "check", "sections", "root", "files[].path", "files[].changed", "files[].drift", "sources", "next"]
+        }),
+        json!({
             "path": "--robot-triage",
             "aliases": ["robot-triage"],
             "usage": "powerbi-cli --robot-triage",
@@ -1121,6 +1142,7 @@ fn global_flags() -> Vec<Value> {
 fn exit_codes() -> Vec<Value> {
     vec![
         json!({"code": EXIT_SUCCESS, "name": "success", "meaning": "Command completed successfully"}),
+        json!({"code": EXIT_DOCS_DRIFT, "name": "docs_drift", "meaning": "Generated repository documentation differs from the live catalog"}),
         json!({"code": EXIT_INVALID_ARGS, "name": "invalid_args", "meaning": "The invocation or manifest input is invalid"}),
         json!({"code": EXIT_FILE_NOT_FOUND, "name": "file_not_found", "meaning": "A requested project, schema, or referenced file was missing"}),
         json!({"code": EXIT_VALIDATION_FAILED, "name": "validation_failed", "meaning": "PBIP/PBIR/TMDL structure or offline-safety validation failed"}),
@@ -1134,6 +1156,7 @@ fn exit_codes() -> Vec<Value> {
 fn diagnostic_codes() -> Vec<Value> {
     vec![
         json!({"code": "invalid_args", "exitCode": EXIT_INVALID_ARGS}),
+        json!({"code": "docs_drift", "exitCode": EXIT_DOCS_DRIFT}),
         json!({"code": "unsupported_feature", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "input_safety_violation", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "spec.unknown_field", "exitCode": EXIT_VALIDATION_FAILED}),

@@ -99,6 +99,7 @@ mod report_visual_mutations;
 mod report_visual_objects;
 mod report_visual_scaffold;
 mod report_visuals;
+mod robot_docs;
 mod rules;
 mod safety_scan;
 mod scaffold;

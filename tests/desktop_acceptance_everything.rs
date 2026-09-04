@@ -190,6 +190,10 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok("version", &svec(["version", "--json"]));
     h.ok("features list", &svec(["features", "list", "--json"]));
     h.ok("robot-docs guide", &svec(["robot-docs", "guide", "--json"]));
+    h.ok(
+        "robot-docs render",
+        &svec(["robot-docs", "render", "--check", "--json"]),
+    );
     h.ok("--robot-triage", &svec(["--robot-triage", "--json"]));
     h.ok("robot-triage", &svec(["robot-triage", "--json"]));
     h.ok("doctor", &svec(["doctor", "--json"]));
