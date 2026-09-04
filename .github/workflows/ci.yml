@@ -27,6 +27,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
+      - name: Check generated documentation
+        run: cargo run --locked -- robot-docs render --check
+
       - name: Check
         run: cargo check --locked --all-targets
 

@@ -190,6 +190,10 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok("version", &svec(["version", "--json"]));
     h.ok("features list", &svec(["features", "list", "--json"]));
     h.ok("robot-docs guide", &svec(["robot-docs", "guide", "--json"]));
+    h.ok(
+        "robot-docs render",
+        &svec(["robot-docs", "render", "--check", "--json"]),
+    );
     h.ok("--robot-triage", &svec(["--robot-triage", "--json"]));
     h.ok("robot-triage", &svec(["robot-triage", "--json"]));
     h.ok("doctor", &svec(["doctor", "--json"]));
@@ -1180,6 +1184,48 @@ fn everything_acceptance_invokes_every_catalog_command() {
     );
     assert_eq!(generic_table_delete["action"], Value::from("delete"));
 
+    let calculated_table = h.ok(
+        "model tables add-calculated",
+        &svec([
+            "model",
+            "tables",
+            "add-calculated",
+            "--project",
+            &generic_project_arg,
+            "--table",
+            "CalculatedProbe",
+            "--expression",
+            "FILTER('FactSales', 'FactSales'[Revenue] > 0)",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        calculated_table["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(calculated_table["action"], Value::from("add-calculated"));
+    assert_eq!(
+        calculated_table["target"]["partitionKind"],
+        Value::from("calculated")
+    );
+    h.ok(
+        "model tables delete",
+        &svec([
+            "model",
+            "tables",
+            "delete",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CalculatedProbe",
+            "--in-place",
+            "--confirm",
+            "table:CalculatedProbe",
+            "--json",
+        ]),
+    );
+
     h.ok(
         "model tables add-static",
         &svec([
@@ -1597,6 +1643,58 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &project_arg,
             "--handle",
             "expression:RefreshDate",
+            "--json",
+        ]),
+    );
+    let named_expression = h.ok(
+        "model expressions add",
+        &svec([
+            "model",
+            "expressions",
+            "add",
+            "--project",
+            &project_arg,
+            "--name",
+            "TransientExpression",
+            "--expression",
+            "let Source = #table(type table [Value = Int64.Type], {{1}}), Result = Source in Result",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        named_expression["schema"],
+        Value::from("powerbi-cli.model.expressions.mutation.v1")
+    );
+    h.ok(
+        "model expressions update",
+        &svec([
+            "model",
+            "expressions",
+            "update",
+            "--project",
+            &project_arg,
+            "--handle",
+            "expression:TransientExpression",
+            "--expression",
+            "let Source = #table(type table [Value = Int64.Type], {{2}}), Result = Source in Result",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model expressions delete",
+        &svec([
+            "model",
+            "expressions",
+            "delete",
+            "--project",
+            &project_arg,
+            "--handle",
+            "expression:TransientExpression",
+            "--in-place",
+            "--confirm",
+            "expression:TransientExpression",
             "--json",
         ]),
     );

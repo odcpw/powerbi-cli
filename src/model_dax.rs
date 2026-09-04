@@ -62,6 +62,25 @@ fn bridge_plan(args: &[String]) -> CliResult<Value> {
         .filter(|column| column.is_calculated())
         .map(calculated_column_json)
         .collect::<Vec<_>>();
+    let calculated_tables = docs
+        .iter()
+        .flat_map(|doc| doc.partitions.iter())
+        .filter(|partition| {
+            partition
+                .expression_kind
+                .as_deref()
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("calculated"))
+        })
+        .map(|partition| {
+            json!({
+                "handle": partition.handle(),
+                "table": partition.table,
+                "name": partition.name,
+                "expression": partition.source,
+                "path": canonical_display(&partition.path)
+            })
+        })
+        .collect::<Vec<_>>();
     let ok = validation.errors.is_empty();
     let exit_code = if ok {
         EXIT_SUCCESS
@@ -79,11 +98,13 @@ fn bridge_plan(args: &[String]) -> CliResult<Value> {
         "counts": {
             "tables": docs.len(),
             "measures": measures.len(),
-            "calculatedColumns": calculated_columns.len()
+            "calculatedColumns": calculated_columns.len(),
+            "calculatedTables": calculated_tables.len()
         },
         "daxInventory": {
             "measures": measures,
-            "calculatedColumns": calculated_columns
+            "calculatedColumns": calculated_columns,
+            "calculatedTables": calculated_tables
         },
         "bridge": {
             "required": true,
@@ -96,7 +117,8 @@ fn bridge_plan(args: &[String]) -> CliResult<Value> {
             "measureAdd": format!("powerbi-cli model measures add --project {project_arg} --table <table> --name <measure> --expression-file <dax.txt> --dry-run --json"),
             "measureUpdate": format!("powerbi-cli model measures update --project {project_arg} --handle <measure-handle> --expression-file <dax.txt> --dry-run --json"),
             "calculatedColumnAdd": format!("powerbi-cli model calculated-columns add --project {project_arg} --table <table> --name <column> --expression-file <dax.txt> --data-type <type> --dry-run --json"),
-            "calculatedColumnUpdate": format!("powerbi-cli model calculated-columns update --project {project_arg} --handle <column-handle> --expression-file <dax.txt> --dry-run --json")
+            "calculatedColumnUpdate": format!("powerbi-cli model calculated-columns update --project {project_arg} --handle <column-handle> --expression-file <dax.txt> --dry-run --json"),
+            "calculatedTableAdd": format!("powerbi-cli model tables add-calculated --project {project_arg} --table <table> --expression-file <dax.txt> --dry-run --json")
         },
         "validationBridge": {
             "status": "boundary-reported-not-validated",
@@ -128,6 +150,7 @@ fn bridge_plan(args: &[String]) -> CliResult<Value> {
             format!("POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project {project_arg} --query-file <query.dax> --allow-data-read --json"),
             format!("powerbi-cli model measures list --project {project_arg} --json"),
             format!("powerbi-cli model calculated-columns list --project {project_arg} --json"),
+            format!("powerbi-cli model tables list --project {project_arg} --json"),
             format!("powerbi-cli desktop open-check {project_arg} --json")
         ]
     }))
@@ -273,6 +296,7 @@ impl DaxAnalysis {
             "expressions": self.expressions.len(),
             "measureExpressions": self.expressions.iter().filter(|expr| expr.kind == "measure").count(),
             "calculatedColumnExpressions": self.expressions.iter().filter(|expr| expr.kind == "calculated-column").count(),
+            "calculatedTableExpressions": self.expressions.iter().filter(|expr| expr.kind == "calculated-table").count(),
             "tableColumnReferences": self.expressions.iter().map(|expr| expr.table_columns.len()).sum::<usize>(),
             "measureReferences": self.expressions.iter().map(|expr| expr.measure_refs.len()).sum::<usize>(),
             "findings": self.findings.len()
@@ -335,6 +359,26 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
             &column.name,
             column.expression.as_deref().unwrap_or_default(),
             &column.path,
+            &index,
+        ));
+    }
+    for partition in docs
+        .iter()
+        .flat_map(|doc| doc.partitions.iter())
+        .filter(|partition| {
+            partition
+                .expression_kind
+                .as_deref()
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("calculated"))
+        })
+    {
+        expressions.push(analyze_expression_text(
+            &partition.handle(),
+            "calculated-table",
+            &partition.table,
+            &partition.name,
+            partition.source.as_deref().unwrap_or_default(),
+            &partition.path,
             &index,
         ));
     }

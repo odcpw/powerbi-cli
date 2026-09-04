@@ -14,6 +14,7 @@ use crate::model::model_command;
 use crate::package::package_command;
 use crate::profile::profile_command;
 use crate::report::report_command;
+use crate::robot_docs::render_robot_docs;
 use crate::schema::schema_command;
 use crate::skill_package::skill_command;
 use crate::source_template::source_template_command;
@@ -219,16 +220,21 @@ fn robot_docs_output(args: &[String], force_json: bool) -> CliResult<CliOutput> 
                 ))
             }
         }
+        [render, rest @ ..] if render == "render" => {
+            value_output(render_robot_docs(rest)?, force_json)
+        }
         [] => Err(
-            CliError::invalid_args("robot-docs requires a subcommand: guide")
+            CliError::invalid_args("robot-docs requires a subcommand: guide or render")
                 .with_hint(
-                    "Run `powerbi-cli robot-docs guide` or `powerbi-cli --json robot-docs guide`.",
+                    "Run `powerbi-cli robot-docs guide` or `powerbi-cli robot-docs render --check`.",
                 )
-                .with_suggested_command("powerbi-cli robot-docs guide"),
+                .with_suggested_command("powerbi-cli robot-docs guide")
+                .with_suggested_command("powerbi-cli robot-docs render --check --json"),
         ),
         _ => Err(CliError::invalid_args("unknown robot-docs subcommand")
-            .with_hint("Run `powerbi-cli robot-docs guide`.")
-            .with_suggested_command("powerbi-cli robot-docs guide")),
+            .with_hint("Run `powerbi-cli robot-docs guide` or `powerbi-cli robot-docs render --check`.")
+            .with_suggested_command("powerbi-cli robot-docs guide")
+            .with_suggested_command("powerbi-cli robot-docs render --check --json")),
     }
 }
 
