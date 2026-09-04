@@ -829,13 +829,15 @@ The locked-down corporate workflow is central and still SQL/Excel shaped.
 
 - T13.1 Source templates for CSV file and folder, and SharePoint/OneDrive
   path placeholders, credential-free, with the same `apply` gate.
-- T13.2 Generic M template kind with an explicit closed grammar (connector
-  allowlist, no credential tokens, placeholder resolution), refused outside
-  the grammar.
+- T13.2 Implemented: generic M source-template kind with an explicit closed
+  grammar (connector allowlist, no credential tokens, placeholder resolution),
+  refused outside the grammar with a pointer into the M text.
 - T13.3 `handoff rebind-check`: on the work machine, after `source-template
-  apply`, validate that every partition resolves, run strict validation, and
-  optionally use the Desktop bridge to confirm refresh; report which
-  partitions are still placeholders.
+  apply`, validate that every partition resolves, run strict native validation,
+  and report which partitions are still placeholders. The check is deliberately
+  offline and credential-free (connector syntax plus local path readability); it
+  never opens a source or Desktop connection. Use its returned Desktop command
+  for the separate authenticated refresh and canvas proof.
 - T13.4 Handoff runbook gains the design scorecard and proof level so the
   reviewer at work knows what was and was not proven at home.
 

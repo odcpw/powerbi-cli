@@ -124,6 +124,295 @@ pub(crate) fn add_textbox(args: &[String]) -> CliResult<Value> {
     scaffold_visual(ScaffoldKind::Textbox, args)
 }
 
+/// Parse one of the scaffold command shapes into the shared typed AddVisual
+/// payload. The command still owns the public argv contract; this helper only
+/// removes the project/output flags and records scaffold-only values as
+/// private metadata in the operation bindings array.
+pub(crate) fn parse_card_operation_args(
+    args: &[String],
+) -> CliResult<(crate::ops::AddVisual, MutationMode)> {
+    parse_scaffold_operation_args(ScaffoldKind::Card, args)
+}
+
+pub(crate) fn parse_slicer_operation_args(
+    args: &[String],
+) -> CliResult<(crate::ops::AddVisual, MutationMode)> {
+    parse_scaffold_operation_args(ScaffoldKind::Slicer, args)
+}
+
+pub(crate) fn parse_textbox_operation_args(
+    args: &[String],
+) -> CliResult<(crate::ops::AddVisual, MutationMode)> {
+    parse_scaffold_operation_args(ScaffoldKind::Textbox, args)
+}
+
+fn parse_scaffold_operation_args(
+    kind: ScaffoldKind,
+    args: &[String],
+) -> CliResult<(crate::ops::AddVisual, MutationMode)> {
+    let options = parse_scaffold_args(kind, args)?;
+    let page = options.page.clone().ok_or_else(|| {
+        CliError::invalid_args(format!(
+            "{} requires --page <page-name-or-handle>",
+            kind.command()
+        ))
+        .with_hint("Use `report pages list` to get stable page handles.")
+        .with_suggested_command(kind.dry_run_command())
+    })?;
+    let page = crate::ops::page_handle(&page);
+    let title = options.title.clone().ok_or_else(|| {
+        CliError::invalid_args(format!("{} requires --title", kind.command()))
+            .with_hint("Give every created visual a readable title.")
+            .with_suggested_command(kind.dry_run_command())
+    })?;
+    validate_nonempty_text(&title, "--title")?;
+    let x = require_geometry(options.x, "--x", kind)?;
+    let y = require_geometry(options.y, "--y", kind)?;
+    let width = require_positive_geometry(options.width, "--width", kind)?;
+    let height = require_positive_geometry(options.height, "--height", kind)?;
+    if x < 0.0 || y < 0.0 {
+        return Err(
+            CliError::invalid_args("visual position x/y must be nonnegative")
+                .with_hint("Pass nonnegative --x and --y values.")
+                .with_suggested_command(kind.dry_run_command()),
+        );
+    }
+    let mode = require_mode_with_contract(
+        options.mode,
+        kind.command(),
+        REQUIRE_MODE_HINT,
+        kind.dry_run_command(),
+    )?;
+    if kind == ScaffoldKind::Slicer && height < SLICER_MIN_HEIGHT {
+        return Err(CliError::invalid_args(format!(
+            "slicer height {height} is below the Power BI minimum of {SLICER_MIN_HEIGHT}"
+        ))
+        .with_hint(format!(
+            "Increase --height to at least {SLICER_MIN_HEIGHT}."
+        ))
+        .with_suggested_command(kind.dry_run_command()));
+    }
+
+    let mut bindings = Vec::new();
+    let mut metadata = Map::new();
+    metadata.insert(
+        "__powerbiCli".to_string(),
+        Value::String("addVisualScaffold".to_string()),
+    );
+    metadata.insert(
+        "kind".to_string(),
+        Value::String(kind.visual_type().to_string()),
+    );
+    let (visual_mode, single_select) = match kind {
+        ScaffoldKind::Card => {
+            let (table, measure) = parse_table_field(
+                options.field.as_deref().ok_or_else(|| {
+                    CliError::invalid_args(
+                        "report visuals add-card requires --measure <Table.Measure>",
+                    )
+                    .with_hint("Pass a model measure as `<Table>.<Measure>`.")
+                    .with_suggested_command(kind.dry_run_command())
+                })?,
+                "--measure",
+            )?;
+            bindings.push(json!({
+                "role": "Values",
+                "table": table,
+                "measure": measure
+            }));
+            if let Some(size) = options.value_font_size {
+                metadata.insert("valueFontSize".to_string(), json!(size));
+            }
+            if let Some(size) = options.category_font_size {
+                metadata.insert("categoryFontSize".to_string(), json!(size));
+            }
+            if options.word_wrap {
+                metadata.insert("wordWrap".to_string(), Value::Bool(true));
+            }
+            (None, false)
+        }
+        ScaffoldKind::Slicer => {
+            let (table, column) = parse_table_field(
+                options.field.as_deref().ok_or_else(|| {
+                    CliError::invalid_args(
+                        "report visuals add-slicer requires --field <Table.Column>",
+                    )
+                    .with_hint("Pass a model column as `<Table>.<Column>`.")
+                    .with_suggested_command(kind.dry_run_command())
+                })?,
+                "--field",
+            )?;
+            bindings.push(json!({
+                "role": "Values",
+                "table": table,
+                "column": column
+            }));
+            let slicer_mode = options.slicer_mode.unwrap_or(SlicerModeOpt::Dropdown);
+            (
+                Some(slicer_mode.as_str().to_string()),
+                options.single_select,
+            )
+        }
+        ScaffoldKind::Textbox => {
+            let paragraphs = load_paragraphs(&options)?;
+            metadata.insert("paragraphs".to_string(), json!(paragraphs));
+            (None, false)
+        }
+    };
+    bindings.push(Value::Object(metadata));
+
+    let position = json!({
+        "height": height,
+        "width": width,
+        "x": x,
+        "y": y
+    });
+    let handle = options.name.as_deref().map_or_else(
+        || {
+            format!(
+                "visual:{}:{}",
+                page.strip_prefix("page:").unwrap_or(&page),
+                crate::report_visual_mutations::operation_base_visual_name(&title)
+            )
+        },
+        |name| {
+            format!(
+                "visual:{}:{name}",
+                page.strip_prefix("page:").unwrap_or(&page)
+            )
+        },
+    );
+    let payload = crate::ops::AddVisual {
+        handle,
+        page,
+        visual_type: kind.visual_type().to_string(),
+        name: options.name,
+        title: Some(title),
+        mode: visual_mode,
+        single_select: (kind == ScaffoldKind::Slicer).then_some(single_select),
+        position: Some(position),
+        bindings,
+    };
+    Ok((payload, mode))
+}
+
+/// Build a scaffold visual JSON document from the reserved operation metadata.
+/// `None` means the payload is a normal generated visual handled by the generic
+/// visual factory.
+pub(crate) fn operation_scaffold_json(
+    payload: &crate::ops::AddVisual,
+    name: &str,
+    title: &str,
+    position: &Value,
+) -> CliResult<Option<Value>> {
+    let Some(metadata) = payload.bindings.iter().find_map(|binding| {
+        let object = binding.as_object()?;
+        (object.get("__powerbiCli").and_then(Value::as_str) == Some("addVisualScaffold"))
+            .then_some(object)
+    }) else {
+        return Ok(None);
+    };
+    let kind = match metadata.get("kind").and_then(Value::as_str) {
+        Some("card") => ScaffoldKind::Card,
+        Some("slicer") => ScaffoldKind::Slicer,
+        Some("textbox") => ScaffoldKind::Textbox,
+        Some(other) => {
+            return Err(CliError::invalid_args(format!(
+                "unsupported AddVisual scaffold kind: {other}"
+            )));
+        }
+        None => {
+            return Err(CliError::invalid_args(
+                "AddVisual scaffold metadata requires kind",
+            ));
+        }
+    };
+    let visual = match kind {
+        ScaffoldKind::Card => {
+            let binding = payload
+                .bindings
+                .iter()
+                .find(|binding| binding["role"].as_str() == Some("Values"))
+                .ok_or_else(|| CliError::invalid_args("card scaffold requires a Values binding"))?;
+            let table = binding["table"].as_str().ok_or_else(|| {
+                CliError::invalid_args("card scaffold Values binding requires table")
+            })?;
+            let measure = binding["measure"].as_str().ok_or_else(|| {
+                CliError::invalid_args("card scaffold Values binding requires measure")
+            })?;
+            card_visual_json(&CardSpec {
+                name,
+                title,
+                table,
+                measure,
+                position,
+                value_font_size: metadata.get("valueFontSize").and_then(Value::as_f64),
+                category_font_size: metadata.get("categoryFontSize").and_then(Value::as_f64),
+                word_wrap: metadata
+                    .get("wordWrap")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            })
+        }
+        ScaffoldKind::Slicer => {
+            let binding = payload
+                .bindings
+                .iter()
+                .find(|binding| binding["role"].as_str() == Some("Values"))
+                .ok_or_else(|| {
+                    CliError::invalid_args("slicer scaffold requires a Values binding")
+                })?;
+            let table = binding["table"].as_str().ok_or_else(|| {
+                CliError::invalid_args("slicer scaffold Values binding requires table")
+            })?;
+            let column = binding["column"].as_str().ok_or_else(|| {
+                CliError::invalid_args("slicer scaffold Values binding requires column")
+            })?;
+            let mode = match payload.mode.as_deref().unwrap_or("Dropdown") {
+                value if value.eq_ignore_ascii_case("basic") => SlicerModeOpt::Basic,
+                value if value.eq_ignore_ascii_case("dropdown") => SlicerModeOpt::Dropdown,
+                other => {
+                    return Err(CliError::unsupported_feature(format!(
+                        "unsupported slicer mode: {other}"
+                    )));
+                }
+            };
+            slicer_visual_json(
+                name,
+                title,
+                table,
+                column,
+                position,
+                mode,
+                payload.single_select.unwrap_or(false),
+            )
+        }
+        ScaffoldKind::Textbox => {
+            let paragraphs = metadata
+                .get("paragraphs")
+                .and_then(Value::as_array)
+                .ok_or_else(|| CliError::invalid_args("textbox scaffold requires paragraphs"))?
+                .iter()
+                .map(|value| {
+                    value.as_str().map(ToOwned::to_owned).ok_or_else(|| {
+                        CliError::invalid_args("textbox scaffold paragraphs must be strings")
+                    })
+                })
+                .collect::<CliResult<Vec<_>>>()?;
+            textbox_visual_json(name, title, position, &paragraphs)
+        }
+    };
+    Ok(Some(visual))
+}
+
+pub(crate) fn operation_next_stack_index(page: &PageRecord) -> u64 {
+    next_stack_index(page)
+}
+
+pub(crate) fn operation_write_visual_json(path: &Path, value: &Value) -> CliResult<()> {
+    write_visual_json(path, value)
+}
+
 fn scaffold_visual(kind: ScaffoldKind, args: &[String]) -> CliResult<Value> {
     let options = parse_scaffold_args(kind, args)?;
     let source_project = required_project(options.project.clone(), kind.command())?;

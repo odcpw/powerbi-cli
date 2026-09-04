@@ -1791,6 +1791,390 @@ pub(super) fn validate_expected_connector_call(tokens: &[MToken], expected: &str
     Ok(())
 }
 
+/// Validate a source-template M expression without choosing one of the typed
+/// source-template constructors.  This deliberately builds on the same lexer
+/// and call-shape checks used by `workflow/source-profile`: only a direct
+/// `Source = <connector>(...)` root is accepted, connector aliases and
+/// computed/postfix calls are rejected, and path/URI literals must be
+/// represented by a complete placeholder token.
+pub(crate) fn validate_generic_m_template(text: &str) -> CliResult<()> {
+    const ROOT_CONNECTORS: &[&str] = &[
+        "Sql.Database",
+        "PostgreSQL.Database",
+        "Odbc.DataSource",
+        "Excel.Workbook",
+        "Csv.Document",
+        "Folder.Files",
+        "SharePoint.Files",
+    ];
+    const SAFE_NAMESPACES: &[&str] = &[
+        "Binary",
+        "Combiner",
+        "Comparer",
+        "Currency",
+        "Date",
+        "DateTime",
+        "DateTimeZone",
+        "Decimal",
+        "Duration",
+        "Int16",
+        "Int32",
+        "Int64",
+        "List",
+        "Logical",
+        "Number",
+        "Percentage",
+        "Record",
+        "Replacer",
+        "Splitter",
+        "Table",
+        "Text",
+        "Time",
+        "Type",
+        "Uri",
+        "QuoteStyle",
+    ];
+
+    if text.trim().is_empty() {
+        return Err(generic_m_template_error(
+            text,
+            "is empty; provide a complete M expression",
+            None,
+        ));
+    }
+    if contains_credential_like_text_str(text) {
+        return Err(generic_m_template_error(
+            text,
+            "contains credential-like content; credentials belong only in Power BI Desktop",
+            None,
+        ));
+    }
+    let tokens =
+        m_tokens(text).map_err(|error| generic_m_template_error(text, &error.message, None))?;
+    if tokens
+        .iter()
+        .any(|token| matches!(token, MToken::Other('#')))
+    {
+        return Err(generic_m_template_error(
+            text,
+            "uses hash intrinsics or #shared indirection outside the closed M grammar",
+            Some("#"),
+        ));
+    }
+    if !delimiters_balanced(&tokens) {
+        return Err(generic_m_template_error(
+            text,
+            "has unbalanced M delimiters",
+            None,
+        ));
+    }
+    let roots = tokens
+        .windows(4)
+        .enumerate()
+        .filter_map(|(index, items)| {
+            if let [
+                MToken::Ident(binding),
+                MToken::Equals,
+                MToken::Ident(connector),
+                MToken::LParen,
+            ] = items
+                && binding == "Source"
+            {
+                return Some((index, connector.as_str()));
+            }
+            None
+        })
+        .collect::<Vec<_>>();
+    if roots.len() != 1 {
+        return Err(generic_m_template_error(
+            text,
+            "must bind Source directly to exactly one allowed root connector",
+            None,
+        ));
+    }
+    let (root_index, root_connector) = roots[0];
+    if !ROOT_CONNECTORS.contains(&root_connector) {
+        return Err(generic_m_template_error(
+            text,
+            "uses a connector outside the closed root allowlist",
+            Some(root_connector),
+        ));
+    }
+    let in_count = tokens
+        .iter()
+        .filter(|token| matches!(token, MToken::Ident(value) if value == "in"))
+        .count();
+    if in_count != 1 {
+        return Err(generic_m_template_error(
+            text,
+            "must contain exactly one `in` expression after the Source binding",
+            None,
+        ));
+    }
+
+    // Keep the exact dynamic-call rejection from source-profile validation,
+    // then reject every executable name outside the connector + safe
+    // transformation namespaces.  A connector identifier that is not called
+    // is also rejected so `Alias = Sql.Database; Alias(...)` cannot bypass
+    // the direct-root requirement.
+    if tokens.windows(2).any(|pair| {
+        matches!(
+            pair,
+            [MToken::RParen | MToken::String(_), MToken::LParen]
+                | [MToken::Other(']' | '}' | '?'), MToken::LParen]
+        ) || matches!(pair, [MToken::Other(value), MToken::LParen] if value.is_ascii_digit())
+    }) {
+        return Err(generic_m_template_error(
+            text,
+            "uses a computed or postfix function invocation outside the closed M grammar",
+            None,
+        ));
+    }
+    let calls = tokens
+        .windows(2)
+        .filter_map(|pair| match pair {
+            [MToken::Ident(name), MToken::LParen] => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    for identifier in tokens.iter().filter_map(|token| match token {
+        MToken::Ident(identifier) if identifier.contains('.') => Some(identifier.as_str()),
+        _ => None,
+    }) {
+        let allowed_root = identifier == root_connector;
+        let allowed_file_reader = identifier == "File.Contents"
+            && matches!(root_connector, "Excel.Workbook" | "Csv.Document");
+        let safe_transform = identifier == "Value.NativeQuery"
+            || identifier
+                .split_once('.')
+                .is_some_and(|(namespace, _)| SAFE_NAMESPACES.contains(&namespace));
+        if !allowed_root && !allowed_file_reader && !safe_transform {
+            return Err(generic_m_template_error(
+                text,
+                "references a function outside the closed M grammar",
+                Some(identifier),
+            ));
+        }
+    }
+    for call in &calls {
+        let allowed_root = *call == root_connector;
+        let allowed_file_reader =
+            *call == "File.Contents" && matches!(root_connector, "Excel.Workbook" | "Csv.Document");
+        let safe_transform = *call == "Value.NativeQuery"
+            || call
+                .split_once('.')
+                .is_some_and(|(namespace, _)| SAFE_NAMESPACES.contains(&namespace));
+        if !allowed_root && !allowed_file_reader && !safe_transform {
+            return Err(generic_m_template_error(
+                text,
+                "invokes a function outside the closed M grammar",
+                Some(call),
+            ));
+        }
+    }
+    if calls.iter().filter(|call| **call == root_connector).count() != 1 {
+        return Err(generic_m_template_error(
+            text,
+            "must execute exactly one root connector call",
+            Some(root_connector),
+        ));
+    }
+    if tokens.iter().any(|token| {
+        matches!(token, MToken::Ident(identifier) if identifier == root_connector)
+    }) && tokens.windows(2).any(|pair| {
+        matches!(pair, [MToken::Ident(identifier), next] if identifier == root_connector && !matches!(next, MToken::LParen))
+    }) {
+        return Err(generic_m_template_error(
+            text,
+            "must invoke the root connector directly rather than through an alias",
+            None,
+        ));
+    }
+
+    matching_paren(&tokens, root_index + 3).ok_or_else(|| {
+        generic_m_template_error(
+            text,
+            "has an unbalanced root connector call",
+            Some(root_connector),
+        )
+    })?;
+    let first_argument = tokens.get(root_index + 4);
+    match root_connector {
+        "Sql.Database" | "PostgreSQL.Database" => {
+            if !matches!(
+                tokens.get(root_index + 4..root_index + 7),
+                Some([MToken::String(_), MToken::Comma, MToken::String(_)])
+            ) {
+                return Err(generic_m_template_error(
+                    text,
+                    "requires literal server and database arguments",
+                    Some(root_connector),
+                ));
+            }
+        }
+        "Odbc.DataSource" => {
+            let Some(MToken::String(dsn)) = first_argument else {
+                return Err(generic_m_template_error(
+                    text,
+                    "requires a literal DSN argument",
+                    Some(root_connector),
+                ));
+            };
+            let dsn_name = dsn.strip_prefix("dsn=").unwrap_or(dsn);
+            if dsn_name.is_empty() || dsn_name.contains([';', '=']) {
+                return Err(generic_m_template_error(
+                    text,
+                    "requires a bare DSN name without inline connection attributes",
+                    Some(root_connector),
+                ));
+            }
+        }
+        "Excel.Workbook" | "Csv.Document" => {
+            let Some(MToken::Ident(reader)) = tokens.get(root_index + 4) else {
+                return Err(generic_m_template_error(
+                    text,
+                    "requires File.Contents as its first argument",
+                    Some(root_connector),
+                ));
+            };
+            if reader != "File.Contents"
+                || !matches!(tokens.get(root_index + 5), Some(MToken::LParen))
+                || !matches!(tokens.get(root_index + 6), Some(MToken::String(_)))
+                || calls
+                    .iter()
+                    .filter(|call| **call == "File.Contents")
+                    .count()
+                    != 1
+            {
+                return Err(generic_m_template_error(
+                    text,
+                    "requires File.Contents(<placeholder>) as its first argument",
+                    Some(root_connector),
+                ));
+            }
+        }
+        "Folder.Files" | "SharePoint.Files" => {
+            if !matches!(first_argument, Some(MToken::String(_))) {
+                return Err(generic_m_template_error(
+                    text,
+                    "requires a literal path or site placeholder argument",
+                    Some(root_connector),
+                ));
+            }
+        }
+        _ => unreachable!("root connector allowlist checked above"),
+    }
+    for value in tokens.iter().filter_map(|token| match token {
+        MToken::String(value) => Some(value.as_str()),
+        _ => None,
+    }) {
+        if value.contains("{{powerbi-cli.") && !is_complete_generic_placeholder(value) {
+            return Err(generic_m_template_error(
+                text,
+                "contains a placeholder embedded in other string text",
+                None,
+            ));
+        }
+        let windows_drive = value.as_bytes().get(1) == Some(&b':')
+            && value
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphabetic);
+        let sharepoint_site = root_connector == "SharePoint.Files"
+            && value.starts_with("https://")
+            && value.to_ascii_lowercase().contains(".sharepoint.com");
+        let sharepoint_relative =
+            root_connector == "SharePoint.Files" && value.starts_with('/') && !value.contains("//");
+        let sharepoint_path = sharepoint_site || sharepoint_relative;
+        if (value.contains("://") && !sharepoint_site)
+            || (value.starts_with(['/', '\\']) && !sharepoint_path)
+            || (value.contains(['/', '\\']) && !sharepoint_path)
+            || windows_drive
+        {
+            return Err(generic_m_template_error(
+                text,
+                "contains a hard-coded file or URI path; use a complete placeholder token",
+                None,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn delimiters_balanced(tokens: &[MToken]) -> bool {
+    let mut stack = Vec::new();
+    for token in tokens {
+        let (opening, closing) = match token {
+            MToken::LParen => (Some('('), None),
+            MToken::RParen => (None, Some(')')),
+            MToken::Other('[') => (Some('['), None),
+            MToken::Other('{') => (Some('{'), None),
+            MToken::Other(']') => (None, Some(']')),
+            MToken::Other('}') => (None, Some('}')),
+            _ => (None, None),
+        };
+        if let Some(opening) = opening {
+            stack.push(opening);
+        } else if let Some(closing) = closing {
+            let Some(opening) = stack.pop() else {
+                return false;
+            };
+            if !matches!((opening, closing), ('(', ')') | ('[', ']') | ('{', '}')) {
+                return false;
+            }
+        }
+    }
+    stack.is_empty()
+}
+
+fn matching_paren(tokens: &[MToken], opening: usize) -> Option<usize> {
+    if !matches!(tokens.get(opening), Some(MToken::LParen)) {
+        return None;
+    }
+    let mut depth = 0_usize;
+    for (index, token) in tokens.iter().enumerate().skip(opening) {
+        match token {
+            MToken::LParen => depth = depth.saturating_add(1),
+            MToken::RParen => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn is_complete_generic_placeholder(value: &str) -> bool {
+    [
+        "{{powerbi-cli.resourcePath:",
+        "{{powerbi-cli.placeholder:",
+        "{{powerbi-cli.source:",
+    ]
+    .iter()
+    .any(|prefix| {
+        value
+            .strip_prefix(prefix)
+            .and_then(|name| name.strip_suffix("}}"))
+            .is_some_and(|name| validate_name(name, "placeholder").is_ok())
+    })
+}
+
+fn generic_m_template_error(text: &str, message: &str, needle: Option<&str>) -> CliError {
+    let offset = needle
+        .and_then(|needle| text.find(needle))
+        .unwrap_or_else(|| {
+            text.find(|character: char| !character.is_whitespace())
+                .unwrap_or(0)
+        });
+    CliError::invalid_args(format!("generic M source template {message}"))
+        .with_hint("Use one direct Sql.Database, PostgreSQL.Database, Odbc.DataSource, Excel.Workbook, Csv.Document, Folder.Files, or SharePoint.Files root with complete placeholder tokens; credentials and computed calls are refused.")
+        .with_suggested_command("powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind generic-m --m-template <M-expression> --dry-run --json")
+        .with_pointer(format!("/mTemplate/{offset}"))
+}
+
 pub(super) fn resource_placeholder_name(value: &str) -> Option<&str> {
     value
         .strip_prefix("{{powerbi-cli.resourcePath:")

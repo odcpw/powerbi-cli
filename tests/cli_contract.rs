@@ -541,6 +541,68 @@ fn help_json_command_paths_match_capabilities_catalog() {
 }
 
 #[test]
+fn documentation_mentions_only_cataloged_commands_and_every_catalog_path() {
+    let capabilities = run_powerbi(&["capabilities", "--json"]);
+    assert_eq!(capabilities.code, 0, "stderr: {}", capabilities.stderr);
+    let catalog = stdout_json(&capabilities);
+    let paths = command_paths(&catalog);
+
+    let docs = [
+        (
+            "README.md",
+            fs::read_to_string("README.md").expect("README.md"),
+        ),
+        (
+            "skills/powerbi-cli/SKILL.md",
+            fs::read_to_string("skills/powerbi-cli/SKILL.md").expect("SKILL.md"),
+        ),
+    ];
+
+    for (name, text) in &docs {
+        for path in &paths {
+            assert!(
+                text.contains(path),
+                "{name} is missing the catalog command path {path}"
+            );
+            let family = path.split_whitespace().next().expect("command family");
+            let family = family.strip_prefix('-').unwrap_or(family);
+            assert!(
+                text.contains(family),
+                "{name} is missing the catalog command family {family}"
+            );
+        }
+
+        for line in text.lines() {
+            let line = line.trim_start();
+            let command = line
+                .strip_prefix("cargo run --bin powerbi-cli --")
+                .or_else(|| line.strip_prefix("POWERBI_DESKTOP_ORACLE=1 powerbi-cli "))
+                .or_else(|| line.strip_prefix("powerbi-cli "))
+                .or_else(|| line.strip_prefix("pbi "));
+            let Some(mut command) = command.map(str::trim_start) else {
+                continue;
+            };
+            while let Some(rest) = command.strip_prefix("--json") {
+                command = rest.trim_start();
+            }
+            if command.is_empty() {
+                continue;
+            }
+            let matched = paths.iter().any(|path| {
+                command == path
+                    || command
+                        .strip_prefix(path)
+                        .is_some_and(|rest| rest.starts_with(char::is_whitespace))
+            });
+            assert!(
+                matched,
+                "{name} documents an invocation that is not in capabilities: {line}"
+            );
+        }
+    }
+}
+
+#[test]
 fn version_is_first_class_catalog_command() {
     let output = run_powerbi(&["version", "--json"]);
     assert_eq!(output.code, 0, "stderr: {}", output.stderr);
@@ -1412,7 +1474,7 @@ fn exact_compact_capabilities_return_only_the_documented_command_fields() {
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--json", "--format json"],
             "examples": ["powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json", "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"],
             "proofLevel": "unit-smoke",
-            "followUpFields": ["projectDir", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "outputSchema": "powerbi-cli.report.build.v1"
         })
     );

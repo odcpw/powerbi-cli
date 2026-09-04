@@ -137,6 +137,10 @@ policies can wait until the object-specific writers and fixtures exist.
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
+- Missing required dashboard intent now returns the registered
+  `spec.missing_input` diagnostic with an RFC 6901 pointer, expected field,
+  reason, example, and `report spec fields` candidate command; documented
+  optional defaults are surfaced in `defaultsApplied[]`.
 - `report spec upgrade --spec <v1.json> --out <v2.json>`: losslessly migrate
   a strict v1 spec to normalized v2 by rewriting only `/schema`, preserving
   array order, and refusing unknown keys before output.
@@ -189,6 +193,8 @@ visual binding is too strict to invent by memory.
 - `handoff check`: verify a project is safe to take home.
 - `handoff rebind-plan`: produce work-machine instructions mapping dummy
   partitions to real source templates without storing credentials.
+- `handoff rebind-check`: verify every rebound partition offline (connector
+  syntax and local path readability only) before the separate Desktop refresh.
 
 ### Proof
 
@@ -404,8 +410,11 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
-  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
+- Source-template support covers SQL Server, PostgreSQL, ODBC, Excel, CSV,
+  folder, SharePoint/OneDrive, and generic M expressions. Generic M uses the
+  workflow/source-profile closed connector grammar with complete placeholder
+  tokens and refuses credentials, hard-coded paths, unknown functions, and
+  computed/postfix calls with an M-text pointer.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
@@ -427,6 +436,12 @@ frozen until proven.
   Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
+- Implemented offline `handoff rebind-check`: it reports deterministic,
+  per-partition materialization state and registered findings for placeholders,
+  incomplete connector syntax, unknown sources, and missing/unreadable local
+  paths. It runs strict native validation and deliberately never opens a source
+  or Desktop connection; `refresh.status` remains `not-run` until the returned
+  Desktop handoff command is performed on the work machine.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
   applies raw report-level theme bundles from `themeCollection` and already
   present registered theme JSON resources. Per-visual raw formatting bundle
@@ -520,7 +535,10 @@ frozen until proven.
   transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
   public `apply --ops` command only after the individual kernels are converted.
 - Make operation JSON durable enough for another agent to inspect and replay.
-- Include generated proof commands in mutation outputs.
+- Include generated proof commands in mutation outputs. `report build` now
+  compiles v2 `proof` requirements into a deterministic `proofPlan` and
+  `next[]`; Desktop-dependent steps remain explicitly unavailable off Windows
+  until the T9 refresh/canvas oracle lands.
 
 ### Phase 9: Optional Bridges
 
@@ -575,11 +593,38 @@ When Desktop rejects a generated file:
 
 ## Near-Term Backlog
 
+The dated [bridge plan](bridge-plan-2026-09.md) is now the authoritative
+ordering for the remaining compiler, design-system, planner, fixture, and
+Desktop-oracle work. The old numbered list is retained in that plan with bead
+IDs and dependencies; this roadmap records what has already landed:
+
+- [x] Schema/profile validation, normalization, deterministic report planning,
+  report-spec v1/v2 validation/normalize/upgrade, and guarded report build.
+- [x] Offline-safe package inspect/extract/import/source-pack/work-pack and
+  Desktop export-plan handoff.
+- [x] Semantic-model table/column/measure/calculated-column/relationship
+  authoring, static-table controls, partition inspection, grouped-rank
+  generation, and advanced metadata readback.
+- [x] PBIR page/visual/filter/slicer/interaction/bookmark metadata surfaces,
+  theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
+  harvester, with each feature's proof level published by `features list`.
+- [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
+  execution, and read-only live TMDL export remain explicit opt-in Windows
+  tracks; no command claims automated canvas/refresh proof.
+
+Remaining work—such as `report compose`, full v2 compilation, design lint,
+broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
+is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
+associated beads. Keep command and feature claims synchronized with the live
+`capabilities --json` and `features list --json` catalogs.
+
 The immediate work is no longer "can we generate something?" The generic
 archetypes (`flat-ops`, `scatter-bubble`, `catalog-proof`) open, refresh, and
 render in Desktop under manual oracle inspection. The next work is turning
 that manual proof into repeatable guardrails and then expanding feature
 coverage only from Desktop-authored or Desktop-proved fixtures.
+
+The detailed near-term backlog below remains useful for implementation context:
 
 1. **Upgrade `desktop open-check` into canvas proof.**
    Current `desktop open-check` is mostly launch/title proof. It should detect
