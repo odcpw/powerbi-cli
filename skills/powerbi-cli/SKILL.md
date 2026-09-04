@@ -261,6 +261,11 @@ supported.
   resources, ops, snapshots, and harvested fragments already have reserved
   numeric limits and typed guards in `docs/input-safety-contract.md`; do not
   bypass those guards or silently strip rejected content when adding a command.
+- The internal operation-plan spine is `powerbi-cli.ops.v1`: typed `op` records
+  use the same stable page, visual, filter, and percent-encoded semantic-model
+  handles as CLI readbacks. Plans validate references and stage order before a
+  temporary-directory transaction is published; no public `apply --ops` command
+  is advertised until the individual mutation kernels are converted.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.

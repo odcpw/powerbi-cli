@@ -1385,6 +1385,17 @@ fn response_shapes() -> Value {
                 }
             }
         },
+        "ops.v1": {
+            "schema": "powerbi-cli.ops.v1",
+            "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
+            "requiredFields": ["schema", "ops"],
+            "operationTag": "op",
+            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "applyThemePreset", "setObject"],
+            "validation": ["dangling handles must resolve in the project or an earlier declaration", "declared handles are unique", "identical operations are rejected", "model, page, visual, behavior, and style stages are ordered"],
+            "validatedPlanFields": ["ops[].index", "ops[].stage", "ops[].operation", "stages[].stage", "stages[].name", "stages[].operations"],
+            "transactionModes": ["dry-run", "out-dir", "in-place with sibling snapshot"],
+            "status": "internal-spine-no-cli-command-yet"
+        },
         "followUps": {
             "next": "Executable powerbi-cli command templates only.",
             "instructions": "Human or agent prose steps that are not executable commands.",
@@ -1508,6 +1519,28 @@ mod tests {
                 .as_str()
                 .expect("catalog rule")
                 .contains("maximum")
+        );
+    }
+
+    #[test]
+    fn capabilities_document_the_durable_operation_plan_contract() {
+        let value = capabilities(&[]).expect("capabilities");
+        let ops = &value["responseShapes"]["ops.v1"];
+        assert_eq!(ops["schema"], "powerbi-cli.ops.v1");
+        assert_eq!(ops["operationTag"], "op");
+        assert!(
+            ops["operationTags"]
+                .as_array()
+                .expect("operation tags")
+                .iter()
+                .any(|tag| tag == "addVisual")
+        );
+        assert!(
+            ops["transactionModes"]
+                .as_array()
+                .expect("transaction modes")
+                .iter()
+                .any(|mode| mode == "in-place with sibling snapshot")
         );
     }
 

@@ -487,6 +487,10 @@ frozen until proven.
 ### Phase 8: Agent Batch Operations
 
 - Add `diff` and `apply --ops` once individual commands are stable.
+- The internal `powerbi-cli.ops.v1` spine now provides typed operation JSON,
+  pointer-rich plan validation, deterministic handles, and a temporary-tree
+  transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
+  public `apply --ops` command only after the individual kernels are converted.
 - Make operation JSON durable enough for another agent to inspect and replay.
 - Include generated proof commands in mutation outputs.
 

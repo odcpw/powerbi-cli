@@ -24,7 +24,7 @@ focused `capabilities --for ...` response.
 | CSV/JSON rows | 64 MiB; at most 100,000 logical records (CSV header included) and 512 fields in any record; strict decoding; malformed CSV/JSON refused; leading `=`, `+`, `-`, and `@` remain exact text and are never rewritten |
 | Intent | 1 MiB; strict UTF-8; line directives beginning with `$`, `@`, `!`, or `#` plus `include`/`exec`, and `include:`/`exec:`, are refused for file and inline intent |
 | Image | PNG only in v1; 16 MiB; the eight-byte PNG signature is sniffed, so an extension cannot authorize content; URL inputs are not accepted |
-| Ops file | 8 MiB; exact `powerbi-cli.ops.v1` schema marker and typed op-kind allowlist must pass before apply; unknown op kinds are refused |
+| Ops file | 8 MiB; exact `powerbi-cli.ops.v1` schema marker and typed `op`-tag allowlist must pass before apply (`kind` is accepted only as a legacy boundary alias); unknown op kinds are refused |
 | Snapshot | Sibling path by default or explicit `--snapshot-dir`; source at most 10,000 files and 512 MiB; links, an inside-project destination, an existing destination, and an unwritable destination are refused |
 | Harvested PBIR fragment | 4 MiB; known persisted selection/filter value containers are refused with a JSON pointer; the guard never silently strips content |
 

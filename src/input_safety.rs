@@ -414,10 +414,17 @@ pub(crate) fn read_ops(path: &Path, known_kinds: &[&str]) -> CliResult<Value> {
         .and_then(Value::as_array)
         .ok_or_else(|| refusal(InputKind::Ops, "ops file must contain an ops array"))?;
     for (index, op) in ops.iter().enumerate() {
-        let kind = op.get("kind").and_then(Value::as_str).ok_or_else(|| {
+        // Durable operation plans use the typed IR's `op` tag. Keep accepting
+        // the historical safety-harness spelling `kind` so this boundary can
+        // validate both forms before the owning parser normalizes them.
+        let (kind_value, field) = match op.get("op") {
+            Some(value) => (Some(value), "op"),
+            None => (op.get("kind"), "kind"),
+        };
+        let kind = kind_value.and_then(Value::as_str).ok_or_else(|| {
             refusal(
                 InputKind::Ops,
-                format!("ops[{index}].kind must be a string"),
+                format!("ops[{index}].{field} must be a string"),
             )
         })?;
         if !known_kinds.contains(&kind) {

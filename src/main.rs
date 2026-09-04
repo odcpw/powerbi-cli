@@ -33,6 +33,7 @@ mod model_advanced;
 mod model_dax;
 mod model_live;
 mod model_partitions_grouped_rank;
+mod ops;
 mod package;
 mod partitions;
 mod pbir;

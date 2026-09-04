@@ -1508,7 +1508,7 @@ fn required_string(object: &Map<String, Value>, field: &str, owner: &str) -> Cli
         .ok_or_else(|| CliError::invalid_args(format!("{owner} requires {field}")))
 }
 
-fn page_name(value: &str) -> String {
+pub(crate) fn page_name(value: &str) -> String {
     if value.starts_with("ReportSection") {
         value.to_string()
     } else {
@@ -1516,7 +1516,7 @@ fn page_name(value: &str) -> String {
     }
 }
 
-fn visual_name(value: &str) -> String {
+pub(crate) fn visual_name(value: &str) -> String {
     if value.starts_with("VisualContainer") {
         value.to_string()
     } else {

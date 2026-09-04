@@ -205,6 +205,12 @@ Every `next[]` or `suggestedCommands[]` string is an executable `powerbi-cli`
 command template; prose belongs in `instructions[]` or `notes[]`. The exact
 machine-readable contract is available at `capabilities.responseShapes`.
 
+The internal operation-plan spine uses the durable `powerbi-cli.ops.v1` JSON
+shape. It is intentionally not a public command yet: converted mutation
+kernels will consume typed `op` records through a temporary-directory
+transaction, validate the staged PBIP tree, and publish only through explicit
+dry-run, out-dir, or snapshotted in-place modes.
+
 ## Build
 
 ```powershell
