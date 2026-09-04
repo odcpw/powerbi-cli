@@ -98,6 +98,47 @@ pub(crate) fn parse_bindings_json_value(value: &Value) -> CliResult<Vec<VisualBi
     array.iter().map(parse_binding_json_object).collect()
 }
 
+/// Encode the command parser's binding shape for the typed AddVisual
+/// operation. Keeping this conversion next to the parser means replayed
+/// operations are decoded by exactly the same validation path as argv input.
+pub(crate) fn binding_input_json(input: &VisualBindingInput) -> Value {
+    let mut object = Map::new();
+    object.insert("role".to_string(), Value::String(input.role.clone()));
+    object.insert("table".to_string(), Value::String(input.table.clone()));
+    if let Some(column) = &input.column {
+        object.insert("column".to_string(), Value::String(column.clone()));
+    }
+    if let Some(measure) = &input.measure {
+        object.insert("measure".to_string(), Value::String(measure.clone()));
+    }
+    if let Some(display_name) = &input.display_name {
+        object.insert(
+            "displayName".to_string(),
+            Value::String(display_name.clone()),
+        );
+    }
+    if let Some(format_string) = &input.format_string {
+        object.insert(
+            "formatString".to_string(),
+            Value::String(format_string.clone()),
+        );
+    }
+    if let Some(sort_direction) = &input.sort_direction {
+        object.insert(
+            "sortDirection".to_string(),
+            Value::String(sort_direction.clone()),
+        );
+    }
+    Value::Object(object)
+}
+
+/// Decode one typed operation binding using the same object parser used by
+/// `--bindings-json`. Reserved scaffold metadata is handled by the visual
+/// kernel and never reaches this function.
+pub(crate) fn binding_input_from_json(value: &Value) -> CliResult<VisualBindingInput> {
+    parse_binding_json_object(value)
+}
+
 pub(crate) fn resolve_visual_bindings(
     docs: &[TableDocument],
     visual_type: &str,
