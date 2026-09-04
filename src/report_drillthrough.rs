@@ -524,10 +524,11 @@ fn resolve_operation_page(
 }
 
 fn operation_target(payload: &SetDrillthroughOp) -> CliResult<(String, String)> {
-    if let (Some(table), Some(column)) = (payload.table.as_deref(), payload.column.as_deref()) {
-        if !table.trim().is_empty() && !column.trim().is_empty() {
-            return Ok((table.to_string(), column.to_string()));
-        }
+    if let (Some(table), Some(column)) = (payload.table.as_deref(), payload.column.as_deref())
+        && !table.trim().is_empty()
+        && !column.trim().is_empty()
+    {
+        return Ok((table.to_string(), column.to_string()));
     }
     parse_target(&payload.target)
 }
