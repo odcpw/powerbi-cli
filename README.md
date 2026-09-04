@@ -945,6 +945,10 @@ three pages.
   before oracle opt-in evaluation. An attempted oracle subsystem failure is exit
   40, while evidence blocked by launch/observation timeout or title mismatch is
   `proof_incomplete` (exit 20).
+- `desktop refresh-check` and `desktop canvas-check` are cataloged forward-compatible
+  Desktop proof commands. They currently return `error.code = "unsupported_feature"`
+  without launching Desktop or writing evidence; refresh completion and canvas
+  rendering proof will be implemented by the T9 Windows work.
 - Validation checks file structure, parseable JSON, page references, TMDL table
   presence, relationship endpoints, and offline hazards. It is not a Power BI
   Desktop open proof.
