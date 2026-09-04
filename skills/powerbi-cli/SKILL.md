@@ -1329,12 +1329,12 @@ and timeout state. The status/exit mapping is:
 - Launch, observer, capture, or cleanup subsystem failure:
   `oracle_failed`, exit 40.
 
-`desktop refresh-check`, `desktop canvas-check`, `desktop save-check`, and
-Desktop round-trip diffing are planned oracle commands. Proof plans may emit
-the first two as forward-compatible templates; they return
-`unsupported_feature` until their T9 implementation lands. Do not expect a
-Desktop proof claim until `capabilities --for desktop` advertises an available
-implementation.
+`desktop refresh-check` and `desktop canvas-check` are cataloged forward-compatible
+oracle commands. They currently return `error.code=unsupported_feature` without
+launching Desktop or writing evidence; proof plans may emit them as templates
+until their T9 Windows implementation lands. `desktop save-check` and Desktop
+round-trip diffing remain planned as well. Do not expect a Desktop proof claim
+until `capabilities --for desktop` advertises an available implementation.
 
 If Desktop commands are unavailable, say the project has local validation and
 fixture-summary proof only, not Desktop compatibility proof.
