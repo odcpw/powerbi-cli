@@ -16,6 +16,9 @@
 // consumers are registered without weakening clippy's correctness lints.
 #![allow(dead_code)]
 
+mod add_measure;
+mod add_relationship;
+mod add_visual;
 mod apply_theme_preset;
 mod handles;
 mod io;
@@ -29,6 +32,12 @@ pub(crate) use crate::report_drillthrough::{
 };
 #[allow(unused_imports)]
 pub(crate) use crate::report_filter_add::{AddFilterKernel, parse_args as parse_add_filter_args};
+#[allow(unused_imports)]
+pub(crate) use add_measure::*;
+#[allow(unused_imports)]
+pub(crate) use add_relationship::*;
+#[allow(unused_imports)]
+pub(crate) use add_visual::*;
 pub(crate) use apply_theme_preset::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
