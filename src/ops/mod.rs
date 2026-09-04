@@ -22,6 +22,10 @@ mod plan;
 mod transaction;
 
 #[allow(unused_imports)]
+pub(crate) use crate::report_drillthrough::{
+    SetDrillthroughKernel, parse_args as parse_set_drillthrough_args,
+};
+#[allow(unused_imports)]
 pub(crate) use crate::report_filter_add::{AddFilterKernel, parse_args as parse_add_filter_args};
 #[allow(unused_imports)]
 pub(crate) use handles::*;
