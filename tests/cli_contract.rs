@@ -370,14 +370,25 @@ fn capabilities_include_agent_contract_metadata() {
             {"character": ":", "encoding": "%3A"}
         ])
     );
-    assert_eq!(
-        value["schemaManifest"]["lintFindingCodes"],
-        json!(["m.unbuffered_reuse", "m.untyped_expansion"])
+    let lint_finding_codes = value["schemaManifest"]["lintFindingCodes"]
+        .as_array()
+        .expect("lint finding codes");
+    assert!(
+        lint_finding_codes
+            .iter()
+            .any(|code| code == "m.unbuffered_reuse")
+    );
+    assert!(
+        lint_finding_codes
+            .iter()
+            .any(|code| code == "dax.reference_self")
     );
     let lint = command_by_path(commands, "lint");
     assert_eq!(
-        lint["diagnosticCodes"],
-        json!(["m.unbuffered_reuse", "m.untyped_expansion"])
+        lint["diagnosticCodes"]
+            .as_array()
+            .expect("lint diagnostic codes"),
+        lint_finding_codes
     );
     let features = commands
         .iter()

@@ -103,6 +103,8 @@ pbi --json capabilities --for "report spec"
 pbi --json capabilities --for inspect
 pbi --json capabilities --for validate
 pbi --json capabilities --for lint
+pbi lint --rules --json
+pbi lint --explain dax.reference_self --json
 pbi --json capabilities --for diff
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
@@ -153,7 +155,7 @@ show/extract/apply bundles, master report style inspect/extract/diff/apply,
 visual
 formatting list/show/extract/apply bundles, visual formatting set-text for
 title/alt-text patches, conditional-formatting readback list/show, handoff
-check, lint, strict validate, doctor, version, robot docs, robot triage,
+check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
 Treat planned CSV/generic-M source templates, filter sort and arbitrary expression
 updates, bookmark state capture/create/update/grouping,
@@ -282,6 +284,7 @@ required for manual canvas/refresh proof together with
 | PBIX/PBIT contains usable source metadata | `package inspect` plus `package extract` into a temporary folder | `package import` succeeds and `validate --strict` passes on the imported project |
 | Model object exists | `inspect --deep` or list/show command | Desktop open-check |
 | DAX references are locally plausible | `model dax dependencies` and `model dax lint` | Desktop/XMLA/Fabric engine validation |
+| A lint or audit finding is understood | `lint --explain <rule-id>` | Inspect the affected artifact and run the rule's remediation command |
 | One bounded DAX query executes in the open model | `model dax execute` with both opt-ins, exact-project match, `ok=true`, and no truncation relevant to the assertion | Repeat the targeted query after refresh; canvas/render proof remains separate |
 | One live PBIP/PBIX semantic model was exported to guarded TMDL | `model live export-tmdl` with both opt-ins, exact-document match, validated output hash/counts, and `integration.cleanup.childrenReaped=true` plus `pumpsJoined=true` | Wrap the reviewed TMDL in a PBIP semantic-model artifact and run strict local/official/Desktop proof; report pages remain separate |
 | Advanced semantic metadata exists | `model advanced inventory` or the relevant roles/perspectives/cultures/expressions list/show command | Desktop open/save round-trip |
@@ -423,6 +426,8 @@ Use the exact command paths below instead of guessing shortened families:
 pbi --json validate --strict build/sales
 pbi --json model dax dependencies --project build/sales
 pbi --json model dax lint --project build/sales
+pbi --json lint --rules
+pbi --json lint --explain dax.reference_self
 pbi --json report wireframe export build/sales
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales

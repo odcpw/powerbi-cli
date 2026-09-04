@@ -254,6 +254,23 @@ struct Feature {
 
 const FEATURE_CATALOG: &[Feature] = &[
     Feature {
+        id: "quality.lint-rule-registry",
+        title: "Discoverable lint and audit rule registry",
+        category: "validation",
+        status: "supported",
+        support: "read-only-contract-catalog",
+        proof_level: "unit-smoke",
+        emits_pbir: false,
+        commands: &["lint", "model dax lint", "report audit"],
+        refusal_code: None,
+        reason: "Every lint and report-audit finding id is registered with family, severity, summary, remediation, optional sanitize action, and version metadata; agents can list or explain rules without opening a project.",
+        next_proof: &[
+            "Extend the typed design family when design lint ships without adding ad-hoc ids",
+        ],
+        reference_signals: &[],
+        tags: &["lint", "audit", "rules", "diagnostics", "agent"],
+    },
+    Feature {
         id: "validation.microsoft-report",
         title: "Official Microsoft report validation backend",
         category: "validation",

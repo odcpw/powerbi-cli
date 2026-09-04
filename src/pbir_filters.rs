@@ -1,4 +1,5 @@
 use crate::pbir::{PageRecord, VisualRecord, load_report_snapshot};
+use crate::rules;
 use crate::{
     CliError, CliResult, ResolvedProject, canonical_display, command_arg, read_json_value,
 };
@@ -625,7 +626,7 @@ fn owner_visual_json(owner: &FilterOwner) -> Option<Value> {
 fn safety_json(record: &ReportFilterRecord, raw_included: bool) -> Value {
     let findings = if record.may_contain_data_values {
         vec![json!({
-            "code": "filter.possible_persisted_values",
+            "code": rules::FILTER_POSSIBLE_PERSISTED_VALUES,
             "severity": "warning",
             "message": "Power BI filter metadata can persist selected values from the semantic model; review raw filter JSON before sharing outside the work environment."
         })]

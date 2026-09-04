@@ -215,6 +215,8 @@ cargo run --bin powerbi-cli -- inspect --deep .\build\sales --json
 cargo run --bin powerbi-cli -- model measures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model dax dependencies --project .\build\sales --json
 cargo run --bin powerbi-cli -- model dax lint --project .\build\sales --json
+cargo run --bin powerbi-cli -- lint --rules --json
+cargo run --bin powerbi-cli -- lint --explain dax.reference_self --json
 $env:POWERBI_DESKTOP_ORACLE='1'
 cargo run --bin powerbi-cli -- model dax execute --project .\build\sales --query 'EVALUATE ROW("Revenue", [Total Revenue])' --allow-data-read --max-rows 10 --json
 cargo run --bin powerbi-cli -- desktop open .\SourceProfile.pbix --json
@@ -670,7 +672,12 @@ three pages.
 - `lint` now includes a small BPA-style report/model pass: DAX static findings,
   duplicate page/visual titles, and validator-rejected `general.altText`
   placements with an explicit `--clear-alt-text` remediation. Missing alt text
-  is valid until Microsoft exposes a supported PBIR location.
+  is valid until Microsoft exposes a supported PBIR location. `lint --rules`
+  lists the single versioned registry used by lint, DAX/M checks, and report
+  audit; `lint --explain <rule-id>` returns one rule's family, default severity,
+  summary, remediation, optional sanitize action, and example finding without
+  requiring a project. The registry includes a typed, currently empty design
+  family so future design lint cannot introduce ad-hoc ids.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.

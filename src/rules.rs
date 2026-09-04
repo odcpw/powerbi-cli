@@ -1,0 +1,257 @@
+//! Canonical lint and audit rule registry.
+//!
+//! Finding producers use the public constants below rather than repeating rule
+//! identifiers. This keeps CLI explanation, capabilities, and emitted findings
+//! on one contract.
+
+use crate::{CliError, CliResult};
+use serde_json::{Value, json};
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RuleFamily {
+    Validation,
+    Report,
+    Model,
+    Dax,
+    M,
+    Audit,
+    Handoff,
+    /// Reserved for the future typed design-lint implementation.
+    Design,
+}
+
+impl RuleFamily {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Validation => "validation",
+            Self::Report => "report",
+            Self::Model => "model",
+            Self::Dax => "dax",
+            Self::M => "m",
+            Self::Audit => "audit",
+            Self::Handoff => "handoff",
+            Self::Design => "design",
+        }
+    }
+}
+
+const RULE_FAMILIES: &[RuleFamily] = &[
+    RuleFamily::Validation,
+    RuleFamily::Report,
+    RuleFamily::Model,
+    RuleFamily::Dax,
+    RuleFamily::M,
+    RuleFamily::Audit,
+    RuleFamily::Handoff,
+    RuleFamily::Design,
+];
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RuleDefinition {
+    pub(crate) id: &'static str,
+    pub(crate) family: RuleFamily,
+    pub(crate) severity: &'static str,
+    pub(crate) summary: &'static str,
+    pub(crate) remediation: &'static str,
+    pub(crate) sanitize_action: Option<&'static str>,
+    pub(crate) since: &'static str,
+}
+
+impl RuleDefinition {
+    pub(crate) fn to_json(self) -> Value {
+        json!({
+            "id": self.id,
+            "family": self.family.as_str(),
+            "severity": self.severity,
+            "summary": self.summary,
+            "remediation": self.remediation,
+            "sanitizeAction": self.sanitize_action,
+            "since": self.since
+        })
+    }
+
+    pub(crate) fn example_finding(self) -> Value {
+        json!({
+            "code": self.id,
+            "ruleId": self.id,
+            "severity": self.severity,
+            "message": self.summary,
+            "handle": "<affected-handle>",
+            "path": "<affected-path>"
+        })
+    }
+}
+
+macro_rules! define_rules {
+    ($(
+        $name:ident => ($id:literal, $family:ident, $severity:literal, $summary:literal, $remediation:literal, $sanitize:expr)
+    ),+ $(,)?) => {
+        $(pub(crate) const $name: &str = $id;)+
+
+        pub(crate) const RULES: &[RuleDefinition] = &[
+            $(RuleDefinition {
+                id: $id,
+                family: RuleFamily::$family,
+                severity: $severity,
+                summary: $summary,
+                remediation: $remediation,
+                sanitize_action: $sanitize,
+                since: "0.1.0",
+            },)+
+        ];
+    };
+}
+
+define_rules! {
+    VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
+    VALIDATION_WARNING => ("validation.warning", Validation, "warning", "Native project validation reported a non-fatal compatibility warning.", "Review the corresponding validation warning and use Power BI Desktop when compatibility proof is required.", None),
+    PBIR_REPORT_DEFINITION_VERSION => ("pbir.report_definition_version", Report, "error", "The PBIR report definition version is not the Desktop round-trip-proven version.", "Regenerate the report with the current CLI or migrate it to the version named in the finding before opening it in Desktop.", None),
+    BPA_REPORT_DUPLICATE_PAGE_TITLE => ("bpa.report.duplicate_page_title", Report, "warning", "Multiple report pages have the same normalized display title.", "Give each page a distinct display name with `report pages update`.", None),
+    REPORT_PAGE_EMPTY => ("report.page_empty", Report, "warning", "A report page contains no visuals.", "Add an intentional visual or delete the empty page with the guarded page command.", None),
+    REPORT_VISUAL_MISSING_TITLE => ("report.visual_missing_title", Report, "warning", "A visual has no visible title text.", "Set a sentence-case title with `report visuals formatting set-text`, unless the visual intentionally uses a separate heading.", None),
+    BPA_REPORT_DUPLICATE_VISUAL_TITLE => ("bpa.report.duplicate_visual_title", Report, "warning", "Multiple visuals on one page share the same normalized title.", "Rename the visuals so each title states its distinct purpose.", None),
+    REPORT_VISUAL_UNBOUND => ("report.visual_unbound", Report, "info", "A visual has no field bindings.", "Bind the required fields with `report visuals set-bindings` or remove the unused visual.", None),
+    PBIR_VISUAL_ALT_TEXT_LEGACY_LOCATION => ("pbir.visual_alt_text_legacy_location", Report, "warning", "Visual alt text is stored at a legacy PBIR location rejected by the Microsoft validator.", "Remove the rejected property with `report visuals formatting set-text --clear-alt-text`.", None),
+    PBIR_VISUAL_ALT_TEXT_UNSUPPORTED_LOCATION => ("pbir.visual_alt_text_unsupported_location", Report, "warning", "Visual alt text is stored at a PBIR location rejected by the Microsoft validator.", "Remove the rejected property with `report visuals formatting set-text --clear-alt-text`; authoring remains fixture-gated.", None),
+    REPORT_VISUAL_OUTSIDE_PAGE => ("report.visual_outside_page", Report, "warning", "A visual extends outside its page bounds.", "Move or resize it with `report visuals set-position` or re-run the layout command.", None),
+    MODEL_TABLE_WITHOUT_COLUMNS => ("model.table_without_columns", Model, "error", "A semantic-model table has no columns.", "Add the intended columns or remove the invalid table definition.", None),
+    MODEL_TABLE_WITHOUT_PARTITION => ("model.table_without_partition", Model, "warning", "A semantic-model table has no partition.", "Add a credential-free dummy or model-derived partition before handoff.", None),
+    MODEL_RELATIONSHIP_COMMENT_UNSUPPORTED => ("model.relationship_comment_unsupported", Model, "error", "A TMDL comment above a relationship is rejected by older supported Desktop builds.", "Delete the comment above the relationship and keep explanatory prose outside TMDL.", None),
+    PLATFORM_UNKNOWN_METADATA_PROPERTY => ("platform.unknown_metadata_property", Validation, "warning", "A .platform file contains metadata outside the proven schema.", "Keep only the documented `type` and `displayName` metadata properties.", None),
+    DAX_REFERENCE_MISSING_COLUMN => ("dax.reference_missing_column", Dax, "error", "A DAX expression references a column absent from the semantic model.", "Correct the table/column reference using handles returned by `inspect --deep`.", None),
+    DAX_REFERENCE_MISSING_MEASURE => ("dax.reference_missing_measure", Dax, "error", "A DAX expression references a measure that cannot be resolved.", "Create the measure or correct the reference using `model measures list`.", None),
+    DAX_REFERENCE_SELF => ("dax.reference_self", Dax, "error", "A DAX measure directly references itself.", "Remove the self-reference or split the calculation into non-cyclic helper measures.", None),
+    DAX_REFERENCE_AMBIGUOUS_MEASURE => ("dax.reference_ambiguous_measure", Dax, "warning", "An unqualified DAX measure reference resolves to multiple measures.", "Rename duplicate measures or qualify the reference so it resolves uniquely.", None),
+    DAX_TABLE_VARIABLE_SCALAR_IF => ("dax.table_variable_scalar_if", Dax, "error", "A variable assigned by scalar IF is passed directly to a table-argument function.", "Branch around the table-consuming calculation instead of choosing table expressions with scalar IF.", None),
+    DAX_DEPENDENCY_CYCLE => ("dax.dependency_cycle", Dax, "error", "The measure dependency graph contains a cycle.", "Break the cycle by extracting acyclic base measures or rewriting one dependency.", None),
+    M_UNBUFFERED_REUSE => ("m.unbuffered_reuse", M, "warning", "A table-producing M step is reused by later steps without Table.Buffer.", "Review query folding and, when repeated evaluation is real, buffer the shared step deliberately.", None),
+    M_UNTYPED_EXPANSION => ("m.untyped_expansion", M, "warning", "Table.ExpandTableColumn emits a numeric model column without a matching type conversion.", "Apply `Table.TransformColumnTypes` to expanded numeric columns before loading them.", None),
+    FILTER_POSSIBLE_PERSISTED_VALUES => ("filter.possible_persisted_values", Audit, "warning", "Report filter metadata may contain persisted data values.", "Clear the filter through `report sanitize apply` after reviewing its plan.", Some("clear-filter-values")),
+    SLICER_POSSIBLE_PERSISTED_VALUES => ("slicer.possible_persisted_values", Audit, "warning", "Slicer metadata may contain persisted selections or data values.", "Clear slicer state through `report sanitize apply` after reviewing its plan.", Some("clear-slicer-selections")),
+    BOOKMARK_POSSIBLE_PERSISTED_VALUES => ("bookmark.possible_persisted_values", Audit, "warning", "Bookmark metadata may contain persisted data values.", "Review the bookmark evidence and remove unsafe captured state before sharing the project.", None),
+    BOOKMARK_POSSIBLE_PERSISTED_STATE => ("bookmark.possible_persisted_state", Audit, "warning", "Bookmark state may persist captured report state or data values.", "Review the bookmark manually; mutation stays blocked until a Desktop-backed shape is proven.", None),
+    INTERACTION_UNSUPPORTED_OR_STALE => ("interaction.unsupported_or_stale", Audit, "warning", "A visual interaction is unsupported or references a missing visual.", "Use the explicit report interaction commands to repair or remove the stale override.", None),
+    PROJECT_VALIDATION_ERROR => ("project.validation_error", Handoff, "error", "Project validation failed during handoff audit.", "Run native validation, repair the reported error, and repeat the handoff audit.", None),
+    PROJECT_VALIDATION_WARNING => ("project.validation_warning", Handoff, "warning", "Project validation produced a warning during handoff audit.", "Review the native validation warning before handing off the project.", None),
+    HANDOFF_OFFLINE_UNSAFE_FILE => ("handoff.offline_unsafe_file", Handoff, "error", "Validation found an offline-unsafe file in the project.", "Remove the unsafe artifact and keep only PBIP/PBIR/TMDL source metadata.", None),
+    HANDOFF_TABLE_WITHOUT_PARTITION => ("handoff.table_without_partition", Handoff, "error", "A table has no partition that can be rebound safely.", "Add a credential-free dummy partition or an explicitly supported work-source partition.", None),
+    HANDOFF_SOURCE_TEMPLATE_STORE_INVALID => ("handoff.source_template_store_invalid", Handoff, "error", "The source-template sidecar cannot be parsed or validated.", "Repair or regenerate the source-template store with `source-template` commands.", None),
+    PARTITION_SOURCE_MISSING => ("partition.source_missing", Handoff, "error", "A partition has no source expression.", "Add a complete credential-free partition source.", None),
+    PARTITION_REAL_CONNECTOR_POSTGRES => ("partition.real_connector.postgres", Handoff, "error", "A partition uses PostgreSQL.Database and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
+    PARTITION_REAL_CONNECTOR_SQL => ("partition.real_connector.sql", Handoff, "error", "A partition uses Sql.Database and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
+    PARTITION_REAL_CONNECTOR_ODBC => ("partition.real_connector.odbc", Handoff, "error", "A partition uses Odbc.DataSource and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
+    PARTITION_REAL_CONNECTOR_WEB => ("partition.real_connector.web", Handoff, "error", "A partition uses Web.Contents and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
+    PARTITION_REAL_CONNECTOR_FILE => ("partition.real_connector.file", Handoff, "error", "A partition reads an external file and is unsafe for offline handoff.", "Replace it with a generated dummy table before offline handoff.", None),
+    PARTITION_DUMMY_TABLE_SHAPE_UNVERIFIED => ("partition.dummy_table_shape_unverified", Handoff, "warning", "A #table partition does not match the proven generated shape.", "Regenerate the dummy partition from the schema or correct its columns and row arity.", None),
+    PARTITION_PII_SUSPECT_LITERAL => ("partition.pii_suspect_literal", Handoff, "warning", "Dummy partition literals may contain personal or long free-text values.", "Replace suspect values with synthetic placeholders before offline handoff.", None),
+    PARTITION_SOURCE_UNKNOWN => ("partition.source_unknown", Handoff, "warning", "A partition source is not a recognized safe dummy or supported connector.", "Classify or replace the source explicitly; do not rely on an unknown M expression.", None),
+    PARTITION_CREDENTIAL_LIKE_TEXT => ("partition.credential_like_text", Handoff, "error", "A partition source contains credential-like text.", "Remove the secret or credential parameter and configure authentication only on the work machine.", None),
+    PARTITION_MODEL_DERIVED => ("partition.model_derived", Handoff, "warning", "A partition is explicitly annotated as model-derived rather than offline dummy data.", "Review it for the work target; offline handoff still requires a generated dummy source.", None),
+    SOURCE_TEMPLATE_CREDENTIAL_LIKE_TEXT => ("sourceTemplate.credential_like_text", Handoff, "error", "A source template contains credential-like text.", "Remove credentials and retain only placeholders plus non-secret source identifiers.", None),
+    SOURCE_TEMPLATE_ODBC_DSN_ATTRIBUTES => ("sourceTemplate.odbc_dsn_attributes", Handoff, "error", "An ODBC DSN contains inline connection attributes.", "Use a bare DSN name and configure attributes and credentials in the work-machine ODBC manager.", None),
+    SOURCE_TEMPLATE_SPECIFIC_VALUES => ("sourceTemplate.specific_values", Handoff, "warning", "A source template stores specific source identifiers instead of placeholders.", "Replace machine- or environment-specific identifiers with registered placeholders.", None),
+    HANDOFF_PARTITION_NOT_DUMMY => ("handoff.partition_not_dummy", Handoff, "error", "An offline handoff partition is not a generated dummy #table.", "Replace the source with a schema-shaped dummy partition before offline handoff.", None),
+    HANDOFF_PARTITION_SOURCE_UNRECOGNIZED => ("handoff.partition_source_unrecognized", Handoff, "error", "A work-target partition is neither dummy, model-derived, nor a recognized connector.", "Use a supported connector or declare and review the intended model-derived source.", None),
+    HANDOFF_POWERBI_CACHE_FOLDER => ("handoff.powerbi_cache_folder", Handoff, "error", "The project contains a Power BI runtime cache folder.", "Delete the .pbi runtime directory before packaging or handoff.", None),
+    HANDOFF_ANALYSIS_SERVICES_CACHE => ("handoff.analysis_services_cache", Handoff, "error", "The project contains an Analysis Services cache file.", "Remove the .abf cache; source projects must never carry imported model data.", None),
+    HANDOFF_BINARY_POWERBI_FILE => ("handoff.binary_powerbi_file", Handoff, "error", "The source project contains a PBIX or PBIT binary.", "Keep binary documents outside the offline-safe PBIP source project.", None),
+    HANDOFF_LOCAL_SETTINGS_FILE => ("handoff.local_settings_file", Handoff, "error", "The project contains localSettings.json runtime state.", "Remove localSettings.json before handoff.", None),
+    HANDOFF_EMBEDDED_DATA_FILE => ("handoff.embedded_data_file", Handoff, "error", "The project contains an embedded data file.", "Remove CSV, workbook, parquet, DuckDB, or SQLite data from the source project.", None),
+    HANDOFF_CREDENTIAL_LIKE_TEXT => ("handoff.credential_like_text", Handoff, "error", "A handoff text file contains credential-like content.", "Remove or redact credentials and configure authentication only on the locked-down machine.", None),
+    HANDOFF_PII_SUSPECT_TEXT => ("handoff.pii_suspect_text", Handoff, "warning", "A handoff text file contains PII-suspect row literals.", "Review and replace possible real rows with synthetic values.", None),
+    HANDOFF_TEXT_SCAN_FAILED => ("handoff.text_scan_failed", Handoff, "error", "A handoff text file could not be read for safety scanning.", "Restore readable source text or remove the unreadable file before handoff.", None),
+}
+
+pub(crate) fn all_rules() -> &'static [RuleDefinition] {
+    RULES
+}
+
+pub(crate) fn rules_for_family(family: RuleFamily) -> impl Iterator<Item = RuleDefinition> {
+    RULES
+        .iter()
+        .copied()
+        .filter(move |rule| rule.family == family)
+}
+
+pub(crate) fn find_rule(id: &str) -> Option<RuleDefinition> {
+    RULES.iter().copied().find(|rule| rule.id == id)
+}
+
+pub(crate) fn rule_ids() -> Vec<&'static str> {
+    RULES.iter().map(|rule| rule.id).collect()
+}
+
+pub(crate) fn rule_family_names() -> Vec<&'static str> {
+    RULE_FAMILIES
+        .iter()
+        .copied()
+        .map(RuleFamily::as_str)
+        .collect()
+}
+
+pub(crate) fn rule_definitions_json() -> Vec<Value> {
+    RULES.iter().copied().map(RuleDefinition::to_json).collect()
+}
+
+pub(crate) fn ensure_finding_ids_registered(findings: &[Value], field: &str) -> CliResult<()> {
+    for finding in findings {
+        let Some(id) = finding.get(field).and_then(Value::as_str) else {
+            continue;
+        };
+        if find_rule(id).is_none() {
+            return Err(CliError::unexpected(format!(
+                "{field} `{id}` is emitted but absent from the lint rule registry"
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_registry() -> Result<(), String> {
+    let mut ids = BTreeSet::new();
+    for rule in RULES {
+        if !ids.insert(rule.id) {
+            return Err(format!("duplicate lint rule id: {}", rule.id));
+        }
+        if rule.id.trim().is_empty()
+            || rule.summary.trim().is_empty()
+            || rule.remediation.trim().is_empty()
+            || rule.since.trim().is_empty()
+        {
+            return Err(format!("undocumented lint rule: {}", rule.id));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        RULES, RuleFamily, ensure_finding_ids_registered, rules_for_family, validate_registry,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn every_registered_rule_has_unique_complete_documentation() {
+        validate_registry().expect("valid documented registry");
+        assert_eq!(RULES.len(), 57);
+    }
+
+    #[test]
+    fn design_lint_has_a_typed_empty_extension_point() {
+        assert_eq!(rules_for_family(RuleFamily::Design).count(), 0);
+    }
+
+    #[test]
+    fn every_emitted_finding_id_must_be_registered() {
+        let registered = vec![json!({"code": RULES[0].id})];
+        ensure_finding_ids_registered(&registered, "code").expect("registered finding");
+
+        let ad_hoc = vec![json!({"code": "future.ad_hoc_rule"})];
+        let error = ensure_finding_ids_registered(&ad_hoc, "code")
+            .expect_err("ad-hoc finding must be rejected");
+        assert_eq!(error.code, "unexpected");
+        assert!(error.message.contains("future.ad_hoc_rule"));
+    }
+}

@@ -1,4 +1,5 @@
 use crate::pbir::{VisualRecord, load_report_snapshot};
+use crate::rules;
 use crate::{CliResult, ResolvedProject, canonical_display, read_json_value};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -241,7 +242,7 @@ fn is_native_single_select_formatting(selection: &Value) -> bool {
 fn safety_json(record: &ReportSlicerRecord, raw_included: bool) -> Value {
     let findings = if record.may_contain_data_values {
         vec![json!({
-            "code": "slicer.possible_persisted_values",
+            "code": rules::SLICER_POSSIBLE_PERSISTED_VALUES,
             "severity": "warning",
             "message": "Power BI slicer visual metadata can persist selected values from the semantic model; review raw slicer visual JSON before sharing outside the work environment."
         })]

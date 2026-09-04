@@ -166,6 +166,7 @@ pub(super) fn commands() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.audit.v1",
             "flags": ["--project <project-dir-or.pbip>", "--profile agent-safe|handoff", "--include-raw", "--json", "--format json"],
             "examples": ["powerbi-cli report audit --project build/sales --json", "powerbi-cli report audit --project build/sales --profile handoff --json"],
+            "diagnosticCodes": crate::rules::rule_ids(),
             "followUpFields": ["ok", "profile", "counts.findings", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].supportedAction", "sanitizePlanCommand", "next"]
         }),
         json!({

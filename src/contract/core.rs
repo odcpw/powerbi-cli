@@ -85,6 +85,8 @@ Usage:
   powerbi-cli --json scaffold --schema <schema.json> --out-dir <project-dir> [--force]
   powerbi-cli --json inspect <project-dir-or.pbip>
   powerbi-cli lint <project-dir-or.pbip> --json
+  powerbi-cli lint --rules --json
+  powerbi-cli lint --explain <rule-id> --json
   powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --json
   powerbi-cli model tables add-static --project <project-dir-or.pbip> --table <table> --column <column> --values-json '["One","Two"]' --dry-run --json
   powerbi-cli model columns set-sort-by --project <project-dir-or.pbip> --table <table> --column <column> --by <sort-column> --dry-run --json
@@ -261,6 +263,9 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "globalFlags": global_flags(),
         "exitCodes": exit_codes(),
         "diagnosticCodes": diagnostic_codes(),
+        "contractNotes": {
+            "explainFlagDiscipline": "--explain <id> always takes an identifier. Whole-artifact explanations are subcommands, such as report spec explain and report plan explain."
+        },
         "responseShapes": response_shapes(),
         "featurePolicy": feature_policy_json(),
         "filter": filter,
@@ -875,22 +880,27 @@ pub(crate) fn command_catalog() -> Vec<Value> {
         }),
         json!({
             "path": "lint",
-            "usage": "powerbi-cli lint <project-dir-or.pbip> --json",
-            "summary": "Run typed PBIP/PBIR/TMDL quality checks, including heuristic M buffer-reuse and untyped-expansion warnings, and return structured findings",
+            "usage": "powerbi-cli lint (<project-dir-or.pbip> | --rules | --explain <rule-id>) --json",
+            "summary": "Run typed PBIP/PBIR/TMDL quality checks or inspect the canonical lint and audit rule registry",
             "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "expansion", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "lintResult.v1",
-            "flags": ["--json", "--format json"],
-            "examples": ["powerbi-cli lint build/sales --json"],
-            "diagnosticCodes": ["m.unbuffered_reuse", "m.untyped_expansion"],
+            "outputSchemas": {
+                "project": "lintResult.v1",
+                "rules": "powerbi-cli.lint.rules.v1",
+                "explain": "powerbi-cli.lint.ruleExplanation.v1"
+            },
+            "flags": ["--rules", "--explain <rule-id>", "--json", "--format json"],
+            "examples": ["powerbi-cli lint build/sales --json", "powerbi-cli lint --rules --json", "powerbi-cli lint --explain dax.reference_self --json"],
+            "diagnosticCodes": crate::rules::rule_ids(),
             "limitations": [
                 "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps. It fires only for table-producing step kinds `other` and `tableLiteral`, plus `navigation` steps that can be expensive. Function definitions (`(args) =>` / `each`), scalar literals, record literals, and list literals are classified via `stepKind` and suppressed. It does not prove folding or refresh performance and never fails validation by itself.",
                 "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`."
             ],
-            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "next"]
+            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
         }),
         json!({
             "path": "diff",
@@ -1035,7 +1045,9 @@ fn schema_manifest() -> Value {
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
-        "lintFindingCodes": ["m.unbuffered_reuse", "m.untyped_expansion"],
+        "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
+        "lintRuleFamilies": crate::rules::rule_family_names(),
+        "lintFindingCodes": crate::rules::rule_ids(),
         "desktopOpenFields": ["ok", "exitCode", "document", "preflight.mode", "preflight.defaulted", "preflight.applicable", "preflight.performed", "preflight.validationPerformed", "preflight.lintPerformed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],
         "desktopCloseFields": ["ok", "exitCode", "session.state", "session.alreadyClosed", "session.document", "session.documentKind", "session.documentName", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.receiptRemoved", "cleanup.attempted", "cleanup.closed", "cleanup.identityMatched", "cleanup.targeted", "cleanup.targetedProcessIds", "cleanup.remainingProcessIds", "cleanup.errors", "next"],
         "desktopOpenCheckFields": ["ok", "exitCode", "changes", "document", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],

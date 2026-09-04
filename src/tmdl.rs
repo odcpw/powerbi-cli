@@ -1,3 +1,4 @@
+use crate::rules;
 use crate::safety_scan::{contains_credential_like_text_str, generated_m_table_safety};
 use crate::{CliError, CliResult, ResolvedProject};
 use std::fs;
@@ -1495,7 +1496,7 @@ fn classify_partition_source(
             PartitionSafety {
                 status: "unsafe".to_string(),
                 findings: vec![PartitionSafetyFinding {
-                    code: "partition.source_missing".to_string(),
+                    code: rules::PARTITION_SOURCE_MISSING.to_string(),
                     severity: "error".to_string(),
                     message: "partition has no source expression".to_string(),
                 }],
@@ -1506,28 +1507,28 @@ fn classify_partition_source(
     let mut findings = Vec::new();
     let source_kind = if normalized.contains("postgresql.database(") {
         findings.push(partition_finding(
-            "partition.real_connector.postgres",
+            rules::PARTITION_REAL_CONNECTOR_POSTGRES,
             "error",
             "partition source uses PostgreSQL.Database; replace with dummy #table before home handoff",
         ));
         "postgresqlDatabase"
     } else if normalized.contains("sql.database(") {
         findings.push(partition_finding(
-            "partition.real_connector.sql",
+            rules::PARTITION_REAL_CONNECTOR_SQL,
             "error",
             "partition source uses Sql.Database; replace with dummy #table before home handoff",
         ));
         "sqlDatabase"
     } else if normalized.contains("odbc.datasource(") {
         findings.push(partition_finding(
-            "partition.real_connector.odbc",
+            rules::PARTITION_REAL_CONNECTOR_ODBC,
             "error",
             "partition source uses Odbc.DataSource; replace with dummy #table before home handoff",
         ));
         "odbcDataSource"
     } else if normalized.contains("web.contents(") {
         findings.push(partition_finding(
-            "partition.real_connector.web",
+            rules::PARTITION_REAL_CONNECTOR_WEB,
             "error",
             "partition source uses Web.Contents; replace with dummy #table before home handoff",
         ));
@@ -1538,7 +1539,7 @@ fn classify_partition_source(
         || normalized.contains("excel.workbook(")
     {
         findings.push(partition_finding(
-            "partition.real_connector.file",
+            rules::PARTITION_REAL_CONNECTOR_FILE,
             "error",
             "partition source reads an external file; replace with dummy #table before home handoff",
         ));
@@ -1547,7 +1548,7 @@ fn classify_partition_source(
         let table_safety = generated_m_table_safety(source, expected_columns);
         if !table_safety.valid_generator_shape {
             findings.push(partition_finding(
-                "partition.dummy_table_shape_unverified",
+                rules::PARTITION_DUMMY_TABLE_SHAPE_UNVERIFIED,
                 "warning",
                 "partition contains #table text but does not match the model column list and generated literal row shape",
             ));
@@ -1555,7 +1556,7 @@ fn classify_partition_source(
         } else {
             if table_safety.pii_suspect {
                 findings.push(partition_finding(
-                    "partition.pii_suspect_literal",
+                    rules::PARTITION_PII_SUSPECT_LITERAL,
                     "warning",
                     "dummy #table row literals may contain personal or long free-text data; review before offline handoff",
                 ));
@@ -1564,7 +1565,7 @@ fn classify_partition_source(
         }
     } else {
         findings.push(partition_finding(
-            "partition.source_unknown",
+            rules::PARTITION_SOURCE_UNKNOWN,
             "warning",
             "partition source is not a recognized dummy #table expression",
         ));
@@ -1573,7 +1574,7 @@ fn classify_partition_source(
 
     if contains_credential_like_text_str(source) {
         findings.push(partition_finding(
-            "partition.credential_like_text",
+            rules::PARTITION_CREDENTIAL_LIKE_TEXT,
             "error",
             "partition source contains credential-like text",
         ));
@@ -1604,11 +1605,11 @@ fn classify_annotated_model_derived(partitions: &mut [PartitionRecord]) {
         partition.safety.findings.retain(|finding| {
             !matches!(
                 finding.code.as_str(),
-                "partition.source_unknown" | "partition.dummy_table_shape_unverified"
+                rules::PARTITION_SOURCE_UNKNOWN | rules::PARTITION_DUMMY_TABLE_SHAPE_UNVERIFIED
             )
         });
         partition.safety.findings.push(partition_finding(
-            "partition.model_derived",
+            rules::PARTITION_MODEL_DERIVED,
             "warning",
             "table annotation declares this partition model-derived; accept it for work handoff, but not offline handoff",
         ));
