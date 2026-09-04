@@ -100,6 +100,8 @@ pbi --json capabilities --for schema
 pbi --json capabilities --for profile
 pbi --json capabilities --for "report build" --compact
 pbi --json capabilities --for "report spec"
+pbi --json report spec schema
+pbi --json report spec explain --schema <schema.json> --spec <dashboard.json>
 pbi --json capabilities --for inspect --compact
 pbi --json capabilities --for validate --compact
 pbi --json capabilities --for lint --compact
@@ -171,7 +173,7 @@ pbi report query --project build/sales --selector kind:visual --json
 pbi report audit --project build/sales --json
 pbi report sanitize plan --project build/sales --json
 pbi report sanitize apply --project build/sales --dry-run --json
-pbi report layout auto --project build/sales --page page:ReportSectionOverview --preset overview --dry-run --json
+pbi report layout auto --project build/sales --page page:ReportSectionOverview --template overview --dry-run --json
 pbi report pages show --project build/sales --handle page:ReportSectionOverview --json
 pbi report pages clone --project build/sales --from page:ReportSectionOverview --new-name ReportSectionOverviewCopy --visual-prefix Copy --dry-run --json
 pbi report drillthrough show --project build/sales --page page:ReportSectionOverview --json
@@ -192,6 +194,18 @@ pbi report visuals set-topn-guard --project build/sales --handle <visual-handle>
 pbi report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
 pbi report visuals set-display-name --project build/sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 ```
+
+`report layout auto --template` uses the deterministic twelve-column design
+grid and eleven named page templates: `overview`, `time-series`, `ranking`,
+`distribution`, `comparison`, `detail-table`, `drillthrough-detail`,
+`exception-list`, `matrix-focus`, `scatter-focus`, and
+`kpi-strip-trend-breakdown`. Each template supplies named slots, preferred
+visual families, and minimum-size diagnostics. The command returns an
+SVG-free JSON preview with overlap/minimum-size invariants and accepts standard
+(1280x720), wide (1920x1080), or explicit `--page-size` and `--grid` values;
+mutations support `--dry-run`, `--out-dir`, and guarded `--in-place`. Legacy
+`--preset overview|analysis|detail|grid` values remain aliases for the named
+templates.
 
 A focused `--for` response returns the matching commands and small shared
 contract fields. It deliberately leaves the large unrelated schema/visual
@@ -515,6 +529,12 @@ discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
   read `errors[].message`, never treat an entry as a bare string. See
   `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
+`report spec schema --json` emits the draft 2020-12 JSON Schema generated from
+the strict v1/v2 key tables. `report spec explain --schema <schema.json>
+--spec <dashboard.json> [--profile <profile.json>] --json` previews the staged
+typed operation plan, stable handles, resolved layout/defaults, unsupported
+sections, and proof commands without writing files.
+
 For a composed spec, normalize it before handing it to another agent or build
 stage, then validate the normalized file. `report spec normalize` accepts the
 same positional path or `--spec` spelling as validation and writes a canonical
@@ -550,6 +570,11 @@ default (`topValueCounts` and cardinality remain available). Only an explicit
 after credential/PII scanning; profiles stamped `dataValues:true` are
 data-bearing and are reported by `handoff check` and refused by
 `package source-pack`. `--redact` is retained as a deprecated no-op alias.
+`profile summarize` additionally emits a deterministic `summary.shape` object
+with facts, dimensions, date-table proposals, key candidates, high-cardinality
+noise, and evidence strings. Shape evidence names the row-count ratio, numeric
+column share, relationship/cardinality fan-out, and date coverage used; weak
+signals return `kind=ambiguous` plus competing hypotheses instead of a guess.
 
 `report plan` is implemented as a deterministic starter-spec planner. Give it a
 schema, optional profile, and either `--intent <intent.md|intent.json>` or the
@@ -561,6 +586,9 @@ unresolved names return `spec.missing_input` with a pointer and candidates.
 Fields not compiled by this starter planner remain in the response with an
 owning-bead warning. It is not a substitute for reviewing generated report
 intent or for Desktop compatibility proof.
+The response's top-level `shape` and `decisions[]` model-shape entry reuse the
+same profile/schema classifier. A date-like column without a related date
+dimension is surfaced as a proposal rather than silently treated as a calendar.
 
 When the compiler cannot safely infer a required value, it asks through a
 structured `spec.missing_input` diagnostic instead of silently choosing a
@@ -580,6 +608,17 @@ Desktop session, query, refresh, or fixture verification runs automatically.
 On Linux and macOS, Desktop-dependent commands are listed in
 `proofPlan.unavailable[]` with the Windows oracle instruction; the compiler
 never claims a Desktop proof level that the host cannot deliver.
+
+`report build` returns `compiled.ops`, flattened `changes[]`, and a `readback`
+object keyed by stable `report:`, `page:`, `visual:`, `table:`, and `measure:`
+handles. The embedded `scorecard.v1` is shared with `triage` and separates
+native validation, Microsoft-validator availability, lint findings grouped by
+severity, the fixed unavailable design-lint shape, offline handoff status, and
+the honest proof level. Pass `--trace` when diagnosing a build to include the
+deterministic `{op, ms}` planning trace; it is omitted by default so ordinary
+responses stay small. The complete field contract is published at
+`capabilities.responseShapes.scorecard.v1` and
+`capabilities.responseShapes.reportBuild`.
 
 ### Scaffold From A Schema
 

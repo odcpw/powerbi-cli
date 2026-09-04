@@ -217,6 +217,17 @@ mutation responses and `report build` expose `changes[]`, including dry-run
 before/after plans. Artifact writers such as scaffold, schema normalize, and
 profile output retain their documented family-specific fields.
 
+`report build` also returns `compiled.ops`, a flat operation-change aggregate,
+and `readback` command arrays keyed by stable report/page/visual/table/measure
+handles. Its shared `scorecard.v1` contains native validation, Microsoft
+validator availability, lint grouped by severity, the fixed unavailable design
+lint shape, offline handoff status, and the honest proof level. Add `--trace`
+to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
+default response omits that optional field. `triage` embeds the same scorecard
+projection for an existing project. See
+`capabilities.responseShapes.scorecard.v1` and
+`capabilities.responseShapes.reportBuild` for the machine-readable details.
+
 Validation/result families may emit `ok:false` with a nonzero `exitCode` on
 stdout. CLI errors are written to stderr with required `code`, `exitCode`, and
 `message`, for example
@@ -278,7 +289,9 @@ cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.js
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
+cargo run --bin powerbi-cli -- report spec schema --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
+cargo run --bin powerbi-cli -- report spec explain --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
@@ -336,7 +349,8 @@ cargo run --bin powerbi-cli -- desktop open-check .\build\sales --json
 cargo run --bin powerbi-cli -- desktop screenshot .\build\sales --out .\proof\sales.png --json
 cargo run --bin powerbi-cli -- report design-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- report wireframe export .\build\sales --json
-cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --preset overview --dry-run --json
+cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --template overview --dry-run --json
+cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --template kpi-strip-trend-breakdown --grid columns=12,gutter=16,margin=24,rowUnit=8 --out-dir .\build\sales-layout --json
 cargo run --bin powerbi-cli -- report pages list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report pages add --project .\build\sales --display-name "Executive Summary" --out-dir .\build\sales-pages --json
 cargo run --bin powerbi-cli -- report pages update --project .\build\sales-pages --handle <page-handle> --display-name "Executive Board" --dry-run --json
@@ -470,6 +484,13 @@ resolve to an exact model measure or the command returns `spec.missing_input`
 with its pointer and measure candidates. Fields that the starter planner does
 not compile remain visible in `warnings[]` with their owning bead. The
 free-form `--objective` form remains available for quick question-only plans.
+The response also includes an evidence-backed `shape` classification and the
+same shape under `profileSummary` when a profile is supplied. It reports flat,
+star, snowflake, or multi-fact only when schema relationships, cardinalities,
+row-count ratios, and profile column signals support that verdict; otherwise
+it returns `ambiguous` with competing hypotheses. Date-like columns without a
+related date dimension produce a date-table proposal, and high-cardinality
+categorical columns are called out as possible noise.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
@@ -582,6 +603,11 @@ This generated snapshot keeps status and proof claims aligned with
   defaults remain explicit in `defaultsApplied[]`. These are not legacy error
   strings. The exact response shape is published at
   `capabilities.responseShapes.reportSpecValidate`.
+- `report spec schema --json` emits a draft 2020-12 JSON Schema for the v1 and
+  v2 key surfaces. `report spec explain --schema <schema.json> --spec
+  <dashboard.json> [--profile <profile.json>] --json` previews the typed,
+  staged operation plan, stable handles, layout coordinates, defaults,
+  unsupported sections, and proof commands without writing a project.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
@@ -906,8 +932,18 @@ This generated snapshot keeps status and proof claims aligned with
   may persist filter, slicer, highlight, or selected semantic-model values.
 - Programmatic report design/layout authoring covers `report design-plan`,
   `report layout auto`, and `report drilldown set-hierarchy`. Design-plan is a
-  read-only profile with exact next commands; auto-layout rewrites only visual
-  `position` blocks; drilldown hierarchy replaces a chart's Category
+  read-only profile with exact next commands; auto-layout uses the deterministic
+  twelve-column design grid and eleven named templates (`overview`,
+  `time-series`, `ranking`, `distribution`, `comparison`, `detail-table`,
+  `drillthrough-detail`, `exception-list`, `matrix-focus`, `scatter-focus`, and
+  `kpi-strip-trend-breakdown`). Templates expose named slots with preferred
+  visual families, emit SVG-free JSON previews and overlap/minimum-size
+  invariants, and support standard (1280x720), wide (1920x1080), or explicit
+  page-size/grid overrides. Mutations support `--dry-run`, `--out-dir`, and
+  guarded `--in-place`; legacy `--preset overview|analysis|detail|grid`
+  remains an alias for the corresponding templates; auto-layout rewrites only
+  visual `position` blocks;
+  drilldown hierarchy replaces a chart's Category
   projections with two or more resolved model columns, marks the first field
   active as the initial level, and explicitly enables its visual-header drill
   controls. Line, area, bar, column, and combo charts

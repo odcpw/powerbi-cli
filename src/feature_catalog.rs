@@ -272,7 +272,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["profile infer", "profile validate", "profile summarize"],
         refusal_code: None,
-        reason: "Profile v2 reads rows only through the bounded input-safety contract and emits null rates, cardinality, numeric/time ranges, bounded top-value counts, coercion diagnostics, and duplicate-key grain conflicts. Literal values remain redacted unless --include-data-values is explicitly requested and every selected column passes credential/PII scanning.",
+        reason: "Profile v2 reads rows only through the bounded input-safety contract and emits null rates, cardinality, numeric/time ranges, bounded top-value counts, coercion diagnostics, and duplicate-key grain conflicts. Profile summaries also classify flat/star/snowflake/multi-fact shape from deterministic row-ratio, column-role, relationship/cardinality, date-coverage, key, and high-cardinality signals; weak evidence stays explicitly ambiguous. Literal values remain redacted unless --include-data-values is explicitly requested and every selected column passes credential/PII scanning.",
         next_proof: &[
             "Review profiles generated from representative synthetic row fixtures",
             "Keep Desktop planner fixtures consuming v2 candidate and grain signals",
@@ -870,7 +870,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["report plan"],
         refusal_code: None,
-        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, normalizes audience/questions/KPIs and planning constraints, resolves KPI names to exact model measures, and returns pointer-rich diagnostics instead of guessing.",
+        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, classifies the schema/profile model shape with evidence-backed role and relationship signals, normalizes audience/questions/KPIs and planning constraints, resolves KPI names to exact model measures, and returns pointer-rich diagnostics instead of guessing.",
         next_proof: &[
             "Compile comparisons, periods, drill paths, alerts, filters, archetypes, page flow, and handoff fields through their owning planner/compiler beads",
         ],
@@ -930,7 +930,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: true,
         commands: &["report design-plan", "report layout auto"],
         refusal_code: None,
-        reason: "The design planner profiles local TMDL/PBIR metadata and auto-layout rewrites only visual position blocks with guarded mutation modes.",
+        reason: "The design planner profiles local TMDL/PBIR metadata and report layout auto resolves the embedded eleven-template twelve-column grid (with page-size and grid overrides), then rewrites only visual position blocks through the shared position mutation boundary with guarded mutation modes.",
         next_proof: &[
             "Desktop screenshot fixture to assert generated layouts are visually readable across page sizes",
         ],

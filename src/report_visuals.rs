@@ -135,6 +135,18 @@ struct BindingOptions {
     out_dir: Option<PathBuf>,
 }
 
+/// One position application staged by a caller such as `report layout auto`.
+/// Keeping this shape in the visual mutation module gives every position
+/// writer the same validation and atomic-write boundary.  The future SetPosition
+/// operation kernel can replace [`apply_positions`] without changing layout
+/// planning code.
+#[derive(Debug)]
+pub(crate) struct PositionApplication {
+    pub(crate) path: PathBuf,
+    pub(crate) before: Value,
+    pub(crate) after: Value,
+}
+
 fn list_visuals(args: &[String]) -> CliResult<Value> {
     let options = parse_list_args(args)?;
     let project = required_project(options.project, "report visuals list")?;
@@ -256,31 +268,30 @@ pub(crate) fn apply_set_position_operation(
             visual.handle
         ))
     })?;
-    let mut visual_json = read_json_value(visual_path)?;
-    let before = visual_json["position"].clone();
     let page_width = snapshot.pages[visual.page_ordinal].width.as_f64();
     let page_height = snapshot.pages[visual.page_ordinal].height.as_f64();
+    let before = read_json_value(visual_path)?["position"].clone();
     let after = patched_position(&before, &patch)?;
-    validate_position_bounds(
-        &after,
+    let applied = apply_positions(
+        &[(visual_path.to_path_buf(), after)],
         page_width,
         page_height,
         operation.allow_outside_page,
+        false,
         "report visuals set-position",
-    )?;
-    if before != after {
-        visual_json["position"] = after.clone();
-        write_json_atomic(visual_path, &visual_json)?;
-    }
+    )?
+    .into_iter()
+    .next()
+    .ok_or_else(|| CliError::unexpected("set-position produced no position application"))?;
     Ok(AppliedPositionMutation {
-        visual_path: visual_path.to_path_buf(),
+        visual_path: applied.path,
         fields: changed_fields(&patch)
             .into_iter()
             .map(ToOwned::to_owned)
             .collect(),
         target,
-        before,
-        after,
+        before: applied.before,
+        after: applied.after,
     })
 }
 
@@ -380,6 +391,50 @@ pub(crate) fn render_set_position_mutation(
         "validateCommand": validate,
         "next": [readback, wireframe, inspect, validate]
     }))
+}
+
+/// Validate and apply a batch of complete PBIR positions.
+///
+/// Every caller, including the layout engine, goes through this function so
+/// bounds checks and writes remain isomorphic to `report visuals set-position`.
+/// Files are all read and validated before any write occurs, avoiding a partial
+/// in-place layout when one visual is malformed.  A future SetPosition Op
+/// implementation only needs to replace this function's body.
+pub(crate) fn apply_positions(
+    updates: &[(PathBuf, Value)],
+    page_width: Option<f64>,
+    page_height: Option<f64>,
+    allow_outside_page: bool,
+    dry_run: bool,
+    command: &str,
+) -> CliResult<Vec<PositionApplication>> {
+    let mut applications = Vec::with_capacity(updates.len());
+    for (path, after) in updates {
+        let mut visual_json = read_json_value(path)?;
+        let before = visual_json["position"].clone();
+        validate_position_bounds(after, page_width, page_height, allow_outside_page, command)?;
+        visual_json["position"] = after.clone();
+        applications.push((
+            PositionApplication {
+                path: path.clone(),
+                before,
+                after: after.clone(),
+            },
+            visual_json,
+        ));
+    }
+    if !dry_run {
+        for (application, visual_json) in &applications {
+            if application.before == application.after {
+                continue;
+            }
+            write_json_atomic(&application.path, visual_json)?;
+        }
+    }
+    Ok(applications
+        .into_iter()
+        .map(|(application, _)| application)
+        .collect())
 }
 
 fn set_bindings(args: &[String]) -> CliResult<Value> {

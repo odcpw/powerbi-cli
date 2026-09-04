@@ -136,6 +136,10 @@ object-specific writers and fixtures exist.
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
+- `report spec schema` emits a draft 2020-12 JSON Schema for both strict
+  dashboard-spec versions, while `report spec explain` previews the typed
+  staged operation plan, handles, layout/defaults, unsupported sections, and
+  proof follow-ups without writing a project.
 - Missing required dashboard intent now returns the registered
   `spec.missing_input` diagnostic with an RFC 6901 pointer, expected field,
   reason, example, and `report spec fields` candidate command; documented
@@ -155,6 +159,11 @@ object-specific writers and fixtures exist.
   measures; unresolved names return `spec.missing_input` with pointer and
   candidates. Uncompiled intent fields remain visible with an owning-bead
   warning.
+- Profile summaries and report plans classify model shape as flat, star,
+  snowflake, or multi-fact only when relationship/cardinality and profile
+  column evidence supports it. Ambiguous models remain explicitly ambiguous;
+  date-like columns without a date dimension produce a date-table proposal and
+  high-cardinality categorical noise is reported for planner review.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
@@ -498,7 +507,14 @@ frozen until proven.
   selectors and conditional-formatting authoring remain Desktop-fixture gated.
 - Implemented first design/layout slices: `report design-plan` profiles local
   TMDL/PBIR metadata and emits agent-ready visual commands; `report layout auto`
-  rewrites only visual `position` blocks; `report drilldown set-hierarchy`
+  now resolves a deterministic twelve-column grid through named templates
+  (`overview`, `time-series`, `ranking`, `distribution`, `comparison`,
+  `detail-table`, `drillthrough-detail`, `exception-list`, `matrix-focus`,
+  `scatter-focus`, and `kpi-strip-trend-breakdown`), returning slot assignments
+  and SVG-free JSON previews with overlap/minimum-size invariants while
+  rewriting only visual `position` blocks; standard and wide page-size presets
+  plus explicit grid overrides are supported, and legacy `--preset` values map
+  to the corresponding named templates. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
 
