@@ -51,6 +51,32 @@ project invariants, not automated Desktop rendering. The live `desktop
 open-check` command remains launch-level proof and must continue to say so until
 canvas/refresh automation is implemented.
 
+## Status 2026-09
+
+The 2026-09-04 reality check finds 172 advertised command paths and 50 feature
+catalog entries (45 supported, 5 planned). The offline compiler/workbench
+reliably validates schemas and profiles, plans and builds the currently
+compiled report-spec subset, authors guarded PBIR pages/visuals/filters and
+TMDL tables/columns/measures/relationships, and packages safe handoff metadata.
+The Desktop reference harvester, managed Desktop lifecycle, bounded DAX path,
+and read-only TMDL export are explicit opt-in surfaces.
+
+The remaining limits are deliberate: report-spec v2 sections whose compiler
+has not landed return `unsupported_feature`, the starter planner still emits a
+fixed seven-visual template, and Desktop canvas/refresh automation is not
+implemented. Local validation and schema/golden checks therefore cannot claim
+the final `desktop-canvas-refresh` proof level. The current supported feature
+proof mix is 33 `unit-smoke`, 7 `schema-golden`, 4 `desktop-golden-pending`,
+and 1 `manual-desktop-canvas-refresh`; no feature currently claims automated
+`desktop-canvas-refresh`.
+
+The August production pilot supplies the field evidence for these boundaries
+and the hand-patched idioms still to compile; see
+[`docs/pilot-lessons.md`](docs/pilot-lessons.md). The dependency-ordered work
+to close those gaps is maintained in
+[`docs/bridge-plan-2026-09.md`](docs/bridge-plan-2026-09.md), which is the
+authoritative September plan.
+
 ## 2026-06-23 Parity Tranche Status
 
 The current implementation pass moved the first nine parity points from plan to
@@ -756,7 +782,8 @@ git diff --check
 ```
 
 The CI workflow enforces that exact clippy command after `cargo check` on the
-Linux, macOS, and Windows matrix jobs.
+`ubuntu-latest` and `windows-latest` matrix jobs; macOS is not currently a CI
+leg.
 
 Feature-specific gates:
 

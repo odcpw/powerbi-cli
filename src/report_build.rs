@@ -8,6 +8,7 @@ use crate::pbir_visual_factory::{
     slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
 use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
@@ -49,6 +50,7 @@ struct BuildResponse<'a> {
     compiled: &'a CompiledDashboard,
     profile: Option<&'a Value>,
     scaffold: Option<Value>,
+    proof_plan: Option<&'a ProofPlan>,
 }
 
 pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
@@ -73,6 +75,11 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
     }
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let compiled = compile_dashboard(&schema_value, spec_value.as_ref())?;
+    let dry_run_proof_plan = if mode == MutationMode::DryRun {
+        compile_proof_plan(spec_value.as_ref(), None)?
+    } else {
+        None
+    };
     let schema_validation = validate_schema_value(&compiled.schema);
     if !schema_validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
@@ -101,6 +108,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
             compiled: &compiled,
             profile: profile_value.as_ref(),
             scaffold: None,
+            proof_plan: dry_run_proof_plan.as_ref(),
         }));
     }
 
@@ -110,6 +118,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
                 "powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             )
     })?;
+    let proof_plan = compile_proof_plan(spec_value.as_ref(), Some(&out_dir))?;
     let scaffold = scaffold_schema_value(
         compiled.schema.clone(),
         &schema_path,
@@ -126,6 +135,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         compiled: &compiled,
         profile: profile_value.as_ref(),
         scaffold: Some(scaffold),
+        proof_plan: proof_plan.as_ref(),
     }))
 }
 
@@ -168,6 +178,11 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
     let normalized_spec = normalize_spec_file(&spec_path)?;
     let spec_value = normalized_spec.value;
     let known_fields = validate_known_fields(&spec_value);
+    let proof_plan_result = if known_fields.is_ok() {
+        compile_proof_plan(Some(&spec_value), None)
+    } else {
+        Ok(None)
+    };
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let (ok, validation_level, errors, warnings, compiled, schema_path) = if let Some(schema_path) =
         options.schema.as_deref()
@@ -199,12 +214,13 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
             ),
         }
     } else {
-        let errors = match known_fields {
-            Ok(_) => validate_spec_shape(&spec_value)
+        let errors = match (known_fields, &proof_plan_result) {
+            (Ok(_), Ok(_)) => validate_spec_shape(&spec_value)
                 .into_iter()
                 .map(Value::String)
                 .collect(),
-            Err(error) => vec![spec_error_json(&error)],
+            (Ok(_), Err(error)) | (Err(_), Err(error)) => vec![spec_error_json(error)],
+            (Err(error), Ok(_)) => vec![spec_error_json(&error)],
         };
         let warnings = if errors.is_empty() {
             vec![
@@ -233,9 +249,23 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         "normalizedFrom": normalized_spec.normalized_from,
         "profileSummary": profile_value.as_ref().map(profile_summary),
         "compiled": compiled.as_ref().map(compiled_summary),
+        "proofPlan": proof_plan_result
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|plan| plan.value.clone()),
         "warnings": warnings,
         "errors": errors,
-        "next": next_for_spec_validate(&spec_path, schema_path.as_deref(), ok, validation_level)
+        "next": next_for_spec_validate(
+            &spec_path,
+            schema_path.as_deref(),
+            ok,
+            validation_level,
+            proof_plan_result
+                .as_ref()
+                .ok()
+                .and_then(Option::as_ref),
+        )
     }))
 }
 
@@ -288,7 +318,21 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         });
     };
     validate_known_fields(spec)?;
-    reject_uncompiled_v2_sections(spec)?;
+    // `proof` is metadata compiled by the side-effect-free proof planner below.
+    // Keep the existing v2 refusal boundary for every other recognized section
+    // without changing the shared walker while adjacent spec work lands.
+    let sections_to_check = if spec.get("proof").is_some() {
+        let mut stripped = spec.clone();
+        stripped
+            .as_object_mut()
+            .expect("validated dashboard spec object")
+            .remove("proof");
+        stripped
+    } else {
+        spec.clone()
+    };
+    reject_uncompiled_v2_sections(&sections_to_check)?;
+    let _proof_plan = compile_proof_plan(Some(spec), None)?;
     if spec.get("report").is_none() && spec.get("pages").is_some() {
         let (schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
         return Ok(CompiledDashboard {
@@ -1308,7 +1352,14 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             "requiredForCompatibility": "desktop-canvas-refresh",
             "note": "report build writes local PBIP/PBIR/TMDL metadata; Desktop canvas/refresh proof is a separate oracle step"
         },
-        "next": next_for_build(response.out_dir, response.dry_run, response.schema_path, response.spec_path)
+        "proofPlan": response.proof_plan.map(|plan| plan.value.clone()),
+        "next": next_for_build(
+            response.out_dir,
+            response.dry_run,
+            response.schema_path,
+            response.spec_path,
+            response.proof_plan,
+        )
     })
 }
 
@@ -1334,17 +1385,22 @@ fn next_for_build(
     dry_run: bool,
     schema_path: &Path,
     spec_path: Option<&Path>,
+    proof_plan: Option<&ProofPlan>,
 ) -> Vec<String> {
     if dry_run {
-        return vec![format!(
+        let mut commands = vec![format!(
             "powerbi-cli report build --schema {}{} --out-dir <project-dir> --json",
             command_arg(schema_path),
             spec_path
                 .map(|path| format!(" --spec {}", command_arg(path)))
                 .unwrap_or_default()
         )];
+        if let Some(plan) = proof_plan {
+            commands.extend(plan.next.iter().cloned());
+        }
+        return commands;
     }
-    out_dir
+    let mut commands = out_dir
         .map(|path| {
             vec![
                 format!("powerbi-cli inspect --deep {} --json", command_arg(path)),
@@ -1357,7 +1413,11 @@ fn next_for_build(
                 format!("powerbi-cli desktop open-check {} --json", command_arg(path)),
             ]
         })
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if let Some(plan) = proof_plan {
+        commands.extend(plan.next.iter().cloned());
+    }
+    commands
 }
 
 fn next_for_spec_validate(
@@ -1365,6 +1425,7 @@ fn next_for_spec_validate(
     schema_path: Option<&Path>,
     ok: bool,
     validation_level: &str,
+    proof_plan: Option<&ProofPlan>,
 ) -> Vec<String> {
     if !ok {
         return Vec::new();
@@ -1381,6 +1442,9 @@ fn next_for_spec_validate(
             "powerbi-cli report spec validate --schema <schema.json> --spec {} --json",
             command_arg(spec_path)
         ));
+    }
+    if let Some(plan) = proof_plan {
+        commands.extend(plan.next.iter().cloned());
     }
     commands
 }
