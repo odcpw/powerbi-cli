@@ -143,6 +143,7 @@ define_rules! {
     PARTITION_REAL_CONNECTOR_ODBC => ("partition.real_connector.odbc", Handoff, "error", "A partition uses Odbc.DataSource and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
     PARTITION_REAL_CONNECTOR_WEB => ("partition.real_connector.web", Handoff, "error", "A partition uses Web.Contents and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
     PARTITION_REAL_CONNECTOR_FILE => ("partition.real_connector.file", Handoff, "error", "A partition reads an external file and is unsafe for offline handoff.", "Replace it with a generated dummy table before offline handoff.", None),
+    PARTITION_REAL_CONNECTOR_SHAREPOINT => ("partition.real_connector.sharepoint", Handoff, "error", "A partition uses SharePoint.Files and is unsafe for offline handoff.", "Replace it with a generated dummy table for offline use, or audit explicitly for the work target and authenticate only in Power BI Desktop.", None),
     PARTITION_DUMMY_TABLE_SHAPE_UNVERIFIED => ("partition.dummy_table_shape_unverified", Handoff, "warning", "A #table partition does not match the proven generated shape.", "Regenerate the dummy partition from the schema or correct its columns and row arity.", None),
     PARTITION_PII_SUSPECT_LITERAL => ("partition.pii_suspect_literal", Handoff, "warning", "Dummy partition literals may contain personal or long free-text values.", "Replace suspect values with synthetic placeholders before offline handoff.", None),
     PARTITION_SOURCE_UNKNOWN => ("partition.source_unknown", Handoff, "warning", "A partition source is not a recognized safe dummy or supported connector.", "Classify or replace the source explicitly; do not rely on an unknown M expression.", None),
@@ -236,7 +237,7 @@ mod tests {
     #[test]
     fn every_registered_rule_has_unique_complete_documentation() {
         validate_registry().expect("valid documented registry");
-        assert_eq!(RULES.len(), 58);
+        assert_eq!(RULES.len(), 59);
     }
 
     #[test]

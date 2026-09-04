@@ -1533,7 +1533,7 @@ fn classify_partition_source(
         "odbcDataSource"
     } else if normalized.contains("sharepoint.files(") {
         findings.push(partition_finding(
-            "partition.real_connector.sharepoint",
+            rules::PARTITION_REAL_CONNECTOR_SHAREPOINT,
             "error",
             "partition source uses SharePoint.Files; replace with dummy #table before home handoff",
         ));
