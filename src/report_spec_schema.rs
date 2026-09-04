@@ -247,6 +247,11 @@ const FILTER: NodeSchema = node(
         "values",
         "min",
         "max",
+        "top",
+        "bottom",
+        "count",
+        "direction",
+        "by",
         "relative",
         "displayName",
     ],
@@ -1187,7 +1192,6 @@ where
 fn first_uncompiled_v2_section(
     root: &Map<String, Value>,
 ) -> Option<(String, &'static str, &'static str)> {
-    const FILTER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.1";
     const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
     const DRILLTHROUGH_BEAD: &str = "pbi-t3-compiler-completeness-1qi.3";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
@@ -1197,13 +1201,6 @@ fn first_uncompiled_v2_section(
     const FORMAT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.8";
     const PROOF_BEAD: &str = "pbi-t3-compiler-completeness-1qi.9";
 
-    if root.contains_key("filters") {
-        return Some((
-            "filters".to_string(),
-            FILTER_BEAD,
-            "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json",
-        ));
-    }
     if let Some(model) = root.get("model").and_then(Value::as_object) {
         for section in [
             "measurePatterns",
@@ -1269,13 +1266,6 @@ fn first_uncompiled_v2_section(
         .filter_map(Value::as_object)
         .enumerate()
     {
-        if page.contains_key("filters") {
-            return Some((
-                format!("pages[{page_index}].filters"),
-                FILTER_BEAD,
-                "powerbi-cli report filters add --project <project-dir> --page <page-handle> --target <Table[Column]> --value <value> --dry-run --json",
-            ));
-        }
         if page.contains_key("slicers") {
             return Some((
                 format!("pages[{page_index}].slicers"),
@@ -1308,14 +1298,12 @@ fn first_uncompiled_v2_section(
             .filter_map(Value::as_object)
             .enumerate()
         {
-            if ["sort", "drilldown", "topnGuard", "filters"]
+            if ["sort", "drilldown", "topnGuard"]
                 .iter()
                 .any(|field| visual.contains_key(*field))
             {
                 return Some((
-                    format!(
-                        "pages[{page_index}].visuals[{visual_index}].sort|drilldown|topnGuard|filters"
-                    ),
+                    format!("pages[{page_index}].visuals[{visual_index}].sort|drilldown|topnGuard"),
                     VISUAL_BEHAVIOR_BEAD,
                     "powerbi-cli --json capabilities --for report",
                 ));
@@ -1368,7 +1356,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
         return Ok(Vec::new());
     }
 
-    const FILTER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.1";
     const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
     const DRILLTHROUGH_BEAD: &str = "pbi-t3-compiler-completeness-1qi.3";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
@@ -1391,14 +1378,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
         });
     };
 
-    if root.contains_key("filters") {
-        push(
-            "filters".to_string(),
-            "/filters".to_string(),
-            FILTER_BEAD,
-            "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json",
-        );
-    }
     if let Some(model) = root.get("model").and_then(Value::as_object) {
         for section in [
             "measurePatterns",
@@ -1467,14 +1446,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                 continue;
             };
             let page_pointer = format!("/pages/{page_index}");
-            if page.contains_key("filters") {
-                push(
-                    format!("pages[{page_index}].filters"),
-                    format!("{page_pointer}/filters"),
-                    FILTER_BEAD,
-                    "powerbi-cli report filters add --project <project-dir> --page <page-handle> --target <Table[Column]> --value <value> --dry-run --json",
-                );
-            }
             if page.contains_key("slicers") {
                 push(
                     format!("pages[{page_index}].slicers"),
@@ -1515,7 +1486,7 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                         continue;
                     };
                     let visual_pointer = format!("{page_pointer}/visuals/{visual_index}");
-                    for field in ["sort", "drilldown", "topnGuard", "filters"] {
+                    for field in ["sort", "drilldown", "topnGuard"] {
                         if visual.contains_key(field) {
                             push(
                                 format!("pages[{page_index}].visuals[{visual_index}].{field}"),
@@ -1791,6 +1762,11 @@ struct FilterV2 {
     values: Option<Vec<Value>>,
     min: Option<Value>,
     max: Option<Value>,
+    top: Option<Value>,
+    bottom: Option<Value>,
+    count: Option<Value>,
+    direction: Option<Value>,
+    by: Option<Value>,
     relative: Option<RelativeFilterV2>,
     display_name: Option<Value>,
 }

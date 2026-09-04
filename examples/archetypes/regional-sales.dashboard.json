@@ -1,5 +1,5 @@
 {
-  "schema": "powerbi-cli.dashboard.v1",
+  "schema": "powerbi-cli.dashboard.v2",
   "report": {
     "name": "RegionalSales",
     "displayName": "Regional Sales",
@@ -78,6 +78,15 @@
             { "role": "Values", "field": "DimCustomer[Customer]" },
             { "role": "Values", "field": "FactSales[Total Revenue]" }
           ],
+          "filters": [
+            {
+              "scope": "visual",
+              "target": "DimCustomer[Customer]",
+              "kind": "topn",
+              "top": 3,
+              "by": "FactSales[Total Revenue]"
+            }
+          ],
           "layout": { "x": 32, "y": 32, "width": 700, "height": 400 }
         },
         {
@@ -104,6 +113,15 @@
           "bindings": [
             { "role": "Values", "field": "DimCustomer[Segment]" },
             { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "filters": [
+            {
+              "scope": "visual",
+              "target": "DimCustomer[Segment]",
+              "kind": "topn",
+              "top": 2,
+              "by": "FactSales[Total Revenue]"
+            }
           ],
           "layout": { "x": 32, "y": 32, "width": 700, "height": 400 }
         },

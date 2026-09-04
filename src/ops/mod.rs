@@ -59,6 +59,8 @@ pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
 /// one match arm while the public `ops apply` dispatcher remains a later bead.
 pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
     match operation {
+        Op::AddFilter(_) => Some(Box::new(AddFilterKernel)),
+        Op::SetDrillthrough(_) => Some(Box::new(SetDrillthroughKernel)),
         Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
         Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
         _ => None,

@@ -1,0 +1,63 @@
+{
+  "schema": "powerbi-cli.dashboard.v2",
+  "report": {
+    "name": "FilterKinds",
+    "displayName": "Filter Kinds",
+    "locale": "en-US"
+  },
+  "filters": [
+    {
+      "scope": "report",
+      "target": "DimCustomer[Segment]",
+      "kind": "categorical",
+      "values": ["Enterprise"],
+      "displayName": "Segment"
+    }
+  ],
+  "pages": [
+    {
+      "id": "overview",
+      "displayName": "Overview",
+      "filters": [
+        {
+          "scope": "page",
+          "target": "FactSales[Units]",
+          "kind": "range",
+          "min": 1,
+          "max": 50
+        },
+        {
+          "scope": "page",
+          "target": "DimDate[Date]",
+          "kind": "relativeDate",
+          "relative": {
+            "direction": "last",
+            "unit": "months",
+            "span": 12
+          }
+        }
+      ],
+      "visuals": [
+        {
+          "id": "customer_detail",
+          "type": "tableEx",
+          "title": "Customer Detail",
+          "bindings": [
+            {"role": "Values", "field": "DimCustomer[CustomerName]"},
+            {"role": "Values", "field": "FactSales[Total Revenue]"}
+          ],
+          "filters": [
+            {
+              "scope": "visual",
+              "target": "DimCustomer[CustomerName]",
+              "kind": "topn",
+              "top": 10,
+              "by": "FactSales[Total Revenue]"
+            }
+          ],
+          "layout": {"x": 32, "y": 32, "width": 700, "height": 400}
+        }
+      ]
+    }
+  ]
+}
