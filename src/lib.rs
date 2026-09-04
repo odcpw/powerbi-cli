@@ -52,6 +52,7 @@ mod pbir_interactions;
 mod pbir_slicers;
 mod pbir_themes;
 mod pbir_visual_factory;
+mod planner_rules;
 mod profile;
 mod profile_shape;
 mod project_io;
