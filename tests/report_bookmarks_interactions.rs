@@ -606,6 +606,301 @@ fn report_interactions_set_updates_existing_row_without_duplicates_and_supports_
 }
 
 #[test]
+fn report_interactions_reset_removes_explicit_row_and_restores_default_semantics() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project arg");
+    let page_name = first_page_name(&project);
+    let page_handle = format!("page:{page_name}");
+    let (source, target) = install_interaction_fixture(&project);
+    let source_handle = format!("visual:{page_name}:{source}");
+    let target_handle = format!("visual:{page_name}:{target}");
+    let page_path = first_page_json(&project);
+    let before_page = fs::read_to_string(&page_path).expect("page json before");
+
+    let dry_run = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        project_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(dry_run.code, 0, "stderr: {}", dry_run.stderr);
+    let dry_json = stdout_json(&dry_run);
+    assert_eq!(
+        dry_json["schema"],
+        Value::from("powerbi-cli.report.interactions.resetMutation.v1")
+    );
+    assert_eq!(dry_json["action"], Value::from("reset"));
+    assert_eq!(dry_json["dryRun"], Value::Bool(true));
+    assert_eq!(dry_json["mode"], Value::from("dry-run"));
+    assert_eq!(
+        dry_json["target"]["interactionType"],
+        Value::from("Default")
+    );
+    assert_eq!(dry_json["target"]["rowPresent"], Value::Bool(false));
+    assert_eq!(dry_json["target"]["defaulted"], Value::Bool(true));
+    assert_eq!(dry_json["interactionPlan"]["existed"], Value::Bool(true));
+    assert_eq!(dry_json["interactionPlan"]["changed"], Value::Bool(true));
+    assert_eq!(dry_json["changes"][0]["action"], Value::from("remove"));
+    assert!(
+        dry_json["resetSemantics"]
+            .as_str()
+            .expect("reset semantics")
+            .contains("target visual's default interaction behavior")
+    );
+    assert_eq!(
+        fs::read_to_string(&page_path).expect("page json after dry-run"),
+        before_page,
+        "dry-run must not mutate source page.json"
+    );
+    assert_json_snapshot(
+        "report-interaction-reset",
+        &json!({
+            "schema": dry_json["schema"],
+            "action": dry_json["action"],
+            "dryRun": dry_json["dryRun"],
+            "mode": dry_json["mode"],
+            "target": {
+                "interactionType": dry_json["target"]["interactionType"],
+                "rowPresent": dry_json["target"]["rowPresent"],
+                "defaulted": dry_json["target"]["defaulted"]
+            },
+            "interactionPlan": {
+                "before": dry_json["interactionPlan"]["before"],
+                "after": dry_json["interactionPlan"]["after"],
+                "existed": dry_json["interactionPlan"]["existed"],
+                "changed": dry_json["interactionPlan"]["changed"],
+                "defaulted": dry_json["interactionPlan"]["defaulted"],
+                "semantics": dry_json["interactionPlan"]["semantics"]
+            },
+            "resetSemantics": dry_json["resetSemantics"],
+            "change": {
+                "kind": dry_json["changes"][0]["kind"],
+                "action": dry_json["changes"][0]["action"],
+                "jsonPointer": dry_json["changes"][0]["jsonPointer"],
+                "after": dry_json["changes"][0]["after"]
+            }
+        }),
+    );
+
+    let out_dir = temp.path().join("sales_reset");
+    let out_arg = out_dir.to_str().expect("out dir");
+    let written = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        project_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--out-dir",
+        out_arg,
+        "--json",
+    ]);
+    assert_eq!(written.code, 0, "stderr: {}", written.stderr);
+    let written_json = stdout_json(&written);
+    assert_eq!(written_json["mode"], Value::from("out-dir"));
+    assert_eq!(written_json["validation"]["ok"], Value::Bool(true));
+    assert_eq!(written_json["changes"][0]["action"], Value::from("remove"));
+    assert_eq!(
+        fs::read_to_string(&page_path).expect("source page after out-dir"),
+        before_page,
+        "out-dir mutation must leave source project unchanged"
+    );
+
+    let list = run_powerbi(&[
+        "report",
+        "interactions",
+        "list",
+        "--project",
+        out_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--json",
+    ]);
+    assert_eq!(list.code, 0, "stderr: {}", list.stderr);
+    assert_eq!(stdout_json(&list)["counts"]["interactions"], Value::from(0));
+
+    let repeated = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        out_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(repeated.code, 0, "stderr: {}", repeated.stderr);
+    let repeated_json = stdout_json(&repeated);
+    assert_eq!(
+        repeated_json["interactionPlan"]["existed"],
+        Value::Bool(false)
+    );
+    assert_eq!(
+        repeated_json["interactionPlan"]["changed"],
+        Value::Bool(false)
+    );
+    assert_eq!(repeated_json["changes"][0]["action"], Value::from("noop"));
+}
+
+#[test]
+fn report_interactions_reset_rejects_invalid_selectors_types_and_duplicates() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project arg");
+    let page_name = first_page_name(&project);
+    let page_handle = format!("page:{page_name}");
+    let (source, target) = install_interaction_fixture(&project);
+    let source_handle = format!("visual:{page_name}:{source}");
+    let target_handle = format!("visual:{page_name}:{target}");
+
+    let missing_mode = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        project_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--json",
+    ]);
+    assert_eq!(missing_mode.code, 2);
+    let missing_mode_json = stderr_json(&missing_mode);
+    assert_eq!(
+        missing_mode_json["error"]["code"],
+        Value::from("invalid_args")
+    );
+    assert!(
+        missing_mode_json["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("requires --dry-run")
+    );
+    assert!(
+        missing_mode_json["error"]["suggestedCommands"]
+            .as_array()
+            .expect("suggested commands")
+            .iter()
+            .any(|command| command
+                .as_str()
+                .unwrap_or_default()
+                .contains("interactions reset"))
+    );
+
+    let with_type = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        project_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--type",
+        "Default",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(with_type.code, 2);
+    let with_type_json = stderr_json(&with_type);
+    assert_eq!(with_type_json["error"]["code"], Value::from("invalid_args"));
+    assert!(
+        with_type_json["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("does not accept --type")
+    );
+
+    let with_handle = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        project_arg,
+        "--handle",
+        "interaction:ReportSectionOverview:0",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(with_handle.code, 2);
+    let with_handle_json = stderr_json(&with_handle);
+    assert_eq!(
+        with_handle_json["error"]["code"],
+        Value::from("invalid_args")
+    );
+    assert!(
+        with_handle_json["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("--handle is not supported")
+    );
+
+    patch_json(&first_page_json(&project), |page| {
+        page["visualInteractions"] = json!([
+            {"source": source.clone(), "target": target.clone(), "type": "NoFilter"},
+            {"source": source.clone(), "target": target.clone(), "type": "DataFilter"}
+        ]);
+    });
+    let duplicate = run_powerbi(&[
+        "report",
+        "interactions",
+        "reset",
+        "--project",
+        project_arg,
+        "--page",
+        &page_handle,
+        "--source",
+        &source_handle,
+        "--target",
+        &target_handle,
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(duplicate.code, 10);
+    let duplicate_json = stderr_json(&duplicate);
+    assert_eq!(
+        duplicate_json["error"]["code"],
+        Value::from("validation_failed")
+    );
+    assert!(
+        duplicate_json["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("duplicate visualInteractions")
+    );
+}
+
+#[test]
 fn report_interactions_mutations_reject_unsafe_or_unproven_requests() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

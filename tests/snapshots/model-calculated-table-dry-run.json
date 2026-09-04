@@ -1,0 +1,19 @@
+{
+  "action": "add-calculated",
+  "changes": [
+    {
+      "action": "add",
+      "after": "table SalesAbovePlan\n    lineageTag: fdcc1d54-43d5-4a5c-a84c-c20bc3c115cf\n\n    partition SalesAbovePlan = calculated\n        mode: import\n        source = FILTER('FactSales', 'FactSales'[Revenue] > 0)\n",
+      "before": null,
+      "kind": "tmdl.calculatedTable"
+    }
+  ],
+  "dryRun": true,
+  "mode": "dry-run",
+  "schema": "powerbi-cli.model.tables.mutation.v1",
+  "target": {
+    "handle": "table:SalesAbovePlan",
+    "partitionKind": "calculated",
+    "table": "SalesAbovePlan"
+  }
+}

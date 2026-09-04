@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 
 pub(crate) const EXIT_SUCCESS: i32 = 0;
+pub(crate) const EXIT_DOCS_DRIFT: i32 = 1;
 pub(crate) const EXIT_INVALID_ARGS: i32 = 2;
 pub(crate) const EXIT_FILE_NOT_FOUND: i32 = 3;
 pub(crate) const EXIT_VALIDATION_FAILED: i32 = 10;

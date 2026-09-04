@@ -843,6 +843,24 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["target.handle", "interactionPlan.after.type", "changes[].jsonPointer", "readbackCommand", "validateCommand", "next"]
         }),
         json!({
+            "path": "report interactions reset",
+            "aliases": ["report interaction reset"],
+            "usage": "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle> (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Remove one explicit PBIR visualInteractions row so the target visual returns to its documented default interaction behavior",
+            "tags": ["pbir", "report", "interaction", "interactions", "visual", "page", "mutation", "reset", "default", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.interactions.resetMutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--source <visual-name-or-handle>", "--target <visual-name-or-handle>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "limitations": ["Reset accepts endpoint selectors rather than an interaction handle because the row is intentionally absent after the mutation.", "Desktop canvas/render confirmation remains pending; the local proof level is unit-smoke.", "The command removes only the matching page-local visualInteractions row and refuses duplicate matching rows."],
+            "examples": ["powerbi-cli report interactions reset --project build/sales --page page:ReportSectionOverview --source <visual-handle> --target <visual-handle> --dry-run --json", "powerbi-cli report interactions reset --project build/sales --page page:ReportSectionOverview --source <visual-handle> --target <visual-handle> --out-dir build/sales-reset --json"],
+            "followUpFields": ["dryRun", "mode", "target.page", "target.source", "target.target", "target.rowPresent", "target.defaulted", "interactionPlan.before", "interactionPlan.after", "interactionPlan.existed", "interactionPlan.changed", "interactionPlan.semantics", "resetSemantics", "changes[].action", "changes[].jsonPointer", "readbackCommand", "pageReadbackCommand", "validateCommand", "next"]
+        }),
+        json!({
             "path": "report themes show",
             "aliases": ["report theme show", "report styles show", "report style show", "report themes get"],
             "usage": "powerbi-cli report themes show --project <project-dir-or.pbip> --json",
@@ -1156,19 +1174,20 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report visuals catalog",
             "aliases": ["report visuals types", "report visuals visual-types"],
-            "usage": "powerbi-cli report visuals catalog [--visual-type <type-or-alias>] --json",
-            "summary": "Return generated visual types plus complete fixture-backed role, projection, exclusivity, and runtime-parity rules for agent-safe report authoring",
+            "usage": "powerbi-cli report visuals catalog [--visual-type <type-or-alias>] [--formatting] --json",
+            "summary": "Return generated visual types plus complete fixture-backed role, projection, exclusivity, and runtime-parity rules, or the curated typed-formatting property catalog",
             "tags": ["pbir", "report", "visual", "catalog", "chart", "binding", "combo", "pareto", "pie", "donut", "matrix", "slicer", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.visuals.catalog.v2",
-            "flags": ["--visual-type <type-or-alias>", "--type <type-or-alias>", "--json", "--format json"],
+            "formattingOutputSchema": "powerbi-cli.report.visuals.formattingCatalog.v1",
+            "flags": ["--visual-type <type-or-alias>", "--type <type-or-alias>", "--formatting", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
-            "examples": ["powerbi-cli report visuals catalog --json", "powerbi-cli report visuals catalog --visual-type line --json"],
-            "limitations": ["Raw columns are supported in proven categorical/table roles and as explicit Sum aggregations for scatter X/Y/Size and hundredPercentStackedColumnChart Y; other value roles require measures.", "scatterChart rejects Details; use Category for detail identity.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending."],
-            "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"]
+            "examples": ["powerbi-cli report visuals catalog --json", "powerbi-cli report visuals catalog --visual-type line --json", "powerbi-cli report visuals catalog --formatting --json"],
+            "limitations": ["Raw columns are supported in proven categorical/table roles and as explicit Sum aggregations for scatter X/Y/Size and hundredPercentStackedColumnChart Y; other value roles require measures.", "scatterChart rejects Details; use Category for detail identity.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending.", "--formatting returns the complete eleven-entry set-object surface; it cannot be combined with --visual-type. Entries are wildcarded only where the existing behavior is visual-type agnostic and each entry carries dated Desktop/pilot evidence."],
+            "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "formattingOutputSchema", "next"]
         }),
         json!({
             "path": "report visuals add",
@@ -1359,7 +1378,7 @@ pub(super) fn commands() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.visuals.objectMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--object <name>", "--property <name>", "--value <raw>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object title --property text --value \"Rate zuletzt (BU je 1'000 FTE)\" --in-place --json"],
-            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature."],
+            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature. Run report visuals catalog --formatting --json for the versioned catalog, encoding, container, and evidence for each pair."],
             "followUpFields": ["dryRun", "mode", "target.handle", "plan.object", "plan.property", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
