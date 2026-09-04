@@ -611,8 +611,12 @@ pbi --json capabilities --for "model tables"
 pbi --json model tables list --project build/sales
 pbi --json model tables show --project build/sales --handle table:FactSales
 pbi --json model tables add --project build/sales --table DimSegment --column Code --data-type string --dry-run
+pbi --json model tables add-calculated --project build/sales --table SalesAbovePlan --expression "FILTER('FactSales', 'FactSales'[Revenue] > 0)" --dry-run
 pbi --json model tables rename --project build/sales --handle table:DimDate --new-name Calendar --rename-references --dry-run
 pbi --json model tables delete --project build/sales --handle table:DimSegment --dry-run
+pbi --json model expressions add --project build/sales --name SharedQuery --expression "#table(type table [Value = Int64.Type], {{1}})" --dry-run
+pbi --json model expressions update --project build/sales --handle expression:SharedQuery --expression-file checks/query.m --dry-run
+pbi --json model expressions delete --project build/sales --handle expression:SharedQuery --dry-run
 pbi --json capabilities --for "model columns"
 pbi --json model columns list --project build/sales
 pbi --json model columns add --project build/sales --table FactSales --name Margin --data-type decimal --dry-run
@@ -630,6 +634,12 @@ targeted block containing unknown Desktop-authored properties (including
 annotations or extended properties) rather than dropping them. Every mutation
 supports `--dry-run`, guarded `--in-place`, and isolated `--out-dir`; run the
 returned inspect and validate commands after applying a plan.
+
+`model tables add-calculated` writes an offline-safe DAX `calculated` partition;
+Desktop may materialize its columns on refresh, so the interim no-columns
+completeness check is deferred. Named M expressions use
+`model expressions add/update/delete` with bounded input, newline-preserving
+TMDL edits, duplicate-step linting, and unknown-metadata refusal.
 
 ### Add A Small Selector Or Lookup Table
 

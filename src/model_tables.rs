@@ -1,7 +1,9 @@
 use crate::cli_support::{
     MutationMode, mode_name, preflight_out_dir, required_project, set_mode, target_project,
 };
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream, validate_text};
 use crate::project_io::{write_text_atomic, write_text_atomic_validated};
+use crate::safety_scan::contains_credential_like_text_str;
 use crate::tmdl::{
     ColumnDefinition, ColumnRecord, TableDocument, column_block_lines, find_table,
     load_table_documents, same_name, table_handle,
@@ -13,6 +15,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 
 use crate::static_tables::static_tables_command;
@@ -20,9 +23,9 @@ use crate::static_tables::static_tables_command;
 pub(crate) fn tables_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "model tables requires a subcommand: list, show, add, rename, delete, add-static",
+            "model tables requires a subcommand: list, show, add, add-calculated, rename, delete, add-static",
         )
-        .with_hint("Use model tables list/show for readback or add/rename/delete for guarded TMDL table CRUD.")
+        .with_hint("Use model tables list/show for readback or add/add-calculated/rename/delete for guarded TMDL table CRUD.")
         .with_suggested_command(
             "powerbi-cli model tables list --project <project-dir-or.pbip> --json",
         ));
@@ -31,6 +34,7 @@ pub(crate) fn tables_command(args: &[String]) -> CliResult<Value> {
         "list" => list_tables(rest),
         "show" => show_table(rest),
         "add" => mutate_table(TableAction::Add, rest),
+        "add-calculated" | "addCalculated" => mutate_table(TableAction::AddCalculated, rest),
         "rename" | "update" => mutate_table(TableAction::Rename, rest),
         "delete" => mutate_table(TableAction::Delete, rest),
         "add-static" | "addStatic" | "add-selector" | "addSelector" => static_tables_command(args),
@@ -61,6 +65,7 @@ struct TableShowOptions {
 #[derive(Debug, Clone, Copy)]
 enum TableAction {
     Add,
+    AddCalculated,
     Rename,
     Delete,
 }
@@ -69,6 +74,7 @@ impl TableAction {
     fn as_str(self) -> &'static str {
         match self {
             Self::Add => "add",
+            Self::AddCalculated => "add-calculated",
             Self::Rename => "rename",
             Self::Delete => "delete",
         }
@@ -84,6 +90,7 @@ struct TableMutationOptions {
     columns: Vec<ColumnDefinitionInput>,
     columns_json_seen: bool,
     data_type: Option<String>,
+    expression: Option<String>,
     rename_references: bool,
     mode: Option<MutationMode>,
     out_dir: Option<PathBuf>,
@@ -174,9 +181,85 @@ fn mutate_table(action: TableAction, args: &[String]) -> CliResult<Value> {
     let docs = load_table_documents(&target_resolved)?;
     match action {
         TableAction::Add => add_table(&target_resolved, &docs, &options, mode),
+        TableAction::AddCalculated => add_calculated_table(&target_resolved, &docs, &options, mode),
         TableAction::Rename => rename_table(&target_resolved, &docs, &options, mode),
         TableAction::Delete => delete_table(&target_resolved, &docs, &options, mode),
     }
+}
+
+fn add_calculated_table(
+    resolved: &crate::ResolvedProject,
+    docs: &[TableDocument],
+    options: &TableMutationOptions,
+    mode: MutationMode,
+) -> CliResult<Value> {
+    let table = options.table.as_deref().expect("validated table");
+    if docs.iter().any(|doc| same_name(&doc.table, table)) {
+        return Err(CliError::invalid_args(format!(
+            "semantic model table already exists: {table}"
+        ))
+        .with_hint("Choose a new table name; this command never replaces an existing table.")
+        .with_suggested_command(format!(
+            "powerbi-cli model tables list --project {} --json",
+            command_arg(&resolved.project_dir)
+        )));
+    }
+    let path = resolved
+        .semantic_model_dir
+        .join("definition")
+        .join("tables")
+        .join(format!("{table}.tmdl"));
+    if path.exists() {
+        return Err(CliError::invalid_args(format!(
+            "table target already exists: {}",
+            path.display()
+        ))
+        .with_hint("The command never overwrites an existing table file."));
+    }
+    let expression = options.expression.as_deref().expect("validated expression");
+    let text = calculated_table_tmdl(table, expression, &options.columns);
+    let dry_run = mode == MutationMode::DryRun;
+    let (validation, project_modified) = if dry_run {
+        (None, false)
+    } else {
+        let (validation, modified) = write_text_atomic_validated(
+            &path,
+            &text,
+            || validate_project(resolved),
+            |report| report.errors.is_empty(),
+        )?;
+        (Some(validation), modified)
+    };
+    let validation_ok = validation
+        .as_ref()
+        .is_none_or(|report| report.errors.is_empty());
+    let project_arg = command_arg(&resolved.project_dir);
+    let show = format!(
+        "powerbi-cli model tables show --project {project_arg} --handle {} --json",
+        crate::cli_support::shell_arg(&table_handle(table))
+    );
+    let inspect = format!("powerbi-cli inspect --deep {project_arg} --json");
+    let validate = format!("powerbi-cli validate --strict {project_arg} --json");
+    Ok(json!({
+        "schema": "powerbi-cli.model.tables.mutation.v1",
+        "ok": validation_ok,
+        "exitCode": if validation_ok { EXIT_SUCCESS } else { EXIT_VALIDATION_FAILED },
+        "action": "add-calculated",
+        "dryRun": dry_run,
+        "mode": mode_name(mode),
+        "projectModified": project_modified,
+        "rollback": (!dry_run && !validation_ok).then(|| json!({"performed": true, "projectModified": false, "reason": "post-mutation validation failed; the new calculated table file was removed"})),
+        "projectDir": canonical_display(&resolved.project_dir),
+        "pbip": canonical_display(&resolved.pbip_path),
+        "semanticModelDir": canonical_display(&resolved.semantic_model_dir),
+        "target": {"handle": table_handle(table), "table": table, "path": canonical_display(&path), "partitionKind": "calculated"},
+        "changes": [{"kind": "tmdl.calculatedTable", "action": "add", "path": canonical_display(&path), "before": Value::Null, "after": text}],
+        "validation": validation.map(validation_json),
+        "readbackCommand": show,
+        "inspectCommand": inspect,
+        "validateCommand": validate,
+        "next": [show, inspect, validate]
+    }))
 }
 
 fn add_table(
@@ -541,7 +624,7 @@ fn table_json(doc: &TableDocument) -> Value {
         "counts": {"columns": doc.columns.len(), "measures": doc.measures.len(), "partitions": doc.partitions.len()},
         "columns": doc.columns.iter().map(column_summary).collect::<Vec<_>>(),
         "measures": doc.measures.iter().map(|measure| json!({"handle": measure.handle(), "name": measure.name, "expression": measure.expression})).collect::<Vec<_>>(),
-        "partitions": doc.partitions.iter().map(|partition| json!({"handle": partition.handle(), "name": partition.name, "sourceKind": partition.source_kind})).collect::<Vec<_>>()
+        "partitions": doc.partitions.iter().map(|partition| json!({"handle": partition.handle(), "name": partition.name, "expressionKind": partition.expression_kind, "mode": partition.mode, "sourceKind": partition.source_kind})).collect::<Vec<_>>()
     })
 }
 
@@ -593,6 +676,37 @@ fn table_tmdl(table: &str, columns: &[ColumnDefinitionInput]) -> String {
     lines.push("                )".to_string());
     lines.push("            in".to_string());
     lines.push("                Source".to_string());
+    lines.join("\n") + "\n"
+}
+
+fn calculated_table_tmdl(
+    table: &str,
+    expression: &str,
+    columns: &[ColumnDefinitionInput],
+) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!("table {}", crate::tmdl::tmdl_object_name(table)));
+    lines.push(format!(
+        "    lineageTag: {}",
+        stable_guid(&format!("calculated-table:{table}"))
+    ));
+    lines.push(String::new());
+    for input in columns {
+        lines.extend(column_block_lines(table, &input.definition));
+    }
+    lines.push(format!(
+        "    partition {} = calculated",
+        crate::tmdl::tmdl_object_name(table)
+    ));
+    lines.push("        mode: import".to_string());
+    if expression.contains('\n') || expression.contains('\r') {
+        lines.push("        source =".to_string());
+        for line in expression.replace("\r\n", "\n").replace('\r', "\n").lines() {
+            lines.push(format!("            {}", line.trim_end()));
+        }
+    } else {
+        lines.push(format!("        source = {}", expression.trim()));
+    }
     lines.join("\n") + "\n"
 }
 
@@ -738,6 +852,27 @@ fn parse_table_mutation_args(
                 options.data_type =
                     Some(crate::cli_support::take_value(args, &mut i, "--data-type")?)
             }
+            "--expression" => {
+                if options.expression.is_some() {
+                    return Err(CliError::invalid_args(
+                        "--expression and --expression-file are mutually exclusive",
+                    ));
+                }
+                options.expression = Some(crate::cli_support::take_value(
+                    args,
+                    &mut i,
+                    "--expression",
+                )?);
+            }
+            "--expression-file" => {
+                if options.expression.is_some() {
+                    return Err(CliError::invalid_args(
+                        "--expression and --expression-file are mutually exclusive",
+                    ));
+                }
+                let path = crate::cli_support::take_value(args, &mut i, "--expression-file")?;
+                options.expression = Some(read_expression_file(&path)?);
+            }
             "--rename-references" | "--update-references" => {
                 options.rename_references = true;
                 i += 1;
@@ -810,11 +945,53 @@ fn parse_table_mutation_args(
                     "--confirm is only valid for model tables delete",
                 ));
             }
+            if options.expression.is_some() {
+                return Err(CliError::invalid_args(
+                    "--expression is only valid for model tables add-calculated",
+                ));
+            }
             if let Some(data_type) = options.data_type.as_deref() {
                 let normalized = normalize_table_type(data_type)?;
                 for input in &mut options.columns {
                     input.definition.data_type = Some(normalized.clone());
                 }
+            }
+            validate_column_definitions(&options.columns)?;
+        }
+        TableAction::AddCalculated => {
+            if options.table.is_none() {
+                return Err(CliError::invalid_args("model tables add-calculated requires --table <table>")
+                    .with_suggested_command("powerbi-cli model tables add-calculated --project <project-dir-or.pbip> --table <table> --expression <dax> --dry-run --json"));
+            }
+            if options.handle.is_some() || options.new_name.is_some() {
+                return Err(CliError::invalid_args(
+                    "model tables add-calculated does not accept --handle or --new-name",
+                ));
+            }
+            if options.rename_references || options.confirm.is_some() || options.data_type.is_some()
+            {
+                return Err(CliError::invalid_args(
+                    "model tables add-calculated accepts --table, --expression, optional columns, and an output mode",
+                ));
+            }
+            let expression = options.expression.as_deref().ok_or_else(|| {
+                CliError::invalid_args(
+                    "model tables add-calculated requires --expression or --expression-file",
+                )
+                .with_hint("Provide the calculated table DAX as inline text or a bounded UTF-8 file.")
+                .with_suggested_command("powerbi-cli model tables add-calculated --project <project-dir-or.pbip> --table <table> --expression \"FILTER('FactSales', 'FactSales'[Revenue] > 0)\" --dry-run --json")
+            })?;
+            validate_text(expression, InputKind::SourceText)?;
+            if expression.trim().is_empty() {
+                return Err(CliError::invalid_args(
+                    "calculated table expression must not be empty",
+                ));
+            }
+            if contains_credential_like_text_str(expression) {
+                return Err(CliError::invalid_args(
+                    "calculated table expression contains credential-like text",
+                )
+                .with_hint("Remove credentials and keep the project offline-safe."));
             }
             validate_column_definitions(&options.columns)?;
         }
@@ -839,7 +1016,10 @@ fn parse_table_mutation_args(
                     "--confirm is only valid for model tables delete",
                 ));
             }
-            if !options.columns.is_empty() || options.data_type.is_some() {
+            if !options.columns.is_empty()
+                || options.data_type.is_some()
+                || options.expression.is_some()
+            {
                 return Err(CliError::invalid_args(
                     "model tables rename accepts only a table selector, --new-name, --rename-references, and an output mode",
                 )
@@ -860,7 +1040,10 @@ fn parse_table_mutation_args(
                     "--new-name and --rename-references are only valid for table rename",
                 ));
             }
-            if !options.columns.is_empty() || options.data_type.is_some() {
+            if !options.columns.is_empty()
+                || options.data_type.is_some()
+                || options.expression.is_some()
+            {
                 return Err(CliError::invalid_args(
                     "model tables delete accepts only a table selector, output mode, and optional --confirm",
                 )
@@ -1173,6 +1356,28 @@ fn stable_guid(value: &str) -> String {
         &hex[16..19],
         &hex[19..31]
     )
+}
+
+fn read_expression_file(path: &str) -> CliResult<String> {
+    let text = if path == "-" {
+        read_utf8_stream(
+            &mut io::stdin(),
+            InputKind::SourceText,
+            "calculated table expression",
+        )?
+    } else {
+        read_utf8(std::path::Path::new(path), InputKind::SourceText)?
+    };
+    let expression = text
+        .trim_start_matches('\u{feff}')
+        .trim_end_matches(['\r', '\n'])
+        .to_string();
+    if expression.trim().is_empty() {
+        return Err(CliError::invalid_args("calculated table expression file is empty")
+            .with_hint("Provide a DAX table expression.")
+            .with_suggested_command("powerbi-cli model tables add-calculated --project <project-dir-or.pbip> --table <table> --expression-file <dax.txt> --dry-run --json"));
+    }
+    Ok(expression)
 }
 
 fn m_identifier(value: &str) -> String {

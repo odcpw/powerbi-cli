@@ -460,7 +460,7 @@ separately with `model relationships add`. The command refuses replacement,
 credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table
 ingestion, and validates the project after every write.
 
-The generic semantic-model surface covers `model tables list/show/add/rename/delete`
+The generic semantic-model surface covers `model tables list/show/add/add-calculated/rename/delete`
 and `model columns list/show/add/update/delete`. Table handles use the form
 `table:<name>`; column handles use `column:<table>:<name>`. Literal `%` and `:`
 inside each component are encoded as `%25` and `%3A`. Table rename refuses when
@@ -469,6 +469,15 @@ relationships, DAX, or variation metadata still reference the old name unless
 Desktop-authored properties in the targeted block, so annotations and
 extended properties are never silently dropped. All mutating commands support
 `--dry-run`, guarded `--in-place`, and isolated `--out-dir` output.
+
+Calculated tables are authored with `model tables add-calculated`; the command
+writes a real `partition <table> = calculated` DAX source and leaves schema
+materialization to Power BI Desktop. Named M expressions use
+`model expressions add/update/delete` with the same guarded output modes. The
+existing DAX and M lint commands inspect these new blocks, while unknown
+Desktop-authored expression metadata is refused rather than discarded. Until
+Desktop refresh materializes a calculated table's columns, model completeness
+lint defers the generic no-columns error for that calculated partition.
 
 The `regional-sales` archetype is deliberately dummy data, but keeps the
 column names and shape close enough to exercise a non-ASCII column
@@ -638,7 +647,7 @@ three pages.
   only after the MCP process tree is reaped. The output contains only a
   `definition/` TMDL tree; it is not a report export or full PBIX-to-PBIP
   conversion.
-- Programmatic semantic-model authoring covers `model tables list/show/add/rename/delete`
+- Programmatic semantic-model authoring covers `model tables list/show/add/add-calculated/rename/delete`
   and `model columns list/show/add/update/delete` with stable percent-encoded
   table/column handles, guarded output modes, and readback/validate commands.
   Rename rewrites relationship, DAX, and variation references only when
@@ -646,6 +655,11 @@ three pages.
   list. Column updates refuse unknown Desktop-authored properties instead of
   dropping annotations or extended properties. `diff --scope model.tables` and
   `diff --scope model.columns` provide semantic table/column changes.
+- Calculated-table authoring covers `model tables add-calculated` with bounded
+  DAX input and `partition = calculated` TMDL output. Named-expression
+  authoring covers `model expressions add/update/delete`; updates preserve
+  newline style and fail closed on unknown Desktop metadata. Run `model dax
+  lint` and project `lint` after writes; Desktop remains the DAX/M oracle.
 - Programmatic static-table authoring covers `model tables add-static` for a
   new disconnected single-string-column selector or a small 1-10-column string
   lookup dimension backed by a generated inline `#table` partition. Cells are

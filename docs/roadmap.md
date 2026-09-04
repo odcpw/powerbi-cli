@@ -103,7 +103,7 @@ Required contract rules:
 
 ### Semantic Model
 
-- `model tables list/show/add/rename/delete` (shipped guarded TMDL CRUD;
+- `model tables list/show/add/add-calculated/rename/delete` (shipped guarded TMDL CRUD;
   rename can rewrite references explicitly)
 - `model columns list/show/add/update/delete` (shipped guarded base and
   calculated-column CRUD with unknown-metadata refusal)
@@ -115,14 +115,15 @@ Required contract rules:
 - `model roles list/show/add/update/delete`
 - `model perspectives list/show/add/update/delete`
 - `model cultures list/show/add/update/delete`
-- `model expressions list/show/add/update/delete`
+- `model expressions list/show/add/update/delete` (shipped guarded named M-expression CRUD;
+  duplicate-step lint and unknown-metadata refusal are explicit)
 - `model translations list/show/add/update/delete`
 
 The first semantic milestone should focus on tables, columns, measures,
-relationships, dummy partitions, static DAX reference checks, and readback of
-advanced TMDL already present in a project. Mutating roles, perspectives,
-cultures, expressions, translations, and refresh policies can wait until the
-object-specific writers and fixtures exist.
+relationships, dummy partitions, calculated tables, named expressions, static
+DAX/M reference checks, and readback of advanced TMDL already present in a
+project. Mutating roles, perspectives, cultures, translations, and refresh
+policies can wait until the object-specific writers and fixtures exist.
 
 ### Report Authoring
 
@@ -641,8 +642,8 @@ coverage only from Desktop-authored or Desktop-proved fixtures.
     canonicalization for v2 dashboard specs; report build consumes normalized
     documents so include-composed and inline-equivalent inputs preserve parity.
 11. **Broaden semantic model authoring.**
-    Add tables/columns CRUD beyond scaffold, calculated tables, named
-    expressions, date-table helpers, roles/RLS, perspectives, translations,
+    Tables/columns CRUD beyond scaffold, calculated tables, and named
+    expressions are shipped. Next add date-table helpers, roles/RLS, perspectives, translations,
     calculation groups/items, and broader DAX format/lint. Bounded Desktop DAX
     execution is delivered; authenticated Fabric/XMLA execution remains optional.
 12. **Add durable batch operations.**
