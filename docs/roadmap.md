@@ -363,6 +363,9 @@ validation, proof, then mutation breadth.
 - Implemented visual catalog and first visual creation slices:
   `report visuals catalog` exposes generated visual types, aliases, binding
   roles, template-only visual types, and planned visual families.
+  `report visuals catalog --formatting` additionally exposes the strict,
+  embedded eleven-entry formatting catalog consumed by `set-object`, including
+  PBIR containers, encoding, wildcard visual scope, and dated evidence.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
   columnChart, lineClusteredColumnComboChart, and scatterChart containers from

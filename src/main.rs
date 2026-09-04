@@ -19,6 +19,7 @@ mod diff;
 mod doctor;
 mod feature_catalog;
 mod fixture;
+mod formatting_catalog;
 mod guid_util;
 mod handoff;
 mod handoff_rebind_check;

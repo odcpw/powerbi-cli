@@ -1354,6 +1354,7 @@ pbi --json report interactions set --project build/sales --page page:ReportSecti
 pbi --json report interactions show --project build/sales-interactions --page page:ReportSectionOverview --source "visual:ReportSectionOverview:<source-visual>" --target "visual:ReportSectionOverview:<target-visual>"
 pbi --json report visuals list --project build/sales --page page:ReportSectionOverview
 pbi --json report visuals catalog
+pbi --json report visuals catalog --formatting
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --title "Revenue Card" --binding "role=Values,table=FactSales,measure=Total Revenue" --dry-run
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --title "Revenue Card" --binding "role=Values,table=FactSales,measure=Total Revenue" --out-dir build/sales-visual
 pbi --json report visuals add --project build/sales --page page:ReportSectionOverview --visual-type pie --title "Revenue Share" --binding "role=Category,table=DimCustomer,column=Segment" --binding "role=Y,table=FactSales,measure=Total Revenue" --dry-run
@@ -1389,6 +1390,13 @@ level. When strict validation finds a mechanical binding parity defect, run
 canonicalization or Sum aggregation wrappers as a typed `setBindings` op.
 Review the returned preview before applying it. Missing roles, duplicate fields,
 and unproven substitutions remain explicit refusals.
+Use `report visuals catalog --formatting --json` for the complete, embedded
+`formatting-catalog.v1` surface consumed by `report visuals set-object`. It
+currently contains exactly eleven proven object/property pairs, including their
+encoding, PBIR container, wildcard visual-type scope, and dated Desktop/pilot
+reference. The catalog is strict and deterministic; an entry is not implied by
+memory, and new properties require a Desktop-authored fixture or dated pilot
+observation. `--formatting` cannot be combined with `--visual-type`.
 `report visuals add` creates only cataloged generated visual containers: card,
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
 hundredPercentStackedColumnChart, lineClusteredColumnComboChart, matrix (PBIR
