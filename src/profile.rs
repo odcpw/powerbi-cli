@@ -278,7 +278,7 @@ fn infer_profile_from_rows(
         .collect::<Vec<_>>();
     let selected_index = select_rows_table(&schema_tables, &external.headers)?;
     if include_data_values {
-        scan_opt_in_columns(&schema_tables[selected_index], &external.rows)?;
+        scan_opt_in_columns(schema_tables[selected_index], &external.rows)?;
     }
 
     let mut tables = Vec::with_capacity(schema_tables.len());
