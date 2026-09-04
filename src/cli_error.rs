@@ -17,8 +17,16 @@ pub(crate) struct CliError {
     pub(crate) message: String,
     pub(crate) hint: Option<String>,
     pub(crate) suggested_commands: Vec<String>,
-    pub(crate) pointer: Option<String>,
-    pub(crate) did_you_mean: Option<String>,
+    // Keep the frequently-carried error type below clippy's `result_large_err`
+    // threshold. These diagnostics are optional and therefore pay for their
+    // allocation only when a caller needs to attach one.
+    details: Option<Box<ErrorDetails>>,
+}
+
+#[derive(Debug, Default)]
+struct ErrorDetails {
+    pointer: Option<String>,
+    did_you_mean: Option<String>,
 }
 
 impl CliError {
@@ -49,8 +57,7 @@ impl CliError {
             message: message.into(),
             hint: None,
             suggested_commands: Vec::new(),
-            pointer: None,
-            did_you_mean: None,
+            details: None,
         }
     }
 
@@ -65,13 +72,42 @@ impl CliError {
     }
 
     pub(crate) fn with_pointer(mut self, pointer: impl Into<String>) -> Self {
-        self.pointer = Some(pointer.into());
+        self.details_mut().pointer = Some(pointer.into());
         self
     }
 
     pub(crate) fn with_did_you_mean(mut self, suggestion: impl Into<String>) -> Self {
-        self.did_you_mean = Some(suggestion.into());
+        self.details_mut().did_you_mean = Some(suggestion.into());
         self
+    }
+
+    pub(crate) fn pointer(&self) -> Option<&str> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.pointer.as_deref())
+    }
+
+    pub(crate) fn did_you_mean(&self) -> Option<&str> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.did_you_mean.as_deref())
+    }
+
+    fn details_mut(&mut self) -> &mut ErrorDetails {
+        self.details
+            .get_or_insert_with(|| Box::new(ErrorDetails::default()))
+            .as_mut()
+    }
+
+    pub(crate) fn prepend_pointer(&mut self, prefix: &str) {
+        if let Some(pointer) = self
+            .details
+            .as_mut()
+            .and_then(|details| details.pointer.as_mut())
+            && !pointer.starts_with('/')
+        {
+            *pointer = format!("{prefix}/{pointer}");
+        }
     }
 }
 

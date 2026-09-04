@@ -378,8 +378,13 @@ The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. A v2
 section is safe to retain before its compiler lands: compiled validation/build
 will return `unsupported_feature` with the owning T3 bead id, never silently
 discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
-reference; `report spec upgrade` remains assigned to
-`pbi-t2-dashboard-spec-v2-dsd.6`.
+  reference; `report spec upgrade` remains assigned to
+  `pbi-t2-dashboard-spec-v2-dsd.6`.
+  `report spec validate` writes validation failures to stdout as structured
+  `errors[]` objects (`code` and `message` are required; `pointer`,
+  `didYouMean`, `hint`, and `suggestedCommands` are optional). Consumers should
+  read `errors[].message`, never treat an entry as a bare string. See
+  `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
 ```bash
 pbi --json schema validate examples/sales.schema.json

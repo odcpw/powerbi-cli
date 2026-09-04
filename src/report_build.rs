@@ -232,11 +232,11 @@ fn spec_error_json(error: &CliError) -> Value {
         "code": error.code,
         "message": error.message,
     });
-    if let Some(pointer) = &error.pointer {
-        value["pointer"] = Value::String(pointer.clone());
+    if let Some(pointer) = error.pointer() {
+        value["pointer"] = Value::String(pointer.to_string());
     }
-    if let Some(did_you_mean) = &error.did_you_mean {
-        value["didYouMean"] = Value::String(did_you_mean.clone());
+    if let Some(did_you_mean) = error.did_you_mean() {
+        value["didYouMean"] = Value::String(did_you_mean.to_string());
     }
     if let Some(hint) = &error.hint {
         value["hint"] = Value::String(hint.clone());

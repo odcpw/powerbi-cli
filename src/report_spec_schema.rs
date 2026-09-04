@@ -546,19 +546,19 @@ fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
             Ok(())
         })?;
     }
-    if let Some(style) = walk_child_object(root, "style", STYLE, "")? {
-        if let Some(tokens) = walk_child_object_at(style, "tokens", STYLE_TOKENS, "/style")? {
-            walk_child_object_at(tokens, "semantic", STYLE_SEMANTIC, "/style/tokens")?;
-            walk_child_object_at(tokens, "typography", STYLE_TYPOGRAPHY, "/style/tokens")?;
-            walk_child_object_at(tokens, "surfaces", STYLE_SURFACES, "/style/tokens")?;
-            walk_child_object_at(tokens, "spacing", STYLE_SPACING, "/style/tokens")?;
-            walk_child_object_at(
-                tokens,
-                "numberFormats",
-                STYLE_NUMBER_FORMATS,
-                "/style/tokens",
-            )?;
-        }
+    if let Some(style) = walk_child_object(root, "style", STYLE, "")?
+        && let Some(tokens) = walk_child_object_at(style, "tokens", STYLE_TOKENS, "/style")?
+    {
+        walk_child_object_at(tokens, "semantic", STYLE_SEMANTIC, "/style/tokens")?;
+        walk_child_object_at(tokens, "typography", STYLE_TYPOGRAPHY, "/style/tokens")?;
+        walk_child_object_at(tokens, "surfaces", STYLE_SURFACES, "/style/tokens")?;
+        walk_child_object_at(tokens, "spacing", STYLE_SPACING, "/style/tokens")?;
+        walk_child_object_at(
+            tokens,
+            "numberFormats",
+            STYLE_NUMBER_FORMATS,
+            "/style/tokens",
+        )?;
     }
     if let Some(layout) = walk_child_object(root, "layout", LAYOUT_ROOT, "")? {
         walk_child_object_at(layout, "grid", LAYOUT_GRID, "/layout")?;
@@ -592,16 +592,16 @@ fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
             Ok(())
         })
     })?;
-    if let Some(proof) = walk_child_object(root, "proof", PROOF, "")? {
-        if let Some(desktop) = walk_child_object_at(proof, "desktop", PROOF_DESKTOP, "/proof")? {
-            walk_objects(
-                desktop,
-                "expectValues",
-                PROOF_EXPECT_VALUE,
-                "/proof/desktop",
-                |_, _| Ok(()),
-            )?;
-        }
+    if let Some(proof) = walk_child_object(root, "proof", PROOF, "")?
+        && let Some(desktop) = walk_child_object_at(proof, "desktop", PROOF_DESKTOP, "/proof")?
+    {
+        walk_objects(
+            desktop,
+            "expectValues",
+            PROOF_EXPECT_VALUE,
+            "/proof/desktop",
+            |_, _| Ok(()),
+        )?;
     }
     Ok(())
 }
@@ -1163,10 +1163,10 @@ where
         let item_pointer = format!("{pointer}/{index}");
         walk_object(object, schema, &item_pointer)?;
         nested(object).map_err(|mut error| {
-            if let Some(relative) = error.pointer.as_deref() {
-                if !relative.starts_with('/') {
-                    error.pointer = Some(format!("{item_pointer}/{relative}"));
-                }
+            if let Some(relative) = error.pointer()
+                && !relative.starts_with('/')
+            {
+                error.prepend_pointer(&item_pointer);
             }
             error
         })?;
@@ -1246,7 +1246,7 @@ mod tests {
     fn assert_unknown(value: Value, pointer: &str) -> CliError {
         let error = validate_known_fields(&value).expect_err("unknown field must fail");
         assert_eq!(error.code, "spec.unknown_field");
-        assert_eq!(error.pointer.as_deref(), Some(pointer));
+        assert_eq!(error.pointer(), Some(pointer));
         error
     }
 
@@ -1290,7 +1290,7 @@ mod tests {
     #[test]
     fn suggests_a_misplaced_known_field_with_its_qualified_path() {
         let error = assert_unknown(json!({"measures": []}), "/measures");
-        assert_eq!(error.did_you_mean.as_deref(), Some("model.measures"));
+        assert_eq!(error.did_you_mean(), Some("model.measures"));
     }
 
     #[test]
