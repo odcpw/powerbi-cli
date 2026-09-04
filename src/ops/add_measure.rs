@@ -47,10 +47,9 @@ pub(crate) fn apply(payload: &AddMeasure, transaction: &mut Transaction) -> CliR
         .find(|measure| {
             same_name(&measure.table, &payload.table) && same_name(&measure.name, &payload.name)
         })
+        && measure_matches_payload(existing, payload)
     {
-        if measure_matches_payload(existing, payload) {
-            return Ok(outcome(transaction, &payload.handle, false, Vec::new()));
-        }
+        return Ok(outcome(transaction, &payload.handle, false, Vec::new()));
     }
 
     let definition = MeasureDefinition {
