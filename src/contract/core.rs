@@ -1524,7 +1524,7 @@ fn response_shapes() -> Value {
             "lint": {"requiredFields": ["ok", "counts", "findings", "findingsList"], "findingsBySeverity": ["error", "warning", "info"]},
             "designLint": {"requiredFields": ["status", "findings"], "unavailableReason": "design lint lands in t5-3 until that bead fills the fixed shape"},
             "handoff": {"requiredFields": ["status", "safeForOfflineHandoff"]},
-            "proofLevel": "The highest compatibility level actually established by the local workflow; build and triage default to unit-smoke.",
+            "proofLevelMeaning": "The highest compatibility level actually established by the local workflow; build and triage default to unit-smoke.",
             "next": "Executable powerbi-cli command templates only."
         },
         "reportBuild": {
