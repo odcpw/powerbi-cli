@@ -286,12 +286,11 @@ fn generic_m_source_template_capability_advertises_kind_and_flags() {
     );
     let features = run_powerbi(&["features", "list", "--for", "source-template", "--json"]);
     assert_eq!(features.code, 0, "stderr: {}", features.stderr);
-    assert_eq!(
+    assert!(
         stdout_json(&features)["features"][0]["supportedKinds"]
             .as_array()
             .expect("supported kinds")
             .iter()
-            .any(|kind| kind == "generic-m"),
-        true
+            .any(|kind| kind == "generic-m")
     );
 }

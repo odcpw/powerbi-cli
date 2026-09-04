@@ -4,8 +4,8 @@ use crate::cli_support::{
 };
 use crate::pbir::{PageRecord, PageSelector, find_page, load_report_snapshot};
 use crate::pbir_bindings::{
-    VisualBindingInput, VisualBindingKind, VisualBindingResolved, binding_summary,
-    parse_binding_spec, parse_bindings_json_file, parse_bindings_json_text,
+    VisualBindingInput, VisualBindingKind, VisualBindingResolved, binding_input_json,
+    binding_summary, parse_binding_spec, parse_bindings_json_file, parse_bindings_json_text,
     resolve_visual_bindings,
 };
 use crate::pbir_visual_factory::{
@@ -179,6 +179,104 @@ pub(crate) fn add_visual(args: &[String]) -> CliResult<Value> {
             visual_handle: format!("visual:{}:{}", page.name, visual_name),
         },
     )
+}
+
+/// Parse the generic `report visuals add` command into the shared typed
+/// operation payload. Scaffold aliases use the dedicated parser in
+/// `report_visual_scaffold`; this path retains the generic binding resolver's
+/// input shape and diagnostics.
+pub(crate) fn parse_add_operation_args(
+    args: &[String],
+) -> CliResult<(crate::ops::AddVisual, MutationMode)> {
+    let options = parse_add_args(args)?;
+    let page = options.page.clone().ok_or_else(|| {
+        CliError::invalid_args("report visuals add requires --page <page-name-or-handle>")
+            .with_hint("Use `report pages list` to get stable page handles.")
+            .with_suggested_command(ADD_DRY_RUN_COMMAND)
+    })?;
+    let page = crate::ops::page_handle(&page);
+    let title = options.title.clone().ok_or_else(|| {
+        CliError::invalid_args("report visuals add requires --title")
+            .with_hint("Agents should give every created visual a readable title.")
+            .with_suggested_command(ADD_DRY_RUN_COMMAND)
+    })?;
+    validate_nonempty_text(&title, "--title")?;
+    let visual_type = options
+        .visual_type
+        .as_deref()
+        .map(canonical_visual_type)
+        .transpose()?
+        .unwrap_or_else(|| "card".to_string());
+    let _ = resolve_slicer_mode(&visual_type, options.slicer_mode.as_deref())?;
+    if let Some(width) = options.width {
+        validate_positive_number(width, "--width")?;
+    }
+    if let Some(height) = options.height {
+        validate_positive_number(height, "--height")?;
+    }
+    let mode = require_mode_with_contract(
+        options.mode,
+        "report visuals add",
+        REQUIRE_MODE_HINT,
+        ADD_DRY_RUN_COMMAND,
+    )?;
+    let mut position = serde_json::Map::new();
+    if let Some(x) = options.x {
+        position.insert("x".to_string(), json!(x));
+    }
+    if let Some(y) = options.y {
+        position.insert("y".to_string(), json!(y));
+    }
+    if let Some(z) = options.z {
+        position.insert("z".to_string(), json!(z));
+    }
+    if let Some(height) = options.height {
+        position.insert("height".to_string(), json!(height));
+    }
+    if let Some(width) = options.width {
+        position.insert("width".to_string(), json!(width));
+    }
+    if let Some(tab_order) = options.tab_order {
+        position.insert("tabOrder".to_string(), json!(tab_order));
+    }
+    let mut bindings = options
+        .bindings
+        .iter()
+        .map(binding_input_json)
+        .collect::<Vec<_>>();
+    if options.allow_outside_page {
+        bindings.push(json!({
+            "__powerbiCli": "addVisualOptions",
+            "allowOutsidePage": true
+        }));
+    }
+    let handle = options.name.as_deref().map_or_else(
+        || {
+            format!(
+                "visual:{}:{}",
+                page.strip_prefix("page:").unwrap_or(&page),
+                operation_base_visual_name(&title)
+            )
+        },
+        |name| {
+            format!(
+                "visual:{}:{name}",
+                page.strip_prefix("page:").unwrap_or(&page)
+            )
+        },
+    );
+    let payload = crate::ops::AddVisual {
+        handle,
+        page,
+        visual_type,
+        name: options.name,
+        title: Some(title),
+        mode: options.slicer_mode,
+        single_select: None,
+        position: (!position.is_empty()).then_some(Value::Object(position)),
+        bindings,
+    };
+    Ok((payload, mode))
 }
 
 fn parse_add_args(args: &[String]) -> CliResult<AddVisualOptions> {
@@ -650,6 +748,40 @@ fn validate_new_visual_name(name: &str, page: &PageRecord) -> CliResult<String> 
         .with_suggested_command(ADD_DRY_RUN_COMMAND));
     }
     Ok(name.to_string())
+}
+
+pub(crate) fn operation_generated_visual_name(title: &str, page: &PageRecord) -> String {
+    generated_visual_name(title, page)
+}
+
+pub(crate) fn operation_base_visual_name(title: &str) -> String {
+    let stem = pascal_identifier(title).unwrap_or_else(|| "Visual".to_string());
+    format!("VisualContainer{stem}")
+}
+
+pub(crate) fn operation_validate_visual_name(name: &str) -> CliResult<()> {
+    validate_visual_name(name)
+}
+
+pub(crate) fn operation_page_visuals_dir(page: &PageRecord) -> CliResult<PathBuf> {
+    page_visuals_dir(page)
+}
+
+pub(crate) fn operation_ensure_child_path(path: &Path, parent: &Path) -> CliResult<()> {
+    ensure_child_path(path, parent)
+}
+
+pub(crate) fn operation_validate_position_bounds(
+    position: &Value,
+    page_width: Option<f64>,
+    page_height: Option<f64>,
+    allow_outside_page: bool,
+) -> CliResult<()> {
+    validate_position_bounds(position, page_width, page_height, allow_outside_page)
+}
+
+pub(crate) fn operation_write_json_file(path: &Path, value: &Value) -> CliResult<()> {
+    write_json_file(path, value)
 }
 
 fn validate_visual_name(name: &str) -> CliResult<()> {
