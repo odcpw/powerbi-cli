@@ -117,7 +117,9 @@ object-specific writers and fixtures exist.
 ### Report Authoring
 
 - `report spec validate`: check a declarative dashboard spec against the schema
-  and visual catalog before writing files.
+  and visual catalog before writing files. The spec key walker is strict at
+  every supported node and reports `spec.unknown_field` with an RFC 6901
+  pointer; `report spec fields` publishes the same allowed-key tables.
 - `report build --schema <schema> [--profile <profile>] [--spec <spec>]`:
   compile schema/profile/spec inputs into an offline-safe PBIP project through
   proven scaffold/report primitives.

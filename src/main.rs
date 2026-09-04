@@ -72,6 +72,7 @@ mod report_plan;
 mod report_slicer_clear;
 mod report_slicers;
 mod report_spec_fields;
+mod report_spec_schema;
 mod report_style;
 mod report_themes;
 mod report_topn_guard;

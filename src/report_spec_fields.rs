@@ -1,4 +1,5 @@
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::report_spec_schema::allowed_fields_json;
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::visual_catalog::supported_visual_type_names;
 use crate::{
@@ -16,10 +17,24 @@ struct FieldsOptions {
 
 pub(crate) fn fields_command(args: &[String]) -> CliResult<Value> {
     let options = parse_fields_args(args)?;
-    let schema_path = options.schema.ok_or_else(|| {
-        CliError::invalid_args("report spec fields requires --schema <schema.json>")
-            .with_suggested_command("powerbi-cli report spec fields --schema <schema.json> --json")
-    })?;
+    let Some(schema_path) = options.schema else {
+        return Ok(json!({
+            "schema": "powerbi-cli.report.spec.fields.v1",
+            "ok": true,
+            "exitCode": EXIT_SUCCESS,
+            "schemaPath": Value::Null,
+            "profilePath": Value::Null,
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1"],
+            "allowedFields": allowed_fields_json(),
+            "supportedVisualTypes": supported_visual_type_names(),
+            "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
+            "tables": [],
+            "fields": [],
+            "rules": ["Supply --schema to add exact table, column, and measure binding references."],
+            "examples": [],
+            "next": ["powerbi-cli report spec fields --schema <schema.json> --json"]
+        }));
+    };
     let schema = load_schema_value(&schema_path)?;
     let schema_validation = validate_schema_value(&schema);
     if !schema_validation.errors.is_empty() {
@@ -96,6 +111,8 @@ pub(crate) fn fields_command(args: &[String]) -> CliResult<Value> {
         "schemaPath": canonical_display(&schema_path),
         "profilePath": options.profile.as_ref().map(|path| canonical_display(path)),
         "profileSummary": profile.as_ref().map(profile_summary),
+        "supportedSpecVersions": ["powerbi-cli.dashboard.v1"],
+        "allowedFields": allowed_fields_json(),
         "supportedVisualTypes": supported_visual_type_names(),
         "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
         "tables": tables,

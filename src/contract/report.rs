@@ -41,12 +41,13 @@ pub(super) fn commands() -> Vec<Value> {
             "validationLevels": [
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
-            ]
+            ],
+            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args"]
         }),
         json!({
             "path": "report spec fields",
-            "usage": "powerbi-cli report spec fields --schema <schema.json> [--profile <profile.json>] --json",
-            "summary": "List exact column and measure binding references for writing dashboard specs without guessing raw schema JSON",
+            "usage": "powerbi-cli report spec fields [--schema <schema.json>] [--profile <profile.json>] --json",
+            "summary": "List the strict dashboard-spec key catalog and, when a schema is supplied, exact column and measure binding references",
             "tags": ["report", "dashboard", "spec", "fields", "schema", "profile", "bindings", "agent"],
             "readOnly": true,
             "mutates": false,
@@ -56,7 +57,7 @@ pub(super) fn commands() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.spec.fields.v1",
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec fields --schema examples/sales.schema.json --profile examples/sales.profile.json --json"],
-            "followUpFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
+            "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
         }),
         json!({
             "path": "report plan",

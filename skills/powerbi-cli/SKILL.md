@@ -354,6 +354,12 @@ materialization.
 Use this as the default data-agnostic dashboard loop. It keeps report intent in
 an explicit dashboard spec instead of relying on hidden inference:
 
+Dashboard spec keys are strict. Before authoring one, run `report spec fields`
+without a schema for the allowed-key catalog or with `--schema` for both the
+catalog and exact binding references. An unknown key returns
+`spec.unknown_field` with an RFC 6901 pointer and, when available, a
+`didYouMean` correction; do not bypass that diagnostic with raw PBIR edits.
+
 ```bash
 pbi --json schema validate examples/sales.schema.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json

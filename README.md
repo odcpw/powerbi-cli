@@ -355,6 +355,12 @@ three pages.
 
 ## Current Limits
 
+- Dashboard specs are strict at every supported object level. `report spec
+  validate` and `report build` reject unknown keys with
+  `spec.unknown_field`, an RFC 6901 `pointer`, and a `didYouMean` suggestion
+  when one is unambiguous; recognized sections that are not compiled still
+  return `unsupported_feature`. Run `report spec fields --json` for the key
+  catalog, adding `--schema` when exact model binding references are needed.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
