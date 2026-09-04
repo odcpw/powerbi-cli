@@ -633,10 +633,11 @@ applying the emitted plan drives design lint to zero on each fixture.
 Planner v2 must make decisions that visibly depend on the data shape and the
 intent, explain each decision, and refuse to guess when signals are weak.
 
-- T6.1 Profile v2: `profile infer --rows <csv|json>` (advertised as planned;
-  implement) computing null rates, distinct counts, min/max, top values, time
-  coverage, and grain conflicts. Only bounded top values leave the rows, and
-  `--redact` replaces literals with counts for sensitive columns.
+- T6.1 Profile v2: `profile infer --rows <csv|json>` computes null rates,
+  distinct counts, min/max, bounded top-value counts, time coverage, and grain
+  conflicts with type-coercion diagnostics. Only bounded top values leave the
+  rows after an explicit `--include-data-values` opt-in and credential/PII
+  scan; default output is redacted and `--redact` is a deprecated no-op alias.
 - T6.2 Shape classification: single flat table, star, snowflake, multi-fact;
   candidate facts/dimensions/date tables; high-cardinality noise; key
   candidates. Emitted in `decisions[]` with evidence. Proposes a date table

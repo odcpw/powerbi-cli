@@ -135,6 +135,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let schema = h.root.join("everything.schema.json");
     let normalized_schema = h.root.join("everything.schema.normalized.json");
     let profile = h.root.join("everything.profile.json");
+    let profile_with_values = h.root.join("everything.profile.with-values.json");
+    let profile_rows = h.root.join("everything.profile.rows.csv");
     let spec = h.root.join("everything.dashboard.json");
     let planned_spec = h.root.join("everything.planned.dashboard.json");
     let project = h.root.join("EverythingAcceptance");
@@ -174,6 +176,11 @@ fn everything_acceptance_invokes_every_catalog_command() {
         "DIVIDE(\n    [Total Cost],\n    [Total Incidents]\n)\n",
     )
     .expect("write dax file");
+    fs::write(
+        &profile_rows,
+        "IncidentId,DateKey,AccidentCount,Cost,Cause\n1,20250101,2,2400,synthetic-a\n2,20260101,1,1200,synthetic-b\n3,,1,,synthetic-a\n",
+    )
+    .expect("write profile rows");
 
     h.ok("capabilities", &svec(["capabilities", "--json"]));
     h.ok("version", &svec(["version", "--json"]));
@@ -251,8 +258,25 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "infer",
             "--schema",
             &p(&schema),
+            "--rows",
+            &p(&profile_rows),
             "--out",
             &p(&profile),
+            "--json",
+        ]),
+    );
+    h.ok(
+        "profile infer",
+        &svec([
+            "profile",
+            "infer",
+            "--schema",
+            &p(&schema),
+            "--rows",
+            &p(&profile_rows),
+            "--include-data-values",
+            "--out",
+            &p(&profile_with_values),
             "--json",
         ]),
     );

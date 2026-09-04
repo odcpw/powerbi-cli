@@ -7,6 +7,7 @@ use std::path::Path;
 use std::time::Duration;
 
 const TWENTY_TABLE_TEN_PAGE_LIMIT: Duration = Duration::from_secs(3);
+const HUNDRED_THOUSAND_ROW_PROFILE_LIMIT: Duration = Duration::from_secs(3);
 
 #[test]
 #[ignore = "nightly performance gate"]
@@ -40,6 +41,56 @@ fn report_build_twenty_tables_ten_pages_completes_under_three_seconds() {
         "20-table/10-page report build took {:?}, limit is {:?}",
         run.elapsed,
         TWENTY_TABLE_TEN_PAGE_LIMIT
+    );
+}
+
+#[test]
+#[ignore = "nightly performance gate"]
+fn profile_infer_one_hundred_thousand_rows_completes_under_three_seconds() {
+    let temp = tempfile::tempdir().expect("perf tempdir");
+    let schema_path = temp.path().join("rows.schema.json");
+    let rows_path = temp.path().join("rows.csv");
+    write_json(
+        &schema_path,
+        &json!({
+            "name": "RowsPerf",
+            "displayName": "Rows Performance",
+            "tables": [{
+                "name": "FactRows",
+                "columns": [
+                    {"name": "Id", "dataType": "int64", "isKey": true},
+                    {"name": "EventDate", "dataType": "date"},
+                    {"name": "Amount", "dataType": "decimal"},
+                    {"name": "Category", "dataType": "string"}
+                ]
+            }]
+        }),
+    );
+    let mut rows = String::from("Id,EventDate,Amount,Category\n");
+    for index in 0..99_999 {
+        rows.push_str(&format!(
+            "{index},2026-01-01,{},Synthetic{}\n",
+            index as f64 / 10.0,
+            index % 10
+        ));
+    }
+    fs::write(&rows_path, rows).expect("write rows perf fixture");
+    let run = run_powerbi_owned(&[
+        "profile".into(),
+        "infer".into(),
+        "--schema".into(),
+        path_arg(&schema_path),
+        "--rows".into(),
+        path_arg(&rows_path),
+        "--json".into(),
+    ]);
+    assert_eq!(run.exit, 0, "profile perf failed: {}", run.stderr);
+    assert_eq!(stdout_json(&run)["profile"]["source"]["rowCount"], 99_999);
+    assert!(
+        run.elapsed < HUNDRED_THOUSAND_ROW_PROFILE_LIMIT,
+        "100k-row profile inference took {:?}, limit is {:?}",
+        run.elapsed,
+        HUNDRED_THOUSAND_ROW_PROFILE_LIMIT
     );
 }
 

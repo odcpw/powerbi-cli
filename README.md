@@ -187,6 +187,18 @@ schema validation, snapshots, and harvested PBIR fragments. See
 numbers and the APIs future command owners must call. Package archives and the
 staged workflow retain their stronger specialized streaming/identity policies.
 
+`profile infer --rows <rows.csv|rows.json>` emits a `powerbi-cli.dataProfile.v2`
+document with bounded null rates, distinct counts, numeric/date ranges, time
+coverage, duplicate-key grain conflicts, and type-coercion diagnostics. CSV
+uses its first row as the header; JSON accepts an array of objects or an array
+whose first item is a header row. Top-value counts and cardinality are always
+available, while literal top values are replaced with `[REDACTED]` by default.
+`--include-data-values` is an explicit opt-in for a maximum of five bounded
+values per column and is refused when credential/PII scanning flags a column.
+`--redact` remains a deprecated no-op alias. Profiles stamped
+`dataValues:true` are data-bearing: `handoff check` reports them and
+`package source-pack` refuses to write an archive.
+
 ## JSON Response Contract
 
 Successful JSON is family-specific; there is no mandatory five-field success
@@ -245,6 +257,8 @@ cargo run --bin powerbi-cli -- package work-pack --project .\build\sales-live --
 cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
+# Bounded CSV/JSON profile inference keeps top literals redacted by default.
+cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --rows .\build\sales-rows.csv --out .\build\sales.profile.v2.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
@@ -442,7 +456,8 @@ three pages.
   safe metadata/source entries by default, `package import` succeeds only when
   real allowlisted PBIP/PBIR/TMDL source files exist inside the archive,
   `package source-pack` first refuses unknown files and files in dot-directories,
-  then scans every included file for credentials and PII-suspect row literals;
+  then scans every included file for credentials, PII-suspect row literals, and
+  data-bearing profile v2 documents;
   non-dummy or unverified partition sources are also refused. The separate
   `package work-pack` uses the same allowlist and scans, but requires every
   partition to be a recognized credential-free materialized live source
@@ -461,7 +476,8 @@ three pages.
   `definition.pbir`/definition JSON, semantic-model `.platform`/
   `definition.pbism`/definition TMDL, registered/shared JSON resources, and the
   generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-  `powerbi-cli.manifest.copy.json` sidecars. A work-pack additionally contains
+  `powerbi-cli.manifest.copy.json` sidecars and root `profile*.json`/`*.profile*.json`
+  metadata files. A work-pack additionally contains
   the generated `powerbi-cli.work-pack.json` class marker. Other files—including every file
   below `.git`, `.vscode`, `.powerbi-cli`, or another dot-directory—cause a
   deterministic refusal listing and no archive is written.

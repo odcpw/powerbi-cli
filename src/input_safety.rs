@@ -1,11 +1,12 @@
 //! Uniform safety contract for files supplied at CLI input boundaries.
 //!
 //! Existing readers should call [`read_bytes`] or [`read_utf8`] with a typed
-//! [`InputKind`] instead of reading an unbounded file. Future `$include`, rows,
-//! image, ops, snapshot, and Desktop-reference-harvesting commands must use the
-//! purpose-built APIs in this module. The module does not add command stubs: it
-//! provides the limits and refusal behavior that the owning command beads must
-//! call when those surfaces land.
+//! [`InputKind`] instead of reading an unbounded file. Profile row inference
+//! uses [`read_rows`]; future `$include`, image, ops, snapshot, and
+//! Desktop-reference-harvesting commands must use the purpose-built APIs in
+//! this module. The module does not add command stubs: it provides the limits
+//! and refusal behavior that the owning command beads must call when those
+//! surfaces land.
 
 use crate::{CliError, CliResult, EXIT_VALIDATION_FAILED};
 use serde_json::{Value, json};
