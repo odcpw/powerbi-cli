@@ -122,10 +122,13 @@ object-specific writers and fixtures exist.
 
 ### Report Authoring
 
-- `report spec validate`: check a declarative dashboard spec against the schema
-  and visual catalog before writing files. The spec key walker is strict at
-  every supported node and reports `spec.unknown_field` with an RFC 6901
-  pointer; `report spec fields` publishes the same versioned allowed-key
+- `report spec validate|normalize`: check or canonicalize a declarative
+  dashboard spec against the schema before writing files. Both commands resolve
+  bounded relative `$include` fragments and expose deterministic
+  `normalizedFrom[]` provenance. The spec key walker is strict at every
+  supported node and reports `spec.unknown_field` with an RFC 6901 pointer;
+  validation also checks the visual catalog before writing files. `report spec
+  fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
@@ -602,10 +605,13 @@ coverage only from Desktop-authored or Desktop-proved fixtures.
    title/data-label/legend/axis typed defaults, style lint, and conditional
    formatting once fixtures exist.
 10. **Version and compose schema manifests.**
-    Add required `schemaVersion`, `$include` or directory-based manifests,
-    `schema validate`, and `schema normalize`. Large real-world schema
-    manifests will eventually be too big for a single JSON file, and agents
-    will want composition.
+    `schema validate` and `schema normalize` now accept bounded relative
+    `$include` fragments, reject traversal/symlink/cycle and resource-budget
+    violations, and expose deterministic `normalizedFrom[]` provenance.
+    `schemaVersion` is warning-only for one compatibility release before it
+    becomes required. `report spec normalize` provides the corresponding
+    canonicalization for v2 dashboard specs; report build consumes normalized
+    documents so include-composed and inline-equivalent inputs preserve parity.
 11. **Broaden semantic model authoring.**
     Add tables/columns CRUD beyond scaffold, calculated tables, named
     expressions, date-table helpers, roles/RLS, perspectives, translations,

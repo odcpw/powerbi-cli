@@ -198,6 +198,7 @@ Usage:
   powerbi-cli report spec fields --schema <schema.json> --json
   powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json> --json
   powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json
+  powerbi-cli report spec normalize <dashboard.json> --out <canonical.json> --json
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
   powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json
   powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--out <file.md>] [--force] --json
@@ -430,6 +431,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportSpecFields": "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
             "reportPlan": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <dashboard-goal> --out <dashboard.json> --json",
             "reportSpecValidate": "powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json",
+            "reportSpecNormalize": "powerbi-cli report spec normalize <dashboard.json> --out <canonical.json> --json",
             "reportBuild": "powerbi-cli report build --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             "packageSourcePack": "powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json",
             "packageWorkPack": "powerbi-cli package work-pack --project <project-dir-or.pbip> --json",
@@ -866,12 +868,14 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.schema.validate.v1",
             "flags": ["<schema.json>", "--schema <schema.json>", "--json", "--format json"],
             "examples": ["powerbi-cli schema validate examples/sales.schema.json --json"],
-            "followUpFields": ["ok", "counts", "tables", "warnings", "errors", "next"]
+            "followUpFields": ["ok", "counts", "tables", "warnings", "errors", "normalizedFrom", "next"],
+            "supportedIncludes": ["root", "tables[]"],
+            "diagnosticCodes": ["include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"]
         }),
         json!({
             "path": "schema normalize",
             "usage": "powerbi-cli schema normalize <schema.json> --out <canonical.json> --json",
-            "summary": "Write a canonical pretty-printed schema manifest for review and reproducible dashboard builds",
+            "summary": "Resolve supported schema includes and write a canonical pretty-printed manifest for review and reproducible dashboard builds",
             "tags": ["schema", "manifest", "normalize", "golden", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -884,7 +888,9 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.schema.normalize.v1",
             "flags": ["<schema.json>", "--schema <schema.json>", "--out <canonical.json>", "--json", "--format json"],
             "examples": ["powerbi-cli schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json --json"],
-            "followUpFields": ["ok", "schemaPath", "normalizedOut", "counts", "next"]
+            "followUpFields": ["ok", "schemaPath", "normalizedOut", "normalizedFrom", "counts", "next"],
+            "supportedIncludes": ["root", "tables[]"],
+            "diagnosticCodes": ["include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"]
         }),
         json!({
             "path": "profile infer",
@@ -1384,6 +1390,12 @@ fn response_shapes() -> Value {
                     "pointer": "RFC 6901 JSON pointer into the submitted dashboard spec when available"
                 }
             }
+        },
+        "reportSpecNormalize": {
+            "schema": "powerbi-cli.report.spec.normalize.v1",
+            "transport": "stdout",
+            "requiredFields": ["ok", "exitCode", "specPath", "normalizedOut", "normalizedFrom", "specVersion", "next"],
+            "normalizedFrom": "Root-relative included JSON fragments, sorted and de-duplicated for deterministic provenance."
         },
         "followUps": {
             "next": "Executable powerbi-cli command templates only.",

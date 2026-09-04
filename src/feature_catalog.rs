@@ -688,9 +688,14 @@ const FEATURE_CATALOG: &[Feature] = &[
         support: "strict-shape-partial-compile",
         proof_level: "unit-smoke",
         emits_pbir: true,
-        commands: &["report spec fields", "report spec validate", "report build"],
+        commands: &[
+            "report spec fields",
+            "report spec validate",
+            "report spec normalize",
+            "report build",
+        ],
         refusal_code: None,
-        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables and deny-unknown-fields models. The currently compiled subset is artifact-identical to v1; every recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. report spec normalize flattens model, page, and style fragments deterministically; every recognized future section stops with unsupported_feature and its owning T3 bead id.",
         next_proof: &[
             "Land the named T3 compiler bead for each currently refused v2 section",
             "Promote generated v2 archetypes through the existing Desktop proof ladder",

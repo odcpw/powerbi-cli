@@ -136,6 +136,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let normalized_schema = h.root.join("everything.schema.normalized.json");
     let profile = h.root.join("everything.profile.json");
     let spec = h.root.join("everything.dashboard.json");
+    let normalized_spec = h.root.join("everything.dashboard.normalized.json");
     let planned_spec = h.root.join("everything.planned.dashboard.json");
     let project = h.root.join("EverythingAcceptance");
     let scaffold_project = h.root.join("ScaffoldSmoke");
@@ -276,6 +277,18 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &p(&profile),
             "--spec",
             &p(&spec),
+            "--json",
+        ]),
+    );
+    h.ok(
+        "report spec normalize",
+        &svec([
+            "report",
+            "spec",
+            "normalize",
+            &p(&spec),
+            "--out",
+            &p(&normalized_spec),
             "--json",
         ]),
     );

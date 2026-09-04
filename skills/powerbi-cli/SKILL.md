@@ -135,9 +135,9 @@ to receive only its path, usage, flags, examples, proof level, follow-up fields,
 and output schema.
 
 Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
-schema validate/normalize, profile
+schema validate/normalize (including bounded `$include` composition), profile
 infer/validate/summarize, deterministic report planning, declarative report spec
-validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
+validation/normalization, report build from schema/profile/spec inputs, scaffold, shallow/deep
 inspect, semantic measure,
 calculated-column, and relationship diff, report wireframe JSON export,
 measure list/show/add/update/delete, static DAX dependencies/lint, explicitly
@@ -261,6 +261,12 @@ supported.
   resources, ops, snapshots, and harvested fragments already have reserved
   numeric limits and typed guards in `docs/input-safety-contract.md`; do not
   bypass those guards or silently strip rejected content when adding a command.
+- Schema and v2 dashboard specs may use bounded, relative `$include` fragments.
+  Use `schema normalize` and `report spec normalize` when you need one
+  canonical artifact for review, caching, or parity checks. Their
+  `normalizedFrom[]` values are root-relative, sorted, and deterministic;
+  traversal, symlink, cycle, depth, count, and fragment-size failures are
+  refusals, not best-effort omissions.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.
@@ -403,11 +409,21 @@ discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
   read `errors[].message`, never treat an entry as a bare string. See
   `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
+For a composed spec, normalize it before handing it to another agent or build
+stage, then validate the normalized file. `report spec normalize` accepts the
+same positional path or `--spec` spelling as validation and writes a canonical
+JSON document plus `normalizedFrom[]` provenance. The schema-side equivalent is
+`schema normalize`; report build and artifact parity already normalize their
+schema/spec inputs internally, so an inline and include-composed document are
+expected to be byte-equivalent when their content is equivalent.
+
 ```bash
 pbi --json schema validate examples/sales.schema.json
+pbi --json schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
 pbi --json profile validate examples/sales.profile.json
 pbi --json report spec validate --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json
+pbi --json report spec normalize examples/sales.dashboard.json --out build/sales.dashboard.normalized.json
 pbi --json report build --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/generic-sales --force
 pbi --json validate --strict build/generic-sales
 pbi --json handoff check build/generic-sales

@@ -12,7 +12,10 @@ Power BI Desktop compatibility.
 the exact `argv`, UTF-8-lossy `stdout` and `stderr`, `exit`, and `elapsed`.
 Specialized tests use `cli_command(args)` to add a current directory, set or
 remove environment variables, and then call `run()` or the byte-compatible
-`output()` method. New tests should prefer `run()`.
+`output()` method. Performance tests that need a child resource bound can call
+`run_with_peak_memory()`, which drains both output pipes while sampling the
+child's resident set size. New tests should prefer `run()` unless they need
+that explicit resource measurement.
 
 Every invocation is retained for the current test thread. If an assertion
 panics, the harness writes the complete records to stderr as JSON Lines. Set
@@ -84,7 +87,8 @@ cargo test --locked --test perf -- --ignored
 
 The first gate requires a generated 20-table, 10-page `report build` to finish
 within three seconds. T2.4 owns the later 100-table schema with 50 `$include`
-fragments target (under ten seconds and 512 MiB); T3.11 owns the later
+fragments target (under ten seconds and 512 MiB RSS); its test measures the
+child process through `run_with_peak_memory()`. T3.11 owns the later
 20-table/10-page `report compose` target (under three seconds). Those cases are
-added only when their commands and resource measurement contracts exist—there
-are no fake passing placeholders in this harness.
+kept deterministic and ignored by default; there are no fake passing
+placeholders in this harness.

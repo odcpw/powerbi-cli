@@ -2,12 +2,14 @@ use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes,
 };
 use crate::input_safety::{InputKind, read_utf8};
+use crate::json_composition::normalize_spec_file;
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
     slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_spec_fields::fields_command;
+use crate::report_spec_normalize::normalize_command;
 use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
@@ -129,8 +131,9 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
 pub(crate) fn spec_command(args: &[String]) -> CliResult<Value> {
     match args {
         [action, rest @ ..] if action == "validate" => spec_validate(rest),
+        [action, rest @ ..] if action == "normalize" => normalize_command(rest),
         [action, rest @ ..] if action == "fields" => fields_command(rest),
-        [] => Err(CliError::invalid_args("report spec requires a subcommand: validate or fields")
+        [] => Err(CliError::invalid_args("report spec requires a subcommand: validate, normalize, or fields")
             .with_suggested_command(
                 "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
             )
@@ -155,7 +158,8 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
                 "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
             )
     })?;
-    let spec_value = load_json_value(&spec_path, "dashboard spec")?;
+    let normalized_spec = normalize_spec_file(&spec_path)?;
+    let spec_value = normalized_spec.value;
     let known_fields = validate_known_fields(&spec_value);
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let (ok, validation_level, errors, warnings, compiled, schema_path) = if let Some(schema_path) =
@@ -219,6 +223,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         "specPath": canonical_display(&spec_path),
         "schemaPath": schema_path.as_ref().map(|path| canonical_display(path)),
         "profilePath": options.profile.as_ref().map(|path| canonical_display(path)),
+        "normalizedFrom": normalized_spec.normalized_from,
         "profileSummary": profile_value.as_ref().map(profile_summary),
         "compiled": compiled.as_ref().map(compiled_summary),
         "warnings": warnings,
@@ -1374,7 +1379,14 @@ fn next_for_spec_validate(
 }
 
 fn load_optional_value(path: Option<&Path>, label: &str) -> CliResult<Option<Value>> {
-    path.map(|path| load_json_value(path, label)).transpose()
+    path.map(|path| {
+        if label == "dashboard spec" {
+            Ok(normalize_spec_file(path)?.value)
+        } else {
+            load_json_value(path, label)
+        }
+    })
+    .transpose()
 }
 
 fn load_json_value(path: &Path, label: &str) -> CliResult<Value> {
