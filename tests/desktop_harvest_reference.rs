@@ -1,6 +1,8 @@
 mod common;
 
-use common::{patch_json, run_powerbi, scaffold_sales, stderr_json, stdout_json};
+use common::{
+    first_visual_json, patch_json, run_powerbi, scaffold_sales, stderr_json, stdout_json,
+};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
@@ -104,6 +106,47 @@ fn harvest_reference_refuses_persisted_filter_state_before_writing() {
             .unwrap_or_default()
             .contains("persisted data values")
     );
+    assert!(!out.exists(), "refused state must not publish an archive");
+}
+
+#[test]
+fn harvest_reference_refuses_oversized_fragment_before_writing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let handle = first_visual_handle(&project);
+    let visual_path = first_visual_json(&project);
+    patch_json(&visual_path, |value| {
+        value["inputSafetyPadding"] = Value::String("x".repeat(4 * 1024 * 1024));
+    });
+    let out = temp.path().join("oversized-reference.json");
+    let output = run_powerbi_owned(&harvest_args(&project, &handle, &out));
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let error = stderr_json(&output);
+    assert_eq!(error["error"]["code"], "input_safety_violation");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("maximum is 4194304 bytes")
+    );
+    assert!(!out.exists(), "refused state must not publish an archive");
+}
+
+#[test]
+fn harvest_reference_refuses_oversized_project_file_before_writing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let handle = first_visual_handle(&project);
+    fs::write(
+        project.join("oversized-project-file.txt"),
+        vec![b'x'; 16 * 1024 * 1024 + 1],
+    )
+    .expect("oversized project file");
+    let out = temp.path().join("oversized-project-reference.json");
+    let output = run_powerbi_owned(&harvest_args(&project, &handle, &out));
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let error = stderr_json(&output);
+    assert_eq!(error["error"]["code"], "input_safety_violation");
     assert!(!out.exists(), "refused state must not publish an archive");
 }
 

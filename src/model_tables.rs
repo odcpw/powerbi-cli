@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, mode_name, preflight_out_dir, required_project, set_mode, target_project,
 };
+use crate::input_safety::{InputKind, read_utf8};
 use crate::project_io::{write_text_atomic, write_text_atomic_validated};
 use crate::tmdl::{
     ColumnDefinition, ColumnRecord, TableDocument, column_block_lines, find_table,
@@ -147,7 +148,7 @@ fn show_table(args: &[String]) -> CliResult<Value> {
         "pbip": canonical_display(&resolved.pbip_path),
         "semanticModelDir": canonical_display(&resolved.semantic_model_dir),
         "table": table_json(doc),
-        "block": fs::read_to_string(&doc.path).map_err(|err| CliError::unexpected(format!("read {}: {err}", doc.path.display())))?,
+        "block": read_utf8(&doc.path, InputKind::ProjectText)?,
         "next": [rename, validate]
     }))
 }
@@ -347,9 +348,7 @@ fn rename_table(
             let text = if path == old_path {
                 renamed_text.clone()
             } else {
-                fs::read_to_string(&path).map_err(|err| {
-                    CliError::unexpected(format!("read {}: {err}", path.display()))
-                })?
+                read_utf8(&path, InputKind::ProjectText)?
             };
             let replaced = replace_table_references(&text, &old_name, new_name);
             if replaced != text {
@@ -360,8 +359,7 @@ fn rename_table(
     let before_files = changes
         .keys()
         .map(|path| {
-            let text = fs::read_to_string(path)
-                .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+            let text = read_utf8(path, InputKind::ProjectText)?;
             Ok((path.clone(), text))
         })
         .collect::<CliResult<BTreeMap<_, _>>>()?;
@@ -484,8 +482,7 @@ fn delete_table(
             crate::cli_support::shell_arg(&table_handle(&doc.table))
         )));
     }
-    let before = fs::read_to_string(&doc.path)
-        .map_err(|err| CliError::unexpected(format!("read {}: {err}", doc.path.display())))?;
+    let before = read_utf8(&doc.path, InputKind::ProjectText)?;
     let dry_run = mode == MutationMode::DryRun;
     let (validation, project_modified) = if dry_run {
         (None, false)
@@ -1257,8 +1254,7 @@ fn collect_table_references(
     let patterns = reference_patterns(table);
     let mut references = Vec::new();
     for path in referenced_tmdl_paths(resolved)? {
-        let text = fs::read_to_string(&path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+        let text = read_utf8(&path, InputKind::ProjectText)?;
         for (index, line) in text.lines().enumerate() {
             if patterns.iter().any(|pattern| line.contains(pattern)) {
                 references.push(format!("{}:{}", path.display(), index + 1));

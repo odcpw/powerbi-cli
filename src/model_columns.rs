@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, preflight_out_dir, required_project, set_mode, take_value,
     target_project,
 };
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 use crate::project_io::write_text_atomic_validated;
 use crate::tmdl::{
     ColumnDefinition, ColumnRecord, ColumnSelector, MutationPlan, add_column_plan,
@@ -13,8 +14,7 @@ use crate::{
     resolve_project, validate_project,
 };
 use serde_json::{Value, json};
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
 struct SetSortByOptions {
@@ -1051,14 +1051,13 @@ fn normalize_column_type(value: &str) -> CliResult<String> {
 
 fn read_column_expression_file(path: &str) -> CliResult<String> {
     let text = if path == "-" {
-        let mut text = String::new();
-        std::io::Read::read_to_string(&mut std::io::stdin(), &mut text)
-            .map_err(|err| CliError::unexpected(format!("read expression from stdin: {err}")))?;
-        text
+        read_utf8_stream(
+            &mut std::io::stdin(),
+            InputKind::SourceText,
+            "DAX calculated column expression from standard input",
+        )?
     } else {
-        fs::read_to_string(path).map_err(|err| {
-            CliError::file_not_found(format!("read expression file {path}: {err}"))
-        })?
+        read_utf8(Path::new(path), InputKind::SourceText)?
     };
     let expression = text
         .trim_start_matches('\u{feff}')

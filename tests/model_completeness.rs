@@ -98,6 +98,57 @@ fn table_and_column_list_show_expose_stable_handles_and_raw_blocks() {
 }
 
 #[test]
+fn table_show_refuses_over_limit_tmdl_with_input_safety_error() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold(temp.path());
+    let path = table_path(&project, "FactSales");
+    fs::write(&path, vec![b'x'; 16 * 1024 * 1024 + 1]).expect("oversized table TMDL");
+    let output = run_powerbi(&[
+        "model",
+        "tables",
+        "show",
+        "--project",
+        project.to_str().expect("project path"),
+        "--handle",
+        "table:FactSales",
+        "--json",
+    ]);
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let error: Value = serde_json::from_str(output.stderr.trim()).expect("error JSON");
+    assert_eq!(error["error"]["code"], "input_safety_violation");
+}
+
+#[test]
+fn table_rename_refuses_over_limit_reference_file_before_mutation() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold(temp.path());
+    let relationships = project
+        .join("SalesOperations.SemanticModel")
+        .join("definition")
+        .join("relationships.tmdl");
+    fs::write(&relationships, vec![b'x'; 16 * 1024 * 1024 + 1])
+        .expect("oversized relationships TMDL");
+    let output = run_powerbi(&[
+        "model",
+        "tables",
+        "rename",
+        "--project",
+        project.to_str().expect("project path"),
+        "--handle",
+        "table:DimDate",
+        "--new-name",
+        "Calendar",
+        "--rename-references",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let error: Value = serde_json::from_str(output.stderr.trim()).expect("error JSON");
+    assert_eq!(error["error"]["code"], "input_safety_violation");
+    assert!(!table_path(&project, "Calendar").exists());
+}
+
+#[test]
 fn table_and_column_add_support_dry_run_out_dir_and_deterministic_plans() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold(temp.path());

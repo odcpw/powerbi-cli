@@ -19,8 +19,7 @@ use crate::{
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::WalkDir;
@@ -612,19 +611,7 @@ fn project_fingerprint(root: &Path) -> CliResult<String> {
         digest.update(relative.as_bytes());
         digest.update([0]);
         digest.update(b"file\0");
-        let mut file = File::open(&path).map_err(|error| {
-            safety_refusal(format!(
-                "read source project file {}: {error}",
-                path.display()
-            ))
-        })?;
-        let mut bytes = Vec::with_capacity(expected_len as usize);
-        file.read_to_end(&mut bytes).map_err(|error| {
-            safety_refusal(format!(
-                "hash source project file {}: {error}",
-                path.display()
-            ))
-        })?;
+        let bytes = read_bytes(&path, InputKind::ProjectText)?;
         if bytes.len() as u64 != expected_len {
             return Err(safety_refusal(format!(
                 "source project file changed while being fingerprinted: {}",
