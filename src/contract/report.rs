@@ -35,15 +35,37 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.spec.validate.v1",
+            "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec validate --schema examples/sales.schema.json --spec examples/sales.dashboard.json --json", "powerbi-cli report spec validate --spec examples/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "warnings", "errors", "next"],
+            "followUpFields": ["ok", "exitCode", "validationLevel", "normalizedFrom", "compiled.counts", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "next"],
             "validationLevels": [
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
             ],
-            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args"],
-            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
+            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args", "include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
+            "supportedIncludes": ["model", "pages[]", "style"]
+        }),
+        json!({
+            "path": "report spec normalize",
+            "usage": "powerbi-cli report spec normalize [--spec <dashboard.json> | <dashboard.json>] --out <canonical.json> --json",
+            "summary": "Resolve supported dashboard-spec includes and write one deterministic canonical JSON document",
+            "tags": ["report", "dashboard", "spec", "normalize", "include", "golden", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesArtifact": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.normalize.v1",
+            "flags": ["--spec <dashboard.json>", "<dashboard.json>", "--out <canonical.json>", "--json", "--format json"],
+            "examples": ["powerbi-cli report spec normalize examples/sales.dashboard.json --out build/sales.dashboard.normalized.json --json"],
+            "followUpFields": ["ok", "specPath", "normalizedOut", "normalizedFrom", "specVersion", "next"],
+            "supportedIncludes": ["model", "pages[]", "style"],
+            "diagnosticCodes": ["include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"]
         }),
         json!({
             "path": "report spec fields",
@@ -61,9 +83,35 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
         }),
         json!({
+            "path": "report spec upgrade",
+            "usage": "powerbi-cli report spec upgrade --spec <v1.json> (--dry-run | --out <v2.json> [--force]) --json",
+            "summary": "Losslessly rewrite a strict powerbi-cli.dashboard.v1 spec as normalized powerbi-cli.dashboard.v2 JSON",
+            "tags": ["report", "dashboard", "spec", "upgrade", "v1", "v2", "normalize", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesArtifact": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.upgrade.v1",
+            "flags": ["--spec <v1.json>", "--dry-run", "--out <v2.json>", "--force", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json --json",
+                "powerbi-cli report spec upgrade --spec examples/sales.dashboard.json --dry-run --json"
+            ],
+            "followUpFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
+            "diagnosticCodes": ["spec.unknown_field", "invalid_args"],
+            "sourceSpecVersion": "powerbi-cli.dashboard.v1",
+            "targetSpecVersion": "powerbi-cli.dashboard.v2",
+            "lossless": true,
+            "normalization": "recursively sorted object keys; array order is preserved"
+        }),
+        json!({
             "path": "report plan",
-            "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json> --json",
-            "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and an explicit dashboard objective",
+            "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] --json",
+            "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text)",
             "tags": ["report", "dashboard", "plan", "intent", "spec", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -72,9 +120,13 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.plan.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--json", "--format json"],
-            "examples": ["powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "spec", "compiled.counts", "decisions", "warnings", "next"]
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|intent.json|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.dashboard.json --json",
+                "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"
+            ],
+            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "spec", "compiled.counts", "decisions", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "diagnosticCodes": ["spec.invalid_intent", "spec.missing_input", "input_safety_violation", "invalid_args"]
         }),
         json!({
             "path": "report design-plan",

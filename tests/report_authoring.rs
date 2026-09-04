@@ -152,7 +152,7 @@ fn design_plan_layout_and_theme_preset_are_agent_surfaces() {
             .as_array()
             .expect("validation errors")
             .iter()
-            .any(|error| error
+            .any(|error| error["message"]
                 .as_str()
                 .unwrap_or_default()
                 .contains("does not match report customTheme name"))

@@ -1,4 +1,4 @@
-use crate::input_safety::{InputKind, read_utf8};
+use crate::json_composition::normalize_schema_file;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
 };
@@ -51,13 +51,14 @@ pub(crate) fn schema_command(args: &[String]) -> CliResult<Value> {
 fn validate_command(args: &[String]) -> CliResult<Value> {
     let options = parse_schema_args(args, "schema validate", false)?;
     let path = required_path(options.path, "schema validate")?;
-    let value = load_schema_value(&path)?;
-    let report = validate_schema_value(&value);
+    let normalized = normalize_schema_file(&path)?;
+    let report = validate_schema_value(&normalized.value);
     Ok(validation_json(
         "powerbi-cli.schema.validate.v1",
         &path,
         &report,
         None,
+        &normalized.normalized_from,
     ))
 }
 
@@ -73,8 +74,8 @@ fn normalize_command(args: &[String]) -> CliResult<Value> {
                 "powerbi-cli schema normalize <schema.json> --out <canonical.json> --json",
             )
     })?;
-    let value = load_schema_value(&path)?;
-    let report = validate_schema_value(&value);
+    let normalized = normalize_schema_file(&path)?;
+    let report = validate_schema_value(&normalized.value);
     if !report.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
             "schema is not valid: {}",
@@ -97,7 +98,7 @@ fn normalize_command(args: &[String]) -> CliResult<Value> {
         &out,
         format!(
             "{}\n",
-            serde_json::to_string_pretty(&value).expect("serialize normalized schema")
+            serde_json::to_string_pretty(&normalized.value).expect("serialize normalized schema")
         ),
     )
     .map_err(|err| CliError::unexpected(format!("write {}: {err}", out.display())))?;
@@ -106,6 +107,7 @@ fn normalize_command(args: &[String]) -> CliResult<Value> {
         &path,
         &report,
         Some(&out),
+        &normalized.normalized_from,
     ))
 }
 
@@ -114,6 +116,7 @@ fn validation_json(
     path: &Path,
     report: &SchemaValidation,
     normalized_out: Option<&Path>,
+    normalized_from: &[String],
 ) -> Value {
     let ok = report.errors.is_empty();
     let mut next = if ok {
@@ -151,6 +154,7 @@ fn validation_json(
         "exitCode": if ok { EXIT_SUCCESS } else { EXIT_VALIDATION_FAILED },
         "schemaPath": canonical_display(path),
         "normalizedOut": normalized_out.map(canonical_display),
+        "normalizedFrom": normalized_from,
         "counts": counts_json(&report.counts),
         "tables": report.tables,
         "warnings": report.warnings,
@@ -160,9 +164,7 @@ fn validation_json(
 }
 
 pub(crate) fn load_schema_value(path: &Path) -> CliResult<Value> {
-    let text = read_utf8(path, InputKind::Schema)?;
-    serde_json::from_str(&text)
-        .map_err(|err| CliError::invalid_args(format!("parse schema {}: {err}", path.display())))
+    Ok(normalize_schema_file(path)?.value)
 }
 
 pub(crate) fn validate_schema_value(value: &Value) -> SchemaValidation {
@@ -173,6 +175,15 @@ pub(crate) fn validate_schema_value(value: &Value) -> SchemaValidation {
             .push("schema root must be a JSON object".to_string());
         return report;
     };
+    match object.get("schemaVersion") {
+        None => report.warnings.push(
+            "schemaVersion is missing; manifests without it are accepted for one release and will become errors in the next release".to_string(),
+        ),
+        Some(Value::String(version)) if !version.trim().is_empty() => {}
+        Some(_) => report
+            .errors
+            .push("schemaVersion must be a non-empty string".to_string()),
+    }
     if string_field(object, "name").is_none_or(|name| name.trim().is_empty()) {
         report
             .errors

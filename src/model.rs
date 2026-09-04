@@ -3,9 +3,9 @@ use crate::measures::measures_command;
 use crate::model_advanced::advanced_model_command;
 use crate::model_dax::dax_command;
 use crate::model_live::live_model_command;
+use crate::model_tables::tables_command;
 use crate::partitions::partitions_command;
 use crate::relationships::relationships_command;
-use crate::static_tables::static_tables_command;
 use crate::{CliError, CliResult};
 use serde_json::Value;
 
@@ -48,7 +48,7 @@ pub(crate) fn model_command(args: &[String]) -> CliResult<Value> {
         "measure" | "measures" => measures_command(rest),
         "partition" | "partitions" => partitions_command(rest),
         "relationship" | "relationships" => relationships_command(rest),
-        "table" | "tables" => static_tables_command(rest),
+        "table" | "tables" => tables_command(rest),
         _ => Err(CliError::invalid_args(format!("unknown model command family: {family}"))
             .with_hint("Run `powerbi-cli --json capabilities --for model` for supported model commands.")
             .with_suggested_command("powerbi-cli --json capabilities --for model")),

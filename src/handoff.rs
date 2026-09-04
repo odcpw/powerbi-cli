@@ -1,6 +1,7 @@
 use crate::handoff_rebind_check::rebind_check;
 use crate::input_safety::{INPUT_SAFETY_ERROR_CODE, InputKind, read_utf8};
 use crate::partitions::partition_summary_json;
+use crate::profile::text_is_data_bearing_profile;
 use crate::rebind_plan::rebind_plan;
 use crate::rules;
 use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect_text};
@@ -11,8 +12,8 @@ use crate::tmdl::{
     PartitionRecord, load_table_documents, partition_source_kind_is_external, table_handle,
 };
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
-    resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, Finding, canonical_display,
+    command_arg, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -78,19 +79,14 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         .flat_map(|doc| doc.partitions.iter())
         .collect::<Vec<_>>();
     let mut findings = Vec::new();
-    for error in &validation.errors {
-        findings.push(project_finding("error", error));
+    for diagnostic in &validation.errors {
+        findings.push(project_finding(diagnostic));
     }
-    for warning in &validation.warnings {
-        findings.push(json!({
-            "code": rules::PROJECT_VALIDATION_WARNING,
-            "severity": "warning",
-            "message": warning,
-            "handle": Value::Null,
-            "path": Value::Null
-        }));
+    for diagnostic in &validation.warnings {
+        findings.push(project_finding(diagnostic));
     }
-    add_project_file_hazards(&resolved.project_dir, &mut findings)?;
+    let data_bearing_profile_count =
+        add_project_file_hazards(&resolved.project_dir, &mut findings)?;
     for doc in &docs {
         if doc.partitions.is_empty() {
             findings.push(json!({
@@ -180,6 +176,8 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         "safeForOfflineHandoff": ok && options.target == HandoffTarget::Offline,
         "safeForWorkHandoff": ok && options.target == HandoffTarget::Work,
         "status": status,
+        "dataBearing": data_bearing_profile_count > 0,
+        "dataBearingProfiles": data_bearing_profile_count,
         "projectDir": canonical_display(&resolved.project_dir),
         "pbip": canonical_display(&resolved.pbip_path),
         "reportDir": canonical_display(&resolved.report_dir),
@@ -198,7 +196,8 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
             "reviewFindings": review_finding_count,
             "sourceTemplates": load_source_template_store(&resolved).map(|store| store.templates.len()).unwrap_or(0),
             "findings": findings.len(),
-            "errors": error_count
+            "errors": error_count,
+            "dataBearingProfiles": data_bearing_profile_count
         },
         "partitions": partitions.iter().map(|partition| partition_summary_json(partition)).collect::<Vec<_>>(),
         "findings": findings,
@@ -378,7 +377,8 @@ fn add_source_template_findings(
 fn add_project_file_hazards(
     project_dir: &std::path::Path,
     findings: &mut Vec<Value>,
-) -> CliResult<()> {
+) -> CliResult<usize> {
+    let mut data_bearing_profile_count = 0usize;
     for entry in WalkDir::new(project_dir) {
         let entry = crate::walkdir_entry(project_dir, entry, "walk handoff safety inputs")?;
         if !entry.file_type().is_file() {
@@ -422,6 +422,16 @@ fn add_project_file_hazards(
         if is_handoff_text_file(&relative) {
             match read_utf8(path, InputKind::ProjectText) {
                 Ok(text) => {
+                    if text_is_data_bearing_profile(&text) {
+                        data_bearing_profile_count += 1;
+                        findings.push(json!({
+                            "code": rules::HANDOFF_PII_SUSPECT_TEXT,
+                            "severity": "error",
+                            "message": format!("offline handoff profile is data-bearing and contains opted-in top values: {relative}"),
+                            "handle": Value::Null,
+                            "path": canonical_display(path)
+                        }));
+                    }
                     if contains_credential_like_text_str(&text) {
                         findings.push(json!({
                             "code": rules::HANDOFF_CREDENTIAL_LIKE_TEXT,
@@ -452,7 +462,7 @@ fn add_project_file_hazards(
             }
         }
     }
-    Ok(())
+    Ok(data_bearing_profile_count)
 }
 
 fn is_handoff_text_file(relative: &str) -> bool {
@@ -469,18 +479,14 @@ fn is_handoff_text_file(relative: &str) -> bool {
         .is_some_and(|name| name.eq_ignore_ascii_case(".platform"))
 }
 
-fn project_finding(severity: &str, message: &str) -> Value {
-    let code = if message.contains("offline-unsafe") {
-        rules::HANDOFF_OFFLINE_UNSAFE_FILE
-    } else {
-        rules::PROJECT_VALIDATION_ERROR
-    };
+fn project_finding(diagnostic: &Finding) -> Value {
     json!({
-        "code": code,
-        "severity": severity,
-        "message": message,
+        "code": diagnostic.code,
+        "severity": diagnostic.severity,
+        "message": diagnostic.message,
         "handle": Value::Null,
-        "path": Value::Null
+        "path": diagnostic.path,
+        "pointer": diagnostic.pointer
     })
 }
 

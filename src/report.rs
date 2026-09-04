@@ -89,7 +89,7 @@ pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
             Err(unsupported_feature_error("report.tooltip-pages"))
         }
         [] => Err(CliError::invalid_args(
-            "report requires a subcommand: build, spec fields, spec validate, design-plan, wireframe export, pages, bookmarks, filters, slicers, interactions, themes, visuals",
+            "report requires a subcommand: build, spec fields, spec validate, spec normalize, spec upgrade, design-plan, wireframe export, pages, bookmarks, filters, slicers, interactions, themes, visuals",
         )
         .with_hint("Run `powerbi-cli report spec fields --schema <schema.json> --json`, `powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json`, or inspect supported report primitives.")
         .with_suggested_command(

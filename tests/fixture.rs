@@ -1026,6 +1026,7 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
     assert!(desktop_paths.contains(&"desktop close"));
     assert!(desktop_paths.contains(&"desktop open-check"));
     assert!(desktop_paths.contains(&"desktop screenshot"));
+    assert!(desktop_paths.contains(&"desktop harvest-reference"));
     let open_command = desktop_catalog_value["commands"]
         .as_array()
         .expect("desktop command catalog")
@@ -1071,6 +1072,26 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
             .as_str()
             .expect("capture safety")
             .contains("sensitive screen content")
+    );
+    let harvest_command = desktop_catalog_value["commands"]
+        .as_array()
+        .expect("desktop command catalog")
+        .iter()
+        .find(|command| command["path"] == "desktop harvest-reference")
+        .expect("desktop harvest-reference command");
+    assert_eq!(
+        harvest_command["outputSchema"],
+        Value::from("powerbi-cli.desktop.harvestReference.v1")
+    );
+    assert_eq!(
+        harvest_command["proofLevel"],
+        Value::from("desktop-golden-pending")
+    );
+    assert!(
+        harvest_command["inputSafety"]
+            .as_str()
+            .expect("harvest input safety")
+            .contains("read_harvested_fragment")
     );
     assert_eq!(
         desktop_catalog_value["proofLevels"]
@@ -1126,5 +1147,23 @@ fn capabilities_advertise_fixture_and_desktop_oracle_commands() {
             .expect("feature commands")
             .iter()
             .any(|command| command == "desktop close")
+    );
+    let harvest_feature = features_value["features"]
+        .as_array()
+        .expect("desktop features")
+        .iter()
+        .find(|feature| feature["id"] == "desktop.reference-harvest")
+        .expect("desktop reference harvest feature");
+    assert_eq!(harvest_feature["status"], Value::from("supported"));
+    assert_eq!(
+        harvest_feature["proofLevel"],
+        Value::from("desktop-golden-pending")
+    );
+    assert!(
+        harvest_feature["commands"]
+            .as_array()
+            .expect("feature commands")
+            .iter()
+            .any(|command| command == "desktop harvest-reference")
     );
 }
