@@ -474,13 +474,13 @@ fn output_destination(
         .file_name()
         .ok_or_else(|| CliError::invalid_args(format!("{COMMAND} --out must name a JSON file")))?;
     let destination = parent.join(file_name);
-    if let Ok(metadata) = fs::symlink_metadata(&destination) {
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(safety_refusal(format!(
-                "output target must be an ordinary file: {}",
-                destination.display()
-            )));
-        }
+    if let Ok(metadata) = fs::symlink_metadata(&destination)
+        && (metadata.file_type().is_symlink() || !metadata.is_file())
+    {
+        return Err(safety_refusal(format!(
+            "output target must be an ordinary file: {}",
+            destination.display()
+        )));
     }
     Ok(destination)
 }
