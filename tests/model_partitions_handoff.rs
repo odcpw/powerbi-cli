@@ -1130,6 +1130,7 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
     assert!(paths.contains(&"model partitions show"));
     assert!(paths.contains(&"handoff check"));
     assert!(paths.contains(&"handoff rebind-plan"));
+    assert!(paths.contains(&"handoff rebind-check"));
 
     let handoff = run_powerbi(&["capabilities", "--json", "--for", "handoff"]);
     assert_eq!(handoff.code, 0, "stderr: {}", handoff.stderr);
@@ -1146,6 +1147,13 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
             .expect("handoff commands")
             .iter()
             .any(|command| command["path"] == "handoff rebind-plan")
+    );
+    assert!(
+        stdout_json(&handoff)["commands"]
+            .as_array()
+            .expect("handoff commands")
+            .iter()
+            .any(|command| command["path"] == "handoff rebind-check")
     );
     let source = run_powerbi(&["capabilities", "--json", "--for", "source-template"]);
     assert_eq!(source.code, 0, "stderr: {}", source.stderr);

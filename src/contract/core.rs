@@ -212,6 +212,7 @@ Usage:
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
   powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json
   powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--out <file.md>] [--force] --json
+  powerbi-cli handoff rebind-check <project-dir-or.pbip> [--table <table>] [--partition <partition-handle>] --json
   powerbi-cli --json validate [--strict] [--backend native|microsoft-report|all] <project-dir-or.pbip>
 
 Agent contract:
@@ -540,6 +541,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportVisualSetDisplayNameDryRun": "powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> --handle <visual-handle> --role Values --display-name <text> --dry-run --json",
             "handoffCheck": "powerbi-cli handoff check <project-dir-or.pbip> --json",
             "handoffRebindPlan": "powerbi-cli handoff rebind-plan <project-dir-or.pbip> --json",
+            "handoffRebindCheck": "powerbi-cli handoff rebind-check <project-dir-or.pbip> --json",
             "validate": "powerbi-cli --json validate <project-dir-or.pbip>"
         },
         "recommendedNext": [
@@ -1059,6 +1061,22 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--templates <source-templates.json|->", "--table <table>", "--partition <partition-handle-or-name>", "--allow-unmapped", "--out <file.md>", "--out-file <file.md>", "--force", "--json", "--format json"],
             "examples": ["powerbi-cli handoff rebind-plan build/sales --json", "powerbi-cli handoff rebind-plan build/sales --out work-machine-rebind.md --json", "powerbi-cli handoff rebind-plan build/sales --out work-machine-rebind.md --force --json", "powerbi-cli handoff rebind build/sales --json", "powerbi-cli handoff-rebind-plan build/sales --json"],
             "followUpFields": ["ok", "complete", "status", "counts", "plans[].partitionHandle", "plans[].template", "instructionsMarkdown", "runbookRequestedPath", "runbookPath", "runbookWritten", "materializationBlocked", "materializationBlockReasons", "handoffCheckCommand", "validateCommand", "next"]
+        }),
+        json!({
+            "path": "handoff rebind-check",
+            "aliases": ["handoff-rebind-check"],
+            "usage": "powerbi-cli handoff rebind-check <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--table <table>] [--partition <partition-handle-or-name>] --json",
+            "summary": "Verify every selected partition resolves to a materialized credential-free source without opening a connection",
+            "tags": ["handoff", "offline", "rebind", "source-template", "partition", "safety", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "networkRequired": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.handoff.rebind-check.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--partition <partition-handle-or-name>", "--handle <partition-handle-or-name>", "--json", "--format json"],
+            "examples": ["powerbi-cli handoff rebind-check build/sales --json", "powerbi-cli handoff rebind-check build/sales --partition partition:FactSales:FactSales --json", "powerbi-cli handoff-rebind-check build/sales --json"],
+            "followUpFields": ["ok", "exitCode", "status", "offline", "credentialsEmbedded", "connectionsOpened", "counts", "partitions[].handle", "partitions[].state", "partitions[].materialized", "partitions[].resolved", "partitions[].sourceKind", "partitions[].template", "partitions[].paths", "partitions[].findings", "findings", "validation", "refresh", "next", "instructions"]
         }),
         json!({
             "path": "validate",
