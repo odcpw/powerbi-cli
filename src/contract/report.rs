@@ -7,8 +7,8 @@ pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
             "path": "report build",
-            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including side-effect-free proofPlan commands",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -17,12 +17,12 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.build.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
-            "followUpFields": ["projectDir", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args"]
         }),
         json!({
@@ -305,8 +305,8 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report layout auto",
             "aliases": ["report layouts auto", "report layout arrange"],
-            "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--preset overview|analysis|detail|grid] [--margin <n>] [--gap <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Reposition existing visuals into deterministic responsive canvas slots without changing bindings or formatting",
+            "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting",
             "tags": ["pbir", "report", "layout", "visual", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -315,9 +315,9 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.layout.autoMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--handle <page-handle>", "--preset overview|analysis|detail|grid", "--margin <n>", "--gap <n>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
-            "examples": ["powerbi-cli report layout auto --project build/sales --page page:ReportSectionOverview --preset overview --dry-run --json"],
-            "followUpFields": ["dryRun", "mode", "layoutPlan.pages", "layoutPlan.changedVisuals", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
+            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--handle <page-handle>", "--template <name>", "--preset overview|analysis|detail|grid", "--page-size 1280x720|1920x1080", "--grid <columns=12,gutter=16,margin=24,rowUnit=8>", "--margin <n>", "--gap <n>", "--gutter <n>", "--row-unit <n>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli report layout auto --project build/sales --page page:ReportSectionOverview --template overview --dry-run --json", "powerbi-cli report layout auto --project build/sales --template scatter-focus --page-size 1920x1080 --grid columns=12,gutter=20,margin=32,rowUnit=8 --out-dir build/sales-layout --json"],
+            "followUpFields": ["dryRun", "mode", "layoutPlan.template", "layoutPlan.grid", "layoutPlan.pages", "layoutPlan.changedVisuals", "preview.pages[].template", "preview.pages[].slots[]", "preview.pages[].assignments[]", "preview.pages[].invariants", "warnings[].code", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "report pages list",
@@ -1165,19 +1165,20 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report visuals catalog",
             "aliases": ["report visuals types", "report visuals visual-types"],
-            "usage": "powerbi-cli report visuals catalog [--visual-type <type-or-alias>] --json",
-            "summary": "Return generated visual types plus complete fixture-backed role, projection, exclusivity, and runtime-parity rules for agent-safe report authoring",
+            "usage": "powerbi-cli report visuals catalog [--visual-type <type-or-alias>] [--formatting] --json",
+            "summary": "Return generated visual types plus complete fixture-backed role, projection, exclusivity, and runtime-parity rules, or the curated typed-formatting property catalog",
             "tags": ["pbir", "report", "visual", "catalog", "chart", "binding", "combo", "pareto", "pie", "donut", "matrix", "slicer", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.visuals.catalog.v2",
-            "flags": ["--visual-type <type-or-alias>", "--type <type-or-alias>", "--json", "--format json"],
+            "formattingOutputSchema": "powerbi-cli.report.visuals.formattingCatalog.v1",
+            "flags": ["--visual-type <type-or-alias>", "--type <type-or-alias>", "--formatting", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
-            "examples": ["powerbi-cli report visuals catalog --json", "powerbi-cli report visuals catalog --visual-type line --json"],
-            "limitations": ["Raw columns are supported in proven categorical/table roles and as explicit Sum aggregations for scatter X/Y/Size and hundredPercentStackedColumnChart Y; other value roles require measures.", "scatterChart rejects Details; use Category for detail identity.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending."],
-            "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"]
+            "examples": ["powerbi-cli report visuals catalog --json", "powerbi-cli report visuals catalog --visual-type line --json", "powerbi-cli report visuals catalog --formatting --json"],
+            "limitations": ["Raw columns are supported in proven categorical/table roles and as explicit Sum aggregations for scatter X/Y/Size and hundredPercentStackedColumnChart Y; other value roles require measures.", "scatterChart rejects Details; use Category for detail identity.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending.", "--formatting returns the complete eleven-entry set-object surface; it cannot be combined with --visual-type. Entries are wildcarded only where the existing behavior is visual-type agnostic and each entry carries dated Desktop/pilot evidence."],
+            "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "formattingOutputSchema", "next"]
         }),
         json!({
             "path": "report visuals add",
@@ -1368,7 +1369,7 @@ pub(super) fn commands() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.visuals.objectMutation.v1",
             "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--object <name>", "--property <name>", "--value <raw>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object title --property text --value \"Rate zuletzt (BU je 1'000 FTE)\" --in-place --json"],
-            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature."],
+            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature. Run report visuals catalog --formatting --json for the versioned catalog, encoding, container, and evidence for each pair."],
             "followUpFields": ["dryRun", "mode", "target.handle", "plan.object", "plan.property", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
         }),
         json!({

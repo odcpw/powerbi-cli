@@ -1,5 +1,6 @@
 use crate::cli_support::shell_arg;
 use crate::lint::lint_project;
+use crate::scorecard::scorecard_from_parts;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, Finding, ResolvedProject,
     ValidationReport, canonical_display, command_arg, resolve_project, validate_project,
@@ -48,6 +49,7 @@ pub(crate) fn triage_command(args: &[String]) -> CliResult<Value> {
     let findings = lint["findings"].as_array().cloned().unwrap_or_default();
     let top_findings = top_findings(&findings);
     let next = next_commands(&resolved, &validation, &findings, ok);
+    let scorecard = scorecard_from_parts(&resolved, &validation, &lint, "unit-smoke");
     Ok(json!({
         "schema": "triageResult.v1",
         "ok": ok,
@@ -74,6 +76,7 @@ pub(crate) fn triage_command(args: &[String]) -> CliResult<Value> {
             "counts": lint["counts"],
             "findings": findings
         },
+        "scorecard": scorecard,
         "topFindings": top_findings,
         "next": next
     }))

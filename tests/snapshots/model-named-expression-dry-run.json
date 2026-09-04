@@ -1,0 +1,18 @@
+{
+  "action": "add",
+  "changes": [
+    {
+      "action": "add",
+      "after": "expression 'Transient:Expression' = #table(type table [Value = Int64.Type], {{1}})\n\n",
+      "before": null,
+      "kind": "tmdl.namedExpression"
+    }
+  ],
+  "dryRun": true,
+  "mode": "dry-run",
+  "schema": "powerbi-cli.model.expressions.mutation.v1",
+  "target": {
+    "handle": "expression:Transient%3AExpression",
+    "name": "Transient:Expression"
+  }
+}

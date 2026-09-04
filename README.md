@@ -183,6 +183,354 @@ metadata, and unproven Power BI features fail with
 Use `powerbi-cli features list --json` to see which feature surfaces are
 supported, read-only, planned, or Desktop-golden gated.
 
+<!-- powerbi-cli:commands:start -->
+### Commands (generated from `capabilities --json`)
+
+This list is generated; edit the live command catalog in `src/contract/` rather than this region.
+
+- `powerbi-cli --robot-triage` — Return quick reference, recommended next steps, health, and command catalog in one call _(proof: `unit-smoke`)_
+- `powerbi-cli --json capabilities [--for <filter> [--compact]]` — List the agent-facing command contract; focused queries omit unrelated large catalogs and exact compact queries return one minimal command record _(proof: `unit-smoke`)_
+- `powerbi-cli desktop bridge reload --project <project-dir-or.pbip> --pid <pid> --json` — Reload the report definition only after exact canonical project/PID identity and a clean saved Desktop state are proven _(proof: `unit-smoke`)_
+- `powerbi-cli desktop bridge screenshot-all --project <project-dir-or.pbip> --pid <pid> --out-dir <new-dir> --json` — Capture the exact bounded Desktop status page inventory through the pinned Bridge into a new guarded directory _(proof: `unit-smoke`)_
+- `powerbi-cli desktop bridge screenshot-page --project <project-dir-or.pbip> --pid <pid> --page <id> --out <new.png> --json` — Capture one exact inventoried PBIR page through the pinned Desktop Bridge into a new guarded PNG evidence file _(proof: `unit-smoke`)_
+- `powerbi-cli desktop bridge status [--pid <pid>] --json` — Inspect pinned Microsoft Desktop Bridge instances and their exact current-file, dirty-state, and PBIR page inventory _(proof: `unit-smoke`)_
+- `powerbi-cli desktop canvas-check <project-dir-or.pbip-or.pbix> --page <page> --expect <values.json> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json` — Planned Windows Desktop canvas proof that will assert expected values and reject a blank rendered page _(proof: `unit-smoke`)_
+- `powerbi-cli desktop close --json` — Idempotently close only the exact CLI-owned Power BI Desktop session and its verified descendants _(proof: `unit-smoke`)_
+- `powerbi-cli desktop harvest-reference --project <saved.pbip> --visual <visual:<page>:<name>|page:<name>|report:main> --out docs/reference/desktop-authored-visuals/<name>.json [--desktop-version <version>] [--license-note <text>] [--dry-run] --json` — Archive one Desktop-saved visual, page, or report fragment with source fingerprint, date, license note, and honest pending proof _(proof: `desktop-golden-pending`)_
+- `powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json` — Open the single CLI-owned interactive Power BI Desktop session, closing a prior owned session first _(proof: `unit-smoke`)_
+- `powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json` — Attempt one-shot Power BI Desktop launch plus exact project-title observation, then clean up _(proof: `unit-smoke`)_
+- `powerbi-cli desktop refresh-check <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json` — Planned Windows Desktop refresh proof that will verify dummy-partition refresh and issue-dialog absence _(proof: `unit-smoke`)_
+- `powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <file.png> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--allow-unverified-capture] [--enable-oracle] --json` — Capture the primary display after exact Desktop title and foreground-PID verification for manual or agent review _(proof: `unit-smoke`)_
+- `powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> [--scope model.tables|model.columns|model.measures|model.calculatedColumns|model.relationships] --json` — Compare two PBIP projects using normalized semantic summaries and stable handles _(proof: `unit-smoke`)_
+- `powerbi-cli --json doctor` — Report local Power BI Desktop detection and format assumptions _(proof: `unit-smoke`)_
+- `powerbi-cli features list [--for <feature-filter>] --json` — List supported, fixture-gated, planned, and explicitly refused Power BI feature surfaces _(proof: `unit-smoke`)_
+- `powerbi-cli fixture normalize <project-dir-or.pbip> [--out <summary.json>] --json` — Emit a deterministic path-free summary for generated or Desktop-authored PBIP golden fixtures _(proof: `unit-smoke`)_
+- `powerbi-cli fixture verify <project-dir-or.pbip> --expected <summary.json> [--write-actual <path>] --json` — Compare a project against a committed normalized fixture summary, returning the actual JSON and pointer differences without writing by default _(proof: `unit-smoke`)_
+- `powerbi-cli guid [--count <1..100>] --json` — Generate lowercase UUIDv4 values for TMDL lineageTag authoring when hand-adding columns or measures _(proof: `unit-smoke`)_
+- `powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json` — Classify an offline/dummy or work-network/live-source PBIP handoff after partition-shape, credential, PII-suspect text, cache, binary, and embedded-data checks _(proof: `unit-smoke`)_
+- `powerbi-cli handoff rebind-check <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--table <table>] [--partition <partition-handle-or-name>] --json` — Verify every selected partition resolves to a materialized credential-free source without opening a connection _(proof: `unit-smoke`)_
+- `powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json` — Generate a redacted work-machine rebind plan and suppress runbook materialization when a template or partition contains credentials _(proof: `unit-smoke`)_
+- `powerbi-cli --json inspect [--deep] <project-dir-or.pbip>` — Summarize a PBIP project and, with --deep, return stable handles for report/model objects _(proof: `unit-smoke`)_
+- `powerbi-cli integrations install --allow-network --json` — Install and atomically activate the committed exact Microsoft Power BI npm graph _(proof: `unit-smoke`)_
+- `powerbi-cli integrations status [--deep] [--component modeling-mcp|report-authoring|desktop-bridge] --json` — Inspect the exact optional Microsoft Power BI toolchain without installation or registry access _(proof: `unit-smoke`)_
+- `powerbi-cli lint (<project-dir-or.pbip> | --rules | --explain <rule-id>) --json` — Run typed PBIP/PBIR/TMDL quality checks or inspect the canonical lint and audit rule registry _(proof: `unit-smoke`)_
+- `powerbi-cli model advanced inventory --project <project-dir-or.pbip> --json` — Inventory advanced TMDL folders for roles, perspectives, cultures, and named expressions _(proof: `unit-smoke`)_
+- `powerbi-cli model calculated-columns add --project <project-dir-or.pbip> --table <table> --name <column> (--expression <dax> | --expression-file <path|->) --data-type <type> [--format-string <fmt>] [--summarize-by <mode>] [--display-folder <folder>] [--description <text>] [--hidden] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a DAX calculated column to a TMDL table with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli model calculated-columns delete --project <project-dir-or.pbip> (--handle <column-handle> | --table <table> --name <column>) (--dry-run | --in-place --confirm <column-handle> | --out-dir <dir>) --json` — Delete a DAX calculated column; in-place delete requires exact handle confirmation _(proof: `unit-smoke`)_
+- `powerbi-cli model calculated-columns list --project <project-dir-or.pbip> [--table <table>] --json` — List semantic model DAX calculated columns with stable column handles _(proof: `unit-smoke`)_
+- `powerbi-cli model calculated-columns show --project <project-dir-or.pbip> (--handle <column-handle> | --table <table> --name <column>) --json` — Show one semantic model DAX calculated column and its TMDL block _(proof: `unit-smoke`)_
+- `powerbi-cli model calculated-columns update --project <project-dir-or.pbip> (--handle <column-handle> | --table <table> --name <column>) [--expression <dax> | --expression-file <path|->] [--data-type <type>] [--format-string <fmt>] [--summarize-by <mode>] [--display-folder <folder>] [--description <text>] [--hidden|--visible] (--dry-run | --in-place | --out-dir <dir>) --json` — Update a DAX calculated column expression or metadata; refuses unsupported Desktop-authored TMDL lines _(proof: `unit-smoke`)_
+- `powerbi-cli model columns add --project <project-dir-or.pbip> --table <table> --name <column> [--expression <dax> | --expression-file <path|->] [--data-type <type>] [--source-column <column>] [--format-string <fmt>] [--summarize-by <mode>] [--sort-by <column>] [--display-folder <folder>] [--description <text>] [--hidden] [--key] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a base or calculated column to a TMDL table _(proof: `unit-smoke`)_
+- `powerbi-cli model columns delete --project <project-dir-or.pbip> (--handle <column-handle> | --table <table> --name <column>) (--dry-run | --in-place --confirm <column-handle> | --out-dir <dir>) --json` — Delete a semantic-model column with guarded in-place confirmation _(proof: `unit-smoke`)_
+- `powerbi-cli model columns list --project <project-dir-or.pbip> [--table <table>] --json` — List base and calculated semantic-model columns with stable handles _(proof: `unit-smoke`)_
+- `powerbi-cli model columns set-sort-by --project <project-dir-or.pbip> --table <table> --column <column> (--by <sort-column> | --clear) (--dry-run | --in-place | --out-dir <dir>) --json` — Set or remove one column's same-table TMDL sortByColumn property with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli model columns show --project <project-dir-or.pbip> (--handle <column-handle> | --table <table> --name <column>) --json` — Show one base or calculated column and its raw TMDL block _(proof: `unit-smoke`)_
+- `powerbi-cli model columns update --project <project-dir-or.pbip> (--handle <column-handle> | --table <table> --name <column>) [--expression <dax> | --expression-file <path|->] [--data-type <type>] [--source-column <column>] [--format-string <fmt>] [--summarize-by <mode>] [--sort-by <column> | --clear-sort-by] [--display-folder <folder>] [--description <text>] [--hidden|--visible] [--key|--not-key] (--dry-run | --in-place | --out-dir <dir>) --json` — Update a base or calculated column while refusing lossy unknown TMDL metadata _(proof: `unit-smoke`)_
+- `powerbi-cli model cultures list --project <project-dir-or.pbip> [--include-raw] --json` — List culture/translation TMDL blocks by stable handle _(proof: `unit-smoke`)_
+- `powerbi-cli model cultures show --project <project-dir-or.pbip> (--handle <culture-handle> | --name <culture-name>) [--include-raw] --json` — Show one culture/translation TMDL block by stable handle or exact name _(proof: `unit-smoke`)_
+- `powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> [--engine desktop|xmla|tabular-editor] --json` — Inventory DAX measures/calculated columns and return the external validation bridge boundary without fake local DAX compatibility claims _(proof: `unit-smoke`)_
+- `powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json` — Extract static DAX table/column and measure references for dependency graphing without claiming DAX-engine validation _(proof: `unit-smoke`)_
+- `POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> (--query <dax> | --query-file <path|->) --allow-data-read [--enable-oracle] [--max-rows <1..100000>] [--max-cell-chars <1..1000000>] [--timeout-ms <1000..300000>] --json` — Execute a bounded read-only DAX EVALUATE query against the exact already-open Power BI Desktop semantic model _(proof: `unit-smoke`)_
+- `powerbi-cli model dax lint --project <project-dir-or.pbip> --json` — Run static DAX and measure-format lint for missing references, ambiguous names, self references, dependency cycles, and malformed or absent display formats _(proof: `unit-smoke`)_
+- `powerbi-cli model expressions add --project <project-dir-or.pbip> --name <expression-name> (--expression <m> | --expression-file <path|->) (--dry-run | --in-place | --out-dir <dir>) --json` — Add a named M expression to definition/expressions.tmdl _(proof: `unit-smoke`)_
+- `powerbi-cli model expressions delete --project <project-dir-or.pbip> (--handle <expression-handle> | --name <expression-name>) (--dry-run | --in-place --confirm <expression-handle> | --out-dir <dir>) --json` — Delete one named M expression with guarded in-place confirmation _(proof: `unit-smoke`)_
+- `powerbi-cli model expressions list --project <project-dir-or.pbip> [--include-raw] --json` — List named expression TMDL blocks by stable handle _(proof: `unit-smoke`)_
+- `powerbi-cli model expressions show --project <project-dir-or.pbip> (--handle <expression-handle> | --name <expression-name>) [--include-raw] --json` — Show one named expression TMDL block by stable handle or exact name _(proof: `unit-smoke`)_
+- `powerbi-cli model expressions update --project <project-dir-or.pbip> (--handle <expression-handle> | --name <expression-name>) (--expression <m> | --expression-file <path|->) (--dry-run | --in-place | --out-dir <dir>) --json` — Replace one named M expression while refusing unknown Desktop metadata _(proof: `unit-smoke`)_
+- `POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read [--enable-oracle] [--timeout-ms <1000..300000>] --json` — Export the semantic model of one exact already-open Desktop PBIP/PBIX document to a fresh validated TMDL definition through the pinned local Microsoft MCP _(proof: `unit-smoke`)_
+- `powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> (--expression <dax> | --expression-file <path|->) [--format-string <fmt> | --format-string-definition <dax>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a DAX measure from inline text or a UTF-8 expression file to a TMDL table with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli model measures delete --project <project-dir-or.pbip> (--handle <measure-handle> | --table <table> --name <measure>) (--dry-run | --in-place --confirm <measure-handle> | --out-dir <dir>) --json` — Delete a DAX measure; in-place delete requires exact handle confirmation _(proof: `unit-smoke`)_
+- `powerbi-cli model measures list --project <project-dir-or.pbip> [--table <table>] --json` — List semantic model DAX measures with stable handles _(proof: `unit-smoke`)_
+- `powerbi-cli model measures show --project <project-dir-or.pbip> (--handle <measure-handle> | --table <table> --name <measure>) --json` — Show one semantic model DAX measure and its TMDL block _(proof: `unit-smoke`)_
+- `powerbi-cli model measures update --project <project-dir-or.pbip> (--handle <measure-handle> | --table <table> --name <measure>) [--expression <dax> | --expression-file <path|->] [--format-string <fmt> | --format-string-definition <dax>] [--display-folder <folder>] [--description <text>] (--dry-run | --in-place | --out-dir <dir>) --json` — Update a DAX measure from inline text or a UTF-8 expression file; refuses unsupported Desktop-authored TMDL lines _(proof: `unit-smoke`)_
+- `powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> [--group-by <column> ...] --order-by <column> [--desc] --rank-column <int64-column> --eligible-when <M-predicate> (--dry-run | --out-dir <dir> | --in-place) --json` — Append a deterministic refresh-time grouped-rank M chain to one safe generated dummy partition, assigning zero to ineligible rows and explicitly retyping the rank _(proof: `schema-golden`)_
+- `powerbi-cli model partitions list --project <project-dir-or.pbip> [--table <table>] --json` — List semantic model partitions with source kind and offline safety classification _(proof: `unit-smoke`)_
+- `powerbi-cli model partitions show --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> --name <partition-name>) [--include-source] --json` — Show one semantic model partition with a redacted preview by default; raw source/block output requires --include-source and is refused unless safety is safe _(proof: `unit-smoke`)_
+- `powerbi-cli model perspectives list --project <project-dir-or.pbip> [--include-raw] --json` — List perspective TMDL blocks by stable handle _(proof: `unit-smoke`)_
+- `powerbi-cli model perspectives show --project <project-dir-or.pbip> (--handle <perspective-handle> | --name <perspective-name>) [--include-raw] --json` — Show one perspective TMDL block by stable handle or exact name _(proof: `unit-smoke`)_
+- `powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> [--name <relationship-name>] [--from-cardinality <one|many>] [--to-cardinality <one|many>] [--cross-filtering-behavior <oneDirection|bothDirections|automatic>] [--inactive] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a semantic model relationship with explicit endpoints and guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli model relationships delete --project <project-dir-or.pbip> (--handle <relationship-handle> | --name <relationship-name>) (--dry-run | --in-place --confirm <relationship-handle> | --out-dir <dir>) --json` — Delete a semantic model relationship; in-place delete requires exact handle confirmation _(proof: `unit-smoke`)_
+- `powerbi-cli model relationships list --project <project-dir-or.pbip> [--table <table>] --json` — List semantic model relationships with stable relationship handles and endpoint column handles _(proof: `unit-smoke`)_
+- `powerbi-cli model relationships show --project <project-dir-or.pbip> (--handle <relationship-handle> | --name <relationship-name>) --json` — Show one semantic model relationship, endpoints, properties, and its TMDL block _(proof: `unit-smoke`)_
+- `powerbi-cli model relationships update --project <project-dir-or.pbip> (--handle <relationship-handle> | --name <relationship-name>) [--from-cardinality <one|many>] [--to-cardinality <one|many>] [--cross-filtering-behavior <oneDirection|bothDirections|automatic>] [--active|--inactive] (--dry-run | --in-place | --out-dir <dir>) --json` — Update relationship active state, cardinality, or cross-filtering behavior; endpoint rewiring is delete+add _(proof: `unit-smoke`)_
+- `powerbi-cli model roles list --project <project-dir-or.pbip> [--include-raw] --json` — List role/RLS TMDL blocks by stable handle _(proof: `unit-smoke`)_
+- `powerbi-cli model roles show --project <project-dir-or.pbip> (--handle <role-handle> | --name <role-name>) [--include-raw] --json` — Show one role/RLS TMDL block by stable handle or exact name _(proof: `unit-smoke`)_
+- `powerbi-cli model tables add --project <project-dir-or.pbip> --table <table> [--column <column> ... | --columns-json <json-array>] [--data-type <type>] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a typed offline-safe TMDL table with a generated dummy partition _(proof: `unit-smoke`)_
+- `powerbi-cli model tables add-calculated --project <project-dir-or.pbip> --table <table> (--expression <dax> | --expression-file <path|->) [--column <column> ... | --columns-json <json-array>] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a calculated TMDL table backed by an offline-safe DAX partition _(proof: `unit-smoke`)_
+- `powerbi-cli model tables add-static --project <project-dir-or.pbip> --table <table> ((--column <column> --values-json <json-array-of-strings>) | (--columns-json <json-array-of-column-names> --rows-json <json-array-of-string-arrays>)) [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json` — Add a small static selector table or multi-column lookup dimension backed by an inline M table _(proof: `unit-smoke`)_
+- `powerbi-cli model tables delete --project <project-dir-or.pbip> (--handle <table-handle> | --table <table>) (--dry-run | --in-place --confirm <table-handle> | --out-dir <dir>) --json` — Delete an unreferenced TMDL table with guarded in-place confirmation _(proof: `unit-smoke`)_
+- `powerbi-cli model tables list --project <project-dir-or.pbip> --json` — List semantic-model tables with stable table handles and child counts _(proof: `unit-smoke`)_
+- `powerbi-cli model tables rename --project <project-dir-or.pbip> (--handle <table-handle> | --table <table>) --new-name <table> [--rename-references] (--dry-run | --in-place | --out-dir <dir>) --json` — Rename a TMDL table and optionally rewrite relationship, DAX, and variation references _(proof: `unit-smoke`)_
+- `powerbi-cli model tables show --project <project-dir-or.pbip> (--handle <table-handle> | --table <table>) --json` — Show one semantic-model table, child inventory, and raw TMDL block _(proof: `unit-smoke`)_
+- `powerbi-cli package export-plan --project <project-dir-or.pbip> --json` — Return the Desktop handoff plan for producing PBIX/PBIT because powerbi-cli does not write opaque binary package containers _(proof: `unit-smoke`)_
+- `powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--include-unknown] [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json` — Extract selected source/metadata entries with streaming archive-bomb budgets and clean partial-output rollback _(proof: `unit-smoke`)_
+- `powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json` — Import PBIP/PBIR/TMDL source entries only when they are actually present inside a package archive _(proof: `unit-smoke`)_
+- `powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json` — Inspect a PBIX/PBIT ZIP-like package and classify source/metadata/cache entries without extracting opaque data caches _(proof: `unit-smoke`)_
+- `powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit|archive.pbix|archive.zip> [--force] [--dry-run] --json` — Write a deterministic, allowlisted source archive only after credential and PII-suspect content scans pass _(proof: `unit-smoke`)_
+- `powerbi-cli package work-pack --project <project-dir-or.pbip> [--out <archive.pbit|archive.pbix|archive.zip>] [--force] [--dry-run] --json` — Write a deterministic credential-free work-machine archive containing only recognized materialized live connectors _(proof: `unit-smoke`)_
+- `powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] [--out <profile.json>] [--include-data-values] [--redact] --json` — Infer an advisory profile from schema metadata and bounded CSV/JSON rows; top values are redacted unless explicitly opted in _(proof: `unit-smoke`)_
+- `powerbi-cli profile summarize <profile.json> --json` — Return a compact summary of a dashboard data profile _(proof: `unit-smoke`)_
+- `powerbi-cli profile validate <profile.json> --json` — Validate a data profile document used by dashboard planning/build flows _(proof: `unit-smoke`)_
+- `powerbi-cli report audit --project <project-dir-or.pbip> [--profile agent-safe|handoff] [--include-raw] --json` — Audit report PBIR state for persisted values, raw-literal risks, stale references, and handoff hygiene issues _(proof: `unit-smoke`)_
+- `powerbi-cli report bookmarks delete --project <project-dir-or.pbip> --handle <bookmark-handle> (--dry-run | --in-place --confirm <bookmark-handle> | --out-dir <dir>) --json` — Delete one bookmark file and remove it from bookmark metadata with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report bookmarks list --project <project-dir-or.pbip> [--include-raw] --json` — List raw PBIR bookmark files with stable handles, bookmark order/group metadata, and data-value safety warnings _(proof: `unit-smoke`)_
+- `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
+- `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
+- `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
+- `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
+- `powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <table[column]> --field <table[column]>... (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Replace a category-axis chart's Category projections with a multi-column hierarchy and enable its Desktop drill controls _(proof: `unit-smoke`)_
+- `powerbi-cli report drillthrough clear --project <project-dir-or.pbip> (--page <page-name-or-handle> | --handle <page-handle>) [--restore-visible] (--dry-run | --in-place --confirm <page-handle> | --out-dir <dir>) [--include-raw] --json` — Remove drillthrough page type, pageBinding, and existing drillthrough-created page filters with guarded output semantics _(proof: `schema-golden`)_
+- `powerbi-cli report drillthrough set --project <project-dir-or.pbip> (--page <page-name-or-handle> | --handle <page-handle>) (--target <table[column]> | --table <table> --column <column>) [--keep-all-filters true|false] [--keep-visible] (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Mark an existing PBIR page as a same-report drillthrough target using linked pageBinding and filterConfig metadata _(proof: `schema-golden`)_
+- `powerbi-cli report drillthrough show --project <project-dir-or.pbip> (--page <page-name-or-handle> | --handle <page-handle>) [--include-raw] --json` — Read linked drillthrough pageBinding parameters and paired Drillthrough filters _(proof: `schema-golden`)_
+- `powerbi-cli report filters add --project <project-dir-or.pbip> [--scope report|page|visual] [--page <page-name-or-handle>] [--visual <visual-name-or-handle>] (--target <table[column]> | --table <table> --column <column>) [--condition-type categorical|range|topn|relative-date] ((--value <text> | --value-json <json> | --values-json <json-array>)... | [--min <number>] [--max <number>] | (--top <N> | --bottom <N>) --by <measure> | --relative last|next|this --unit days|weeks|months|years|calendar-weeks|calendar-months|calendar-years --span <N>) (--dry-run | --in-place | --out-dir <dir>) [--name <filter-name>] [--display-name <label>] [--include-raw] --json` — Add one categorical, numeric range, TopN, or relative-date PBIR filter with TMDL type checks and guarded output semantics _(proof: `schema-golden`)_
+- `powerbi-cli report filters clear --project <project-dir-or.pbip> (--handle <filter-handle> | --scope report | --page <page-name-or-handle> | --visual <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle> | --all) (--dry-run | --in-place --confirm <confirm-token> | --out-dir <dir>) [--include-raw] --json` — Clear existing PBIR filters by exact filter handle, report scope, one page owner, one visual owner, or explicit --all with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report filters delete --project <project-dir-or.pbip> --handle <filter-handle> (--dry-run | --in-place --confirm <filter-handle> | --out-dir <dir>) [--include-raw] --json` — Delete one existing report, page, or visual PBIR filter by stable handle with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report filters list --project <project-dir-or.pbip> [--scope all|report|page|visual] [--page <page-name-or-handle>] [--visual <visual-name-or-handle>] [--include-raw] --json` — List raw PBIR report, page, and visual filters with stable handles and data-value safety warnings _(proof: `unit-smoke`)_
+- `powerbi-cli report filters show --project <project-dir-or.pbip> --handle <filter-handle> [--no-raw] --json` — Show one raw PBIR filter by stable handle, including owner readback and persisted-value safety metadata _(proof: `unit-smoke`)_
+- `powerbi-cli report filters update --project <project-dir-or.pbip> --handle <filter-handle> (--display-name <label> | (--value <text> | --value-json <json> | --values-json <json-array>)...) [--condition-type categorical|range|topn|relative-date] (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Update one filter by stable handle: change any display name or replace categorical values while preserving filter type _(proof: `unit-smoke`)_
+- `powerbi-cli report find --project <project-dir-or.pbip> [--kind <kind>] [--name-contains <text>] [--title-contains <text>] [--visual-type <type>] [--path-contains <text>] [--include-raw] --json` — Search report objects by stable metadata instead of guessing PBIR file paths _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions disable --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert an explicit NoFilter visualInteraction row so the target visual does not react to the source visual _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--source <visual-name-or-handle>] [--target <visual-name-or-handle>] [--type Default|DataFilter|HighlightFilter|NoFilter] [--include-raw] --json` — List explicit PBIR page visualInteraction overrides with stable handles, source/target visual resolution, and default-interaction semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle> (--dry-run | --in-place | --out-dir <dir>) --json` — Remove one explicit PBIR visualInteractions row so the target visual returns to its documented default interaction behavior _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions set --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) --type DataFilter|HighlightFilter|NoFilter (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert one explicit PBIR page visualInteraction override for a source/target visual pair; Default authoring remains Desktop-fixture gated _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions show --project <project-dir-or.pbip> --handle <interaction-handle> [--no-raw] --json` — Show one explicit PBIR page visualInteraction override by handle or page/source/target selector _(proof: `unit-smoke`)_
+- `powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json` — Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting _(proof: `unit-smoke`)_
+- `powerbi-cli report pages add --project <project-dir-or.pbip> --display-name <name> [--name <pbir-page-name>] [--width <n>] [--height <n>] [--display-option <mode>] [--before <page-handle>|--after <page-handle>] [--set-active] (--dry-run | --in-place | --out-dir <dir>) --json` — Add an empty PBIR report page and update pageOrder with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report pages clone --project <project-dir-or.pbip> --from <page-name-or-handle> --new-name <ReportSectionX> [--display-name <text>] [--visual-prefix <Prefix>] (--dry-run | --in-place | --out-dir <dir>) --json` — Clone a complete PBIR page, regenerate page/visual/filter identities, prune stale visual interactions, and append pageOrder _(proof: `schema-golden`)_
+- `powerbi-cli report pages delete-empty --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place --confirm <page-handle> | --out-dir <dir>) --json` — Delete only a simple empty PBIR page; pages with visuals or unknown files are refused _(proof: `unit-smoke`)_
+- `powerbi-cli report pages list --project <project-dir-or.pbip> --json` — List PBIR report pages with stable page handles and visual counts _(proof: `unit-smoke`)_
+- `powerbi-cli report pages reorder --project <project-dir-or.pbip> --order <page-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Replace PBIR pageOrder after resolving every page handle exactly once _(proof: `unit-smoke`)_
+- `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
+- `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
+- `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] --json` — Create a deterministic starter dashboard spec from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
+- `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
+- `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
+- `powerbi-cli report slicers clear --project <project-dir-or.pbip> (--handle <slicer-or-visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--dry-run | --in-place --confirm <confirm-token> | --out-dir <dir>) [--include-raw] --json` — Clear persisted PBIR slicer selection/filter state for one slicer visual without changing bindings, layout, or formatting _(proof: `unit-smoke`)_
+- `powerbi-cli report slicers list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--include-raw] --json` — List PBIR slicer visuals with stable slicer handles, visual handles, bindings, state summaries, and persisted-value safety warnings _(proof: `unit-smoke`)_
+- `powerbi-cli report slicers show --project <project-dir-or.pbip> --handle <slicer-handle> [--no-raw] --json` — Show one PBIR slicer visual by slicer or visual handle, including raw visual state and persisted-value safety metadata _(proof: `unit-smoke`)_
+- `powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json` — Compile a strict dashboard spec to a deterministic staged operation plan without writing a project _(proof: `unit-smoke`)_
+- `powerbi-cli report spec fields [--schema <schema.json>] [--profile <profile.json>] --json` — List the strict dashboard-spec key catalog and, when a schema is supplied, exact column and measure binding references _(proof: `unit-smoke`)_
+- `powerbi-cli report spec normalize [--spec <dashboard.json> | <dashboard.json>] --out <canonical.json> --json` — Resolve supported dashboard-spec includes and write one deterministic canonical JSON document _(proof: `unit-smoke`)_
+- `powerbi-cli report spec schema [--version v1|v2|all] --json` — Emit the draft 2020-12 JSON Schema generated from the strict v1/v2 dashboard-spec key catalog _(proof: `unit-smoke`)_
+- `powerbi-cli report spec upgrade --spec <v1.json> (--dry-run | --out <v2.json> [--force]) --json` — Losslessly rewrite a strict powerbi-cli.dashboard.v1 spec as normalized powerbi-cli.dashboard.v2 JSON _(proof: `unit-smoke`)_
+- `powerbi-cli report spec validate [--schema <schema.json>] --spec <dashboard.json> [--profile <profile.json>] --json` — Validate a strict powerbi-cli.dashboard.v1 or v2 shape, and compile-check it against a schema/profile when --schema is supplied before report build _(proof: `unit-smoke`)_
+- `powerbi-cli report style apply --project <target-project-or.pbip> --bundle <style-bundle.json> [--allow-literal-text] (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a master-style bundle by replacing report themeCollection and matching visual formatting payloads by visualType+ordinal _(proof: `unit-smoke`)_
+- `powerbi-cli report style diff <before-style.json> <after-style.json> --json` — Compare two extracted report style bundles by fingerprint, themeCollection, and visual-style counts _(proof: `unit-smoke`)_
+- `powerbi-cli report style extract --project <project-dir-or.pbip> [--out <style-bundle.json>] [--include-literal-text] --json` — Extract a portable master-style bundle containing report themeCollection and per-visual formatting payloads _(proof: `unit-smoke`)_
+- `powerbi-cli report style inspect --project <project-dir-or.pbip> --json` — Inspect a combined report style bundle: report themeCollection plus per-visual formatting payload summaries _(proof: `unit-smoke`)_
+- `powerbi-cli report themes apply --project <target-project-or.pbip> --bundle <theme-bundle.json> (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a raw report theme bundle by replacing themeCollection and copied registered theme JSON resources; does not copy per-visual formatting _(proof: `unit-smoke`)_
+- `powerbi-cli report themes apply-preset --project <target-project-or.pbip> [--preset risk-dashboard|neutral-ops] (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a built-in registered-resource theme preset to a report with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report themes extract --project <source-project-or.pbip> [--out <theme-bundle.json>] --json` — Extract a deterministic raw report theme bundle from themeCollection and already-present registered theme JSON resources _(proof: `unit-smoke`)_
+- `powerbi-cli report themes presets list --json | powerbi-cli report themes presets show --preset <preset-id> [--include-bundle] --json` — List or show built-in report theme presets that apply as registered theme JSON resources _(proof: `unit-smoke`)_
+- `powerbi-cli report themes show --project <project-dir-or.pbip> --json` — Show raw report-level theme state, fingerprint, themeCollection, and registered theme JSON resources _(proof: `unit-smoke`)_
+- `powerbi-cli report tree --project <project-dir-or.pbip> [--include-raw] --json` — Return a stable navigable report object tree across pages, visuals, bindings, filters, slicers, bookmarks, and interactions _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-name-or-handle> --title <title> [--visual-type <type>] [--mode basic|dropdown|between] [--name <visual-name>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file>) [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Create a PBIR visual container on an existing page using the same minimal generated patterns as scaffold _(proof: `schema-golden`)_
+- `powerbi-cli report visuals add-card --project <project-dir-or.pbip> --page <page-name-or-handle> --measure <Table.Measure> --title <text> --x <n> --y <n> --width <n> --height <n> [--name <VisualContainerX>] [--value-font-size <n>] [--category-font-size <n>] [--word-wrap] (--dry-run | --in-place | --out-dir <dir>) --json` — Scaffold a Desktop-proven KPI card visual.json with a Values measure binding and optional label/category font objects _(proof: `schema-golden`)_
+- `powerbi-cli report visuals add-slicer --project <project-dir-or.pbip> --page <page-name-or-handle> --field <Table.Column> --title <text> --x <n> --y <n> --width <n> --height <n> [--name <VisualContainerX>] [--mode Basic|Dropdown] [--single-select] (--dry-run | --in-place | --out-dir <dir>) --json` — Scaffold a Desktop-proven slicer visual.json with a Column projection, Dropdown/Basic mode, and optional single-select _(proof: `schema-golden`)_
+- `powerbi-cli report visuals add-textbox --project <project-dir-or.pbip> --page <page-name-or-handle> --title <text> --x <n> --y <n> --width <n> --height <n> [--name <VisualContainerX>] (--paragraphs-file <path|-> | --text <paragraph>) (--dry-run | --in-place | --out-dir <dir>) --json` — Scaffold a Desktop-proven reading-guide textbox with first paragraph bold 12pt and remaining paragraphs 10pt _(proof: `schema-golden`)_
+- `powerbi-cli report visuals catalog [--visual-type <type-or-alias>] [--formatting] --json` — Return generated visual types plus complete fixture-backed role, projection, exclusivity, and runtime-parity rules, or the curated typed-formatting property catalog _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals clone --project <project-dir-or.pbip> (--handle <source-visual-handle> | --from-page <page-name-or-handle> --visual <visual-name-or-handle>) [--target-page <page-name-or-handle>] [--name <new-visual-name>] [--title <title>] [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Clone one simple PBIR visual container by copying visual.json and patching only name, position, and clone annotations _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals delete --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--dry-run | --in-place --confirm <visual-handle> | --out-dir <dir>) --json` — Delete one PBIR visual container directory after proving it contains only visual.json; in-place delete requires exact handle confirmation _(proof: `schema-golden`)_
+- `powerbi-cli report visuals formatting apply --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --bundle <formatting-bundle.json> [--allow-literal-text] [--allow-cross-type] [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a visual formatting bundle by replacing only /visual/objects and /objects on the target visual _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting conditional-formatting list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--include-raw] --json` — Inventory conditional-formatting/rule/gradient PBIR signals across visuals without authoring new rules _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting conditional-formatting show --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--include-raw] --json` — Show conditional-formatting/rule/gradient PBIR signals for one visual _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting extract --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--out <formatting-bundle.json>] --json` — Extract one visual's raw PBIR formatting objects into an auditable bundle for style portability _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--include-raw] --json` — Inventory per-visual PBIR formatting object containers and property names without raw formatting payloads by default _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting set-color --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--slot title.fontColor|dataPoint.fill --color <#RRGGBB|#AARRGGBB> | --title-font-color <hex> | --data-point-fill <hex>) [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch static PBIR visual title font color or wildcard data point fill without replacing other formatting objects _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--title <text>] [--show-title true|false] [--clear-alt-text] [--include-raw] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch typed PBIR visual title visibility/text or remove validator-rejected alt-text metadata without replacing sibling formatting objects _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals formatting show --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--include-raw] --json` — Show one visual's PBIR formatting object inventory; raw PBIR objects require explicit --include-raw _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals list --project <project-dir-or.pbip> [--page <page-name-or-handle>] --json` — List PBIR report visuals with stable handles, page context, geometry, and binding counts _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --dry-run --json` — Inspect one existing visual against the fixture-backed role map and propose the minimal proven set-bindings op for mechanical runtime-parity defects _(proof: `schema-golden`)_
+- `powerbi-cli report visuals set-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file> | --clear-bindings) (--dry-run | --in-place | --out-dir <dir>) --json` — Replace or clear PBIR field-well bindings for an existing visual using canonical TMDL table, column, and measure names _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> [--index <n>] (--display-name <text> | --clear) (--dry-run | --in-place | --out-dir <dir>) --json` — Set or clear displayName on one existing visual queryState projection _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw> (--dry-run | --in-place | --out-dir <dir>) --json` — Set one curated PBIR visual object property (labels, categoryLabels, categoryAxis, valueAxis, or title) using Desktop literal encoding _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals set-position --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only a PBIR visual position object with guarded output semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals set-topn-guard --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <Table.Column> --order-by <Table.Measure> --top <N> [--direction desc|asc] [--display-name <text>] [--name <filterName>] (--dry-run | --in-place | --out-dir <dir>) --json` — Create or update a visual-level TopN guard filter so a cheap ranking measure bounds the axis before heavy display measures evaluate _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals show --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --json` — Show one PBIR visual with page context, geometry, type, and field bindings _(proof: `unit-smoke`)_
+- `powerbi-cli report wireframe export <project-dir-or.pbip> --json` — Export report pages, visual geometry, bindings, and report handles as JSON without Power BI Desktop _(proof: `unit-smoke`)_
+- `powerbi-cli robot-docs guide [--json]` — Print the in-tool agent guide so agents do not need external docs _(proof: `unit-smoke`)_
+- `powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]` — Render marker-delimited README and SKILL sections from the live capabilities and feature catalogs, or check for documentation drift _(proof: `unit-smoke`)_
+- `powerbi-cli robot-triage` — Alias for --robot-triage when an agent expects a normal command token _(proof: `unit-smoke`)_
+- `powerbi-cli --json scaffold --schema <schema.json> --out-dir <project-dir> [--force]` — Create an offline-safe PBIP project from a schema manifest _(proof: `unit-smoke`)_
+- `powerbi-cli schema normalize <schema.json> --out <canonical.json> --json` — Resolve supported schema includes and write a canonical pretty-printed manifest for review and reproducible dashboard builds _(proof: `unit-smoke`)_
+- `powerbi-cli schema validate <schema.json> --json` — Validate a data schema manifest before report planning or PBIP generation _(proof: `unit-smoke`)_
+- `powerbi-cli skill install --json` — Install or repair the canonical embedded Codex skill without Python, network access, or an external script _(proof: `unit-smoke`)_
+- `powerbi-cli skill status --json` — Verify that the globally installed Codex skill exactly matches the repository-embedded canonical skill _(proof: `unit-smoke`)_
+- `powerbi-cli source-template add --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> [--partition <partition-name>]) [--name <template-name>] --kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m> [kind parameters] (--dry-run | --in-place | --out-dir <dir>) --json` — Add or replace a credential-free database, file, folder, SharePoint, or closed-grammar generic M source template sidecar without changing executable partitions _(proof: `unit-smoke`)_
+- `powerbi-cli source-template apply --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) [kind parameters] [--replace-existing --confirm <partition-handle>] (--dry-run | --in-place | --out-dir <dir>) --json` — Materialize one credential-free source template, including a validated generic M expression, into a generated dummy partition, or explicitly retarget a confirmed existing credential-free partition _(proof: `unit-smoke`)_
+- `powerbi-cli source-template list --project <project-dir-or.pbip> [--table <table>] [--kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m>] --json` — List credential-free sidecar source templates used by handoff rebind plans _(proof: `unit-smoke`)_
+- `powerbi-cli source-template show --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) --json` — Show one source template, its partition mapping, M template preview, and safety findings _(proof: `unit-smoke`)_
+- `powerbi-cli triage <project-dir-or.pbip> --json` — Run strict validation and lint together and return ranked findings plus the next copy-paste command _(proof: `unit-smoke`)_
+- `powerbi-cli --json validate [--strict] [--backend native|microsoft-report|all] <project-dir-or.pbip>` — Run native PBIP/PBIR/TMDL validation by default, or explicitly add the exact official Microsoft report validator _(proof: `unit-smoke`)_
+- `powerbi-cli version --json` — Return the binary version and agent contract version for provenance checks _(proof: `unit-smoke`)_
+- `powerbi-cli workflow plan --project <project-dir-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json` — Create a fingerprinted deterministic plan for one selected PBIP closure and typed source-profile replacements _(proof: `unit-smoke`)_
+- `powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json` — Recheck a fingerprinted plan, build a fresh selected-artifact closure, apply exact local MCP model edits, validate, and write a checksummed receipt _(proof: `unit-smoke`)_
+- `powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] [--row-scale <positive-integer>] [--seed <non-negative-integer>] --json` — Copy a live PBIP into a fresh offline project, install synthetic shared M expressions, and replace shared Database connector steps with one complete navigation shim _(proof: `schema-golden`)_
+- `powerbi-cli workflow verify --plan <plan.json> --json` — Reconstruct profile-derived plan and staged-model semantics, bind output and MCP readbacks, and rerun native/official validation without editing the workflow output _(proof: `unit-smoke`)_
+<!-- powerbi-cli:commands:end -->
+
+<!-- powerbi-cli:limits:start -->
+### Input-safety limits (generated from `capabilities.limits`)
+
+The exact bounded input contract is live in the capabilities payload.
+
+```json
+{
+  "dashboardSpec": {
+    "maxBytes": 8388608,
+    "symlinks": "refused",
+    "utf8": true
+  },
+  "errorCode": "input_safety_violation",
+  "harvestedFragments": {
+    "maxBytes": 4194304,
+    "persistedDataValues": "refused",
+    "silentStripping": false
+  },
+  "images": {
+    "externalUrls": "refused",
+    "formats": [
+      "png"
+    ],
+    "magicByteSniffed": true,
+    "maxBytes": 16777216
+  },
+  "include": {
+    "canonicalized": true,
+    "cycles": "refused",
+    "maxDepth": 8,
+    "maxFragmentBytes": 8388608,
+    "maxResolvedFragments": 200,
+    "relativeOnly": true,
+    "symlinks": "refused"
+  },
+  "intent": {
+    "includeAndExecDirectives": "refused",
+    "maxBytes": 1048576,
+    "utf8": true
+  },
+  "jsonArtifact": {
+    "maxBytes": 16777216,
+    "symlinks": "refused",
+    "utf8": true
+  },
+  "ops": {
+    "maxBytes": 8388608,
+    "schema": "powerbi-cli.ops.v1",
+    "schemaValidationBeforeApply": true,
+    "unknownOpKinds": "refused"
+  },
+  "profile": {
+    "maxBytes": 8388608,
+    "symlinks": "refused",
+    "utf8": true
+  },
+  "projectText": {
+    "maxBytesPerFile": 16777216,
+    "symlinks": "refused",
+    "utf8": true
+  },
+  "reservedApis": [
+    "IncludeGuard::resolve",
+    "read_rows",
+    "read_png",
+    "read_ops",
+    "snapshot_destination",
+    "read_harvested_fragment"
+  ],
+  "rows": {
+    "decodeErrors": "refused",
+    "leadingFormulaCharacters": "preserved-verbatim",
+    "maxColumns": 512,
+    "maxFileBytes": 67108864,
+    "maxRows": 100000,
+    "utf8": true
+  },
+  "schema": {
+    "maxBytes": 8388608,
+    "symlinks": "refused",
+    "utf8": true
+  },
+  "snapshots": {
+    "location": "sibling-or-explicit-snapshot-dir",
+    "maxFiles": 10000,
+    "maxTotalBytes": 536870912,
+    "unwritableDestination": "refused"
+  },
+  "sourceText": {
+    "maxBytes": 2097152,
+    "symlinks": "refused",
+    "utf8": true
+  }
+}
+```
+<!-- powerbi-cli:limits:end -->
+
+<!-- powerbi-cli:features:start -->
+### Feature catalog (generated from `features list --json`)
+
+Each feature carries its live support status and proof level; update `src/feature_catalog.rs` rather than this region.
+
+- `agent.codex-skill-distribution` — **supported**, embedded-install-and-hash-verification, proof `unit-smoke`: Self-contained Codex skill installation and verification. Commands: `skill install`, `skill status`.
+- `desktop.canvas-check` — **planned**, planned-windows-oracle, proof `unit-smoke`: Desktop canvas and expected-value proof. Commands: `desktop canvas-check`.
+- `desktop.dax-query-execution` — **supported**, explicit-opt-in-exact-document-read-only-query, proof `unit-smoke`: Bounded DAX query execution against an open Desktop model. Commands: `model dax execute`.
+- `desktop.live-tmdl-export` — **supported**, explicit-opt-in-exact-document-read-only-mcp-export, proof `unit-smoke`: Read-only semantic-model TMDL export from an open Desktop document. Commands: `model live export-tmdl`.
+- `desktop.reference-harvest` — **supported**, linux-safe-provenance-archive, proof `desktop-golden-pending`: Desktop-authored PBIR reference harvesting. Commands: `desktop harvest-reference`.
+- `desktop.refresh-check` — **planned**, planned-windows-oracle, proof `unit-smoke`: Desktop refresh proof. Commands: `desktop refresh-check`.
+- `desktop.window-evidence` — **supported**, opt-in-window-observation-and-primary-display-capture, proof `unit-smoke`: Managed Desktop sessions, window observation, and screenshot evidence. Commands: `desktop open`, `desktop close`, `desktop open-check`, `desktop screenshot`.
+- `integrations.microsoft-toolchain` — **supported**, explicit-install-immutable-cache, proof `unit-smoke`: Exact optional Microsoft Power BI toolchain. Commands: `integrations status`, `integrations install`.
+- `model.advanced-readback` — **supported**, read-only, proof `unit-smoke`: Advanced semantic model TMDL readback. Commands: `model advanced inventory`, `model roles list`, `model roles show`, `model perspectives list`, `model perspectives show`, `model cultures list`, `model cultures show`, `model expressions list`, `model expressions show`.
+- `model.calculated-columns` — **supported**, read-write, proof `unit-smoke`: DAX calculated columns. Commands: `model calculated-columns list`, `model calculated-columns show`, `model calculated-columns add`, `model calculated-columns update`, `model calculated-columns delete`.
+- `model.calculated-tables` — **supported**, read-write, proof `unit-smoke`: Calculated semantic-model tables. Commands: `model tables add-calculated`.
+- `model.columns` — **supported**, read-write, proof `unit-smoke`: Semantic-model base and calculated column inventory and CRUD. Commands: `model columns list`, `model columns show`, `model columns add`, `model columns update`, `model columns delete`.
+- `model.dax-static-analysis` — **supported**, read-only-static-analysis, proof `unit-smoke`: DAX dependency inventory and static lint. Commands: `model dax dependencies`, `model dax lint`, `model dax bridge-plan`.
+- `model.measures` — **supported**, read-write, proof `unit-smoke`: DAX measures. Commands: `model measures list`, `model measures show`, `model measures add`, `model measures update`, `model measures delete`.
+- `model.named-expressions` — **supported**, read-write, proof `unit-smoke`: Named M expression authoring. Commands: `model expressions list`, `model expressions show`, `model expressions add`, `model expressions update`, `model expressions delete`.
+- `model.partition-grouped-rank` — **supported**, safe-generated-partition-mutation, proof `schema-golden`: Refresh-time grouped rank partition generator. Commands: `model partitions add-grouped-rank`.
+- `model.relationships` — **supported**, read-write, proof `unit-smoke`: Model relationships. Commands: `model relationships list`, `model relationships show`, `model relationships add`, `model relationships update`, `model relationships delete`.
+- `model.source-templates` — **supported**, sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m, proof `unit-smoke`: Credential-free source templates and rebind runbooks. Commands: `source-template list`, `source-template show`, `source-template add`, `source-template apply`, `handoff rebind-plan`, `handoff rebind-check`.
+- `model.static-control-tables` — **supported**, add-bounded-string-table, proof `unit-smoke`: Small static selector and lookup tables. Commands: `model tables add-static`.
+- `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
+- `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
+- `profile.data-profile-v2` — **supported**, schema-matched-statistics-with-redacted-values, proof `unit-smoke`: Bounded CSV/JSON data profile inference. Commands: `profile infer`, `profile validate`, `profile summarize`.
+- `quality.lint-rule-registry` — **supported**, read-only-contract-catalog, proof `unit-smoke`: Discoverable lint and audit rule registry. Commands: `validate`, `lint`, `model dax lint`, `report audit`.
+- `quality.model-completeness-lint` — **supported**, offline-static-heuristics, proof `unit-smoke`: DAX format and semantic-model completeness lint. Commands: `lint`, `triage`, `model dax lint`.
+- `report.bookmark-mutations` — **planned**, unsupported, proof `unit-smoke`: Bookmark state capture/create/update.
+- `report.bookmarks.readback` — **supported**, read-write-metadata-only, proof `unit-smoke`: Bookmark inventory/readback and metadata edits. Commands: `report bookmarks list`, `report bookmarks show`, `report bookmarks set-display-name`, `report bookmarks reorder`, `report bookmarks delete`.
+- `report.conditional-formatting` — **supported**, read-only-static-scan, proof `unit-smoke`: Conditional formatting readback. Commands: `report visuals formatting conditional-formatting list`, `report visuals formatting conditional-formatting show`.
+- `report.dashboard-spec-v2` — **supported**, strict-shape-partial-compile, proof `unit-smoke`: Strict dashboard spec v2 shape and compilation boundary. Commands: `report spec fields`, `report spec validate`, `report spec normalize`, `report spec upgrade`, `report build`.
+- `report.design-layout` — **supported**, read-write-layout, proof `unit-smoke`: Report design planning and automatic layout. Commands: `report design-plan`, `report layout auto`.
+- `report.drilldown` — **supported**, read-write-category-hierarchy, proof `unit-smoke`: Hierarchy drilldown authoring. Commands: `report drilldown set-hierarchy`.
+- `report.drillthrough` — **supported**, read-write-page-binding, proof `schema-golden`: Same-report drillthrough page bindings. Commands: `report drillthrough set`, `report drillthrough show`, `report drillthrough clear`.
+- `report.filters.categorical` — **supported**, read-write-categorical, proof `unit-smoke`: Categorical report/page/visual filters. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`, `report filters clear`.
+- `report.filters.numeric-range` — **supported**, read-write-advanced-comparison, proof `schema-golden`: Numeric range report/page/visual filters. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`.
+- `report.filters.relative-date` — **supported**, read-write-between-date-expressions, proof `schema-golden`: Relative-date report/page/visual filters. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`.
+- `report.filters.topn` — **supported**, read-write-visual-subquery, proof `schema-golden`: TopN visual filters ordered by a measure. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`, `report visuals set-topn-guard`.
+- `report.intent-parser` — **supported**, deterministic-json-markdown-normalization, proof `unit-smoke`: Structured report intent parsing. Commands: `report plan`.
+- `report.interaction-default-reset` — **supported**, read-write-reset-to-default, proof `unit-smoke`: Interaction Default/reset semantics. Commands: `report interactions reset`.
+- `report.interactions.overrides` — **supported**, read-write-explicit-overrides, proof `unit-smoke`: Explicit visual interaction overrides. Commands: `report build`, `report interactions list`, `report interactions show`, `report interactions set`, `report interactions disable`.
+- `report.pages` — **supported**, read-write, proof `unit-smoke`: Report pages and layout metadata. Commands: `report pages list`, `report pages show`, `report pages add`, `report pages update`, `report pages reorder`, `report pages set-active`, `report pages delete-empty`.
+- `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
+- `report.slicer-clear` — **supported**, read-write-clear-only, proof `unit-smoke`: Slicer inventory and persisted-selection clear. Commands: `report slicers list`, `report slicers show`, `report slicers clear`.
+- `report.slicer-sync-authoring` — **planned**, unsupported, proof `unit-smoke`: Slicer sync groups.
+- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`.
+- `report.tooltip-pages` — **planned**, unsupported, proof `unit-smoke`: Report tooltip pages.
+- `report.visuals.category-share` — **supported**, generated-desktop-golden-pending, proof `desktop-golden-pending`: Generated pie and donut visuals. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
+- `report.visuals.combo-pareto` — **supported**, generated-manual-desktop-canvas-refresh, proof `manual-desktop-canvas-refresh`: Generated line and clustered-column combo visual. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
+- `report.visuals.generated` — **supported**, read-write-small-catalog, proof `schema-golden`: Generated core visuals. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-position`, `report visuals set-bindings`, `report visuals set-object`, `report visuals set-display-name`, `report visuals delete`.
+- `report.visuals.matrix` — **supported**, generated-desktop-golden-pending, proof `desktop-golden-pending`: Generated matrix visual. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
+- `report.visuals.planned-types` — **planned**, unsupported, proof `unit-smoke`: Generated PBIR for non-catalog visual types.
+- `report.visuals.role-maps` — **supported**, validated-catalog-and-dry-run-repair, proof `unit-smoke`: Fixture-backed visual role maps and runtime-parity repair. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report visuals repair-bindings`, `report spec validate`.
+- `report.visuals.template-clone` — **supported**, guarded-copy, proof `unit-smoke`: Template visual clone. Commands: `report visuals clone`.
+- `validation.microsoft-report` — **supported**, explicit-exact-official-validator, proof `unit-smoke`: Official Microsoft report validation backend. Commands: `validate`.
+- `workflow.source-profile` — **supported**, plan-run-verify, proof `unit-smoke`: Deterministic staged source-profile workflow. Commands: `workflow plan`, `workflow run`, `workflow verify`.
+- `workflow.synthetic-source` — **supported**, shared-m-expressions-with-scale-and-seed, proof `schema-golden`: Offline deterministic synthetic source swap. Commands: `workflow synthesize`.
+<!-- powerbi-cli:features:end -->
+
 ## Input Safety Limits
 
 User-supplied schema, profile, dashboard-spec, JSON bundle, intent, DAX/text,
@@ -216,6 +564,17 @@ envelope. Reader commands expose the records and counts documented by
 mutation responses and `report build` expose `changes[]`, including dry-run
 before/after plans. Artifact writers such as scaffold, schema normalize, and
 profile output retain their documented family-specific fields.
+
+`report build` also returns `compiled.ops`, a flat operation-change aggregate,
+and `readback` command arrays keyed by stable report/page/visual/table/measure
+handles. Its shared `scorecard.v1` contains native validation, Microsoft
+validator availability, lint grouped by severity, the fixed unavailable design
+lint shape, offline handoff status, and the honest proof level. Add `--trace`
+to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
+default response omits that optional field. `triage` embeds the same scorecard
+projection for an existing project. See
+`capabilities.responseShapes.scorecard.v1` and
+`capabilities.responseShapes.reportBuild` for the machine-readable details.
 
 Validation/result families may emit `ok:false` with a nonzero `exitCode` on
 stdout. CLI errors are written to stderr with required `code`, `exitCode`, and
@@ -261,6 +620,7 @@ cargo run --bin powerbi-cli -- --json capabilities
 cargo run --bin powerbi-cli -- features list --json
 cargo run --bin powerbi-cli -- features list --for drillthrough --json
 cargo run --bin powerbi-cli -- robot-docs guide
+cargo run --bin powerbi-cli -- robot-docs render --check
 cargo run --bin powerbi-cli -- --robot-triage
 cargo run --bin powerbi-cli -- skill status --json
 cargo run --bin powerbi-cli -- skill install --json
@@ -338,7 +698,8 @@ cargo run --bin powerbi-cli -- desktop open-check .\build\sales --json
 cargo run --bin powerbi-cli -- desktop screenshot .\build\sales --out .\proof\sales.png --json
 cargo run --bin powerbi-cli -- report design-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- report wireframe export .\build\sales --json
-cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --preset overview --dry-run --json
+cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --template overview --dry-run --json
+cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --template kpi-strip-trend-breakdown --grid columns=12,gutter=16,margin=24,rowUnit=8 --out-dir .\build\sales-layout --json
 cargo run --bin powerbi-cli -- report pages list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report pages add --project .\build\sales --display-name "Executive Summary" --out-dir .\build\sales-pages --json
 cargo run --bin powerbi-cli -- report pages update --project .\build\sales-pages --handle <page-handle> --display-name "Executive Board" --dry-run --json
@@ -377,6 +738,7 @@ cargo run --bin powerbi-cli -- report style diff .\build\style-before.json .\bui
 cargo run --bin powerbi-cli -- report style apply --project .\build\sales --bundle .\build\corp-style-bundle.json --out-dir .\build\sales-styled --allow-literal-text --json
 cargo run --bin powerbi-cli -- report visuals list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report visuals catalog --json
+cargo run --bin powerbi-cli -- report visuals catalog --formatting --json
 cargo run --bin powerbi-cli -- report visuals formatting list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report visuals formatting show --project .\build\sales --handle <visual-handle> --json
 cargo run --bin powerbi-cli -- report visuals formatting conditional-formatting list --project .\build\sales --json
@@ -534,7 +896,7 @@ separately with `model relationships add`. The command refuses replacement,
 credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table
 ingestion, and validates the project after every write.
 
-The generic semantic-model surface covers `model tables list/show/add/rename/delete`
+The generic semantic-model surface covers `model tables list/show/add/add-calculated/rename/delete`
 and `model columns list/show/add/update/delete`. Table handles use the form
 `table:<name>`; column handles use `column:<table>:<name>`. Literal `%` and `:`
 inside each component are encoded as `%25` and `%3A`. Table rename refuses when
@@ -543,6 +905,15 @@ relationships, DAX, or variation metadata still reference the old name unless
 Desktop-authored properties in the targeted block, so annotations and
 extended properties are never silently dropped. All mutating commands support
 `--dry-run`, guarded `--in-place`, and isolated `--out-dir` output.
+
+Calculated tables are authored with `model tables add-calculated`; the command
+writes a real `partition <table> = calculated` DAX source and leaves schema
+materialization to Power BI Desktop. Named M expressions use
+`model expressions add/update/delete` with the same guarded output modes. The
+existing DAX and M lint commands inspect these new blocks, while unknown
+Desktop-authored expression metadata is refused rather than discarded. Until
+Desktop refresh materializes a calculated table's columns, model completeness
+lint defers the generic no-columns error for that calculated partition.
 
 The `regional-sales` archetype is deliberately dummy data, but keeps the
 column names and shape close enough to exercise a non-ASCII column
@@ -692,6 +1063,11 @@ This generated snapshot keeps status and proof claims aligned with
   can propose a typed `setBindings` op for mechanical, proven repairs such as
   scatter `Details` to `Category` and bare scatter value-axis columns to Sum
   aggregations. It never writes, invents fields, or drops ambiguous bindings.
+  `report visuals catalog --formatting --json` lists the complete embedded
+  `formatting-catalog.v1` consumed by `report visuals set-object`: exactly eleven
+  object/property pairs with their encoding, PBIR container, wildcard visual
+  scope, and dated Desktop/pilot reference. The strict catalog is deterministic;
+  new entries require a Desktop-authored fixture or dated pilot observation.
   `report visuals formatting list/show` inventories existing PBIR formatting
   object cards and property names with raw payloads omitted unless
   `--include-raw` is passed. `report visuals formatting extract/apply` copies
@@ -740,7 +1116,7 @@ This generated snapshot keeps status and proof claims aligned with
   only after the MCP process tree is reaped. The output contains only a
   `definition/` TMDL tree; it is not a report export or full PBIX-to-PBIP
   conversion.
-- Programmatic semantic-model authoring covers `model tables list/show/add/rename/delete`
+- Programmatic semantic-model authoring covers `model tables list/show/add/add-calculated/rename/delete`
   and `model columns list/show/add/update/delete` with stable percent-encoded
   table/column handles, guarded output modes, and readback/validate commands.
   Rename rewrites relationship, DAX, and variation references only when
@@ -748,6 +1124,11 @@ This generated snapshot keeps status and proof claims aligned with
   list. Column updates refuse unknown Desktop-authored properties instead of
   dropping annotations or extended properties. `diff --scope model.tables` and
   `diff --scope model.columns` provide semantic table/column changes.
+- Calculated-table authoring covers `model tables add-calculated` with bounded
+  DAX input and `partition = calculated` TMDL output. Named-expression
+  authoring covers `model expressions add/update/delete`; updates preserve
+  newline style and fail closed on unknown Desktop metadata. Run `model dax
+  lint` and project `lint` after writes; Desktop remains the DAX/M oracle.
 - Programmatic static-table authoring covers `model tables add-static` for a
   new disconnected single-string-column selector or a small 1-10-column string
   lookup dimension backed by a generated inline `#table` partition. Cells are
@@ -922,8 +1303,18 @@ This generated snapshot keeps status and proof claims aligned with
   may persist filter, slicer, highlight, or selected semantic-model values.
 - Programmatic report design/layout authoring covers `report design-plan`,
   `report layout auto`, and `report drilldown set-hierarchy`. Design-plan is a
-  read-only profile with exact next commands; auto-layout rewrites only visual
-  `position` blocks; drilldown hierarchy replaces a chart's Category
+  read-only profile with exact next commands; auto-layout uses the deterministic
+  twelve-column design grid and eleven named templates (`overview`,
+  `time-series`, `ranking`, `distribution`, `comparison`, `detail-table`,
+  `drillthrough-detail`, `exception-list`, `matrix-focus`, `scatter-focus`, and
+  `kpi-strip-trend-breakdown`). Templates expose named slots with preferred
+  visual families, emit SVG-free JSON previews and overlap/minimum-size
+  invariants, and support standard (1280x720), wide (1920x1080), or explicit
+  page-size/grid overrides. Mutations support `--dry-run`, `--out-dir`, and
+  guarded `--in-place`; legacy `--preset overview|analysis|detail|grid`
+  remains an alias for the corresponding templates; auto-layout rewrites only
+  visual `position` blocks;
+  drilldown hierarchy replaces a chart's Category
   projections with two or more resolved model columns, marks the first field
   active as the initial level, and explicitly enables its visual-header drill
   controls. Line, area, bar, column, and combo charts

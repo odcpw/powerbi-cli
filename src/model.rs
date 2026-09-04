@@ -2,6 +2,7 @@ use crate::calculated_columns::calculated_columns_command;
 use crate::measures::measures_command;
 use crate::model_advanced::advanced_model_command;
 use crate::model_dax::dax_command;
+use crate::model_expressions::expressions_command;
 use crate::model_live::live_model_command;
 use crate::model_tables::tables_command;
 use crate::partitions::partitions_command;
@@ -36,7 +37,7 @@ pub(crate) fn model_command(args: &[String]) -> CliResult<Value> {
             advanced_model_command("cultures", rest)
         }
         "expression" | "expressions" | "named-expression" | "named-expressions" => {
-            advanced_model_command("expressions", rest)
+            expressions_command(rest)
         }
         "advanced" => match rest.split_first() {
             Some((action, tail)) if action == "inventory" => {

@@ -20,6 +20,7 @@ const OP_KIND_CATALOG: &[&str] = &[
     "resetInteraction",
     "applyThemePreset",
     "setObject",
+    "setPosition",
     // Compatibility spellings accepted by the safety harness while older
     // plans are migrated to the tagged IR representation.
     "AddMeasure",
@@ -31,6 +32,7 @@ const OP_KIND_CATALOG: &[&str] = &[
     "ResetInteraction",
     "ApplyThemePreset",
     "SetObject",
+    "SetPosition",
 ];
 
 pub(crate) fn read_plan_file(path: &Path) -> CliResult<OpPlan> {
@@ -78,6 +80,7 @@ fn normalize_tag(value: Value) -> Value {
         "ResetInteraction" => "resetInteraction",
         "ApplyThemePreset" => "applyThemePreset",
         "SetObject" => "setObject",
+        "SetPosition" => "setPosition",
         _ => tag,
     };
     Value::String(normalized.to_string())
