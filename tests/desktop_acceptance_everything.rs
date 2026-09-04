@@ -1981,6 +1981,10 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["report", "visuals", "catalog", "--json"]),
     );
     h.ok(
+        "report visuals catalog",
+        &svec(["report", "visuals", "catalog", "--formatting", "--json"]),
+    );
+    h.ok(
         "report visuals repair-bindings",
         &svec([
             "report",

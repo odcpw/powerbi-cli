@@ -388,6 +388,7 @@ cargo run --bin powerbi-cli -- report style diff .\build\style-before.json .\bui
 cargo run --bin powerbi-cli -- report style apply --project .\build\sales --bundle .\build\corp-style-bundle.json --out-dir .\build\sales-styled --allow-literal-text --json
 cargo run --bin powerbi-cli -- report visuals list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report visuals catalog --json
+cargo run --bin powerbi-cli -- report visuals catalog --formatting --json
 cargo run --bin powerbi-cli -- report visuals formatting list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report visuals formatting show --project .\build\sales --handle <visual-handle> --json
 cargo run --bin powerbi-cli -- report visuals formatting conditional-formatting list --project .\build\sales --json
@@ -704,6 +705,11 @@ This generated snapshot keeps status and proof claims aligned with
   can propose a typed `setBindings` op for mechanical, proven repairs such as
   scatter `Details` to `Category` and bare scatter value-axis columns to Sum
   aggregations. It never writes, invents fields, or drops ambiguous bindings.
+  `report visuals catalog --formatting --json` lists the complete embedded
+  `formatting-catalog.v1` consumed by `report visuals set-object`: exactly eleven
+  object/property pairs with their encoding, PBIR container, wildcard visual
+  scope, and dated Desktop/pilot reference. The strict catalog is deterministic;
+  new entries require a Desktop-authored fixture or dated pilot observation.
   `report visuals formatting list/show` inventories existing PBIR formatting
   object cards and property names with raw payloads omitted unless
   `--include-raw` is passed. `report visuals formatting extract/apply` copies

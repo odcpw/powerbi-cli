@@ -2,6 +2,9 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, required_project,
     set_report_visual_mode as set_mode, shell_arg, take_report_value as take_value, target_project,
 };
+use crate::formatting_catalog::{
+    FormattingCatalogEntry, FormattingContainer, FormattingEncoding, formatting_catalog_entries,
+};
 use crate::ops::SetObject;
 use crate::pbir::{VisualRecord, VisualSelector, find_visual, load_report_snapshot, visual_detail};
 use crate::project_io::write_json_atomic;
@@ -18,95 +21,7 @@ const DISPLAY_NAME_ROLES: &[&str] = &[
     "Values", "Category", "Series", "X", "Y", "Y2", "Size", "Rows", "Columns", "Tooltips",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PropertyType {
-    Bool,
-    Double,
-    String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ObjectHome {
-    VisualObjects,
-    VisualContainerObjects,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ObjectProperty {
-    object: &'static str,
-    property: &'static str,
-    value_type: PropertyType,
-    home: ObjectHome,
-}
-
-const OBJECT_CATALOG: &[ObjectProperty] = &[
-    ObjectProperty {
-        object: "labels",
-        property: "show",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "labels",
-        property: "fontSize",
-        value_type: PropertyType::Double,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "categoryLabels",
-        property: "show",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "categoryLabels",
-        property: "fontSize",
-        value_type: PropertyType::Double,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "categoryLabels",
-        property: "wordWrap",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "categoryAxis",
-        property: "show",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "categoryAxis",
-        property: "showAxisTitle",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "valueAxis",
-        property: "show",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "valueAxis",
-        property: "showAxisTitle",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualObjects,
-    },
-    ObjectProperty {
-        object: "title",
-        property: "show",
-        value_type: PropertyType::Bool,
-        home: ObjectHome::VisualContainerObjects,
-    },
-    ObjectProperty {
-        object: "title",
-        property: "text",
-        value_type: PropertyType::String,
-        home: ObjectHome::VisualContainerObjects,
-    },
-];
+type ObjectProperty = FormattingCatalogEntry;
 
 #[derive(Debug, Default)]
 struct ObjectOptions {
@@ -438,7 +353,7 @@ fn resolve_object_property(
             .with_hint(supported_pairs_hint())
             .with_suggested_command(set_object_usage())
     })?;
-    OBJECT_CATALOG
+    formatting_catalog_entries()?
         .iter()
         .find(|spec| spec.object == object && spec.property == property)
         .ok_or_else(|| {
@@ -452,8 +367,8 @@ fn resolve_object_property(
 }
 
 fn encode_property_value(spec: &ObjectProperty, raw: &str) -> CliResult<Value> {
-    match spec.value_type {
-        PropertyType::Bool => {
+    match spec.encoding {
+        FormattingEncoding::Bool => {
             let value = parse_bool_value(raw).ok_or_else(|| {
                 CliError::invalid_args(format!(
                     "--value for {object}.{property} must be true or false, got {raw}",
@@ -467,7 +382,7 @@ fn encode_property_value(spec: &ObjectProperty, raw: &str) -> CliResult<Value> {
             })?;
             Ok(literal_expression(if value { "true" } else { "false" }))
         }
-        PropertyType::Double => {
+        FormattingEncoding::Double => {
             if parse_bool_value(raw).is_some() {
                 return Err(CliError::invalid_args(format!(
                     "--value for {object}.{property} must be a number, got boolean {raw}",
@@ -492,7 +407,7 @@ fn encode_property_value(spec: &ObjectProperty, raw: &str) -> CliResult<Value> {
             })?;
             Ok(literal_expression(&encode_double_literal(parsed)))
         }
-        PropertyType::String => Ok(literal_expression(&encode_text_literal(raw))),
+        FormattingEncoding::String => Ok(literal_expression(&encode_text_literal(raw))),
     }
 }
 
@@ -523,23 +438,23 @@ fn parse_bool_value(raw: &str) -> Option<bool> {
 fn object_property_pointer(spec: &ObjectProperty) -> String {
     format!(
         "{}/{}/0/properties/{}",
-        object_home_pointer(spec.home),
+        object_home_pointer(spec.container),
         spec.object,
         spec.property
     )
 }
 
-fn object_home_pointer(home: ObjectHome) -> &'static str {
+fn object_home_pointer(home: FormattingContainer) -> &'static str {
     match home {
-        ObjectHome::VisualObjects => "/visual/objects",
-        ObjectHome::VisualContainerObjects => "/visual/visualContainerObjects",
+        FormattingContainer::Objects => "/visual/objects",
+        FormattingContainer::VisualContainerObjects => "/visual/visualContainerObjects",
     }
 }
 
-fn object_home_key(home: ObjectHome) -> &'static str {
+fn object_home_key(home: FormattingContainer) -> &'static str {
     match home {
-        ObjectHome::VisualObjects => "objects",
-        ObjectHome::VisualContainerObjects => "visualContainerObjects",
+        FormattingContainer::Objects => "objects",
+        FormattingContainer::VisualContainerObjects => "visualContainerObjects",
     }
 }
 
@@ -566,8 +481,8 @@ fn ensure_object_slot_properties<'a>(
         .entry("visual".to_string())
         .or_insert_with(|| json!({}));
     let visual = json_object_mut(visual, "visual.json visual")?;
-    let home_key = object_home_key(spec.home);
-    let home_pointer = object_home_pointer(spec.home);
+    let home_key = object_home_key(spec.container);
+    let home_pointer = object_home_pointer(spec.container);
     let objects = visual
         .entry(home_key.to_string())
         .or_insert_with(|| json!({}));
@@ -895,7 +810,8 @@ fn json_object_mut<'a>(value: &'a mut Value, label: &str) -> CliResult<&'a mut M
 }
 
 fn supported_pairs() -> Vec<String> {
-    OBJECT_CATALOG
+    formatting_catalog_entries()
+        .expect("embedded formatting catalog is valid")
         .iter()
         .map(|spec| format!("{}.{}", spec.object, spec.property))
         .collect()
@@ -903,8 +819,8 @@ fn supported_pairs() -> Vec<String> {
 
 /// Return the closed visual-format key catalog used by both the formatting
 /// command and dashboard-spec schema generation. Keeping this derived from
-/// `OBJECT_CATALOG` prevents the declarative schema from drifting away from
-/// the proven T4 formatting surface.
+/// the embedded formatting catalog prevents the declarative schema from
+/// drifting away from the proven T4 formatting surface.
 pub(crate) fn format_catalog_keys() -> Vec<String> {
     supported_pairs()
 }

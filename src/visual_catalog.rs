@@ -148,10 +148,21 @@ const PLANNED_TYPES: &[(&str, &str)] = &[(
 #[derive(Debug, Default)]
 struct CatalogOptions {
     visual_type: Option<String>,
+    formatting: bool,
 }
 
 pub(crate) fn visual_catalog_command(args: &[String]) -> CliResult<Value> {
     let options = parse_catalog_args(args)?;
+    if options.formatting {
+        if options.visual_type.is_some() {
+            return Err(CliError::invalid_args(
+                "--formatting cannot be combined with --visual-type",
+            )
+            .with_hint("Run the formatting catalog without a visual-type filter.")
+            .with_suggested_command("powerbi-cli report visuals catalog --formatting --json"));
+        }
+        return crate::formatting_catalog::formatting_catalog_json();
+    }
     let specs = match options.visual_type.as_deref() {
         Some(value) => vec![lookup_visual_type(value)?],
         None => VISUAL_TYPES.to_vec(),
@@ -341,6 +352,10 @@ fn parse_catalog_args(args: &[String]) -> CliResult<CatalogOptions> {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
+            "--formatting" => {
+                options.formatting = true;
+                i += 1;
+            }
             "--visual-type" | "--visualType" | "--type" => {
                 options.visual_type = Some(take_value(args, &mut i, "--visual-type")?);
             }
@@ -348,7 +363,9 @@ fn parse_catalog_args(args: &[String]) -> CliResult<CatalogOptions> {
                 return Err(CliError::invalid_args(format!(
                     "unknown report visuals catalog flag: {other}"
                 ))
-                .with_hint("Run `powerbi-cli report visuals catalog --json`.")
+                .with_hint(
+                    "Run `powerbi-cli report visuals catalog --json` or `--formatting --json`.",
+                )
                 .with_suggested_command("powerbi-cli report visuals catalog --json"));
             }
         }

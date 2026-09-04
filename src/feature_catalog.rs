@@ -955,7 +955,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report visuals delete",
         ],
         refusal_code: None,
-        reason: "Only cataloged core visual families emit generated PBIR; other visual families are refused until fixture-proven.",
+        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence, and other visual families are refused until fixture-proven.",
         next_proof: &[
             "Add Desktop-authored golden fixtures before widening visual families or field wells",
         ],

@@ -532,6 +532,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportThemesApplyPresetDryRun": "powerbi-cli report themes apply-preset --project <target-project-or.pbip> --preset risk-dashboard --dry-run --json",
             "reportVisualsList": "powerbi-cli report visuals list --project <project-dir-or.pbip> --json",
             "reportVisualsCatalog": "powerbi-cli report visuals catalog --json",
+            "reportVisualsFormattingCatalog": "powerbi-cli report visuals catalog --formatting --json",
             "reportVisualFormattingList": "powerbi-cli report visuals formatting list --project <project-dir-or.pbip> --json",
             "reportVisualFormattingShow": "powerbi-cli report visuals formatting show --project <project-dir-or.pbip> --handle <visual-handle> --json",
             "reportVisualFormattingExtract": "powerbi-cli report visuals formatting extract --project <source-project-or.pbip> --handle <source-visual-handle> --out visual-formatting-bundle.json --json",
@@ -1256,6 +1257,7 @@ fn schema_manifest() -> Value {
         "visualFields": ["name", "visualType", "title", "mode", "bindings", "x", "y", "z", "width", "height", "tabOrder"],
         "visualBindingFields": ["role", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
         "visualCatalogFields": ["supportedVisualTypes", "visualTypes[].visualType", "visualTypes[].aliases", "visualTypes[].proofLevel", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].proofLevel", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"],
+        "visualFormattingCatalogFields": ["schema", "catalogSchema", "source", "entryCount", "entries[].object", "entries[].property", "entries[].encoding", "entries[].visualTypes", "entries[].container", "entries[].reference", "notes", "next"],
         "visualFormattingFields": ["rawIncluded", "formatObjectContainerCount", "formatCardCount", "formatPropertyCount", "unsupportedContainerCount", "literalValueCount", "sources", "objectNames", "containers", "safety"],
         "visualFormattingContainerFields": ["source", "objectName", "shape", "unsupportedShape", "cardCount", "propertyCount", "selectorCount", "literalValueCount", "propertyNames", "cards", "raw"],
         "visualFormattingBundleFields": ["schema", "bundleVersion", "sourceFingerprint", "source.visual", "formatting.visualObjects", "formatting.topLevelObjects", "summary", "safety"],
@@ -1546,6 +1548,14 @@ fn response_shapes() -> Value {
         "triageResult": {
             "schema": "triageResult.v1",
             "scorecard": "The embedded scorecard uses scorecard.v1 and the same projection as report build for the inspected project."
+        },
+        "visualFormattingCatalog": {
+            "schema": "powerbi-cli.report.visuals.formattingCatalog.v1",
+            "catalogSchema": "powerbi-cli.formatting-catalog.v1",
+            "transport": "stdout",
+            "requiredFields": ["schema", "catalogSchema", "source", "entryCount", "entries", "notes", "next"],
+            "entryFields": ["object", "property", "encoding", "visualTypes", "container", "reference"],
+            "determinism": "Entries are embedded at build time, validated with deny_unknown_fields, duplicate-key checks, and stable source order."
         },
         "ops.v1": {
             "schema": "powerbi-cli.ops.v1",

@@ -10,6 +10,7 @@ include = [
     "/src/**",
     "/integrations/microsoft/**",
     "/testdata/desktop-proof/**",
+    "/testdata/formatting-catalog.v1.json",
     "/Cargo.toml",
     "/Cargo.lock",
     "/LICENSE",
