@@ -9,6 +9,7 @@ use crate::pbir_visual_factory::{
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
+use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
 use crate::{
@@ -130,12 +131,18 @@ pub(crate) fn spec_command(args: &[String]) -> CliResult<Value> {
     match args {
         [action, rest @ ..] if action == "validate" => spec_validate(rest),
         [action, rest @ ..] if action == "fields" => fields_command(rest),
-        [] => Err(CliError::invalid_args("report spec requires a subcommand: validate or fields")
+        [action, rest @ ..] if action == "upgrade" => upgrade_command(rest),
+        [] => Err(CliError::invalid_args(
+            "report spec requires a subcommand: validate, fields, or upgrade",
+        )
             .with_suggested_command(
                 "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
             )
             .with_suggested_command(
                 "powerbi-cli report spec fields --schema <schema.json> --json",
+            )
+            .with_suggested_command(
+                "powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json",
             )),
         _ => Err(CliError::invalid_args("unknown report spec command")
             .with_suggested_command("powerbi-cli --json capabilities --for \"report spec\"")),

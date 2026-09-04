@@ -61,6 +61,32 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
         }),
         json!({
+            "path": "report spec upgrade",
+            "usage": "powerbi-cli report spec upgrade --spec <v1.json> (--dry-run | --out <v2.json> [--force]) --json",
+            "summary": "Losslessly rewrite a strict powerbi-cli.dashboard.v1 spec as normalized powerbi-cli.dashboard.v2 JSON",
+            "tags": ["report", "dashboard", "spec", "upgrade", "v1", "v2", "normalize", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesArtifact": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.upgrade.v1",
+            "flags": ["--spec <v1.json>", "--dry-run", "--out <v2.json>", "--force", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json --json",
+                "powerbi-cli report spec upgrade --spec examples/sales.dashboard.json --dry-run --json"
+            ],
+            "followUpFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
+            "diagnosticCodes": ["spec.unknown_field", "invalid_args"],
+            "sourceSpecVersion": "powerbi-cli.dashboard.v1",
+            "targetSpecVersion": "powerbi-cli.dashboard.v2",
+            "lossless": true,
+            "normalization": "recursively sorted object keys; array order is preserved"
+        }),
+        json!({
             "path": "report plan",
             "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json> --json",
             "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and an explicit dashboard objective",
