@@ -92,9 +92,8 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         | Op::SetDisplayName(_)
         | Op::SetTopNGuard(_)
         | Op::SetDrilldownHierarchy(_) => Some(Box::new(VisualKernel)),
-        Op::CloneVisual(_)
-        | Op::DeleteVisual(_)
-        | Op::UpdateFilter(_)
+        Op::CloneVisual(_) | Op::DeleteVisual(_) => Some(Box::new(VisualKernel)),
+        Op::UpdateFilter(_)
         | Op::DeleteFilter(_)
         | Op::ClearFilter(_)
         | Op::SlicerClear(_)
@@ -504,11 +503,7 @@ impl Op {
                 let page = payload_text(payload, "targetPage")
                     .or_else(|| payload_text(payload, "page"))?;
                 let name = payload_text(payload, "name")?;
-                Some(format!(
-                    "visual:{}:{}",
-                    page.trim_start_matches("page:"),
-                    name
-                ))
+                Some(crate::ops::handles::visual_handle(page, name))
             }
             Self::AddMeasure(_)
             | Self::AddRelationship(_)

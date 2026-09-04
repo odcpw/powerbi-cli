@@ -15,6 +15,8 @@ impl OpKernel for VisualKernel {
             Op::SetDrilldownHierarchy(payload) => {
                 (payload, &["report", "drilldown", "set-hierarchy"])
             }
+            Op::CloneVisual(payload) => (payload, &["report", "visuals", "clone"]),
+            Op::DeleteVisual(payload) => (payload, &["report", "visuals", "delete"]),
             _ => {
                 return Err(CliError::invalid_args(format!(
                     "VisualKernel cannot apply operation `{}`",
