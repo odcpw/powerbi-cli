@@ -217,6 +217,17 @@ mutation responses and `report build` expose `changes[]`, including dry-run
 before/after plans. Artifact writers such as scaffold, schema normalize, and
 profile output retain their documented family-specific fields.
 
+`report build` also returns `compiled.ops`, a flat operation-change aggregate,
+and `readback` command arrays keyed by stable report/page/visual/table/measure
+handles. Its shared `scorecard.v1` contains native validation, Microsoft
+validator availability, lint grouped by severity, the fixed unavailable design
+lint shape, offline handoff status, and the honest proof level. Add `--trace`
+to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
+default response omits that optional field. `triage` embeds the same scorecard
+projection for an existing project. See
+`capabilities.responseShapes.scorecard.v1` and
+`capabilities.responseShapes.reportBuild` for the machine-readable details.
+
 Validation/result families may emit `ok:false` with a nonzero `exitCode` on
 stdout. CLI errors are written to stderr with required `code`, `exitCode`, and
 `message`, for example
@@ -278,7 +289,9 @@ cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.js
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
+cargo run --bin powerbi-cli -- report spec schema --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
+cargo run --bin powerbi-cli -- report spec explain --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
@@ -453,6 +466,15 @@ cargo run --bin powerbi-cli -- validate --strict .\build\sales --json
 cargo run --bin powerbi-cli -- --json validate .\build\sales
 ```
 
+When a v2 spec contains `proof.desktop.level`, `proof.desktop.pages`,
+`proof.desktop.expectValues`, or `proof.goldens`, `report build` returns a
+`proofPlan` and appends the same commands to `next[]`. Expectation entries
+become bounded `model dax execute` templates and golden names become
+`fixture verify` templates. The compiler never runs those commands. On
+non-Windows hosts Desktop-dependent entries are listed in
+`proofPlan.unavailable[]` with the exact Windows oracle instruction; a
+Desktop proof level is not claimed locally.
+
 `report plan` accepts a bounded `--intent <intent.md|intent.json>` document in
 the `intent.v1` shape. JSON fields and Markdown H2 sections cover audience,
 questions, KPIs, comparisons, periods, drill paths, alert rules, filter
@@ -462,6 +484,13 @@ resolve to an exact model measure or the command returns `spec.missing_input`
 with its pointer and measure candidates. Fields that the starter planner does
 not compile remain visible in `warnings[]` with their owning bead. The
 free-form `--objective` form remains available for quick question-only plans.
+The response also includes an evidence-backed `shape` classification and the
+same shape under `profileSummary` when a profile is supplied. It reports flat,
+star, snowflake, or multi-fact only when schema relationships, cardinalities,
+row-count ratios, and profile column signals support that verdict; otherwise
+it returns `ambiguous` with competing hypotheses. Date-like columns without a
+related date dimension produce a date-table proposal, and high-cardinality
+categorical columns are called out as possible noise.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
@@ -554,8 +583,12 @@ This generated snapshot keeps status and proof claims aligned with
   catalog, adding `--schema` when exact model binding references are needed.
   Both `powerbi-cli.dashboard.v1` and its v2 superset are accepted. V2 defines
   model, style, layout, filter, slicer, visual-formatting, and proof sections;
-  sections whose compiler bead has not landed return `unsupported_feature`
-  with the owning bead id instead of being dropped. The checked-in
+  `proof.desktop` and `proof.goldens` compile to a side-effect-free
+  `proofPlan` plus exact `next[]` commands. Desktop levels are never claimed by
+  the Linux compiler: `proofPlan.unavailable[]` records the platform, missing
+  Desktop, or missing-reference reason and the Windows instruction. Sections
+  whose other compiler bead has not landed return `unsupported_feature` with
+  the owning bead id instead of being dropped. The checked-in
   `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
   subset and builds byte-identically to the v1 sales fixture. To migrate any
   validated v1 spec, run `report spec upgrade --spec <v1.json> --out <v2.json>`;
@@ -564,8 +597,17 @@ This generated snapshot keeps status and proof claims aligned with
   `spec.unknown_field` before the output is created.
   Validation failures are returned on stdout as `errors[]` objects with required
   `code` and `message` fields plus optional `pointer`, `didYouMean`, `hint`, and
-  `suggestedCommands`; they are not legacy error strings. The exact response
-  shape is published at `capabilities.responseShapes.reportSpecValidate`.
+  `suggestedCommands`; `spec.missing_input` additionally includes `field`,
+  `reason`, `candidatesCommand`, and an `example` value. The compiler refuses
+  to infer required schema, intent, and field-well inputs; optional documented
+  defaults remain explicit in `defaultsApplied[]`. These are not legacy error
+  strings. The exact response shape is published at
+  `capabilities.responseShapes.reportSpecValidate`.
+- `report spec schema --json` emits a draft 2020-12 JSON Schema for the v1 and
+  v2 key surfaces. `report spec explain --schema <schema.json> --spec
+  <dashboard.json> [--profile <profile.json>] --json` previews the typed,
+  staged operation plan, stable handles, layout coordinates, defaults,
+  unsupported sections, and proof commands without writing a project.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
@@ -1017,6 +1059,10 @@ This generated snapshot keeps status and proof claims aligned with
   before oracle opt-in evaluation. An attempted oracle subsystem failure is exit
   40, while evidence blocked by launch/observation timeout or title mismatch is
   `proof_incomplete` (exit 20).
+- `desktop refresh-check` and `desktop canvas-check` are cataloged forward-compatible
+  Desktop proof commands. They currently return `error.code = "unsupported_feature"`
+  without launching Desktop or writing evidence; refresh completion and canvas
+  rendering proof will be implemented by the T9 Windows work.
 - Validation checks file structure, parseable JSON, page references, TMDL table
   presence, relationship endpoints, and offline hazards. It is not a Power BI
   Desktop open proof.

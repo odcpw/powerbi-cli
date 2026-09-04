@@ -327,13 +327,15 @@ Every section maps to ops from T1. Unknown keys fail per T0.1.
 
 ### T2.2 `report spec explain` and `report spec schema`
 
-- `report spec schema --json` emits the JSON Schema for v2 so agents can
-  self-validate and so tests can prove the walker and the schema agree.
-- `report spec explain --spec x.json --json` prints the compiled op plan
-  without writing anything: the exact ordered ops with stage numbers, the
-  handles they will create, resolved slot coordinates, the design defaults
-  that will apply per visual, and the proof commands that will follow. This
-  is the agent's dry run for a whole dashboard.
+- `report spec schema --json` emits the JSON Schema for both strict v1 and v2
+  specs so agents can self-validate and tests can prove the walker and schema
+  agree.
+- `report spec explain --schema schema.json --spec x.json --json` prints the
+  compiled op plan without writing anything: the exact ordered ops with stage
+  numbers, the handles they will create, resolved slot coordinates, design
+  defaults per visual, unsupported sections with owning beads, and proof
+  commands that will follow. This is the agent's dry run for a whole
+  dashboard.
 
 ### T2.3 Missing-input diagnostics
 
@@ -412,7 +414,7 @@ and a `features list` status.
 - T3.10 Build response: aggregate `changes[]`, per-op readback, `compiled.ops`
   count, op timing trace, and a `scorecard` (strict validation, Microsoft
   validator when installed, lint, design lint, handoff, proof level).
-  `report build --explain` is an alias for `report spec explain`. `triage`
+  `report spec explain` is the sole whole-spec preview spelling. `triage`
   reads the same scorecard.
 - T3.11 `report compose`: the mega-command from the top of this document.
   Runs `profile infer` (with `--rows` when given), `report plan`, `report

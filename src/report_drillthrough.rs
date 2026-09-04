@@ -2,8 +2,9 @@ use crate::cli_support::{
     MutationMode, mode_name, required_project, set_mode, shell_arg, take_value, target_project,
 };
 use crate::feature_catalog::unsupported_feature_error_with_message;
+use crate::ops::{Op, OpKernel, OpOutcome, SetDrillthrough as SetDrillthroughOp, Transaction};
 use crate::pbir::{PageRecord, PageSelector, find_page, load_report_snapshot, page_summary};
-use crate::pbir_filters::filter_target;
+use crate::pbir_filters::{FilterArrayOrigin, FilterScope, filter_target, named_filter_handle};
 use crate::project_io::write_json_atomic;
 use crate::tmdl::{load_table_documents, same_name};
 use crate::{
@@ -69,6 +70,132 @@ struct DrillthroughClearPlan {
     after: Value,
     changes: Vec<Value>,
     removed_filters: usize,
+}
+
+/// Kernel registration for the typed `setDrillthrough` operation. The
+/// established CLI set/show/clear commands remain unchanged; this adapter
+/// applies the same first-slice page-binding shape to a staged transaction.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct SetDrillthroughKernel;
+
+impl OpKernel for SetDrillthroughKernel {
+    fn apply(&mut self, operation: &Op, transaction: &mut Transaction) -> CliResult<OpOutcome> {
+        let Op::SetDrillthrough(payload) = operation else {
+            return Err(CliError::invalid_args(format!(
+                "setDrillthrough kernel received operation `{}`",
+                operation.tag()
+            )));
+        };
+        apply_set_drillthrough(payload, transaction)
+    }
+}
+
+/// Parse the existing `report drillthrough set` argv contract into a typed
+/// operation and its requested mutation mode. Read-only resolution here keeps
+/// page handles, canonical target names, and diagnostics aligned with the CLI.
+pub(crate) fn parse_args(args: &[String]) -> CliResult<(Op, MutationMode)> {
+    let options = parse_set_args(args)?;
+    let source_project = required_project(options.project.clone(), "report drillthrough set")?;
+    require_page_selector(&options.selector, "report drillthrough set")?;
+    let mode = require_drillthrough_mode(options.mode, "report drillthrough set")?;
+    let source_resolved = resolve_project(&source_project)?;
+    let page = resolve_drillthrough_page(
+        &source_resolved,
+        &options.selector,
+        "report drillthrough set",
+    )?;
+    let (table, column) = resolve_target_column(&source_resolved, &options)?;
+    Ok((
+        Op::SetDrillthrough(SetDrillthroughOp {
+            page: page.page.handle,
+            target: format!("{table}[{column}]"),
+            fields: vec![format!("{table}[{column}]")],
+            table: Some(table),
+            column: Some(column),
+            keep_all_filters: options.keep_all_filters,
+            keep_visible: Some(options.keep_visible),
+            hidden: Some(!options.keep_visible),
+            back_button: None,
+        }),
+        mode,
+    ))
+}
+
+/// Apply a typed drillthrough payload to the transaction's staged project.
+pub(crate) fn apply_set_drillthrough(
+    payload: &SetDrillthroughOp,
+    transaction: &mut Transaction,
+) -> CliResult<OpOutcome> {
+    let working = transaction.working_project()?;
+    let (table, column) = operation_target(payload)?;
+    if payload.fields.len() > 1 {
+        return Err(CliError::unsupported_feature(
+            "setDrillthrough supports one model column in the first slice",
+        ));
+    }
+    if payload.back_button.is_some() {
+        return Err(CliError::unsupported_feature(
+            "setDrillthrough back-button metadata is not supported in the first slice",
+        ));
+    }
+    let page = resolve_operation_page(&working, &payload.page)?;
+    let options = SetOptions {
+        selector: PageSelector {
+            handle: Some(page.page.handle.clone()),
+            ..PageSelector::default()
+        },
+        target: Some(format!("{table}[{column}]")),
+        table: Some(table.clone()),
+        column: Some(column.clone()),
+        keep_all_filters: payload.keep_all_filters,
+        keep_visible: payload
+            .keep_visible
+            .or_else(|| payload.hidden.map(|hidden| !hidden))
+            .unwrap_or(false),
+        ..SetOptions::default()
+    };
+    let plan = build_set_plan(&page, &table, &column, &options)?;
+    if plan.changes.is_empty() {
+        return Ok(OpOutcome::unchanged());
+    }
+    write_json_atomic(&page.path, &plan.page_json)?;
+
+    let project_arg = command_arg(&transaction.source.project_dir);
+    let show = drillthrough_show_command(&transaction.source, &page.page.handle);
+    let filter_readback = format!(
+        "powerbi-cli report filters list --project {project_arg} --scope page --page {} --json",
+        shell_arg(&page.page.handle)
+    );
+    let source_page_path = source_relative_path(&page.path, &working, transaction);
+    let mut changes = plan.changes;
+    for change in &mut changes {
+        change["path"] = Value::String(canonical_display(&source_page_path));
+    }
+    let mut outcome = OpOutcome {
+        changed: true,
+        changes,
+        readback: vec![
+            show,
+            page_show_command(&transaction.source, &page.page.handle),
+            filter_readback,
+            format!("powerbi-cli report wireframe export {project_arg} --json"),
+            format!("powerbi-cli inspect --deep {project_arg} --json"),
+            validate_command(&transaction.source),
+        ],
+        warnings: Vec::new(),
+        created_handles: Vec::new(),
+    };
+    // Drillthrough's paired filter is the only public stable handle it creates;
+    // binding and parameter names remain PBIR-internal identities.
+    let filter_name = generated_name("DrillthroughFilter", &page.page.name, &table, &column);
+    outcome.created_handles.push(named_filter_handle(
+        FilterScope::Page,
+        Some(&page.page.name),
+        None,
+        &filter_name,
+        FilterArrayOrigin::FilterConfig,
+    ));
+    Ok(outcome)
 }
 
 pub(crate) fn drillthrough_command(args: &[String]) -> CliResult<Value> {
@@ -376,6 +503,45 @@ fn resolve_drillthrough_page(
     let page = find_page(&snapshot.pages, selector, command)?.clone();
     let path = page_path(&page)?;
     Ok(ResolvedDrillthroughPage { page, path })
+}
+
+fn resolve_operation_page(
+    resolved: &ResolvedProject,
+    value: &str,
+) -> CliResult<ResolvedDrillthroughPage> {
+    let selector = if value.starts_with("page:") {
+        PageSelector {
+            handle: Some(value.to_string()),
+            ..PageSelector::default()
+        }
+    } else {
+        PageSelector {
+            name: Some(value.to_string()),
+            ..PageSelector::default()
+        }
+    };
+    resolve_drillthrough_page(resolved, &selector, "setDrillthrough operation")
+}
+
+fn operation_target(payload: &SetDrillthroughOp) -> CliResult<(String, String)> {
+    if let (Some(table), Some(column)) = (payload.table.as_deref(), payload.column.as_deref())
+        && !table.trim().is_empty()
+        && !column.trim().is_empty()
+    {
+        return Ok((table.to_string(), column.to_string()));
+    }
+    parse_target(&payload.target)
+}
+
+fn source_relative_path(
+    working_path: &Path,
+    working: &ResolvedProject,
+    transaction: &Transaction,
+) -> PathBuf {
+    working_path
+        .strip_prefix(&working.project_dir)
+        .map(|relative| transaction.source.project_dir.join(relative))
+        .unwrap_or_else(|_| working_path.to_path_buf())
 }
 
 fn page_path(page: &PageRecord) -> CliResult<PathBuf> {
@@ -1072,4 +1238,202 @@ fn validate_command(resolved: &ResolvedProject) -> String {
         "powerbi-cli validate --strict {} --json",
         command_arg(&resolved.project_dir)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ops::{Op, OpPlan, ProjectIndex};
+
+    fn scaffold(root: &Path) -> ResolvedProject {
+        let schema: Value =
+            serde_json::from_str(include_str!("../examples/sales.schema.json")).expect("schema");
+        crate::scaffold_schema_value(schema, Path::new("examples/sales.schema.json"), root, false)
+            .expect("scaffold");
+        resolve_project(root).expect("resolve")
+    }
+
+    fn page_json(project: &Path) -> PathBuf {
+        let pages: Value = serde_json::from_str(
+            &std::fs::read_to_string(
+                project
+                    .join("SalesOperations.Report")
+                    .join("definition")
+                    .join("pages")
+                    .join("pages.json"),
+            )
+            .expect("pages json"),
+        )
+        .expect("parse pages");
+        let page = pages["pageOrder"][0].as_str().expect("page name");
+        project
+            .join("SalesOperations.Report")
+            .join("definition")
+            .join("pages")
+            .join(page)
+            .join("page.json")
+    }
+
+    fn run_cli_and_kernel(keep_visible: bool) {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let cli_source = scaffold(&temp.path().join("cli-source"));
+        let page = page_json(&cli_source.project_dir);
+        let page_name = page
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .expect("page name")
+            .to_string();
+        let page_handle = format!("page:{page_name}");
+        let cli_out = temp.path().join("cli-out");
+        let mut cli_args = vec![
+            "set".to_string(),
+            "--project".to_string(),
+            cli_source.project_dir.to_string_lossy().into_owned(),
+            "--page".to_string(),
+            page_handle.clone(),
+            "--target".to_string(),
+            "DimCustomer[Segment]".to_string(),
+            "--out-dir".to_string(),
+            cli_out.to_string_lossy().into_owned(),
+        ];
+        if keep_visible {
+            cli_args.push("--keep-visible".to_string());
+        }
+        drillthrough_command(&cli_args).expect("CLI mutation");
+
+        let op_source = scaffold(&temp.path().join("op-source"));
+        let op_out = temp.path().join("op-out");
+        let mut op_args = vec![
+            "--project".to_string(),
+            op_source.project_dir.to_string_lossy().into_owned(),
+            "--page".to_string(),
+            page_handle,
+            "--target".to_string(),
+            "DimCustomer[Segment]".to_string(),
+            "--out-dir".to_string(),
+            op_out.to_string_lossy().into_owned(),
+        ];
+        if keep_visible {
+            op_args.push("--keep-visible".to_string());
+        }
+        let (operation, mode) = parse_args(&op_args).expect("parse operation");
+        assert_eq!(mode, MutationMode::OutDir);
+        assert!(matches!(&operation, Op::SetDrillthrough(_)));
+        let plan = OpPlan::new(vec![operation]);
+        let validated = plan
+            .validate(&ProjectIndex::from_project(&op_source).expect("index"))
+            .expect("plan");
+        let mut transaction = Transaction::begin(op_source).expect("transaction");
+        let mut kernel = SetDrillthroughKernel;
+        let receipt = transaction
+            .apply_all(&validated, &mut kernel)
+            .expect("kernel apply");
+        assert_eq!(receipt.outcomes.len(), 1);
+        assert_eq!(receipt.outcomes[0].created_handles.len(), 1);
+        assert!(receipt.outcomes[0].created_handles[0].starts_with("filter:page:"));
+        transaction
+            .commit_out_dir(&op_out, false)
+            .expect("op commit");
+        assert_eq!(
+            std::fs::read(page_json(&cli_out)).expect("CLI page"),
+            std::fs::read(page_json(&op_out)).expect("op page")
+        );
+    }
+
+    #[test]
+    fn set_drillthrough_kernel_matches_cli_for_hidden_page() {
+        run_cli_and_kernel(false);
+    }
+
+    #[test]
+    fn set_drillthrough_kernel_matches_cli_for_visible_page() {
+        run_cli_and_kernel(true);
+    }
+
+    #[test]
+    fn set_drillthrough_kernel_replay_is_an_unchanged_noop() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = scaffold(&temp.path().join("source"));
+        let page = page_json(&source.project_dir);
+        let page_name = page
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .expect("page name");
+        let args = vec![
+            "--project".into(),
+            source.project_dir.to_string_lossy().into_owned(),
+            "--page".into(),
+            format!("page:{page_name}"),
+            "--target".into(),
+            "DimCustomer[Segment]".into(),
+            "--dry-run".into(),
+        ];
+        let (operation, _) = parse_args(&args).expect("parse");
+        let plan = OpPlan::new(vec![operation.clone()]);
+        let validated = plan
+            .validate(&ProjectIndex::from_project(&source).expect("index"))
+            .expect("plan");
+        let mut transaction = Transaction::begin(source).expect("transaction");
+        let mut kernel = SetDrillthroughKernel;
+        transaction
+            .apply_all(&validated, &mut kernel)
+            .expect("first apply");
+        let first = std::fs::read(
+            transaction
+                .work_dir()
+                .join("SalesOperations.Report")
+                .join("definition")
+                .join("pages")
+                .join(page_name)
+                .join("page.json"),
+        )
+        .expect("first page");
+        let Op::SetDrillthrough(payload) = operation else {
+            panic!("expected setDrillthrough")
+        };
+        let replay = apply_set_drillthrough(&payload, &mut transaction).expect("replay");
+        assert!(!replay.changed);
+        assert!(replay.changes.is_empty());
+        let second = std::fs::read(
+            transaction
+                .work_dir()
+                .join("SalesOperations.Report")
+                .join("definition")
+                .join("pages")
+                .join(page_name)
+                .join("page.json"),
+        )
+        .expect("second page");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn set_drillthrough_kernel_refuses_multiple_fields_without_writing() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = scaffold(&temp.path().join("source"));
+        let page = page_json(&source.project_dir);
+        let page_name = page
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            .expect("page name")
+            .to_string();
+        let payload = SetDrillthroughOp {
+            page: format!("page:{page_name}"),
+            target: "DimCustomer[Segment]".into(),
+            fields: vec!["DimCustomer[Segment]".into(), "DimDate[Date]".into()],
+            table: Some("DimCustomer".into()),
+            column: Some("Segment".into()),
+            keep_all_filters: None,
+            keep_visible: None,
+            hidden: None,
+            back_button: None,
+        };
+        let mut transaction = Transaction::begin(source).expect("transaction");
+        let error = apply_set_drillthrough(&payload, &mut transaction).expect_err("refusal");
+        assert_eq!(error.code, "unsupported_feature");
+        assert!(error.message.contains("one model column"));
+    }
 }

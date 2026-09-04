@@ -1,0 +1,29 @@
+{
+  "dateTables": [],
+  "dimensions": [],
+  "facts": [],
+  "highCardinality": [],
+  "hypotheses": [
+    "multi-fact",
+    "snowflake",
+    "star"
+  ],
+  "keyCandidates": [],
+  "kind": "ambiguous",
+  "relationships": [],
+  "warnings": [
+    {
+      "code": "shape.ambiguous",
+      "hypotheses": [
+        "multi-fact",
+        "snowflake",
+        "star"
+      ],
+      "message": "model shape is ambiguous; competing hypotheses: multi-fact, snowflake, star"
+    },
+    {
+      "code": "shape.no_relationships",
+      "message": "multiple tables have no declared relationships; star, snowflake, or multi-fact shape cannot be proven from metadata"
+    }
+  ]
+}

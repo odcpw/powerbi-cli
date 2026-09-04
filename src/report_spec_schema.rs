@@ -1,8 +1,10 @@
 use crate::help::edit_distance;
+use crate::report_visual_objects::format_catalog_keys;
+use crate::visual_catalog::visual_type_contracts;
 use crate::{CliError, CliResult, EXIT_VALIDATION_FAILED};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const DASHBOARD_V1: &str = "powerbi-cli.dashboard.v1";
 pub(crate) const DASHBOARD_V2: &str = "powerbi-cli.dashboard.v2";
@@ -80,6 +82,7 @@ const VISUAL: NodeSchema = node(
         "type",
         "visualType",
         "title",
+        "text",
         "bindings",
         "layout",
         "mode",
@@ -291,6 +294,7 @@ const VISUAL_V2: NodeSchema = node(
         "type",
         "visualType",
         "title",
+        "text",
         "subtitle",
         "bindings",
         "layout",
@@ -465,6 +469,526 @@ pub(crate) fn versioned_allowed_fields_json() -> Value {
         {"schema": DASHBOARD_V1, "allowedFields": nodes_json(V1_NODES)},
         {"schema": DASHBOARD_V2, "allowedFields": nodes_json(V2_NODES)}
     ])
+}
+
+/// Emit the dashboard-spec JSON Schema directly. The object properties are
+/// built from the same `NodeSchema` key tables consumed by the strict walker;
+/// nested overrides only describe value shape and never add a key that the
+/// walker would reject.
+pub(crate) fn schema_command(args: &[String]) -> CliResult<Value> {
+    let version = parse_schema_version(args)?;
+    Ok(dashboard_schema_json(version))
+}
+
+fn parse_schema_version(args: &[String]) -> CliResult<Option<SpecVersion>> {
+    let mut version = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--version" => {
+                let value = args.get(index + 1).ok_or_else(|| {
+                    CliError::invalid_args("report spec schema --version requires v1, v2, or all")
+                        .with_suggested_command(
+                            "powerbi-cli report spec schema --version all --json",
+                        )
+                })?;
+                if version.is_some() {
+                    return Err(CliError::invalid_args(
+                        "report spec schema accepts only one --version",
+                    )
+                    .with_suggested_command(
+                        "powerbi-cli report spec schema --version all --json",
+                    ));
+                }
+                version = match value.as_str() {
+                    "v1" | "V1" | DASHBOARD_V1 => Some(SpecVersion::V1),
+                    "v2" | "V2" | DASHBOARD_V2 => Some(SpecVersion::V2),
+                    "all" | "both" => None,
+                    other => {
+                        return Err(CliError::invalid_args(format!(
+                            "unsupported report spec schema version `{other}`"
+                        ))
+                        .with_hint("Use --version v1, --version v2, or --version all.")
+                        .with_suggested_command(
+                            "powerbi-cli report spec schema --version all --json",
+                        ));
+                    }
+                };
+                index += 2;
+            }
+            other => {
+                return Err(CliError::invalid_args(format!(
+                    "unknown report spec schema flag: {other}"
+                ))
+                .with_hint("Use `powerbi-cli report spec schema --version all --json`.")
+                .with_suggested_command("powerbi-cli report spec schema --version all --json"));
+            }
+        }
+    }
+    Ok(version)
+}
+
+fn dashboard_schema_json(version: Option<SpecVersion>) -> Value {
+    match version {
+        Some(SpecVersion::V1) => version_schema(SpecVersion::V1),
+        Some(SpecVersion::V2) => version_schema(SpecVersion::V2),
+        None => json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "powerbi-cli.report.spec.schema.v1",
+            "schema": "powerbi-cli.report.spec.schema.v1",
+            "title": "powerbi-cli dashboard specification (v1 or v2)",
+            "oneOf": [
+                {"$ref": "#/$defs/v1"},
+                {"$ref": "#/$defs/v2"}
+            ],
+            "$defs": {
+                "v1": version_schema(SpecVersion::V1),
+                "v2": version_schema(SpecVersion::V2)
+            }
+        }),
+    }
+}
+
+fn version_schema(version: SpecVersion) -> Value {
+    let nodes = match version {
+        SpecVersion::V1 => V1_NODES,
+        SpecVersion::V2 => V2_NODES,
+    };
+    let visual_types = json!({
+        "type": "string",
+        "enum": visual_type_values()
+    });
+    let number = json!({"type": "number"});
+    let string = json!({"type": "string"});
+    let any_array = json!({"type": "array", "items": {}});
+
+    let report = node_object(
+        nodes,
+        "report",
+        &[("questions", json!({"type": "array", "items": string}))],
+    );
+    let model_measure = node_object(nodes, "model.measures[]", &[]);
+    let model = match version {
+        SpecVersion::V1 => node_object(
+            nodes,
+            "model",
+            &[
+                ("measures", json!({"type": "array", "items": model_measure})),
+                ("relationships", any_array.clone()),
+            ],
+        ),
+        SpecVersion::V2 => {
+            let measure_pattern = node_object(nodes, "model.measurePatterns[]", &[]);
+            let calculated_column = node_object(nodes, "model.calculatedColumns[]", &[]);
+            let relationship = node_object(nodes, "model.relationships[]", &[]);
+            let static_table = node_object(
+                nodes,
+                "model.staticTables[]",
+                &[
+                    ("columns", json!({"type": "array", "items": {}})),
+                    (
+                        "rows",
+                        json!({"type": "array", "items": {"type": "array", "items": {}}}),
+                    ),
+                ],
+            );
+            let date_table = node_object(nodes, "model.dateTable", &[]);
+            let sort_by = node_object(nodes, "model.sortBy[]", &[]);
+            let format_string = node_object(nodes, "model.formatStrings[]", &[]);
+            node_object(
+                nodes,
+                "model",
+                &[
+                    ("measures", json!({"type": "array", "items": model_measure})),
+                    (
+                        "measurePatterns",
+                        json!({"type": "array", "items": measure_pattern}),
+                    ),
+                    (
+                        "calculatedColumns",
+                        json!({"type": "array", "items": calculated_column}),
+                    ),
+                    (
+                        "relationships",
+                        json!({"type": "array", "items": relationship}),
+                    ),
+                    (
+                        "staticTables",
+                        json!({"type": "array", "items": static_table}),
+                    ),
+                    ("dateTable", date_table),
+                    ("sortBy", json!({"type": "array", "items": sort_by})),
+                    (
+                        "formatStrings",
+                        json!({"type": "array", "items": format_string}),
+                    ),
+                ],
+            )
+        }
+    };
+
+    let page_size = node_object(
+        nodes,
+        "pages[].size",
+        &[("width", number.clone()), ("height", number.clone())],
+    );
+    let binding = node_object(
+        nodes,
+        "pages[].visuals[].bindings[]",
+        &[
+            ("role", string.clone()),
+            ("field", string.clone()),
+            ("table", string.clone()),
+            ("column", string.clone()),
+            ("measure", string.clone()),
+            ("displayName", string.clone()),
+            ("formatString", string.clone()),
+            ("sortDirection", string.clone()),
+        ],
+    );
+    let visual_layout = node_object(
+        nodes,
+        "pages[].visuals[].layout",
+        &[
+            ("x", number.clone()),
+            ("y", number.clone()),
+            ("width", number.clone()),
+            ("height", number.clone()),
+        ],
+    );
+    let interaction = node_object(
+        nodes,
+        "pages[].interactions[]",
+        &[
+            ("source", string.clone()),
+            ("target", string.clone()),
+            ("type", string.clone()),
+        ],
+    );
+
+    let page = match version {
+        SpecVersion::V1 => node_object(
+            nodes,
+            "pages[]",
+            &[
+                ("size", page_size.clone()),
+                (
+                    "visuals",
+                    json!({"type": "array", "items": node_object(
+                        nodes,
+                        "pages[].visuals[]",
+                        &visual_properties(
+                            visual_types.clone(),
+                            visual_layout.clone(),
+                            binding.clone(),
+                            None,
+                        ),
+                    )}),
+                ),
+                (
+                    "interactions",
+                    json!({"type": "array", "items": interaction.clone()}),
+                ),
+                ("filters", any_array.clone()),
+            ],
+        ),
+        SpecVersion::V2 => {
+            let slicer = node_object(nodes, "pages[].slicers[]", &[]);
+            let drillthrough = node_object(nodes, "pages[].drillthrough", &[]);
+            let visual_sort = node_object(nodes, "pages[].visuals[].sort", &[]);
+            let visual_drilldown = node_object(nodes, "pages[].visuals[].drilldown", &[]);
+            let visual_topn = node_object(nodes, "pages[].visuals[].topnGuard", &[]);
+            let filter_relative = node_object(nodes, "filters[].relative", &[]);
+            let filter = node_object(
+                nodes,
+                "filters[]",
+                &[
+                    ("relative", filter_relative),
+                    ("values", json!({"type": "array", "items": {}})),
+                ],
+            );
+            let visual_format = format_schema(nodes);
+            let visual = node_object(
+                nodes,
+                "pages[].visuals[]",
+                &visual_properties(
+                    visual_types,
+                    visual_layout,
+                    binding,
+                    Some((
+                        visual_sort,
+                        visual_drilldown,
+                        visual_topn,
+                        visual_format,
+                        filter.clone(),
+                    )),
+                ),
+            );
+            node_object(
+                nodes,
+                "pages[]",
+                &[
+                    ("size", page_size),
+                    ("slicers", json!({"type": "array", "items": slicer})),
+                    ("drillthrough", drillthrough),
+                    ("filters", json!({"type": "array", "items": filter})),
+                    ("visuals", json!({"type": "array", "items": visual})),
+                    (
+                        "interactions",
+                        json!({"type": "array", "items": interaction}),
+                    ),
+                ],
+            )
+        }
+    };
+
+    let mut root = match version {
+        SpecVersion::V1 => node_object(
+            nodes,
+            "root",
+            &[
+                ("report", report),
+                ("model", model),
+                ("pages", json!({"type": "array", "items": page})),
+                ("style", json!({"type": "object"})),
+                ("proof", json!({"type": "object"})),
+                ("schema", json!({"const": DASHBOARD_V1})),
+            ],
+        ),
+        SpecVersion::V2 => {
+            let style_tokens = node_object(
+                nodes,
+                "style.tokens",
+                &[("palette", json!({"type": "array", "items": {}}))],
+            );
+            let style = node_object(
+                nodes,
+                "style",
+                &[
+                    ("tokens", style_tokens_with_children(nodes, style_tokens)),
+                    ("defaults", json!({"type": "object"})),
+                ],
+            );
+            let layout = layout_schema(nodes);
+            let filter_relative = node_object(nodes, "filters[].relative", &[]);
+            let filter = node_object(
+                nodes,
+                "filters[]",
+                &[
+                    ("relative", filter_relative),
+                    ("values", json!({"type": "array", "items": {}})),
+                ],
+            );
+            let proof = proof_schema(nodes);
+            node_object(
+                nodes,
+                "root",
+                &[
+                    ("schema", json!({"const": DASHBOARD_V2})),
+                    ("report", report),
+                    ("model", model),
+                    ("style", style),
+                    ("layout", layout),
+                    ("filters", json!({"type": "array", "items": filter})),
+                    ("pages", json!({"type": "array", "items": page})),
+                    ("proof", proof),
+                ],
+            )
+        }
+    };
+    if let Some(object) = root.as_object_mut() {
+        object.insert(
+            "$schema".to_string(),
+            Value::String("https://json-schema.org/draft/2020-12/schema".to_string()),
+        );
+        object.insert(
+            "$id".to_string(),
+            Value::String(format!(
+                "powerbi-cli.report.spec.schema.{}",
+                match version {
+                    SpecVersion::V1 => "v1",
+                    SpecVersion::V2 => "v2",
+                }
+            )),
+        );
+        object.insert(
+            "schema".to_string(),
+            Value::String("powerbi-cli.report.spec.schema.v1".to_string()),
+        );
+        object.insert(
+            "title".to_string(),
+            Value::String(format!(
+                "powerbi-cli dashboard specification ({})",
+                match version {
+                    SpecVersion::V1 => "v1",
+                    SpecVersion::V2 => "v2",
+                }
+            )),
+        );
+        if version == SpecVersion::V2 {
+            object.insert("required".to_string(), json!(["schema", "report", "pages"]));
+        }
+    }
+    root
+}
+
+fn node_object(nodes: &[NodeSchema], name: &str, overrides: &[(&str, Value)]) -> Value {
+    let node = nodes
+        .iter()
+        .find(|candidate| candidate.name == name)
+        .unwrap_or_else(|| panic!("schema node table is missing {name}"));
+    let mut properties = Map::new();
+    for field in node.fields {
+        let property = overrides
+            .iter()
+            .find(|(key, _)| key == field)
+            .map(|(_, value)| value.clone())
+            .unwrap_or_else(|| json!({}));
+        properties.insert((*field).to_string(), property);
+    }
+    json!({
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": false
+    })
+}
+
+fn visual_properties(
+    visual_types: Value,
+    visual_layout: Value,
+    binding: Value,
+    v2_children: Option<(Value, Value, Value, Value, Value)>,
+) -> Vec<(&'static str, Value)> {
+    let string = json!({"type": "string"});
+    let number = json!({"type": "number"});
+    let mut properties = vec![
+        ("type", visual_types.clone()),
+        ("visualType", visual_types),
+        ("title", string.clone()),
+        ("id", string.clone()),
+        ("name", string),
+        ("layout", visual_layout),
+        ("bindings", json!({"type": "array", "items": binding})),
+        ("x", number.clone()),
+        ("y", number.clone()),
+        ("width", number.clone()),
+        ("height", number),
+    ];
+    if let Some((sort, drilldown, topn, format, filter)) = v2_children {
+        properties.extend([
+            ("sort", sort),
+            ("drilldown", drilldown),
+            ("topnGuard", topn),
+            ("format", format),
+            ("filters", json!({"type": "array", "items": filter})),
+            (
+                "conditionalFormatting",
+                json!({"type": "array", "items": {}}),
+            ),
+            ("subtitle", json!({"type": "string"})),
+            ("slot", json!({"type": "string"})),
+            ("mode", json!({"type": "string"})),
+            ("singleSelect", json!({"type": "boolean"})),
+            ("sortDirection", json!({"type": "string"})),
+        ]);
+    }
+    properties
+}
+
+fn format_schema(nodes: &[NodeSchema]) -> Value {
+    let keys = format_catalog_keys();
+    let overrides = keys
+        .iter()
+        .map(|key| (key.as_str(), json!({})))
+        .collect::<Vec<_>>();
+    node_object(nodes, "pages[].visuals[].format", &overrides)
+}
+
+fn style_tokens_with_children(nodes: &[NodeSchema], base: Value) -> Value {
+    let semantic = node_object(nodes, "style.tokens.semantic", &[]);
+    let typography = node_object(nodes, "style.tokens.typography", &[]);
+    let surfaces = node_object(nodes, "style.tokens.surfaces", &[]);
+    let spacing = node_object(nodes, "style.tokens.spacing", &[]);
+    let number_formats = node_object(nodes, "style.tokens.numberFormats", &[]);
+    let mut object = base;
+    if let Some(properties) = object.get_mut("properties").and_then(Value::as_object_mut) {
+        properties.insert("semantic".to_string(), semantic);
+        properties.insert("typography".to_string(), typography);
+        properties.insert("surfaces".to_string(), surfaces);
+        properties.insert("spacing".to_string(), spacing);
+        properties.insert("numberFormats".to_string(), number_formats);
+    }
+    object
+}
+
+fn layout_schema(nodes: &[NodeSchema]) -> Value {
+    let number = json!({"type": "number"});
+    let grid = node_object(
+        nodes,
+        "layout.grid",
+        &[
+            ("columns", number.clone()),
+            ("gutter", number.clone()),
+            ("margin", number.clone()),
+        ],
+    );
+    let page_size = node_object(
+        nodes,
+        "layout.pageSize",
+        &[("width", number.clone()), ("height", number)],
+    );
+    let slicer = node_object(nodes, "layout.rail.slicers[]", &[]);
+    let rail = node_object(
+        nodes,
+        "layout.rail",
+        &[
+            ("side", json!({"type": "string"})),
+            ("slicers", json!({"type": "array", "items": slicer})),
+        ],
+    );
+    node_object(
+        nodes,
+        "layout",
+        &[("grid", grid), ("pageSize", page_size), ("rail", rail)],
+    )
+}
+
+fn proof_schema(nodes: &[NodeSchema]) -> Value {
+    let expectation = node_object(nodes, "proof.desktop.expectValues[]", &[]);
+    let desktop = node_object(
+        nodes,
+        "proof.desktop",
+        &[(
+            "expectValues",
+            json!({"type": "array", "items": expectation}),
+        )],
+    );
+    node_object(
+        nodes,
+        "proof",
+        &[
+            ("desktop", desktop),
+            ("goldens", json!({"type": "array", "items": {}})),
+        ],
+    )
+}
+
+fn visual_type_values() -> Vec<String> {
+    let mut values = BTreeSet::new();
+    for contract in visual_type_contracts() {
+        if let Some(value) = contract.get("visualType").and_then(Value::as_str) {
+            values.insert(value.to_string());
+        }
+        if let Some(aliases) = contract.get("aliases").and_then(Value::as_array) {
+            values.extend(
+                aliases
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(ToOwned::to_owned),
+            );
+        }
+    }
+    values.into_iter().collect()
 }
 
 fn nodes_json(nodes: &[NodeSchema]) -> Value {
@@ -824,6 +1348,218 @@ fn first_uncompiled_v2_section(
     None
 }
 
+/// A recognized dashboard-spec section that the current compiler deliberately
+/// leaves for a later completeness bead. Explain mode reports these instead
+/// of refusing the entire preview, so an agent can see exactly which portions
+/// of a spec still need a follow-up command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UncompiledSection {
+    pub(crate) section: String,
+    pub(crate) pointer: String,
+    pub(crate) owning_bead: &'static str,
+    pub(crate) suggested_command: &'static str,
+}
+
+pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSection>> {
+    let Some(root) = spec.as_object() else {
+        return Ok(Vec::new());
+    };
+    if spec_version(root)? != SpecVersion::V2 {
+        return Ok(Vec::new());
+    }
+
+    const FILTER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.1";
+    const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
+    const DRILLTHROUGH_BEAD: &str = "pbi-t3-compiler-completeness-1qi.3";
+    const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
+    const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
+    const FORMAT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.8";
+    const PROOF_BEAD: &str = "pbi-t3-compiler-completeness-1qi.9";
+
+    let mut sections = Vec::new();
+    let mut push = |section: String,
+                    pointer: String,
+                    owning_bead: &'static str,
+                    suggested_command: &'static str| {
+        sections.push(UncompiledSection {
+            section,
+            pointer,
+            owning_bead,
+            suggested_command,
+        });
+    };
+
+    if root.contains_key("filters") {
+        push(
+            "filters".to_string(),
+            "/filters".to_string(),
+            FILTER_BEAD,
+            "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json",
+        );
+    }
+    if let Some(model) = root.get("model").and_then(Value::as_object) {
+        for section in [
+            "measurePatterns",
+            "calculatedColumns",
+            "relationships",
+            "staticTables",
+            "dateTable",
+            "sortBy",
+            "formatStrings",
+        ] {
+            if model.contains_key(section) {
+                push(
+                    format!("model.{section}"),
+                    format!("/model/{section}"),
+                    MODEL_BEAD,
+                    "powerbi-cli --json capabilities --for model",
+                );
+            }
+        }
+        if let Some(measures) = model.get("measures").and_then(Value::as_array) {
+            for (index, measure) in measures.iter().enumerate() {
+                let Some(measure) = measure.as_object() else {
+                    continue;
+                };
+                for field in ["expressionFile", "formatStringExpression"] {
+                    if measure.contains_key(field) {
+                        push(
+                            format!("model.measures[].{field}"),
+                            format!("/model/measures/{index}/{field}"),
+                            MODEL_BEAD,
+                            "powerbi-cli model measures add --project <project-dir> --table <table> --name <name> --expression-file <path> --dry-run --json",
+                        );
+                    }
+                }
+            }
+        }
+    }
+    if root.contains_key("style") {
+        push(
+            "style".to_string(),
+            "/style".to_string(),
+            STYLE_BEAD,
+            "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
+        );
+    }
+    if let Some(layout) = root.get("layout").and_then(Value::as_object) {
+        if layout.contains_key("rail") {
+            push(
+                "layout.rail".to_string(),
+                "/layout/rail".to_string(),
+                SLICER_BEAD,
+                "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
+            );
+        } else {
+            push(
+                "layout".to_string(),
+                "/layout".to_string(),
+                LAYOUT_BEAD,
+                "powerbi-cli report layout auto --project <project-dir> --page <page-handle> --preset overview --dry-run --json",
+            );
+        }
+    }
+    if let Some(pages) = root.get("pages").and_then(Value::as_array) {
+        for (page_index, page) in pages.iter().enumerate() {
+            let Some(page) = page.as_object() else {
+                continue;
+            };
+            let page_pointer = format!("/pages/{page_index}");
+            if page.contains_key("filters") {
+                push(
+                    format!("pages[{page_index}].filters"),
+                    format!("{page_pointer}/filters"),
+                    FILTER_BEAD,
+                    "powerbi-cli report filters add --project <project-dir> --page <page-handle> --target <Table[Column]> --value <value> --dry-run --json",
+                );
+            }
+            if page.contains_key("slicers") {
+                push(
+                    format!("pages[{page_index}].slicers"),
+                    format!("{page_pointer}/slicers"),
+                    SLICER_BEAD,
+                    "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
+                );
+            }
+            if page.contains_key("drillthrough") {
+                push(
+                    format!("pages[{page_index}].drillthrough"),
+                    format!("{page_pointer}/drillthrough"),
+                    DRILLTHROUGH_BEAD,
+                    "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
+                );
+            }
+            if page.contains_key("tooltipFor") {
+                push(
+                    format!("pages[{page_index}].tooltipFor"),
+                    format!("{page_pointer}/tooltipFor"),
+                    DRILLTHROUGH_BEAD,
+                    "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
+                );
+            }
+            for field in ["template", "heading", "subtitle"] {
+                if page.contains_key(field) {
+                    push(
+                        format!("pages[{page_index}].{field}"),
+                        format!("{page_pointer}/{field}"),
+                        LAYOUT_BEAD,
+                        "powerbi-cli report layout auto --project <project-dir> --page <page-handle> --preset overview --dry-run --json",
+                    );
+                }
+            }
+            if let Some(visuals) = page.get("visuals").and_then(Value::as_array) {
+                for (visual_index, visual) in visuals.iter().enumerate() {
+                    let Some(visual) = visual.as_object() else {
+                        continue;
+                    };
+                    let visual_pointer = format!("{page_pointer}/visuals/{visual_index}");
+                    for field in ["sort", "drilldown", "topnGuard", "filters"] {
+                        if visual.contains_key(field) {
+                            push(
+                                format!("pages[{page_index}].visuals[{visual_index}].{field}"),
+                                format!("{visual_pointer}/{field}"),
+                                VISUAL_BEHAVIOR_BEAD,
+                                "powerbi-cli --json capabilities --for report",
+                            );
+                        }
+                    }
+                    for field in ["slot", "subtitle"] {
+                        if visual.contains_key(field) {
+                            push(
+                                format!("pages[{page_index}].visuals[{visual_index}].{field}"),
+                                format!("{visual_pointer}/{field}"),
+                                LAYOUT_BEAD,
+                                "powerbi-cli report visuals set-position --project <project-dir> --handle <visual-handle> --x <x> --y <y> --width <width> --height <height> --dry-run --json",
+                            );
+                        }
+                    }
+                    for field in ["format", "conditionalFormatting"] {
+                        if visual.contains_key(field) {
+                            push(
+                                format!("pages[{page_index}].visuals[{visual_index}].{field}"),
+                                format!("{visual_pointer}/{field}"),
+                                FORMAT_BEAD,
+                                "powerbi-cli report visuals set-object --project <project-dir> --handle <visual-handle> --object <object> --property <property> --value <value> --dry-run --json",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if root.contains_key("proof") {
+        push(
+            "proof".to_string(),
+            "/proof".to_string(),
+            PROOF_BEAD,
+            "powerbi-cli desktop open-check <project-dir> --json",
+        );
+    }
+    Ok(sections)
+}
+
 // These DTOs deliberately mirror the public v2 shape. The strict walker owns
 // pointer-rich unknown-field diagnostics; serde supplies independent structural
 // type validation and deny_unknown_fields at each statically shaped node.
@@ -1087,6 +1823,7 @@ struct VisualV2 {
     r#type: Option<Value>,
     visual_type: Option<Value>,
     title: Option<Value>,
+    text: Option<Value>,
     subtitle: Option<Value>,
     bindings: Option<Vec<BindingV2>>,
     layout: Option<VisualLayoutV2>,

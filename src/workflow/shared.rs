@@ -1868,24 +1868,23 @@ pub(crate) fn validate_generic_m_template(text: &str) -> CliResult<()> {
             None,
         ));
     }
-    let roots =
-        tokens
-            .windows(4)
-            .enumerate()
-            .filter_map(|(index, items)| {
-                matches!(
-                items,
-                [MToken::Ident(binding), MToken::Equals, MToken::Ident(connector), MToken::LParen]
-                    if binding == "Source"
-            )
-            .then(|| match items {
-                [MToken::Ident(_), MToken::Equals, MToken::Ident(connector), MToken::LParen] => {
-                    (index, connector.as_str())
-                }
-                _ => unreachable!("the match above fixes the four-token shape"),
-            })
-            })
-            .collect::<Vec<_>>();
+    let roots = tokens
+        .windows(4)
+        .enumerate()
+        .filter_map(|(index, items)| {
+            if let [
+                MToken::Ident(binding),
+                MToken::Equals,
+                MToken::Ident(connector),
+                MToken::LParen,
+            ] = items
+                && binding == "Source"
+            {
+                return Some((index, connector.as_str()));
+            }
+            None
+        })
+        .collect::<Vec<_>>();
     if roots.len() != 1 {
         return Err(generic_m_template_error(
             text,

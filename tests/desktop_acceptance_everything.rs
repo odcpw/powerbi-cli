@@ -348,6 +348,26 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let explained = h.ok(
+        "report spec explain",
+        &svec([
+            "report",
+            "spec",
+            "explain",
+            "--schema",
+            &p(&schema),
+            "--profile",
+            &p(&profile),
+            "--spec",
+            &p(&spec),
+            "--json",
+        ]),
+    );
+    assert!(explained["plan"]["stages"].as_array().is_some());
+    h.ok(
+        "report spec schema",
+        &svec(["report", "spec", "schema", "--json"]),
+    );
     h.ok(
         "scaffold",
         &svec([
@@ -423,6 +443,25 @@ fn everything_acceptance_invokes_every_catalog_command() {
         "desktop open-check",
         desktop_oracle_exit,
         &svec(["desktop", "open-check", &project_arg, "--json"]),
+    );
+    h.code(
+        "desktop refresh-check",
+        2,
+        &svec(["desktop", "refresh-check", &project_arg, "--json"]),
+    );
+    h.code(
+        "desktop canvas-check",
+        2,
+        &svec([
+            "desktop",
+            "canvas-check",
+            &project_arg,
+            "--page",
+            "Overview",
+            "--expect",
+            "values.json",
+            "--json",
+        ]),
     );
     h.code(
         "desktop screenshot",

@@ -1,0 +1,110 @@
+{
+  "dateTables": [
+    {
+      "column": "Date",
+      "evidence": [
+        "column Date has date-like signal from data type date",
+        "date coverage is unavailable in the supplied profile",
+        "dimension is connected to a fact table and can serve as the date table"
+      ],
+      "proposed": false,
+      "table": "DimDate"
+    }
+  ],
+  "dimensions": [
+    {
+      "evidence": [
+        "1 declared key column(s) provide a dimension-key signal",
+        "numeric column share is 0/2 (0%)",
+        "profile role is explicitly dimension",
+        "relationship FactSales[DateKey] -> DimDate[DateKey] has many-to-one cardinality; connected table FactSales is a classified model role",
+        "relationship FactTargets[DateKey] -> DimDate[DateKey] has many-to-one cardinality; connected table FactTargets is a classified model role",
+        "relationship fan-in is 2",
+        "row count is unavailable or zero; row-ratio evidence is inconclusive",
+        "table name uses the Dim/calendar prefix"
+      ],
+      "table": "DimDate"
+    }
+  ],
+  "facts": [
+    {
+      "evidence": [
+        "numeric column share is 1/2 (50%)",
+        "profile role is explicitly fact",
+        "relationship FactSales[DateKey] -> DimDate[DateKey] has many-to-one cardinality; connected table DimDate is a classified model role",
+        "relationship fan-out is 1",
+        "row count is unavailable or zero; row-ratio evidence is inconclusive",
+        "table name uses the Fact prefix"
+      ],
+      "table": "FactSales"
+    },
+    {
+      "evidence": [
+        "numeric column share is 1/2 (50%)",
+        "profile role is explicitly fact",
+        "relationship FactTargets[DateKey] -> DimDate[DateKey] has many-to-one cardinality; connected table DimDate is a classified model role",
+        "relationship fan-out is 1",
+        "row count is unavailable or zero; row-ratio evidence is inconclusive",
+        "table name uses the Fact prefix"
+      ],
+      "table": "FactTargets"
+    }
+  ],
+  "highCardinality": [],
+  "hypotheses": [],
+  "keyCandidates": [
+    {
+      "column": "DateKey",
+      "evidence": [
+        "column name uses an id/key suffix signal",
+        "relationship endpoint identifies the column as a key candidate",
+        "schema/profile marks the column as a key",
+        "uniqueness is unavailable because no positive row count was profiled"
+      ],
+      "table": "DimDate",
+      "uniqueness": null
+    },
+    {
+      "column": "DateKey",
+      "evidence": [
+        "column name uses an id/key suffix signal",
+        "relationship endpoint identifies the column as a key candidate",
+        "uniqueness is unavailable because no positive row count was profiled"
+      ],
+      "table": "FactSales",
+      "uniqueness": null
+    },
+    {
+      "column": "DateKey",
+      "evidence": [
+        "column name uses an id/key suffix signal",
+        "relationship endpoint identifies the column as a key candidate",
+        "uniqueness is unavailable because no positive row count was profiled"
+      ],
+      "table": "FactTargets",
+      "uniqueness": null
+    }
+  ],
+  "kind": "multi-fact",
+  "relationships": [
+    {
+      "evidence": "relationship FactSales[DateKey] -> DimDate[DateKey] has many-to-one cardinality",
+      "fromCardinality": "many",
+      "fromColumn": "DateKey",
+      "fromTable": "FactSales",
+      "toCardinality": "one",
+      "toColumn": "DateKey",
+      "toTable": "DimDate"
+    },
+    {
+      "evidence": "relationship FactTargets[DateKey] -> DimDate[DateKey] has many-to-one cardinality",
+      "fromCardinality": "many",
+      "fromColumn": "DateKey",
+      "fromTable": "FactTargets",
+      "toCardinality": "one",
+      "toColumn": "DateKey",
+      "toTable": "DimDate"
+    }
+  ],
+  "warnings": []
+}

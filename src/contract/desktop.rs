@@ -81,6 +81,36 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
         }),
         json!({
+            "path": "desktop refresh-check",
+            "usage": "powerbi-cli desktop refresh-check <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json",
+            "summary": "Planned Windows Desktop refresh proof that will verify dummy-partition refresh and issue-dialog absence",
+            "tags": ["desktop", "oracle", "proof", "refresh", "windows", "planned", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "planned",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.desktop.refreshCheck.v1",
+            "platforms": ["windows when T9.1 is available", "linux unsupported_feature", "macos unsupported_feature"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--enable-oracle", "--json", "--format json"],
+            "limitations": ["T9.1 is not implemented in this release; the command is advertised so proof plans remain forward-compatible and returns unsupported_feature until the Windows oracle implementation lands."],
+            "followUpFields": ["ok", "exitCode", "project", "refresh.completed", "refresh.errors", "proof", "diagnostics", "next"]
+        }),
+        json!({
+            "path": "desktop canvas-check",
+            "usage": "powerbi-cli desktop canvas-check <project-dir-or.pbip-or.pbix> --page <page> --expect <values.json> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json",
+            "summary": "Planned Windows Desktop canvas proof that will assert expected values and reject a blank rendered page",
+            "tags": ["desktop", "oracle", "proof", "canvas", "refresh", "windows", "planned", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "planned",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.desktop.canvasCheck.v1",
+            "platforms": ["windows when T9.2 is available", "linux unsupported_feature", "macos unsupported_feature"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--page <page>", "--expect <values.json>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--enable-oracle", "--json", "--format json"],
+            "limitations": ["T9.2 is not implemented in this release; the command is advertised so proof plans remain forward-compatible and returns unsupported_feature until the Windows oracle implementation lands."],
+            "followUpFields": ["ok", "exitCode", "project", "page", "expectations", "canvas.rendered", "canvas.blankRejected", "proof", "diagnostics", "next"]
+        }),
+        json!({
             "path": "desktop bridge status",
             "usage": "powerbi-cli desktop bridge status [--pid <pid>] --json",
             "summary": "Inspect pinned Microsoft Desktop Bridge instances and their exact current-file, dirty-state, and PBIR page inventory",

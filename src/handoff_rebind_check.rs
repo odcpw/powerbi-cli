@@ -652,12 +652,12 @@ fn source_string_literals(source: &str) -> Vec<String> {
             index = next;
             continue;
         }
-        if bytes[index] == b'"' {
-            if let Some((literal, next)) = parse_m_string(bytes, index) {
-                literals.push(literal);
-                index = next;
-                continue;
-            }
+        if bytes[index] == b'"'
+            && let Some((literal, next)) = parse_m_string(bytes, index)
+        {
+            literals.push(literal);
+            index = next;
+            continue;
         }
         index += 1;
     }

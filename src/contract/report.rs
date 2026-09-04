@@ -7,8 +7,8 @@ pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
             "path": "report build",
-            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -17,12 +17,13 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.build.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
-            "followUpFields": ["projectDir", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"]
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args"]
         }),
         json!({
             "path": "report spec validate",
@@ -38,12 +39,12 @@ pub(super) fn commands() -> Vec<Value> {
             "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec validate --schema examples/sales.schema.json --spec examples/sales.dashboard.json --json", "powerbi-cli report spec validate --spec examples/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "exitCode", "validationLevel", "normalizedFrom", "compiled.counts", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "next"],
+            "followUpFields": ["ok", "exitCode", "validationLevel", "normalizedFrom", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "errors[].field", "errors[].reason", "errors[].candidatesCommand", "errors[].example", "next"],
             "validationLevels": [
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
             ],
-            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args", "include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"],
+            "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args", "include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"],
             "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
             "supportedIncludes": ["model", "pages[]", "style"]
         }),
@@ -81,6 +82,38 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec fields --json", "powerbi-cli report spec fields --schema examples/sales.schema.json --profile examples/sales.profile.json --json"],
             "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
+        }),
+        json!({
+            "path": "report spec schema",
+            "usage": "powerbi-cli report spec schema [--version v1|v2|all] --json",
+            "summary": "Emit the draft 2020-12 JSON Schema generated from the strict v1/v2 dashboard-spec key catalog",
+            "tags": ["report", "dashboard", "spec", "schema", "json-schema", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.schema.v1",
+            "flags": ["--version v1|v2|all", "--json", "--format json"],
+            "examples": ["powerbi-cli report spec schema --json", "powerbi-cli report spec schema --version v2 --json"],
+            "followUpFields": ["$schema", "$id", "$defs.v1", "$defs.v2", "oneOf"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
+        }),
+        json!({
+            "path": "report spec explain",
+            "usage": "powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json",
+            "summary": "Compile a strict dashboard spec to a deterministic staged operation plan without writing a project",
+            "tags": ["report", "dashboard", "spec", "explain", "plan", "dry-run", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.explain.v1",
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
+            "examples": ["powerbi-cli report spec explain --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --json"],
+            "followUpFields": ["ok", "specVersion", "plan.stages", "plan.ops", "handles.declared", "handles.references", "layout.pages[].slots", "defaults.perVisual", "proofPlan.commands", "proofPlan.unavailable", "unsupportedSections", "warnings", "next"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
         }),
         json!({
             "path": "report spec upgrade",
@@ -125,7 +158,7 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.dashboard.json --json",
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"
             ],
-            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "spec", "compiled.counts", "decisions", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].shape", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
             "diagnosticCodes": ["spec.invalid_intent", "spec.missing_input", "input_safety_violation", "invalid_args"]
         }),
         json!({
