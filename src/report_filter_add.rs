@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode, required_project, set_mode, shell_arg, take_value,
     target_project,
 };
+use crate::ops::{AddFilter as AddFilterOp, Op, OpKernel, OpOutcome, Transaction};
 use crate::pbir::{VisualSelector, find_page, find_visual, load_report_snapshot};
 use crate::pbir_filters::{
     FilterArrayOrigin, FilterScope, filter_fingerprint, filter_target, named_filter_handle,
@@ -64,6 +65,371 @@ struct FilterAddPlan {
     before_count: usize,
     after_count: usize,
     handle: String,
+}
+
+/// Kernel registration for the typed `addFilter` operation. The legacy CLI
+/// command remains the compatibility surface; this adapter applies the same
+/// owner/target/spec helpers to a [`Transaction`] working copy.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct AddFilterKernel;
+
+impl OpKernel for AddFilterKernel {
+    fn apply(&mut self, operation: &Op, transaction: &mut Transaction) -> CliResult<OpOutcome> {
+        let Op::AddFilter(payload) = operation else {
+            return Err(CliError::invalid_args(format!(
+                "addFilter kernel received operation `{}`",
+                operation.tag()
+            )));
+        };
+        apply_add_filter(payload, transaction)
+    }
+}
+
+/// Parse the existing `report filters add` argv contract into one typed op.
+/// Resolution is read-only and is intentionally performed here so generated
+/// names and errors stay byte-identical to the established CLI path.
+pub(crate) fn parse_args(args: &[String]) -> CliResult<(Op, MutationMode)> {
+    let options = parse_add_args(args)?;
+    let source_project = required_project(options.project.clone(), "report filters add")?;
+    let mode = require_mode(options.mode, "report filters add")?;
+    let source_resolved = resolve_project(&source_project)?;
+    let owner = resolve_filter_owner(&source_resolved, &options)?;
+    ensure_filter_owner_path(&source_resolved, &owner.path)?;
+    let column = resolve_requested_column(&source_resolved, &options)?;
+    let spec = resolve_filter_spec(&source_resolved, &options)?;
+    spec.validate_for(&column, owner.scope)?;
+    let name = options
+        .name
+        .clone()
+        .unwrap_or_else(|| generated_filter_name(owner.scope, &column, &spec));
+    validate_filter_name(&name)?;
+    let handle = filter_handle(&owner, &name);
+    Ok((
+        Op::AddFilter(AddFilterOp {
+            handle,
+            scope: owner.scope.as_str().to_string(),
+            owner: owner.stable_id,
+            filter_type: filter_type_name(&spec).to_string(),
+            target: json!({ "table": column.table, "column": column.column }),
+            name: Some(name),
+            display_name: options.display_name,
+            condition: spec_condition(&spec),
+            values: spec_values(&spec),
+            relative: spec_relative(&spec),
+        }),
+        mode,
+    ))
+}
+
+/// Apply a typed add-filter payload to the transaction's staged project.
+/// Every path lookup and PBIR shape is delegated to the existing mutation
+/// helpers, while the source project remains untouched until commit.
+pub(crate) fn apply_add_filter(
+    payload: &AddFilterOp,
+    transaction: &mut Transaction,
+) -> CliResult<OpOutcome> {
+    let working = transaction.working_project()?;
+    let options = owner_options(payload)?;
+    let owner = resolve_filter_owner(&working, &options)?;
+    ensure_filter_owner_path(&working, &owner.path)?;
+    let (table, column_name) = operation_target(payload)?;
+    let column = resolve_filter_column(&working, &table, &column_name)?;
+    let spec = operation_filter_spec(&working, payload)?;
+    spec.validate_for(&column, owner.scope)?;
+    let name = payload
+        .name
+        .clone()
+        .unwrap_or_else(|| generated_filter_name(owner.scope, &column, &spec));
+    validate_filter_name(&name)?;
+    let filter = spec.to_pbir(&name, payload.display_name.as_deref(), &column)?;
+    let plan = add_filter_to_file(&owner, filter)?;
+    write_json_atomic(&owner.path, &plan.file_json)?;
+
+    let source_path = source_relative_path(&owner.path, &working, transaction);
+    let mut outcome = OpOutcome::changed();
+    outcome.created_handles.push(plan.handle.clone());
+    outcome.changes.push(json!({
+        "kind": "pbir.filter",
+        "action": "add",
+        "path": canonical_display(&source_path),
+        "jsonPointer": plan.json_pointer,
+        "parentJsonPointer": "/filterConfig/filters",
+        "ordinal": plan.before_count,
+        "before": Value::Null,
+        "after": filter_summary_for_path(&owner, &plan, &spec, &source_path),
+    }));
+    let project_arg = command_arg(&transaction.source.project_dir);
+    let filter_show = format!(
+        "powerbi-cli report filters show --project {project_arg} --handle {} --json",
+        shell_arg(&plan.handle)
+    );
+    outcome.readback = vec![
+        owner
+            .readback_command
+            .replace(&command_arg(&working.project_dir), &project_arg),
+        filter_show,
+        owner
+            .owner_readback_command
+            .replace(&command_arg(&working.project_dir), &project_arg),
+        format!("powerbi-cli report wireframe export {project_arg} --json"),
+        format!("powerbi-cli inspect --deep {project_arg} --json"),
+        format!("powerbi-cli validate --strict {project_arg} --json"),
+    ];
+    Ok(outcome)
+}
+
+fn filter_type_name(spec: &FilterSpec) -> &'static str {
+    match spec {
+        FilterSpec::Categorical { .. } => "Categorical",
+        FilterSpec::NumericRange { .. } => "Advanced",
+        FilterSpec::TopN { .. } => "TopN",
+        FilterSpec::RelativeDate { .. } => "RelativeDate",
+    }
+}
+
+fn spec_condition(spec: &FilterSpec) -> Option<Value> {
+    match spec {
+        FilterSpec::Categorical { values } => Some(json!({ "values": values })),
+        FilterSpec::NumericRange { min, max } => Some(json!({
+            "min": min,
+            "max": max
+        })),
+        FilterSpec::TopN {
+            direction,
+            count,
+            by,
+        } => Some(json!({
+            "direction": direction.flag(),
+            "count": count,
+            "by": { "table": by.table, "measure": by.measure }
+        })),
+        FilterSpec::RelativeDate { .. } => None,
+    }
+}
+
+fn spec_values(spec: &FilterSpec) -> Vec<Value> {
+    match spec {
+        FilterSpec::Categorical { values } => values.clone(),
+        FilterSpec::NumericRange { .. }
+        | FilterSpec::TopN { .. }
+        | FilterSpec::RelativeDate { .. } => Vec::new(),
+    }
+}
+
+fn spec_relative(spec: &FilterSpec) -> Option<Value> {
+    match spec {
+        FilterSpec::RelativeDate {
+            operator,
+            unit,
+            span,
+        } => Some(json!({
+            "operator": operator.as_str(),
+            "unit": unit.as_str(),
+            "span": span
+        })),
+        FilterSpec::Categorical { .. }
+        | FilterSpec::NumericRange { .. }
+        | FilterSpec::TopN { .. } => None,
+    }
+}
+
+fn owner_options(payload: &AddFilterOp) -> CliResult<AddFilterOptions> {
+    let scope = match payload.scope.to_ascii_lowercase().as_str() {
+        "report" => FilterScope::Report,
+        "page" => FilterScope::Page,
+        "visual" => FilterScope::Visual,
+        other => {
+            return Err(CliError::invalid_args(format!(
+                "invalid addFilter scope: {other}"
+            )));
+        }
+    };
+    let mut options = AddFilterOptions {
+        scope: Some(scope),
+        ..AddFilterOptions::default()
+    };
+    match scope {
+        FilterScope::Report => {
+            if payload.owner != "report" && payload.owner != "report:main" {
+                return Err(CliError::invalid_args(format!(
+                    "report addFilter owner must be report:main: {}",
+                    payload.owner
+                )));
+            }
+        }
+        FilterScope::Page => options.page = Some(payload.owner.clone()),
+        FilterScope::Visual => options.visual = Some(payload.owner.clone()),
+        FilterScope::All => unreachable!("addFilter scope parser never returns all"),
+    }
+    Ok(options)
+}
+
+fn operation_target(payload: &AddFilterOp) -> CliResult<(String, String)> {
+    let Some(object) = payload.target.as_object() else {
+        if let Some(target) = payload.target.as_str() {
+            return parse_field_reference(target);
+        }
+        return Err(CliError::invalid_args(
+            "addFilter operation target must be an object with table and column",
+        ));
+    };
+    let table = object.get("table").and_then(Value::as_str).ok_or_else(|| {
+        CliError::invalid_args("addFilter operation target requires string table")
+    })?;
+    let column = object
+        .get("column")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            CliError::invalid_args("addFilter operation target requires string column")
+        })?;
+    if table.trim().is_empty() || column.trim().is_empty() {
+        return Err(CliError::invalid_args(
+            "addFilter operation target table and column must not be empty",
+        ));
+    }
+    Ok((table.to_string(), column.to_string()))
+}
+
+fn operation_filter_spec(
+    resolved: &ResolvedProject,
+    payload: &AddFilterOp,
+) -> CliResult<FilterSpec> {
+    let kind = payload
+        .filter_type
+        .to_ascii_lowercase()
+        .replace(['_', '-'], "");
+    match kind.as_str() {
+        "categorical" => {
+            let values = if payload.values.is_empty() {
+                payload
+                    .condition
+                    .as_ref()
+                    .and_then(|condition| condition["values"].as_array())
+                    .cloned()
+                    .unwrap_or_default()
+            } else {
+                payload.values.clone()
+            };
+            Ok(FilterSpec::Categorical { values })
+        }
+        "advanced" | "range" | "numericrange" => {
+            let condition = payload.condition.as_ref();
+            let min = condition
+                .and_then(|value| value.get("min"))
+                .filter(|value| !value.is_null())
+                .cloned();
+            let max = condition
+                .and_then(|value| value.get("max"))
+                .filter(|value| !value.is_null())
+                .cloned();
+            Ok(FilterSpec::NumericRange { min, max })
+        }
+        "topn" | "top" => {
+            let condition = payload.condition.as_ref().ok_or_else(|| {
+                CliError::invalid_args("TopN addFilter operation requires condition")
+            })?;
+            let direction = match condition
+                .get("direction")
+                .and_then(Value::as_str)
+                .unwrap_or("--top")
+                .to_ascii_lowercase()
+                .as_str()
+            {
+                "top" | "--top" => TopNDirection::Top,
+                "bottom" | "--bottom" => TopNDirection::Bottom,
+                other => {
+                    return Err(CliError::invalid_args(format!(
+                        "unsupported TopN direction: {other}"
+                    )));
+                }
+            };
+            let count = condition
+                .get("count")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| CliError::invalid_args("TopN addFilter requires integer count"))?;
+            let by = condition
+                .get("by")
+                .and_then(|value| {
+                    value.as_str().map(ToOwned::to_owned).or_else(|| {
+                        Some(format!(
+                            "{}[{}]",
+                            value.get("table")?.as_str()?,
+                            value.get("measure")?.as_str()?
+                        ))
+                    })
+                })
+                .or_else(|| {
+                    Some(format!(
+                        "{}[{}]",
+                        condition.get("byTable")?.as_str()?,
+                        condition.get("byMeasure")?.as_str()?
+                    ))
+                })
+                .ok_or_else(|| {
+                    CliError::invalid_args("TopN addFilter requires a measure in condition.by")
+                })?;
+            Ok(FilterSpec::TopN {
+                direction,
+                count,
+                by: resolve_filter_measure(resolved, &by)?,
+            })
+        }
+        "relativedate" | "relativetime" => {
+            let relative = payload
+                .relative
+                .as_ref()
+                .or(payload.condition.as_ref())
+                .ok_or_else(|| {
+                    CliError::invalid_args(
+                        "relative-date addFilter operation requires relative metadata",
+                    )
+                })?;
+            let operator = relative
+                .get("operator")
+                .and_then(Value::as_str)
+                .ok_or_else(|| CliError::invalid_args("relative-date addFilter requires operator"))
+                .and_then(RelativeDateOperator::parse)?;
+            let unit = relative
+                .get("unit")
+                .and_then(Value::as_str)
+                .ok_or_else(|| CliError::invalid_args("relative-date addFilter requires unit"))
+                .and_then(RelativeDateUnit::parse)?;
+            let span = relative
+                .get("span")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| CliError::invalid_args("relative-date addFilter requires span"))?;
+            Ok(FilterSpec::RelativeDate {
+                operator,
+                unit,
+                span,
+            })
+        }
+        other => Err(CliError::unsupported_feature(format!(
+            "addFilter operation cannot emit filter type {other}"
+        ))),
+    }
+}
+
+fn source_relative_path(
+    working_path: &Path,
+    working: &ResolvedProject,
+    transaction: &Transaction,
+) -> PathBuf {
+    working_path
+        .strip_prefix(&working.project_dir)
+        .map(|relative| transaction.source.project_dir.join(relative))
+        .unwrap_or_else(|_| working_path.to_path_buf())
+}
+
+fn filter_summary_for_path(
+    owner: &ResolvedFilterOwner,
+    plan: &FilterAddPlan,
+    spec: &FilterSpec,
+    path: &Path,
+) -> Value {
+    let mut summary = filter_summary(owner, plan, spec, false);
+    summary["path"] = Value::String(canonical_display(path));
+    summary
 }
 
 pub(crate) fn add_filter(args: &[String]) -> CliResult<Value> {
@@ -900,4 +1266,179 @@ fn ensure_filter_owner_path(resolved: &ResolvedProject, path: &Path) -> CliResul
     ))
     .with_hint("Run `validate --strict` before mutating this report.")
     .with_suggested_command("powerbi-cli validate --strict <project-dir-or.pbip> --json"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ops::{OpPlan, ProjectIndex};
+
+    fn scaffold(root: &Path) -> ResolvedProject {
+        let schema: Value =
+            serde_json::from_str(include_str!("../examples/sales.schema.json")).expect("schema");
+        crate::scaffold_schema_value(schema, Path::new("examples/sales.schema.json"), root, false)
+            .expect("scaffold");
+        resolve_project(root).expect("resolve")
+    }
+
+    fn run_kernel_case(args: Vec<String>) {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let cli_source_root = temp.path().join("cli-source");
+        let cli_source = scaffold(&cli_source_root);
+        let cli_out = temp.path().join("cli-out");
+        let mut cli_args = args.clone();
+        cli_args.splice(
+            0..0,
+            [
+                "--project".to_string(),
+                cli_source.project_dir.to_string_lossy().into_owned(),
+                "--out-dir".to_string(),
+                cli_out.to_string_lossy().into_owned(),
+            ],
+        );
+        add_filter(&cli_args).expect("CLI mutation");
+
+        let op_source_root = temp.path().join("op-source");
+        let op_source = scaffold(&op_source_root);
+        let op_out = temp.path().join("op-out");
+        let mut op_args = args;
+        op_args.splice(
+            0..0,
+            [
+                "--project".to_string(),
+                op_source.project_dir.to_string_lossy().into_owned(),
+                "--out-dir".to_string(),
+                op_out.to_string_lossy().into_owned(),
+            ],
+        );
+        let (operation, mode) = parse_args(&op_args).expect("parse operation");
+        assert_eq!(mode, MutationMode::OutDir);
+        let declared_handle = match &operation {
+            Op::AddFilter(payload) => payload,
+            other => panic!("unexpected operation: {}", other.tag()),
+        }
+        .handle
+        .clone();
+        assert!(declared_handle.starts_with("filter:"));
+        let plan = OpPlan::new(vec![operation]);
+        let validated = plan
+            .validate(&ProjectIndex::from_project(&op_source).expect("index"))
+            .expect("plan");
+        let mut transaction = Transaction::begin(op_source).expect("transaction");
+        let mut kernel = AddFilterKernel;
+        let receipt = transaction
+            .apply_all(&validated, &mut kernel)
+            .expect("kernel apply");
+        assert_eq!(receipt.outcomes[0].created_handles, vec![declared_handle]);
+        transaction
+            .commit_out_dir(&op_out, false)
+            .expect("op commit");
+        assert_eq!(
+            fs::read(report_json(&cli_out)).expect("CLI report"),
+            fs::read(report_json(&op_out)).expect("op report")
+        );
+    }
+
+    fn report_json(project: &Path) -> PathBuf {
+        project
+            .join("SalesOperations.Report")
+            .join("definition")
+            .join("report.json")
+    }
+
+    #[test]
+    fn add_filter_kernel_matches_cli_for_categorical_filter() {
+        run_kernel_case(vec![
+            "--scope".into(),
+            "report".into(),
+            "--target".into(),
+            "DimCustomer[Segment]".into(),
+            "--value".into(),
+            "Enterprise".into(),
+        ]);
+    }
+
+    #[test]
+    fn add_filter_kernel_matches_cli_for_numeric_range_filter() {
+        run_kernel_case(vec![
+            "--scope".into(),
+            "report".into(),
+            "--target".into(),
+            "FactSales[Units]".into(),
+            "--condition-type".into(),
+            "range".into(),
+            "--min".into(),
+            "1".into(),
+            "--max".into(),
+            "50".into(),
+        ]);
+    }
+
+    #[test]
+    fn add_filter_kernel_matches_cli_for_relative_date_filter() {
+        run_kernel_case(vec![
+            "--scope".into(),
+            "report".into(),
+            "--target".into(),
+            "DimDate[Date]".into(),
+            "--relative".into(),
+            "last".into(),
+            "--unit".into(),
+            "months".into(),
+            "--span".into(),
+            "12".into(),
+        ]);
+    }
+
+    #[test]
+    fn add_filter_kernel_matches_cli_for_visual_topn_filter() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let project = scaffold(&temp.path().join("source"));
+        let snapshot = crate::pbir::load_report_snapshot(&project).expect("snapshot");
+        let visual = snapshot.pages[0].visuals[0].handle.clone();
+        run_kernel_case(vec![
+            "--visual".into(),
+            visual,
+            "--target".into(),
+            "DimCustomer[CustomerName]".into(),
+            "--top".into(),
+            "10".into(),
+            "--by".into(),
+            "FactSales[Total Revenue]".into(),
+        ]);
+    }
+
+    #[test]
+    fn add_filter_kernel_replay_refuses_duplicate_identity() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let source = scaffold(&temp.path().join("source"));
+        let project_arg = source.project_dir.to_string_lossy().into_owned();
+        let args = vec![
+            "--project".into(),
+            project_arg,
+            "--scope".into(),
+            "report".into(),
+            "--target".into(),
+            "DimCustomer[Segment]".into(),
+            "--value".into(),
+            "Enterprise".into(),
+            "--dry-run".into(),
+        ];
+        let (operation, _) = parse_args(&args).expect("parse");
+        let plan = OpPlan::new(vec![operation.clone()]);
+        let validated = plan
+            .validate(&ProjectIndex::from_project(&source).expect("index"))
+            .expect("plan");
+        let mut transaction = Transaction::begin(source).expect("transaction");
+        let mut kernel = AddFilterKernel;
+        transaction
+            .apply_all(&validated, &mut kernel)
+            .expect("first apply");
+        let Op::AddFilter(payload) = operation else {
+            panic!("expected addFilter")
+        };
+        let error = apply_add_filter(&payload, &mut transaction).expect_err("replay refusal");
+        assert_eq!(error.code, "invalid_args");
+        assert!(error.message.contains("filter name already exists"));
+    }
 }

@@ -25,6 +25,12 @@ mod transaction;
 
 pub(crate) use apply_theme_preset::*;
 #[allow(unused_imports)]
+pub(crate) use crate::report_drillthrough::{
+    SetDrillthroughKernel, parse_args as parse_set_drillthrough_args,
+};
+#[allow(unused_imports)]
+pub(crate) use crate::report_filter_add::{AddFilterKernel, parse_args as parse_add_filter_args};
+#[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
 pub(crate) use io::*;
@@ -140,6 +146,8 @@ pub(crate) struct AddFilter {
     pub(crate) target: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) display_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) condition: Option<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -454,7 +462,8 @@ pub(crate) fn schema_json() -> Value {
                         operation("addFilter", serde_json::json!({
                             "handle": {"type": "string"}, "scope": {"type": "string"},
                             "owner": {"type": "string"}, "filterType": {"type": "string"},
-                            "target": {}
+                            "target": {}, "name": {"type": "string"},
+                            "displayName": {"type": "string"}
                         }), &["handle", "scope", "owner", "filterType", "target"]),
                         operation("setDrillthrough", serde_json::json!({
                             "page": {"type": "string"}, "target": {"type": "string"},
@@ -527,6 +536,7 @@ mod tests {
                 filter_type: "Categorical".into(),
                 target: serde_json::json!({"table": "Customers", "column": "Segment"}),
                 name: Some("RevenueFilter".into()),
+                display_name: None,
                 condition: Some(serde_json::json!({"values": ["Enterprise"]})),
                 values: vec![serde_json::json!("Enterprise")],
                 relative: None,

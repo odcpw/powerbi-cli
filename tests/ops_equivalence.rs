@@ -118,3 +118,62 @@ fn apply_theme_preset_cli_fixture_is_byte_deterministic_and_matches_ops_shape() 
     assert_eq!(operation["op"], "applyThemePreset");
     assert_eq!(operation["preset"], "risk-dashboard");
 }
+
+#[test]
+fn add_filter_ops_equivalence_fixture_is_byte_deterministic() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let source = scaffold_sales(temp.path());
+    let source_arg = source.to_str().expect("source path");
+    let first = temp.path().join("first-filter");
+    let second = temp.path().join("second-filter");
+    for output in [&first, &second] {
+        let output_arg = output.to_str().expect("output path");
+        let run = run_powerbi(&[
+            "report",
+            "filters",
+            "add",
+            "--project",
+            source_arg,
+            "--scope",
+            "report",
+            "--target",
+            "DimCustomer[Segment]",
+            "--value",
+            "Enterprise",
+            "--out-dir",
+            output_arg,
+            "--json",
+        ]);
+        assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    }
+    assert_eq!(tree(&first), tree(&second));
+}
+
+#[test]
+fn set_drillthrough_ops_equivalence_fixture_is_byte_deterministic() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let source = scaffold_sales(temp.path());
+    let source_arg = source.to_str().expect("source path");
+    let page_handle = format!("page:{}", first_page_name(&source));
+    let first = temp.path().join("first-drillthrough");
+    let second = temp.path().join("second-drillthrough");
+    for output in [&first, &second] {
+        let output_arg = output.to_str().expect("output path");
+        let run = run_powerbi(&[
+            "report",
+            "drillthrough",
+            "set",
+            "--project",
+            source_arg,
+            "--page",
+            &page_handle,
+            "--target",
+            "DimCustomer[Segment]",
+            "--out-dir",
+            output_arg,
+            "--json",
+        ]);
+        assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    }
+    assert_eq!(tree(&first), tree(&second));
+}
