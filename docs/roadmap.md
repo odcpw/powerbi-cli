@@ -136,6 +136,10 @@ object-specific writers and fixtures exist.
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
+- `report spec schema` emits a draft 2020-12 JSON Schema for both strict
+  dashboard-spec versions, while `report spec explain` previews the typed
+  staged operation plan, handles, layout/defaults, unsupported sections, and
+  proof follow-ups without writing a project.
 - `report spec upgrade --spec <v1.json> --out <v2.json>`: losslessly migrate
   a strict v1 spec to normalized v2 by rewriting only `/schema`, preserving
   array order, and refusing unknown keys before output.

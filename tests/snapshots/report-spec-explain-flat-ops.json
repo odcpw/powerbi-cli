@@ -1,0 +1,389 @@
+{
+  "defaults": {
+    "perVisual": [
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+        "pointer": "/pages/0/visuals/0",
+        "position": {
+          "height": 120,
+          "width": 280,
+          "x": 32,
+          "y": 32
+        },
+        "visualType": "card"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+        "pointer": "/pages/0/visuals/1",
+        "position": {
+          "height": 320,
+          "width": 600,
+          "x": 32,
+          "y": 184
+        },
+        "visualType": "clusteredBarChart"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+        "pointer": "/pages/0/visuals/2",
+        "position": {
+          "height": 320,
+          "width": 560,
+          "x": 664,
+          "y": 184
+        },
+        "visualType": "tableEx"
+      }
+    ]
+  },
+  "handles": {
+    "declared": [
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+        "kind": "visual",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+        "kind": "visual",
+        "opIndex": 1,
+        "pointer": "/pages/0/visuals/1"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+        "kind": "visual",
+        "opIndex": 2,
+        "pointer": "/pages/0/visuals/2"
+      }
+    ],
+    "references": [
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 1,
+        "pointer": "/pages/0/visuals/1/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 2,
+        "pointer": "/pages/0/visuals/2/page"
+      }
+    ]
+  },
+  "layout": {
+    "available": true,
+    "pages": [
+      {
+        "page": "page:ReportSectionOverview",
+        "pointer": "/pages/0",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 120,
+              "width": 280,
+              "x": 32,
+              "y": 32
+            },
+            "height": 120,
+            "pointer": "/pages/0/visuals/0",
+            "visual": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+            "width": 280,
+            "x": 32,
+            "y": 32
+          },
+          {
+            "coordinates": {
+              "height": 320,
+              "width": 600,
+              "x": 32,
+              "y": 184
+            },
+            "height": 320,
+            "pointer": "/pages/0/visuals/1",
+            "visual": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          {
+            "coordinates": {
+              "height": 320,
+              "width": 560,
+              "x": 664,
+              "y": 184
+            },
+            "height": 320,
+            "pointer": "/pages/0/visuals/2",
+            "visual": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+            "width": 560,
+            "x": 664,
+            "y": 184
+          }
+        ]
+      }
+    ],
+    "unavailable": null
+  },
+  "plan": {
+    "operationCount": 3,
+    "ops": [
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+        "index": 0,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Completed Items",
+              "role": "Values",
+              "table": "WorkItems"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+          "name": "VisualContainerCompletedCard",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 120,
+            "width": 280,
+            "x": 32,
+            "y": 32
+          },
+          "title": "Completed Items",
+          "visualType": "card"
+        },
+        "pointer": "/pages/0/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+        "index": 1,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Team",
+              "role": "Category",
+              "table": "WorkItems"
+            },
+            {
+              "measure": "Total Hours",
+              "role": "Y",
+              "table": "WorkItems"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+          "name": "VisualContainerHoursByTeam",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 320,
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          "title": "Hours by Team",
+          "visualType": "clusteredBarChart"
+        },
+        "pointer": "/pages/0/visuals/1",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+        "index": 2,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "WorkDate",
+              "role": "Values",
+              "table": "WorkItems"
+            },
+            {
+              "column": "Team",
+              "role": "Values",
+              "table": "WorkItems"
+            },
+            {
+              "column": "Priority",
+              "role": "Values",
+              "table": "WorkItems"
+            },
+            {
+              "measure": "Total Hours",
+              "role": "Values",
+              "table": "WorkItems"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+          "name": "VisualContainerWorkDetail",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 320,
+            "width": 560,
+            "x": 664,
+            "y": 184
+          },
+          "title": "Work Detail",
+          "visualType": "tableEx"
+        },
+        "pointer": "/pages/0/visuals/2",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      }
+    ],
+    "schema": "powerbi-cli.ops.v1",
+    "stages": [
+      {
+        "index": 2,
+        "name": "visual",
+        "operationIndexes": [
+          0,
+          1,
+          2
+        ],
+        "ops": [
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+            "index": 0,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Completed Items",
+                  "role": "Values",
+                  "table": "WorkItems"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerCompletedCard",
+              "name": "VisualContainerCompletedCard",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 120,
+                "width": 280,
+                "x": 32,
+                "y": 32
+              },
+              "title": "Completed Items",
+              "visualType": "card"
+            },
+            "pointer": "/pages/0/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+            "index": 1,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Team",
+                  "role": "Category",
+                  "table": "WorkItems"
+                },
+                {
+                  "measure": "Total Hours",
+                  "role": "Y",
+                  "table": "WorkItems"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerHoursByTeam",
+              "name": "VisualContainerHoursByTeam",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 320,
+                "width": 600,
+                "x": 32,
+                "y": 184
+              },
+              "title": "Hours by Team",
+              "visualType": "clusteredBarChart"
+            },
+            "pointer": "/pages/0/visuals/1",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+            "index": 2,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "WorkDate",
+                  "role": "Values",
+                  "table": "WorkItems"
+                },
+                {
+                  "column": "Team",
+                  "role": "Values",
+                  "table": "WorkItems"
+                },
+                {
+                  "column": "Priority",
+                  "role": "Values",
+                  "table": "WorkItems"
+                },
+                {
+                  "measure": "Total Hours",
+                  "role": "Values",
+                  "table": "WorkItems"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerWorkDetail",
+              "name": "VisualContainerWorkDetail",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 320,
+                "width": 560,
+                "x": 664,
+                "y": 184
+              },
+              "title": "Work Detail",
+              "visualType": "tableEx"
+            },
+            "pointer": "/pages/0/visuals/2",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          }
+        ]
+      }
+    ]
+  },
+  "proofUnavailable": [
+    {
+      "level": "desktop-canvas-refresh",
+      "reason": "Power BI Desktop is the compatibility oracle; explain is a unit-smoke preview and does not launch Desktop."
+    }
+  ],
+  "schema": "powerbi-cli.report.spec.explain.v1",
+  "specVersion": "powerbi-cli.dashboard.v1",
+  "unsupportedSections": []
+}

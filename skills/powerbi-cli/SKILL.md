@@ -100,6 +100,8 @@ pbi --json capabilities --for schema
 pbi --json capabilities --for profile
 pbi --json capabilities --for "report build" --compact
 pbi --json capabilities --for "report spec"
+pbi --json report spec schema
+pbi --json report spec explain --schema <schema.json> --spec <dashboard.json>
 pbi --json capabilities --for inspect --compact
 pbi --json capabilities --for validate --compact
 pbi --json capabilities --for lint --compact
@@ -514,6 +516,12 @@ discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
   `didYouMean`, `hint`, and `suggestedCommands` are optional). Consumers should
   read `errors[].message`, never treat an entry as a bare string. See
   `capabilities.responseShapes.reportSpecValidate` for the machine contract.
+
+`report spec schema --json` emits the draft 2020-12 JSON Schema generated from
+the strict v1/v2 key tables. `report spec explain --schema <schema.json>
+--spec <dashboard.json> [--profile <profile.json>] --json` previews the staged
+typed operation plan, stable handles, resolved layout/defaults, unsupported
+sections, and proof commands without writing files.
 
 For a composed spec, normalize it before handing it to another agent or build
 stage, then validate the normalized file. `report spec normalize` accepts the

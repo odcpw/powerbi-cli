@@ -1,0 +1,995 @@
+{
+  "defaults": {
+    "perVisual": [
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+        "pointer": "/pages/0/visuals/0",
+        "position": {
+          "height": 120,
+          "width": 220,
+          "x": 32,
+          "y": 32
+        },
+        "visualType": "card"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+        "pointer": "/pages/0/visuals/1",
+        "position": {
+          "height": 120,
+          "width": 220,
+          "x": 276,
+          "y": 32
+        },
+        "visualType": "card"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+        "pointer": "/pages/0/visuals/2",
+        "position": {
+          "height": 120,
+          "width": 220,
+          "x": 520,
+          "y": 32
+        },
+        "visualType": "card"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+        "pointer": "/pages/0/visuals/3",
+        "position": {
+          "height": 320,
+          "width": 600,
+          "x": 32,
+          "y": 184
+        },
+        "visualType": "lineChart"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+        "pointer": "/pages/0/visuals/4",
+        "position": {
+          "height": 240,
+          "width": 280,
+          "x": 664,
+          "y": 184
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+        "pointer": "/pages/1/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 700,
+          "x": 32,
+          "y": 32
+        },
+        "visualType": "tableEx"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+        "pointer": "/pages/1/visuals/1",
+        "position": {
+          "height": 240,
+          "width": 280,
+          "x": 764,
+          "y": 32
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+        "pointer": "/pages/2/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 700,
+          "x": 32,
+          "y": 32
+        },
+        "visualType": "tableEx"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+        "pointer": "/pages/2/visuals/1",
+        "position": {
+          "height": 120,
+          "width": 220,
+          "x": 764,
+          "y": 32
+        },
+        "visualType": "card"
+      }
+    ]
+  },
+  "handles": {
+    "declared": [
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+        "kind": "visual",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+        "kind": "visual",
+        "opIndex": 1,
+        "pointer": "/pages/0/visuals/1"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+        "kind": "visual",
+        "opIndex": 2,
+        "pointer": "/pages/0/visuals/2"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+        "kind": "visual",
+        "opIndex": 3,
+        "pointer": "/pages/0/visuals/3"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+        "kind": "visual",
+        "opIndex": 4,
+        "pointer": "/pages/0/visuals/4"
+      },
+      {
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+        "kind": "visual",
+        "opIndex": 5,
+        "pointer": "/pages/1/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+        "kind": "visual",
+        "opIndex": 6,
+        "pointer": "/pages/1/visuals/1"
+      },
+      {
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+        "kind": "visual",
+        "opIndex": 7,
+        "pointer": "/pages/2/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+        "kind": "visual",
+        "opIndex": 8,
+        "pointer": "/pages/2/visuals/1"
+      }
+    ],
+    "references": [
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 1,
+        "pointer": "/pages/0/visuals/1/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 2,
+        "pointer": "/pages/0/visuals/2/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 3,
+        "pointer": "/pages/0/visuals/3/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 4,
+        "pointer": "/pages/0/visuals/4/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionCustomerDetail",
+        "opIndex": 5,
+        "pointer": "/pages/1/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionCustomerDetail",
+        "opIndex": 6,
+        "pointer": "/pages/1/visuals/1/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionSegmentDetail",
+        "opIndex": 7,
+        "pointer": "/pages/2/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionSegmentDetail",
+        "opIndex": 8,
+        "pointer": "/pages/2/visuals/1/page"
+      }
+    ]
+  },
+  "layout": {
+    "available": true,
+    "pages": [
+      {
+        "page": "page:ReportSectionOverview",
+        "pointer": "/pages/0",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 120,
+              "width": 220,
+              "x": 32,
+              "y": 32
+            },
+            "height": 120,
+            "pointer": "/pages/0/visuals/0",
+            "visual": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+            "width": 220,
+            "x": 32,
+            "y": 32
+          },
+          {
+            "coordinates": {
+              "height": 120,
+              "width": 220,
+              "x": 276,
+              "y": 32
+            },
+            "height": 120,
+            "pointer": "/pages/0/visuals/1",
+            "visual": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+            "width": 220,
+            "x": 276,
+            "y": 32
+          },
+          {
+            "coordinates": {
+              "height": 120,
+              "width": 220,
+              "x": 520,
+              "y": 32
+            },
+            "height": 120,
+            "pointer": "/pages/0/visuals/2",
+            "visual": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+            "width": 220,
+            "x": 520,
+            "y": 32
+          },
+          {
+            "coordinates": {
+              "height": 320,
+              "width": 600,
+              "x": 32,
+              "y": 184
+            },
+            "height": 320,
+            "pointer": "/pages/0/visuals/3",
+            "visual": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          {
+            "coordinates": {
+              "height": 240,
+              "width": 280,
+              "x": 664,
+              "y": 184
+            },
+            "height": 240,
+            "pointer": "/pages/0/visuals/4",
+            "visual": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+            "width": 280,
+            "x": 664,
+            "y": 184
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionCustomerDetail",
+        "pointer": "/pages/1",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 700,
+              "x": 32,
+              "y": 32
+            },
+            "height": 400,
+            "pointer": "/pages/1/visuals/0",
+            "visual": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+            "width": 700,
+            "x": 32,
+            "y": 32
+          },
+          {
+            "coordinates": {
+              "height": 240,
+              "width": 280,
+              "x": 764,
+              "y": 32
+            },
+            "height": 240,
+            "pointer": "/pages/1/visuals/1",
+            "visual": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+            "width": 280,
+            "x": 764,
+            "y": 32
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionSegmentDetail",
+        "pointer": "/pages/2",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 700,
+              "x": 32,
+              "y": 32
+            },
+            "height": 400,
+            "pointer": "/pages/2/visuals/0",
+            "visual": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+            "width": 700,
+            "x": 32,
+            "y": 32
+          },
+          {
+            "coordinates": {
+              "height": 120,
+              "width": 220,
+              "x": 764,
+              "y": 32
+            },
+            "height": 120,
+            "pointer": "/pages/2/visuals/1",
+            "visual": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+            "width": 220,
+            "x": 764,
+            "y": 32
+          }
+        ]
+      }
+    ],
+    "unavailable": null
+  },
+  "plan": {
+    "operationCount": 9,
+    "ops": [
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+        "index": 0,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Total Revenue",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+          "name": "VisualContainerTotalRevenueCard",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 120,
+            "width": 220,
+            "x": 32,
+            "y": 32
+          },
+          "title": "Total Revenue",
+          "visualType": "card"
+        },
+        "pointer": "/pages/0/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+        "index": 1,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Total Units",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+          "name": "VisualContainerTotalUnitsCard",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 120,
+            "width": 220,
+            "x": 276,
+            "y": 32
+          },
+          "title": "Total Units",
+          "visualType": "card"
+        },
+        "pointer": "/pages/0/visuals/1",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+        "index": 2,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Umsatz Übersicht",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+          "name": "VisualContainerUmsatzUebersichtCard",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 120,
+            "width": 220,
+            "x": 520,
+            "y": 32
+          },
+          "title": "Umsatz Übersicht",
+          "visualType": "card"
+        },
+        "pointer": "/pages/0/visuals/2",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+        "index": 3,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Year",
+              "role": "Category",
+              "table": "FactSales"
+            },
+            {
+              "measure": "Total Revenue",
+              "role": "Y",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+          "name": "VisualContainerRevenueByYearLine",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 320,
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          "title": "Revenue by Year",
+          "visualType": "lineChart"
+        },
+        "pointer": "/pages/0/visuals/3",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+        "index": 4,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Größenklasse",
+              "role": "Values",
+              "table": "DimCustomer"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+          "mode": "Basic",
+          "name": "VisualContainerGroessenklasseSlicer",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 240,
+            "width": 280,
+            "x": 664,
+            "y": 184
+          },
+          "title": "Größenklasse",
+          "visualType": "slicer"
+        },
+        "pointer": "/pages/0/visuals/4",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+        "index": 5,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Customer",
+              "role": "Values",
+              "table": "DimCustomer"
+            },
+            {
+              "measure": "Total Revenue",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+          "name": "VisualContainerCustomerDetailTable",
+          "op": "addVisual",
+          "page": "page:ReportSectionCustomerDetail",
+          "position": {
+            "height": 400,
+            "width": 700,
+            "x": 32,
+            "y": 32
+          },
+          "title": "Customer Detail",
+          "visualType": "tableEx"
+        },
+        "pointer": "/pages/1/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+        "index": 6,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Segment",
+              "role": "Values",
+              "table": "DimCustomer"
+            }
+          ],
+          "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+          "mode": "Basic",
+          "name": "VisualContainerSegmentSlicer",
+          "op": "addVisual",
+          "page": "page:ReportSectionCustomerDetail",
+          "position": {
+            "height": 240,
+            "width": 280,
+            "x": 764,
+            "y": 32
+          },
+          "title": "Segment",
+          "visualType": "slicer"
+        },
+        "pointer": "/pages/1/visuals/1",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+        "index": 7,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Segment",
+              "role": "Values",
+              "table": "DimCustomer"
+            },
+            {
+              "measure": "Total Revenue",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+          "name": "VisualContainerSegmentDetailTable",
+          "op": "addVisual",
+          "page": "page:ReportSectionSegmentDetail",
+          "position": {
+            "height": 400,
+            "width": 700,
+            "x": 32,
+            "y": 32
+          },
+          "title": "Segment Detail",
+          "visualType": "tableEx"
+        },
+        "pointer": "/pages/2/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+        "index": 8,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Total Revenue",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+          "name": "VisualContainerSegmentTotalCard",
+          "op": "addVisual",
+          "page": "page:ReportSectionSegmentDetail",
+          "position": {
+            "height": 120,
+            "width": 220,
+            "x": 764,
+            "y": 32
+          },
+          "title": "Total Revenue",
+          "visualType": "card"
+        },
+        "pointer": "/pages/2/visuals/1",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      }
+    ],
+    "schema": "powerbi-cli.ops.v1",
+    "stages": [
+      {
+        "index": 2,
+        "name": "visual",
+        "operationIndexes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "ops": [
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+            "index": 0,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Total Revenue",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+              "name": "VisualContainerTotalRevenueCard",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 120,
+                "width": 220,
+                "x": 32,
+                "y": 32
+              },
+              "title": "Total Revenue",
+              "visualType": "card"
+            },
+            "pointer": "/pages/0/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+            "index": 1,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Total Units",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+              "name": "VisualContainerTotalUnitsCard",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 120,
+                "width": 220,
+                "x": 276,
+                "y": 32
+              },
+              "title": "Total Units",
+              "visualType": "card"
+            },
+            "pointer": "/pages/0/visuals/1",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+            "index": 2,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Umsatz Übersicht",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+              "name": "VisualContainerUmsatzUebersichtCard",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 120,
+                "width": 220,
+                "x": 520,
+                "y": 32
+              },
+              "title": "Umsatz Übersicht",
+              "visualType": "card"
+            },
+            "pointer": "/pages/0/visuals/2",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+            "index": 3,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Year",
+                  "role": "Category",
+                  "table": "FactSales"
+                },
+                {
+                  "measure": "Total Revenue",
+                  "role": "Y",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+              "name": "VisualContainerRevenueByYearLine",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 320,
+                "width": 600,
+                "x": 32,
+                "y": 184
+              },
+              "title": "Revenue by Year",
+              "visualType": "lineChart"
+            },
+            "pointer": "/pages/0/visuals/3",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+            "index": 4,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Größenklasse",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+              "mode": "Basic",
+              "name": "VisualContainerGroessenklasseSlicer",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 240,
+                "width": 280,
+                "x": 664,
+                "y": 184
+              },
+              "title": "Größenklasse",
+              "visualType": "slicer"
+            },
+            "pointer": "/pages/0/visuals/4",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+            "index": 5,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Customer",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                },
+                {
+                  "measure": "Total Revenue",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+              "name": "VisualContainerCustomerDetailTable",
+              "op": "addVisual",
+              "page": "page:ReportSectionCustomerDetail",
+              "position": {
+                "height": 400,
+                "width": 700,
+                "x": 32,
+                "y": 32
+              },
+              "title": "Customer Detail",
+              "visualType": "tableEx"
+            },
+            "pointer": "/pages/1/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+            "index": 6,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Segment",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                }
+              ],
+              "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+              "mode": "Basic",
+              "name": "VisualContainerSegmentSlicer",
+              "op": "addVisual",
+              "page": "page:ReportSectionCustomerDetail",
+              "position": {
+                "height": 240,
+                "width": 280,
+                "x": 764,
+                "y": 32
+              },
+              "title": "Segment",
+              "visualType": "slicer"
+            },
+            "pointer": "/pages/1/visuals/1",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+            "index": 7,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Segment",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                },
+                {
+                  "measure": "Total Revenue",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+              "name": "VisualContainerSegmentDetailTable",
+              "op": "addVisual",
+              "page": "page:ReportSectionSegmentDetail",
+              "position": {
+                "height": 400,
+                "width": 700,
+                "x": 32,
+                "y": 32
+              },
+              "title": "Segment Detail",
+              "visualType": "tableEx"
+            },
+            "pointer": "/pages/2/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+            "index": 8,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Total Revenue",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+              "name": "VisualContainerSegmentTotalCard",
+              "op": "addVisual",
+              "page": "page:ReportSectionSegmentDetail",
+              "position": {
+                "height": 120,
+                "width": 220,
+                "x": 764,
+                "y": 32
+              },
+              "title": "Total Revenue",
+              "visualType": "card"
+            },
+            "pointer": "/pages/2/visuals/1",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          }
+        ]
+      }
+    ]
+  },
+  "proofUnavailable": [
+    {
+      "level": "desktop-canvas-refresh",
+      "reason": "Power BI Desktop is the compatibility oracle; explain is a unit-smoke preview and does not launch Desktop."
+    }
+  ],
+  "schema": "powerbi-cli.report.spec.explain.v1",
+  "specVersion": "powerbi-cli.dashboard.v1",
+  "unsupportedSections": []
+}
