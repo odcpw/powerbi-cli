@@ -17,6 +17,7 @@
 #![allow(dead_code)]
 
 mod add_measure;
+mod add_relationship;
 mod handles;
 mod io;
 mod plan;
@@ -24,6 +25,8 @@ mod transaction;
 
 #[allow(unused_imports)]
 pub(crate) use add_measure::*;
+#[allow(unused_imports)]
+pub(crate) use add_relationship::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
