@@ -188,7 +188,7 @@ fn dashboard_build_emits_declared_visual_interactions() {
     ]);
     assert_eq!(invalid.code, 10);
     assert!(
-        stdout_json(&invalid)["errors"][0]
+        stdout_json(&invalid)["errors"][0]["message"]
             .as_str()
             .unwrap_or_default()
             .contains("source visual missing_visual does not exist")
@@ -1155,7 +1155,7 @@ fn dashboard_spec_validate_enforces_visual_binding_contracts() {
     let card_json = stdout_json(&card);
     assert_eq!(card_json["ok"], Value::Bool(false));
     assert!(
-        card_json["errors"][0]
+        card_json["errors"][0]["message"]
             .as_str()
             .unwrap_or_default()
             .contains("exactly one Values")
@@ -1204,7 +1204,7 @@ fn dashboard_spec_validate_enforces_visual_binding_contracts() {
     let scatter_json = stdout_json(&scatter);
     assert_eq!(scatter_json["ok"], Value::Bool(false));
     assert!(
-        scatter_json["errors"][0]
+        scatter_json["errors"][0]["message"]
             .as_str()
             .unwrap_or_default()
             .contains("exactly one X and exactly one Y")
@@ -1373,7 +1373,7 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
                 .as_array()
                 .expect("validation errors")
                 .iter()
-                .filter_map(Value::as_str)
+                .filter_map(|error| error["message"].as_str())
                 .any(|error| error.contains(expected)),
             "{slug} errors: {}",
             result_json["errors"]

@@ -1280,6 +1280,20 @@ fn response_shapes() -> Value {
                 }
             }
         },
+        "reportSpecValidate": {
+            "schema": "powerbi-cli.report.spec.validate.v1",
+            "transport": "stdout",
+            "validationFailure": "exitCode=10 with ok=false (or ok=null for shape-only validation)",
+            "errors": {
+                "type": "array",
+                "item": {
+                    "type": "object",
+                    "requiredFields": ["code", "message"],
+                    "optionalFields": ["pointer", "didYouMean", "hint", "suggestedCommands"],
+                    "pointer": "RFC 6901 JSON pointer into the submitted dashboard spec when available"
+                }
+            }
+        },
         "followUps": {
             "next": "Executable powerbi-cli command templates only.",
             "instructions": "Human or agent prose steps that are not executable commands.",

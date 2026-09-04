@@ -369,7 +369,11 @@ fn spec_validate_refuses_bare_columns_in_every_measure_only_reference_family() {
                 .as_array()
                 .expect("validation errors")
                 .iter()
-                .any(|error| error.as_str().is_some_and(|text| text.contains(expected))),
+                .any(|error| {
+                    error["message"]
+                        .as_str()
+                        .is_some_and(|text| text.contains(expected))
+                }),
             "{slug} did not return the measure-only refusal: {result}"
         );
     }

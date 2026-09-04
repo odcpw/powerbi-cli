@@ -384,6 +384,10 @@ three pages.
   with the owning bead id instead of being dropped. The checked-in
   `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
   subset and builds byte-identically to the v1 sales fixture.
+  Validation failures are returned on stdout as `errors[]` objects with required
+  `code` and `message` fields plus optional `pointer`, `didYouMean`, `hint`, and
+  `suggestedCommands`; they are not legacy error strings. The exact response
+  shape is published at `capabilities.responseShapes.reportSpecValidate`.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
