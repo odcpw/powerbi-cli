@@ -20,6 +20,7 @@ mod add_measure;
 mod add_relationship;
 mod add_visual;
 mod apply_theme_preset;
+mod filter_kernels;
 mod handles;
 mod io;
 mod legacy;
@@ -43,6 +44,7 @@ pub(crate) use add_relationship::*;
 #[allow(unused_imports)]
 pub(crate) use add_visual::*;
 pub(crate) use apply_theme_preset::*;
+pub(crate) use filter_kernels::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
@@ -93,11 +95,10 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         | Op::SetTopNGuard(_)
         | Op::SetDrilldownHierarchy(_) => Some(Box::new(VisualKernel)),
         Op::CloneVisual(_) | Op::DeleteVisual(_) => Some(Box::new(VisualKernel)),
-        Op::UpdateFilter(_)
-        | Op::DeleteFilter(_)
-        | Op::ClearFilter(_)
-        | Op::SlicerClear(_)
-        | Op::SetText(_)
+        Op::UpdateFilter(_) | Op::DeleteFilter(_) | Op::ClearFilter(_) | Op::SlicerClear(_) => {
+            Some(Box::new(FilterKernel))
+        }
+        Op::SetText(_)
         | Op::SetColor(_)
         | Op::FormattingApply(_)
         | Op::ApplyThemeBundle(_)

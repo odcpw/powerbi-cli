@@ -362,6 +362,18 @@ mod tests {
             Op::DeleteVisual(MutationPayload {
                 fields: BTreeMap::new(),
             }),
+            Op::UpdateFilter(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::DeleteFilter(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::ClearFilter(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::SlicerClear(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
         ];
         for operation in operations {
             let value = serde_json::to_value(&operation).expect("serialize operation");
