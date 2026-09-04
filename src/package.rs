@@ -436,7 +436,12 @@ fn source_pack(args: &[String]) -> CliResult<Value> {
     if !validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
             "project is not valid for source packaging: {}",
-            validation.errors.join("; ")
+            validation
+                .errors
+                .iter()
+                .map(|finding| finding.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
         ))
         .with_suggested_command(format!(
             "powerbi-cli validate --strict {} --json",

@@ -180,23 +180,25 @@ fn lint_mode_conflict() -> CliError {
 }
 
 fn add_validation_findings(validation: &ValidationReport, findings: &mut Vec<Value>) {
-    for message in &validation.errors {
-        findings.push(finding(
-            rules::VALIDATION_STRUCTURE,
-            "error",
-            message,
-            None,
-            None,
-        ));
+    for diagnostic in &validation.errors {
+        findings.push(json!({
+            "code": diagnostic.code,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "handle": Value::Null,
+            "path": diagnostic.path,
+            "pointer": diagnostic.pointer
+        }));
     }
-    for message in &validation.warnings {
-        findings.push(finding(
-            rules::VALIDATION_WARNING,
-            "warning",
-            message,
-            None,
-            None,
-        ));
+    for diagnostic in &validation.warnings {
+        findings.push(json!({
+            "code": diagnostic.code,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "handle": Value::Null,
+            "path": diagnostic.path,
+            "pointer": diagnostic.pointer
+        }));
     }
 }
 

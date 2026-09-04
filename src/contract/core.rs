@@ -967,10 +967,11 @@ pub(crate) fn command_catalog() -> Vec<Value> {
                 "microsoft-report": "powerbi-cli.validate.microsoft-report.v1",
                 "all": "powerbi-cli.validate.all.v1"
             },
+            "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
             "flags": ["--strict", "--backend native|microsoft-report|all", "--json", "--format json"],
             "examples": ["powerbi-cli --json validate build/sales", "powerbi-cli validate --strict build/sales --json", "powerbi-cli validate build/sales --backend microsoft-report --json", "powerbi-cli validate build/sales --strict --backend all --json"],
             "limitations": ["Native remains the default. microsoft-report runs only the installed exact official validator with --no-schema and emits powerbi-cli.validate.microsoft-report.v1. all requires both validators to complete successfully."],
-            "followUpFields": ["ok", "exitCode", "backend", "counts", "warnings", "errors", "lint", "validators.native", "validators.microsoftReport"]
+            "followUpFields": ["ok", "exitCode", "backend", "counts", "warnings", "warnings[].code", "warnings[].message", "warnings[].path", "warnings[].pointer", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "lint", "validators.native", "validators.microsoftReport"]
         }),
     ]);
     commands
@@ -1048,6 +1049,7 @@ fn schema_manifest() -> Value {
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
         "lintRuleFamilies": crate::rules::rule_family_names(),
         "lintFindingCodes": crate::rules::rule_ids(),
+        "validationFindingCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
         "desktopOpenFields": ["ok", "exitCode", "document", "preflight.mode", "preflight.defaulted", "preflight.applicable", "preflight.performed", "preflight.validationPerformed", "preflight.lintPerformed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],
         "desktopCloseFields": ["ok", "exitCode", "session.state", "session.alreadyClosed", "session.document", "session.documentKind", "session.documentName", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.receiptPath", "session.receiptRemoved", "cleanup.attempted", "cleanup.closed", "cleanup.identityMatched", "cleanup.targeted", "cleanup.targetedProcessIds", "cleanup.remainingProcessIds", "cleanup.errors", "next"],
         "desktopOpenCheckFields": ["ok", "exitCode", "changes", "document", "oracle.available", "oracle.desktopVersion", "oracle.detection", "validation", "validation.strict", "validation.strict.lint", "proof.level", "proof.observedStage", "proof.status", "proof.passed", "proof.claimedCompatibility", "proof.requiresManualReview", "proof.requiredCompatibilityLevel", "proof.timeoutMs", "proof.timeoutScope", "proof.signals", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "proof.unprovenSignals", "proof.compatibility", "proof.manualReview", "diagnostics", "next"],

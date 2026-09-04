@@ -36,7 +36,7 @@ fn lint_rules_are_complete_documented_and_generated_into_capabilities() {
     );
     let rules = listed_json["rules"].as_array().expect("rules");
     assert_eq!(listed_json["count"], rules.len());
-    assert_eq!(rules.len(), 57);
+    assert_eq!(rules.len(), 77);
     for rule in rules {
         for field in [
             "id",

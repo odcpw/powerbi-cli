@@ -3,8 +3,9 @@
 use crate::pbir_bindings::visual_query_state_errors;
 use crate::pbir_visual_factory::{BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT};
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
-    lint, microsoft, read_json_value, relationship_tmdl, resolve_project, tmdl, walkdir_entry,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, Finding, ResolvedProject,
+    canonical_display, lint, microsoft, read_json_value, relationship_tmdl, resolve_project, rules,
+    tmdl, walkdir_entry,
 };
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,8 +15,8 @@ use walkdir::WalkDir;
 
 #[derive(Debug, Default)]
 pub(crate) struct ValidationReport {
-    pub(crate) errors: Vec<String>,
-    pub(crate) warnings: Vec<String>,
+    pub(crate) errors: Vec<Finding>,
+    pub(crate) warnings: Vec<Finding>,
     pub(crate) json_files_checked: usize,
     pub(crate) pages: usize,
     pub(crate) visuals: usize,
@@ -23,6 +24,30 @@ pub(crate) struct ValidationReport {
     pub(crate) tables: usize,
     pub(crate) measures: usize,
     pub(crate) relationships: usize,
+}
+
+impl ValidationReport {
+    fn error(
+        &mut self,
+        code: &str,
+        path: &Path,
+        pointer: impl Into<String>,
+        message: impl Into<String>,
+    ) {
+        self.errors
+            .push(Finding::error(code, message, path, pointer));
+    }
+
+    fn warning(
+        &mut self,
+        code: &str,
+        path: &Path,
+        pointer: impl Into<String>,
+        message: impl Into<String>,
+    ) {
+        self.warnings
+            .push(Finding::warning(code, message, path, pointer));
+    }
 }
 
 pub(crate) fn validate_command(args: &[String]) -> CliResult<Value> {
@@ -301,9 +326,12 @@ fn validate_project_with_runtime_policy(
 
 fn required_file(path: &Path, report: &mut ValidationReport) {
     if !path.is_file() {
-        report
-            .errors
-            .push(format!("missing required file: {}", path.display()));
+        report.error(
+            rules::VALIDATION_MISSING_FILE,
+            path,
+            "",
+            format!("missing required file: {}", path.display()),
+        );
     }
 }
 
@@ -355,14 +383,27 @@ fn check_json_files_in(
 }
 
 fn check_json_file(path: &Path, report: &mut ValidationReport) -> CliResult<()> {
+    // Required-file checks own missing inputs; avoid reporting a second
+    // low-level read error for the same absent artifact.
+    if !path.is_file() {
+        return Ok(());
+    }
     report.json_files_checked += 1;
-    if has_utf8_bom(path)? {
-        report
-            .errors
-            .push(format!("JSON-like file has UTF-8 BOM: {}", path.display()));
+    match has_utf8_bom(path) {
+        Ok(true) => report.error(
+            rules::VALIDATION_UTF8_BOM,
+            path,
+            "",
+            format!("JSON-like file has UTF-8 BOM: {}", path.display()),
+        ),
+        Ok(false) => {}
+        Err(err) => {
+            report.error(rules::VALIDATION_FILE_READ, path, "", err.message);
+            return Ok(());
+        }
     }
     if let Err(err) = read_json_value(path) {
-        report.errors.push(err.message);
+        report.error(rules::VALIDATION_INVALID_JSON, path, "", err.message);
     }
     Ok(())
 }
@@ -390,36 +431,60 @@ fn check_report_theme(resolved: &ResolvedProject, report: &mut ValidationReport)
     if !report_json_path.is_file() {
         return Ok(());
     }
-    let report_json = read_json_value(&report_json_path)?;
+    // `check_json_file` has already recorded malformed/read failures.  Do not
+    // abort the native report; continue returning all actionable findings.
+    let Ok(report_json) = read_json_value(&report_json_path) else {
+        return Ok(());
+    };
     let Some(theme_collection) = report_json.get("themeCollection") else {
-        report.errors.push(format!(
-            "{} is missing required themeCollection",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_SHAPE,
+            &report_json_path,
+            "/themeCollection",
+            format!(
+                "{} is missing required themeCollection",
+                report_json_path.display()
+            ),
+        );
         return Ok(());
     };
     let Some(theme_collection) = theme_collection.as_object() else {
-        report.errors.push(format!(
-            "{} themeCollection must be an object",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_SHAPE,
+            &report_json_path,
+            "/themeCollection",
+            format!(
+                "{} themeCollection must be an object",
+                report_json_path.display()
+            ),
+        );
         return Ok(());
     };
     let Some(custom_theme) = theme_collection.get("customTheme") else {
         return Ok(());
     };
     let Some(custom_theme) = custom_theme.as_object() else {
-        report.errors.push(format!(
-            "{} themeCollection.customTheme must be an object",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_SHAPE,
+            &report_json_path,
+            "/themeCollection/customTheme",
+            format!(
+                "{} themeCollection.customTheme must be an object",
+                report_json_path.display()
+            ),
+        );
         return Ok(());
     };
     if custom_theme.contains_key("resource") {
-        report.errors.push(format!(
-            "{} themeCollection.customTheme.resource is not valid PBIR report schema metadata; use customTheme.name/reportVersionAtImport/type plus report resourcePackages",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_SHAPE,
+            &report_json_path,
+            "/themeCollection/customTheme/resource",
+            format!(
+                "{} themeCollection.customTheme.resource is not valid PBIR report schema metadata; use customTheme.name/reportVersionAtImport/type plus report resourcePackages",
+                report_json_path.display()
+            ),
+        );
     }
     for field in ["name", "type"] {
         if custom_theme
@@ -427,10 +492,15 @@ fn check_report_theme(resolved: &ResolvedProject, report: &mut ValidationReport)
             .and_then(Value::as_str)
             .is_none_or(|value| value.trim().is_empty())
         {
-            report.errors.push(format!(
-                "{} themeCollection.customTheme.{field} must be a non-empty string",
-                report_json_path.display()
-            ));
+            report.error(
+                rules::VALIDATION_THEME_SHAPE,
+                &report_json_path,
+                format!("/themeCollection/customTheme/{field}"),
+                format!(
+                    "{} themeCollection.customTheme.{field} must be a non-empty string",
+                    report_json_path.display()
+                ),
+            );
         }
     }
     let theme_version_valid = match report_schema_major(&report_json) {
@@ -444,17 +514,27 @@ fn check_report_theme(resolved: &ResolvedProject, report: &mut ValidationReport)
         _ => false,
     };
     if !theme_version_valid {
-        report.errors.push(format!(
-            "{} themeCollection.customTheme.reportVersionAtImport must match the report schema version",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_SHAPE,
+            &report_json_path,
+            "/themeCollection/customTheme/reportVersionAtImport",
+            format!(
+                "{} themeCollection.customTheme.reportVersionAtImport must match the report schema version",
+                report_json_path.display()
+            ),
+        );
     }
     let theme_type = custom_theme.get("type").and_then(Value::as_str);
     if !matches!(theme_type, Some("RegisteredResources" | "SharedResources")) {
-        report.errors.push(format!(
-            "{} themeCollection.customTheme.type must be RegisteredResources or SharedResources",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_SHAPE,
+            &report_json_path,
+            "/themeCollection/customTheme/type",
+            format!(
+                "{} themeCollection.customTheme.type must be RegisteredResources or SharedResources",
+                report_json_path.display()
+            ),
+        );
     }
     if theme_type == Some("RegisteredResources") {
         check_registered_theme_resource_package(
@@ -478,46 +558,71 @@ fn check_registered_theme_resource_package(
         .and_then(Value::as_str)
         .unwrap_or_default();
     if !theme_name.to_ascii_lowercase().ends_with(".json") {
-        report.errors.push(format!(
-            "{} RegisteredResources customTheme name `{theme_name}` must include the .json extension",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/themeCollection/customTheme/name",
+            format!(
+                "{} RegisteredResources customTheme name `{theme_name}` must include the .json extension",
+                report_json_path.display()
+            ),
+        );
     }
     let Some(packages) = report_json
         .get("resourcePackages")
         .and_then(Value::as_array)
     else {
-        report.errors.push(format!(
-            "{} RegisteredResources customTheme requires report resourcePackages",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/resourcePackages",
+            format!(
+                "{} RegisteredResources customTheme requires report resourcePackages",
+                report_json_path.display()
+            ),
+        );
         return;
     };
     let Some(package) = packages.iter().find(|package| {
         package["name"].as_str() == Some("RegisteredResources")
             && package["type"].as_str() == Some("RegisteredResources")
     }) else {
-        report.errors.push(format!(
-            "{} RegisteredResources customTheme requires a RegisteredResources resource package",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/resourcePackages",
+            format!(
+                "{} RegisteredResources customTheme requires a RegisteredResources resource package",
+                report_json_path.display()
+            ),
+        );
         return;
     };
     let Some(items) = package["items"].as_array() else {
-        report.errors.push(format!(
-            "{} RegisteredResources resource package must contain an items array",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/resourcePackages",
+            format!(
+                "{} RegisteredResources resource package must contain an items array",
+                report_json_path.display()
+            ),
+        );
         return;
     };
     let has_theme_item = items.iter().any(|item| {
         item["type"].as_str() == Some("CustomTheme") && item["name"].as_str() == Some(theme_name)
     });
     if !has_theme_item {
-        report.errors.push(format!(
-            "{} RegisteredResources customTheme `{theme_name}` has no matching CustomTheme resource package item",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/resourcePackages",
+            format!(
+                "{} RegisteredResources customTheme `{theme_name}` has no matching CustomTheme resource package item",
+                report_json_path.display()
+            ),
+        );
         return;
     }
     let theme_item = items.iter().find(|item| {
@@ -528,10 +633,15 @@ fn check_registered_theme_resource_package(
     };
     let item_path = theme_item["path"].as_str().unwrap_or_default();
     if item_path != theme_name || item_path.contains('/') || item_path.contains('\\') {
-        report.errors.push(format!(
-            "{} CustomTheme resource path `{item_path}` must be the same filename as `{theme_name}`",
-            report_json_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/resourcePackages",
+            format!(
+                "{} CustomTheme resource path `{item_path}` must be the same filename as `{theme_name}`",
+                report_json_path.display()
+            ),
+        );
         return;
     }
     let Some(report_dir) = report_json_path.parent().and_then(Path::parent) else {
@@ -542,25 +652,40 @@ fn check_registered_theme_resource_package(
         .join("RegisteredResources")
         .join(item_path);
     if !theme_path.is_file() {
-        report.errors.push(format!(
-            "{} references missing CustomTheme file {}",
-            report_json_path.display(),
-            theme_path.display()
-        ));
+        report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            report_json_path,
+            "/resourcePackages",
+            format!(
+                "{} references missing CustomTheme file {}",
+                report_json_path.display(),
+                theme_path.display()
+            ),
+        );
         return;
     }
     match read_json_value(&theme_path) {
         Ok(theme_json) if theme_json["name"].as_str() == Some(theme_name) => {}
-        Ok(theme_json) => report.errors.push(format!(
-            "{} theme name `{}` does not match report customTheme name `{theme_name}`",
-            theme_path.display(),
-            theme_json["name"].as_str().unwrap_or_default()
-        )),
-        Err(err) => report.errors.push(format!(
-            "{} could not be read for theme validation: {}",
-            theme_path.display(),
-            err.message
-        )),
+        Ok(theme_json) => report.error(
+            rules::VALIDATION_THEME_RESOURCE,
+            &theme_path,
+            "/name",
+            format!(
+                "{} theme name `{}` does not match report customTheme name `{theme_name}`",
+                theme_path.display(),
+                theme_json["name"].as_str().unwrap_or_default()
+            ),
+        ),
+        Err(err) => report.error(
+            rules::VALIDATION_INVALID_JSON,
+            &theme_path,
+            "",
+            format!(
+                "{} could not be read for theme validation: {}",
+                theme_path.display(),
+                err.message
+            ),
+        ),
     }
 }
 
@@ -570,67 +695,101 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
     if !pages_json_path.exists() {
         return Ok(());
     }
-    let pages_json = read_json_value(&pages_json_path)?;
+    let Ok(pages_json) = read_json_value(&pages_json_path) else {
+        // check_json_file records the malformed JSON finding once.
+        return Ok(());
+    };
     let mut page_order = Vec::new();
     let mut seen_pages = BTreeSet::new();
     match pages_json["pageOrder"].as_array() {
         Some(items) => {
-            for item in items {
+            for (page_index, item) in items.iter().enumerate() {
                 let Some(page_name) = item.as_str() else {
-                    report.errors.push(format!(
-                        "{} pageOrder contains a non-string entry",
-                        pages_json_path.display()
-                    ));
+                    report.error(
+                        rules::VALIDATION_PAGE_ORDER,
+                        &pages_json_path,
+                        format!("/pageOrder/{page_index}"),
+                        format!(
+                            "{} pageOrder contains a non-string entry",
+                            pages_json_path.display()
+                        ),
+                    );
                     continue;
                 };
                 if !seen_pages.insert(page_name.to_string()) {
-                    report.errors.push(format!(
-                        "{} pageOrder contains duplicate page: {}",
-                        pages_json_path.display(),
-                        page_name
-                    ));
+                    report.error(
+                        rules::VALIDATION_PAGE_ORDER,
+                        &pages_json_path,
+                        format!("/pageOrder/{page_index}"),
+                        format!(
+                            "{} pageOrder contains duplicate page: {}",
+                            pages_json_path.display(),
+                            page_name
+                        ),
+                    );
                 }
                 page_order.push(page_name.to_string());
             }
         }
-        None => report.errors.push(format!(
-            "{} has no pageOrder array",
-            pages_json_path.display()
-        )),
+        None => report.error(
+            rules::VALIDATION_PAGE_ORDER,
+            &pages_json_path,
+            "/pageOrder",
+            format!("{} has no pageOrder array", pages_json_path.display()),
+        ),
     }
     if page_order.is_empty() {
-        report.warnings.push(format!(
-            "{} has no pageOrder entries",
-            pages_json_path.display()
-        ));
+        report.warning(
+            rules::VALIDATION_PAGE_ORDER_EMPTY,
+            &pages_json_path,
+            "/pageOrder",
+            format!("{} has no pageOrder entries", pages_json_path.display()),
+        );
     }
     if let Some(active_page_name) = pages_json["activePageName"].as_str()
         && !seen_pages.contains(active_page_name)
     {
-        report.errors.push(format!(
-            "{} activePageName references a page not in pageOrder: {}",
-            pages_json_path.display(),
-            active_page_name
-        ));
+        report.error(
+            rules::VALIDATION_PAGE_ORDER,
+            &pages_json_path,
+            "/activePageName",
+            format!(
+                "{} activePageName references a page not in pageOrder: {}",
+                pages_json_path.display(),
+                active_page_name
+            ),
+        );
     }
-    for page_name in &page_order {
+    for (page_index, page_name) in page_order.iter().enumerate() {
         let page_dir = pages_dir.join(page_name);
         let page_json_path = page_dir.join("page.json");
         if !page_json_path.is_file() {
-            report.errors.push(format!(
-                "pageOrder references missing page.json: {}",
-                page_json_path.display()
-            ));
+            report.error(
+                rules::VALIDATION_MISSING_FILE,
+                &pages_json_path,
+                format!("/pageOrder/{page_index}"),
+                format!(
+                    "pageOrder references missing page.json: {}",
+                    page_json_path.display()
+                ),
+            );
             continue;
         }
         report.pages += 1;
-        let page_json = read_json_value(&page_json_path)?;
+        let Ok(page_json) = read_json_value(&page_json_path) else {
+            continue;
+        };
         if page_json["name"].as_str() != Some(page_name) {
-            report.errors.push(format!(
-                "{} name does not match page folder {}",
-                page_json_path.display(),
-                page_name
-            ));
+            report.error(
+                rules::VALIDATION_PAGE_SHAPE,
+                &page_json_path,
+                "/name",
+                format!(
+                    "{} name does not match page folder {}",
+                    page_json_path.display(),
+                    page_name
+                ),
+            );
         }
         check_positive_page_number(&page_json_path, &page_json, "width", report);
         check_positive_page_number(&page_json_path, &page_json, "height", report);
@@ -659,17 +818,29 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
                 }
                 let visual_json = visual_entry.path().join("visual.json");
                 if !visual_json.is_file() {
-                    report.errors.push(format!(
-                        "visual directory is missing visual.json: {}. Remove the empty visual directory or restore its visual.json before retrying",
-                        visual_entry.path().display()
-                    ));
+                    report.error(
+                        rules::VALIDATION_MISSING_FILE,
+                        &visual_json,
+                        "",
+                        format!(
+                            "visual directory is missing visual.json: {}. Remove the empty visual directory or restore its visual.json before retrying",
+                            visual_entry.path().display()
+                        ),
+                    );
                     continue;
                 }
                 report.visuals += 1;
-                let visual = read_json_value(&visual_json)?;
-                report
-                    .errors
-                    .extend(visual_query_state_errors(&visual_json, &visual));
+                let Ok(visual) = read_json_value(&visual_json) else {
+                    continue;
+                };
+                for message in visual_query_state_errors(&visual_json, &visual) {
+                    report.error(
+                        rules::VALIDATION_QUERY_STATE,
+                        &visual_json,
+                        "/visual/query/queryState",
+                        message,
+                    );
+                }
                 check_visual_minimum_size(&visual_json, &visual, report);
                 if visual["visual"]["query"]["queryState"]
                     .as_object()
@@ -703,10 +874,15 @@ fn check_report_pages(resolved: &ResolvedProject, report: &mut ValidationReport)
             continue;
         };
         if !seen_pages.contains(name) && path.join("page.json").is_file() {
-            report.warnings.push(format!(
-                "page directory is not referenced by pageOrder: {}",
-                path.display()
-            ));
+            report.warning(
+                rules::VALIDATION_PAGE_UNREFERENCED,
+                &path.join("page.json"),
+                "",
+                format!(
+                    "page directory is not referenced by pageOrder: {}",
+                    path.display()
+                ),
+            );
         }
     }
     Ok(())
@@ -735,17 +911,27 @@ fn check_visual_minimum_size(
         "slicer"
     };
     let Some(height) = visual["position"]["height"].as_f64() else {
-        report.errors.push(format!(
-            "{} {qualifier} position.height must be a number of at least {minimum}",
-            visual_json_path.display(),
-        ));
+        report.error(
+            rules::VALIDATION_VISUAL_SHAPE,
+            visual_json_path,
+            "/position/height",
+            format!(
+                "{} {qualifier} position.height must be a number of at least {minimum}",
+                visual_json_path.display(),
+            ),
+        );
         return;
     };
     if height < minimum {
-        report.errors.push(format!(
-            "{} {qualifier} height {height} is below the Power BI minimum of {minimum}",
-            visual_json_path.display(),
-        ));
+        report.error(
+            rules::VALIDATION_VISUAL_SHAPE,
+            visual_json_path,
+            "/position/height",
+            format!(
+                "{} {qualifier} height {height} is below the Power BI minimum of {minimum}",
+                visual_json_path.display(),
+            ),
+        );
     }
 }
 
@@ -756,11 +942,16 @@ fn check_positive_page_number(
     report: &mut ValidationReport,
 ) {
     if !page_json[field].as_f64().is_some_and(|value| value > 0.0) {
-        report.errors.push(format!(
-            "{} has invalid nonpositive or missing page {}",
-            page_json_path.display(),
-            field
-        ));
+        report.error(
+            rules::VALIDATION_PAGE_SHAPE,
+            page_json_path,
+            format!("/{field}"),
+            format!(
+                "{} has invalid nonpositive or missing page {}",
+                page_json_path.display(),
+                field
+            ),
+        );
     }
 }
 
@@ -786,7 +977,10 @@ fn check_report_filter_configs(
         if !matches!(file_name, Some("report.json" | "page.json" | "visual.json")) {
             continue;
         }
-        let value = read_json_value(path)?;
+        let Ok(value) = read_json_value(path) else {
+            // check_json_file records malformed JSON once for this path.
+            continue;
+        };
         check_filter_config(path, &value, report);
     }
     Ok(())
@@ -797,19 +991,24 @@ fn check_filter_config(path: &Path, value: &Value, report: &mut ValidationReport
         return;
     };
     let Some(filter_config) = filter_config.as_object() else {
-        report
-            .errors
-            .push(format!("{} filterConfig is not an object", path.display()));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            "/filterConfig",
+            format!("{} filterConfig is not an object", path.display()),
+        );
         return;
     };
     let Some(filters) = filter_config.get("filters") else {
         return;
     };
     let Some(filters) = filters.as_array() else {
-        report.errors.push(format!(
-            "{} filterConfig.filters is not an array",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            "/filterConfig/filters",
+            format!("{} filterConfig.filters is not an array", path.display()),
+        );
         return;
     };
     for (index, filter) in filters.iter().enumerate() {
@@ -825,26 +1024,46 @@ fn check_filter_config_entry(
 ) {
     match filter.get("name") {
         Some(Value::String(name)) if name.trim().is_empty() || name.len() > 50 => {
-            report.errors.push(format!(
-                "{} filterConfig.filters[{index}] name must be between 1 and 50 characters for Power BI Desktop",
-                path.display()
-            ));
+            report.error(
+                rules::VALIDATION_FILTER_SHAPE,
+                path,
+                format!("/filterConfig/filters/{index}/name"),
+                format!(
+                    "{} filterConfig.filters[{index}] name must be between 1 and 50 characters for Power BI Desktop",
+                    path.display()
+                ),
+            );
         }
         Some(Value::String(_)) => {}
-        None => report.errors.push(format!(
-            "{} filterConfig.filters[{index}] is missing required name",
-            path.display()
-        )),
-        Some(_) => report.errors.push(format!(
-            "{} filterConfig.filters[{index}] name is not a string",
-            path.display()
-        )),
+        None => report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/name"),
+            format!(
+                "{} filterConfig.filters[{index}] is missing required name",
+                path.display()
+            ),
+        ),
+        Some(_) => report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/name"),
+            format!(
+                "{} filterConfig.filters[{index}] name is not a string",
+                path.display()
+            ),
+        ),
     }
     if filter["howCreated"].as_str() == Some("powerbi-cli") {
-        report.errors.push(format!(
-            "{} filterConfig.filters[{index}] has invalid howCreated \"powerbi-cli\"; use a Power BI value such as \"User\"",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/howCreated"),
+            format!(
+                "{} filterConfig.filters[{index}] has invalid howCreated \"powerbi-cli\"; use a Power BI value such as \"User\"",
+                path.display()
+            ),
+        );
     }
     let Some(filter_type) = filter["type"].as_str() else {
         return;
@@ -869,30 +1088,50 @@ fn check_filter_config_entry(
         return;
     };
     if filter_type == "Categorical" && body.contains_key("values") {
-        report.errors.push(format!(
-            "{} categorical filterConfig.filters[{index}] uses legacy filter.values; expected filter.Version, filter.From, and filter.Where",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/values"),
+            format!(
+                "{} categorical filterConfig.filters[{index}] uses legacy filter.values; expected filter.Version, filter.From, and filter.Where",
+                path.display()
+            ),
+        );
     }
     if filter["filter"]["Version"].as_i64() != Some(2) {
-        report.errors.push(format!(
-            "{} {filter_type} filterConfig.filters[{index}] is missing filter.Version = 2",
-            path.display(),
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Version"),
+            format!(
+                "{} {filter_type} filterConfig.filters[{index}] is missing filter.Version = 2",
+                path.display(),
+            ),
+        );
     }
     let from = filter["filter"]["From"].as_array();
     if from.is_none_or(|items| items.is_empty()) {
-        report.errors.push(format!(
-            "{} {filter_type} filterConfig.filters[{index}] is missing non-empty filter.From",
-            path.display(),
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/From"),
+            format!(
+                "{} {filter_type} filterConfig.filters[{index}] is missing non-empty filter.From",
+                path.display(),
+            ),
+        );
     }
     let where_clauses = filter["filter"]["Where"].as_array();
     if where_clauses.is_none_or(|items| items.is_empty()) {
-        report.errors.push(format!(
-            "{} {filter_type} filterConfig.filters[{index}] is missing non-empty filter.Where",
-            path.display(),
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where"),
+            format!(
+                "{} {filter_type} filterConfig.filters[{index}] is missing non-empty filter.Where",
+                path.display(),
+            ),
+        );
     }
     let aliases = filter_from_aliases(filter);
     if let Some(where_clauses) = where_clauses {
@@ -925,10 +1164,15 @@ fn check_filter_field(path: &Path, index: usize, filter: &Value, report: &mut Va
             && field.pointer("/Expression/SourceRef/Source").is_none()
     });
     if !valid {
-        report.errors.push(format!(
-            "{} filterConfig.filters[{index}] field must be a Column or Measure with top-level SourceRef.Entity and a Property",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/field"),
+            format!(
+                "{} filterConfig.filters[{index}] field must be a Column or Measure with top-level SourceRef.Entity and a Property",
+                path.display()
+            ),
+        );
     }
 }
 
@@ -939,10 +1183,15 @@ fn check_categorical_filter_shape(
     report: &mut ValidationReport,
 ) {
     let Some(in_condition) = filter.pointer("/filter/Where/0/Condition/In") else {
-        report.errors.push(format!(
-            "{} categorical filterConfig.filters[{index}] must use Where[0].Condition.In",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where/0/Condition/In"),
+            format!(
+                "{} categorical filterConfig.filters[{index}] must use Where[0].Condition.In",
+                path.display()
+            ),
+        );
         return;
     };
     if in_condition["Expressions"]
@@ -950,10 +1199,15 @@ fn check_categorical_filter_shape(
         .is_none_or(|items| items.is_empty())
         || !in_condition["Values"].is_array()
     {
-        report.errors.push(format!(
-            "{} categorical filterConfig.filters[{index}] In condition requires non-empty Expressions and a Values array",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where/0/Condition/In"),
+            format!(
+                "{} categorical filterConfig.filters[{index}] In condition requires non-empty Expressions and a Values array",
+                path.display()
+            ),
+        );
     }
 }
 
@@ -964,17 +1218,27 @@ fn check_advanced_filter_shape(
     report: &mut ValidationReport,
 ) {
     let Some(condition) = filter.pointer("/filter/Where/0/Condition") else {
-        report.errors.push(format!(
-            "{} Advanced filterConfig.filters[{index}] is missing Where[0].Condition",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where/0/Condition"),
+            format!(
+                "{} Advanced filterConfig.filters[{index}] is missing Where[0].Condition",
+                path.display()
+            ),
+        );
         return;
     };
     if !valid_advanced_condition(condition) {
-        report.errors.push(format!(
-            "{} Advanced filterConfig.filters[{index}] has an invalid or empty Where[0].Condition expression",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where/0/Condition"),
+            format!(
+                "{} Advanced filterConfig.filters[{index}] has an invalid or empty Where[0].Condition expression",
+                path.display()
+            ),
+        );
     }
 }
 
@@ -1011,10 +1275,15 @@ fn check_topn_filter_shape(
         })
         .and_then(|item| item.pointer("/Expression/Subquery/Query"));
     let Some(query) = subquery else {
-        report.errors.push(format!(
-            "{} TopN filterConfig.filters[{index}] requires a Type 2 subquery source in filter.From",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/From"),
+            format!(
+                "{} TopN filterConfig.filters[{index}] requires a Type 2 subquery source in filter.From",
+                path.display()
+            ),
+        );
         return;
     };
     let query_from = query["From"].as_array();
@@ -1033,10 +1302,15 @@ fn check_topn_filter_shape(
         || !matches!(direction, Some(1 | 2))
         || !has_measure
     {
-        report.errors.push(format!(
-            "{} TopN filterConfig.filters[{index}] subquery requires Version 2, From, Select, measure OrderBy with Direction 1 or 2, and positive Top",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/From"),
+            format!(
+                "{} TopN filterConfig.filters[{index}] subquery requires Version 2, From, Select, measure OrderBy with Direction 1 or 2, and positive Top",
+                path.display()
+            ),
+        );
     }
     let query_aliases = query_from
         .map(|items| {
@@ -1075,10 +1349,15 @@ fn check_topn_filter_shape(
         || table_alias.is_none()
         || table_alias != topn_alias
     {
-        report.errors.push(format!(
-            "{} TopN filterConfig.filters[{index}] Where must use In.Expressions and reference the Type 2 subquery alias through In.Table.SourceRef.Source",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where"),
+            format!(
+                "{} TopN filterConfig.filters[{index}] Where must use In.Expressions and reference the Type 2 subquery alias through In.Table.SourceRef.Source",
+                path.display()
+            ),
+        );
     }
 }
 
@@ -1089,10 +1368,15 @@ fn check_relative_date_filter_shape(
     report: &mut ValidationReport,
 ) {
     let Some(between) = filter.pointer("/filter/Where/0/Condition/Between") else {
-        report.errors.push(format!(
-            "{} RelativeDate filterConfig.filters[{index}] must use Where[0].Condition.Between",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where/0/Condition/Between"),
+            format!(
+                "{} RelativeDate filterConfig.filters[{index}] must use Where[0].Condition.Between",
+                path.display()
+            ),
+        );
         return;
     };
     if between.pointer("/Expression/Column").is_none()
@@ -1101,10 +1385,15 @@ fn check_relative_date_filter_shape(
         || !contains_expression_key(&between["LowerBound"], "Now")
         || !contains_expression_key(&between["UpperBound"], "Now")
     {
-        report.errors.push(format!(
-            "{} RelativeDate filterConfig.filters[{index}] Between requires a column Expression and DateSpan bounds derived from Now",
-            path.display()
-        ));
+        report.error(
+            rules::VALIDATION_FILTER_SHAPE,
+            path,
+            format!("/filterConfig/filters/{index}/filter/Where/0/Condition/Between"),
+            format!(
+                "{} RelativeDate filterConfig.filters[{index}] Between requires a column Expression and DateSpan bounds derived from Now",
+                path.display()
+            ),
+        );
     }
 }
 
@@ -1148,19 +1437,29 @@ fn check_filter_where_source_refs(
                 if source_ref.get("Entity").and_then(Value::as_str).is_some()
                     && source_ref.get("Source").is_none()
                 {
-                    report.warnings.push(format!(
-                        "{} filterConfig.filters[{index}] Where SourceRef uses Entity instead of Source alias",
-                        path.display()
-                    ));
+                    report.warning(
+                        rules::VALIDATION_FILTER_SOURCE_REF,
+                        path,
+                        format!("/filterConfig/filters/{index}/filter/Where"),
+                        format!(
+                            "{} filterConfig.filters[{index}] Where SourceRef uses Entity instead of Source alias",
+                            path.display()
+                        ),
+                    );
                 }
                 if let Some(source) = source_ref.get("Source").and_then(Value::as_str)
                     && !aliases.is_empty()
                     && !aliases.contains(source)
                 {
-                    report.warnings.push(format!(
-                        "{} filterConfig.filters[{index}] Where SourceRef.Source \"{source}\" is not present in filter.From",
-                        path.display()
-                    ));
+                    report.warning(
+                        rules::VALIDATION_FILTER_SOURCE_REF,
+                        path,
+                        format!("/filterConfig/filters/{index}/filter/Where"),
+                        format!(
+                            "{} filterConfig.filters[{index}] Where SourceRef.Source \"{source}\" is not present in filter.From",
+                            path.display()
+                        ),
+                    );
                 }
             }
             for child in object.values() {
@@ -1183,10 +1482,12 @@ fn check_semantic_model(
     let definition = resolved.semantic_model_dir.join("definition");
     let tables_dir = definition.join("tables");
     if !tables_dir.is_dir() {
-        report.errors.push(format!(
-            "missing TMDL tables directory: {}",
-            tables_dir.display()
-        ));
+        report.error(
+            rules::VALIDATION_MODEL_TABLE,
+            &tables_dir,
+            "",
+            format!("missing TMDL tables directory: {}", tables_dir.display()),
+        );
         return Ok(());
     }
     for entry in fs::read_dir(&tables_dir)
@@ -1198,30 +1499,53 @@ fn check_semantic_model(
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) == Some("tmdl") {
             report.tables += 1;
-            let text = fs::read_to_string(&path)
-                .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+            let text = match fs::read_to_string(&path) {
+                Ok(text) => text,
+                Err(err) => {
+                    report.error(
+                        rules::VALIDATION_FILE_READ,
+                        &path,
+                        "",
+                        format!("read {}: {err}", path.display()),
+                    );
+                    continue;
+                }
+            };
             report.measures += text
                 .lines()
                 .filter(|line| line.trim_start().starts_with("measure "))
                 .count();
             if !text.contains("partition ") {
-                report
-                    .warnings
-                    .push(format!("table has no partition block: {}", path.display()));
+                report.warning(
+                    rules::VALIDATION_MODEL_PARTITION,
+                    &path,
+                    "",
+                    format!("table has no partition block: {}", path.display()),
+                );
             }
             if text.contains("Sql.Database(") || text.contains("Odbc.DataSource(") {
-                report.warnings.push(format!(
-                    "table partition appears to contain a real connector, review before taking home: {}",
-                    path.display()
-                ));
+                report.warning(
+                    rules::VALIDATION_MODEL_CONNECTOR,
+                    &path,
+                    "",
+                    format!(
+                        "table partition appears to contain a real connector, review before taking home: {}",
+                        path.display()
+                    ),
+                );
             }
         }
     }
     if report.tables == 0 {
-        report.errors.push(format!(
-            "semantic model contains no table .tmdl files: {}",
-            tables_dir.display()
-        ));
+        report.error(
+            rules::VALIDATION_MODEL_TABLE,
+            &tables_dir,
+            "",
+            format!(
+                "semantic model contains no table .tmdl files: {}",
+                tables_dir.display()
+            ),
+        );
     }
     check_relationships(resolved, report)?;
     Ok(())
@@ -1236,24 +1560,46 @@ fn check_relationships(resolved: &ResolvedProject, report: &mut ValidationReport
         return Ok(());
     }
 
-    let (relationship_doc, tables) = relationship_tmdl::load_relationships_and_tables(resolved)?;
+    let (relationship_doc, tables) =
+        match relationship_tmdl::load_relationships_and_tables(resolved) {
+            Ok(value) => value,
+            Err(err) => {
+                report.error(
+                    rules::VALIDATION_RELATIONSHIP,
+                    &relationships_path,
+                    "",
+                    err.message,
+                );
+                return Ok(());
+            }
+        };
     report.relationships = relationship_doc.relationships.len();
     for relationship in &relationship_doc.relationships {
         if !tmdl_column_exists(&tables, &relationship.from_table, &relationship.from_column) {
-            report.errors.push(format!(
-                "relationship references missing from column {}.{}: {}",
-                relationship.from_table,
-                relationship.from_column,
-                relationship.handle()
-            ));
+            report.error(
+                rules::VALIDATION_RELATIONSHIP,
+                &relationships_path,
+                "",
+                format!(
+                    "relationship references missing from column {}.{}: {}",
+                    relationship.from_table,
+                    relationship.from_column,
+                    relationship.handle()
+                ),
+            );
         }
         if !tmdl_column_exists(&tables, &relationship.to_table, &relationship.to_column) {
-            report.errors.push(format!(
-                "relationship references missing to column {}.{}: {}",
-                relationship.to_table,
-                relationship.to_column,
-                relationship.handle()
-            ));
+            report.error(
+                rules::VALIDATION_RELATIONSHIP,
+                &relationships_path,
+                "",
+                format!(
+                    "relationship references missing to column {}.{}: {}",
+                    relationship.to_table,
+                    relationship.to_column,
+                    relationship.handle()
+                ),
+            );
         }
     }
     check_variation_references(&tables, &relationship_doc.relationships, report)?;
@@ -1275,8 +1621,18 @@ fn check_variation_references(
         .collect::<BTreeSet<_>>();
     let mut hierarchy_names = BTreeMap::<String, BTreeSet<String>>::new();
     for table in tables {
-        let text = fs::read_to_string(&table.path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", table.path.display())))?;
+        let text = match fs::read_to_string(&table.path) {
+            Ok(text) => text,
+            Err(err) => {
+                report.error(
+                    rules::VALIDATION_FILE_READ,
+                    &table.path,
+                    "",
+                    format!("read {}: {err}", table.path.display()),
+                );
+                continue;
+            }
+        };
         let names = text
             .lines()
             .filter_map(|line| line.trim().strip_prefix("hierarchy "))
@@ -1287,19 +1643,34 @@ fn check_variation_references(
     }
 
     for table in tables {
-        let text = fs::read_to_string(&table.path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", table.path.display())))?;
+        let text = match fs::read_to_string(&table.path) {
+            Ok(text) => text,
+            Err(err) => {
+                report.error(
+                    rules::VALIDATION_FILE_READ,
+                    &table.path,
+                    "",
+                    format!("read {}: {err}", table.path.display()),
+                );
+                continue;
+            }
+        };
         for (index, line) in text.lines().enumerate() {
             let trimmed = line.trim();
             if let Some(value) = trimmed.strip_prefix("relationship:") {
                 let name = unquote_tmdl_reference(value.trim());
                 if !name.is_empty() && !relationship_names.contains(&name.to_ascii_lowercase()) {
-                    report.errors.push(format!(
-                        "{}:{} variation references missing relationship: {}",
-                        table.path.display(),
-                        index + 1,
-                        name
-                    ));
+                    report.error(
+                        rules::VALIDATION_VARIATION,
+                        &table.path,
+                        "",
+                        format!(
+                            "{}:{} variation references missing relationship: {}",
+                            table.path.display(),
+                            index + 1,
+                            name
+                        ),
+                    );
                 }
             }
             if let Some(value) = trimmed.strip_prefix("defaultHierarchy:")
@@ -1307,23 +1678,33 @@ fn check_variation_references(
             {
                 let table_key = table_name.to_ascii_lowercase();
                 if !table_names.contains(&table_key) {
-                    report.errors.push(format!(
-                        "{}:{} variation defaultHierarchy references missing table: {}",
-                        table.path.display(),
-                        index + 1,
-                        table_name
-                    ));
+                    report.error(
+                        rules::VALIDATION_VARIATION,
+                        &table.path,
+                        "",
+                        format!(
+                            "{}:{} variation defaultHierarchy references missing table: {}",
+                            table.path.display(),
+                            index + 1,
+                            table_name
+                        ),
+                    );
                 } else if !hierarchy_names
                     .get(&table_key)
                     .is_some_and(|names| names.contains(&hierarchy_name.to_ascii_lowercase()))
                 {
-                    report.errors.push(format!(
-                        "{}:{} variation defaultHierarchy references missing hierarchy: {}.{}",
-                        table.path.display(),
-                        index + 1,
-                        table_name,
-                        hierarchy_name
-                    ));
+                    report.error(
+                        rules::VALIDATION_VARIATION,
+                        &table.path,
+                        "",
+                        format!(
+                            "{}:{} variation defaultHierarchy references missing hierarchy: {}.{}",
+                            table.path.display(),
+                            index + 1,
+                            table_name,
+                            hierarchy_name
+                        ),
+                    );
                 }
             }
         }
@@ -1424,10 +1805,15 @@ fn check_offline_hazards(
                     || normalized.ends_with(".pbix")
                     || normalized.ends_with(".pbit"))
             {
-                report.errors.push(format!(
-                    "offline-unsafe data/cache/local file present: {}",
-                    path.display()
-                ));
+                report.error(
+                    rules::VALIDATION_OFFLINE_UNSAFE_FILE,
+                    path,
+                    "",
+                    format!(
+                        "offline-unsafe data/cache/local file present: {}",
+                        path.display()
+                    ),
+                );
             }
         }
     }

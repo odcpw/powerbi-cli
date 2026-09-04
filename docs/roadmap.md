@@ -237,6 +237,9 @@ validation, proof, then mutation breadth.
   lint, and M lint. `lint --rules` inventories it and `lint --explain
   <rule-id>` returns versioned remediation metadata; the empty design family is
   reserved for the future design-lint implementation.
+- Implemented structured native validation diagnostics: every finding now
+  carries a registered code, unchanged message, source path, severity, and RFC
+  6901 pointer (with the empty pointer reserved for whole-file/TMDL findings).
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 

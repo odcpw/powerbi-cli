@@ -341,7 +341,7 @@ fn validate_rejects_stale_scatter_legend_role_with_series_repair() {
             .as_array()
             .expect("errors")
             .iter()
-            .any(|error| error.as_str().is_some_and(|message| {
+            .any(|error| error["message"].as_str().is_some_and(|message| {
                 message.contains("queryState role `Legend`") && message.contains("use `Series`")
             }))
     );
@@ -370,7 +370,7 @@ fn validate_reports_empty_visual_directory_with_repair_hint() {
             .as_array()
             .expect("errors")
             .iter()
-            .any(|error| error.as_str().is_some_and(|message| {
+            .any(|error| error["message"].as_str().is_some_and(|message| {
                 message.contains("visual directory is missing visual.json")
                     && message.contains("Remove the empty visual directory")
             }))

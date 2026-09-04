@@ -256,7 +256,7 @@ fn report_theme_preset_uses_schema_three_version_object() {
             .as_array()
             .expect("validation errors")
             .iter()
-            .any(|error| error
+            .any(|error| error["message"]
                 .as_str()
                 .unwrap_or_default()
                 .contains("reportVersionAtImport must match"))

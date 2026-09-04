@@ -133,7 +133,7 @@ fn in_place_delete_rolls_back_when_a_relationship_depends_on_the_column() {
             .as_array()
             .expect("validation errors")
             .iter()
-            .filter_map(Value::as_str)
+            .filter_map(|error| error["message"].as_str())
             .any(|message| message.contains("CustomerKey Calc")),
         "validation error must explain the dependent relationship: {delete_json:?}"
     );

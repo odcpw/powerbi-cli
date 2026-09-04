@@ -13,6 +13,7 @@ mod desktop;
 mod desktop_proof;
 mod desktop_session;
 mod desktop_target;
+mod diagnostics;
 mod diff;
 mod doctor;
 mod feature_catalog;
@@ -102,6 +103,7 @@ mod workflow;
 
 pub(crate) use cli_error::*;
 pub(crate) use cli_support::command_arg;
+pub(crate) use diagnostics::Finding;
 pub(crate) use doctor::doctor_json;
 pub(crate) use inspect::inspect_command;
 pub(crate) use json_io::read_json_value;

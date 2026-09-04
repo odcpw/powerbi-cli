@@ -681,6 +681,11 @@ three pages.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.
+- Native validation errors and warnings are structured findings with a stable
+  registry code, unchanged human message, source `path`, severity, and an RFC
+  6901 `pointer` (the empty pointer denotes a whole-file/TMDL finding). Every
+  emitted code is explainable with `lint --explain <code> --json` and listed by
+  the validation capability contract.
 - `diff` compares normalized semantic summaries with stable handles, so agents
   can verify measure, calculated-column, and relationship changes after CLI
   mutations or Desktop round-trips without reading raw TMDL.

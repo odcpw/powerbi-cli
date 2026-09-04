@@ -236,7 +236,7 @@ fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
             .as_array()
             .expect("offline errors")
             .iter()
-            .any(|error| error
+            .any(|error| error["message"]
                 .as_str()
                 .unwrap_or_default()
                 .contains("offline-unsafe"))
