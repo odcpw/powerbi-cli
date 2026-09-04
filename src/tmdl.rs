@@ -771,7 +771,12 @@ fn encode_handle_component(value: &str) -> String {
 pub(crate) fn partition_source_kind_is_external(source_kind: &str) -> bool {
     matches!(
         source_kind,
-        "postgresqlDatabase" | "sqlDatabase" | "odbcDataSource" | "webContents" | "externalFile"
+        "postgresqlDatabase"
+            | "sqlDatabase"
+            | "odbcDataSource"
+            | "webContents"
+            | "externalFile"
+            | "sharePointFiles"
     )
 }
 
@@ -1526,6 +1531,13 @@ fn classify_partition_source(
             "partition source uses Odbc.DataSource; replace with dummy #table before home handoff",
         ));
         "odbcDataSource"
+    } else if normalized.contains("sharepoint.files(") {
+        findings.push(partition_finding(
+            "partition.real_connector.sharepoint",
+            "error",
+            "partition source uses SharePoint.Files; replace with dummy #table before home handoff",
+        ));
+        "sharePointFiles"
     } else if normalized.contains("web.contents(") {
         findings.push(partition_finding(
             rules::PARTITION_REAL_CONNECTOR_WEB,

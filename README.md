@@ -197,6 +197,7 @@ machine-readable contract is available at `capabilities.responseShapes`.
 ```powershell
 cargo build --bin powerbi-cli
 cargo run --bin powerbi-cli -- --json capabilities
+cargo run --bin powerbi-cli -- --json capabilities --for "report build" --compact
 ```
 
 The CLI is pure Rust and should compile on Windows, Linux, and macOS. Power BI
@@ -227,6 +228,7 @@ cargo run --bin powerbi-cli -- package inspect .\template.pbit --json
 cargo run --bin powerbi-cli -- package extract .\template.pbit --out-dir .\build\template-source --json
 cargo run --bin powerbi-cli -- package import .\source.pbix --out-dir .\build\imported-source --json
 cargo run --bin powerbi-cli -- package source-pack --project .\build\sales --out .\build\sales-source.pbit --json
+cargo run --bin powerbi-cli -- package work-pack --project .\build\sales-live --json
 cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
@@ -272,6 +274,9 @@ cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --h
 cargo run --bin powerbi-cli -- model partitions add-grouped-rank --project .\build\analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when "[IsEligible] = true" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
@@ -425,7 +430,12 @@ three pages.
   real allowlisted PBIP/PBIR/TMDL source files exist inside the archive,
   `package source-pack` first refuses unknown files and files in dot-directories,
   then scans every included file for credentials and PII-suspect row literals;
-  non-dummy or unverified partition sources are also refused, and
+  non-dummy or unverified partition sources are also refused. The separate
+  `package work-pack` uses the same allowlist and scans, but requires every
+  partition to be a recognized credential-free materialized live source
+  accepted by `handoff check --target work`; it writes source metadata only,
+  never imported rows, caches, PBIX files, or local settings. Its default output
+  is the sibling `<project>-work.pbit`. Finally,
   `package export-plan` emits the Desktop handoff. `package export/compile/pack`
   is intentionally refused.
 - Package extraction streams through four default budgets: 10,000 archive
@@ -438,7 +448,8 @@ three pages.
   `definition.pbir`/definition JSON, semantic-model `.platform`/
   `definition.pbism`/definition TMDL, registered/shared JSON resources, and the
   generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-  `powerbi-cli.manifest.copy.json` sidecars. Other files—including every file
+  `powerbi-cli.manifest.copy.json` sidecars. A work-pack additionally contains
+  the generated `powerbi-cli.work-pack.json` class marker. Other files—including every file
   below `.git`, `.vscode`, `.powerbi-cli`, or another dot-directory—cause a
   deterministic refusal listing and no archive is written.
 - Programmatic visual authoring currently covers first-slice PBIR visual
@@ -584,14 +595,18 @@ three pages.
   advanced surfaces remains blocked until object-specific writers and fixtures
   exist.
 - Source-template authoring covers `source-template list/show/add/apply` for
-  credential-free SQL Server, PostgreSQL, ODBC, and Excel rebind metadata stored
+  credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, and
+  SharePoint/OneDrive rebind metadata stored
   as sidecar JSON. PostgreSQL templates record current Npgsql compatibility guidance;
   ODBC templates accept only a bare DSN name (no `;`/`=` attributes) and record
-  that the named DSN must already exist there. `source-template apply` is the
+  that the named DSN must already exist there. CSV, folder, and SharePoint
+  templates render `Csv.Document`, `Folder.Files`, and `SharePoint.Files`
+  expressions with explicit TMDL-derived column type conversions.
+  `source-template apply` is the
   explicit materialization step that replaces one safe generated dummy partition.
   With `--replace-existing` and an exact `--confirm <partition-handle>`, it can also
-  intentionally retarget a recognized credential-free SQL, PostgreSQL, ODBC, or
-  external-file partition; unknown, web, credential-bearing, and unconfirmed
+  intentionally retarget a recognized credential-free SQL, PostgreSQL, ODBC,
+  external-file, or SharePoint partition; unknown, web, credential-bearing, and unconfirmed
   sources remain refused. Excel templates use `Excel.Workbook(File.Contents(...))`,
   promote the selected sheet/table headers, explicitly convert imported columns to
   their TMDL model types, and require an absolute workbook path when applied.

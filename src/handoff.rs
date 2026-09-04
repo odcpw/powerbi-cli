@@ -5,7 +5,9 @@ use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect
 use crate::source_templates::{
     load_source_template_store, source_template_findings, source_templates_path,
 };
-use crate::tmdl::{PartitionRecord, load_table_documents, table_handle};
+use crate::tmdl::{
+    PartitionRecord, load_table_documents, partition_source_kind_is_external, table_handle,
+};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
     resolve_project, validate_project,
@@ -325,10 +327,12 @@ fn add_partition_findings(
 }
 
 fn is_recognized_live_source(source_kind: &str) -> bool {
-    matches!(
-        source_kind,
-        "postgresqlDatabase" | "sqlDatabase" | "odbcDataSource" | "webContents" | "externalFile"
-    )
+    partition_source_kind_is_external(source_kind)
+}
+
+pub(crate) fn partition_is_safe_materialized_work_source(partition: &PartitionRecord) -> bool {
+    is_recognized_live_source(&partition.source_kind)
+        && partition_safe_for_target(partition, HandoffTarget::Work)
 }
 
 fn partition_safe_for_target(partition: &PartitionRecord, target: HandoffTarget) -> bool {

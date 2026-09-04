@@ -2,16 +2,23 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
 };
 use crate::project_io::write_text_atomic_validated;
+use crate::source_template_paths::{
+    add_connector_column_types, is_placeholder, parse_bool_flag, parse_csv_encoding,
+    validate_csv_delimiter, validate_csv_file, validate_folder_pattern,
+    validate_relative_source_path, validate_sharepoint_library, validate_sharepoint_site_url,
+};
 use crate::source_templates::{
-    ExcelSourceTemplateInput, OdbcSourceTemplateInput, PostgresSourceTemplateInput,
-    SourceTemplateRecord, SqlSourceTemplateInput, excel_source_template, find_template,
-    load_source_template_store, odbc_source_template, postgres_source_template,
-    save_source_template_store, source_template_findings, source_template_json,
-    source_templates_path, sql_source_template, template_has_errors, upsert_template,
+    CsvSourceTemplateInput, ExcelSourceTemplateInput, FolderSourceTemplateInput,
+    OdbcSourceTemplateInput, PostgresSourceTemplateInput, SharePointSourceTemplateInput,
+    SourceTemplateRecord, SqlSourceTemplateInput, csv_source_template, excel_source_template,
+    find_template, folder_source_template, load_source_template_store, odbc_source_template,
+    postgres_source_template, save_source_template_store, sharepoint_source_template,
+    source_template_findings, source_template_json, source_templates_path, sql_source_template,
+    template_has_errors, upsert_template,
 };
 use crate::tmdl::{
-    ColumnRecord, PartitionSelector, find_partition, load_table_documents,
-    partition_selector_parts, replace_partition_source_plan, same_name,
+    PartitionSelector, find_partition, load_table_documents, partition_selector_parts,
+    replace_partition_source_plan, same_name,
 };
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -73,8 +80,15 @@ struct AddOptions {
     sql_schema: Option<String>,
     object: Option<String>,
     file: Option<String>,
+    path: Option<String>,
     item: Option<String>,
     item_kind: Option<String>,
+    delimiter: Option<String>,
+    encoding: Option<String>,
+    has_header: Option<bool>,
+    pattern: Option<String>,
+    site_url: Option<String>,
+    library: Option<String>,
     description: Option<String>,
     mode: Option<MutationMode>,
     out_dir: Option<PathBuf>,
@@ -91,8 +105,15 @@ struct ApplyOptions {
     sql_schema: Option<String>,
     object: Option<String>,
     file: Option<String>,
+    path: Option<String>,
     item: Option<String>,
     item_kind: Option<String>,
+    delimiter: Option<String>,
+    encoding: Option<String>,
+    has_header: Option<bool>,
+    pattern: Option<String>,
+    site_url: Option<String>,
+    library: Option<String>,
     replace_existing: bool,
     confirm: Option<String>,
     mode: Option<MutationMode>,
@@ -182,6 +203,7 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
         "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
     )?;
     let kind = normalize_kind(options.kind.as_deref())?;
+    validate_add_kind_flags(&options, &kind)?;
     if kind == "odbc" {
         validate_bare_odbc_dsn(options.dsn.as_deref().unwrap_or("<dsn>"))?;
     }
@@ -275,7 +297,11 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
             reject_flag_for_kind(&options.database, "--database", "excel", "--file")?;
             reject_flag_for_kind(&options.sql_schema, "--schema", "excel", "--item-kind")?;
             reject_flag_for_kind(&options.object, "--object", "excel", "--item")?;
-            let file = options.file.as_deref().unwrap_or("<file>");
+            let file = options
+                .file
+                .as_deref()
+                .or(options.path.as_deref())
+                .unwrap_or("<file>");
             let item = options.item.as_deref().unwrap_or(&partition.table);
             let item_kind = normalize_excel_item_kind(options.item_kind.as_deref())?;
             if !(file.contains('<') && file.contains('>')) {
@@ -296,6 +322,69 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
                 description: options.description.clone(),
             })
         }
+        "csv" => {
+            let file = options
+                .file
+                .as_deref()
+                .or(options.path.as_deref())
+                .unwrap_or("<file.csv>");
+            let delimiter = options.delimiter.as_deref().unwrap_or(",");
+            let encoding = parse_csv_encoding(options.encoding.as_deref().unwrap_or("65001"))?;
+            let has_header = options.has_header.unwrap_or(true);
+            if !is_placeholder(file) {
+                validate_csv_file(file)?;
+            }
+            validate_csv_delimiter(delimiter)?;
+            validate_template_parameters(&[("file", file), ("delimiter", delimiter)])?;
+            csv_source_template(CsvSourceTemplateInput {
+                table: partition.table.clone(),
+                partition: partition.name.clone(),
+                name: options.template_name.clone(),
+                file: file.to_string(),
+                delimiter: delimiter.to_string(),
+                encoding,
+                has_header,
+                description: options.description.clone(),
+            })
+        }
+        "folder" => {
+            let path = options.path.as_deref().unwrap_or("<folder>");
+            let pattern = options.pattern.as_deref().unwrap_or("*.csv");
+            validate_folder_pattern(pattern)?;
+            validate_template_parameters(&[("path", path), ("pattern", pattern)])?;
+            folder_source_template(FolderSourceTemplateInput {
+                table: partition.table.clone(),
+                partition: partition.name.clone(),
+                name: options.template_name.clone(),
+                path: path.to_string(),
+                pattern: pattern.to_string(),
+                description: options.description.clone(),
+            })
+        }
+        "sharepoint" => {
+            let site_url = options.site_url.as_deref().unwrap_or("<siteUrl>");
+            let library = options.library.as_deref().unwrap_or("<library>");
+            let path = options.path.as_deref().unwrap_or("<path>");
+            if !is_placeholder(site_url) {
+                validate_sharepoint_site_url(site_url)?;
+            }
+            validate_sharepoint_library(library)?;
+            validate_relative_source_path(path)?;
+            validate_template_parameters(&[
+                ("siteUrl", site_url),
+                ("library", library),
+                ("path", path),
+            ])?;
+            sharepoint_source_template(SharePointSourceTemplateInput {
+                table: partition.table.clone(),
+                partition: partition.name.clone(),
+                name: options.template_name.clone(),
+                site_url: site_url.to_string(),
+                library: library.to_string(),
+                path: path.to_string(),
+                description: options.description.clone(),
+            })
+        }
         _ => return Err(unsupported_kind_error(&kind)),
     };
     if template_has_errors(&record) {
@@ -303,7 +392,7 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
             "source-template add refuses to store credential-like template text",
         )
         .with_hint("Use placeholders such as `<server>` and configure credentials only inside Power BI Desktop at work.")
-        .with_suggested_command("powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel> --dry-run --json"));
+        .with_suggested_command("powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint> --dry-run --json"));
     }
 
     let mut store = load_source_template_store(&target_resolved)?;
@@ -420,12 +509,14 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         name: None,
     };
     let source_partition = find_partition(&source_docs, &partition_selector)?;
-    if record.kind == "excel"
-        && let Some(table) = source_docs
-            .iter()
-            .find(|table| same_name(&table.table, &record.table))
+    if matches!(
+        record.kind.as_str(),
+        "excel" | "csv" | "folder" | "sharepoint"
+    ) && let Some(table) = source_docs
+        .iter()
+        .find(|table| same_name(&table.table, &record.table))
     {
-        m_source = add_excel_column_types(&m_source, &table.columns);
+        m_source = add_connector_column_types(&m_source, &record.kind, &parameters, &table.columns);
     }
     let replacing_dummy =
         source_partition.source_kind == "dummyMTable" && source_partition.safety.status == "safe";
@@ -438,7 +529,7 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
                 "source-template apply only replaces a safe generated dummy partition by default; {} is {} ({})",
                 handle, source_partition.source_kind, source_partition.safety.status
             ))
-            .with_hint("To intentionally retarget a known credential-free SQL, PostgreSQL, ODBC, or external-file partition, pass --replace-existing and --confirm with the exact partition handle. Unknown, web, and credential-bearing sources remain refused.")
+            .with_hint("To intentionally retarget a known credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint partition, pass --replace-existing and --confirm with the exact partition handle. Unknown, web, and credential-bearing sources remain refused.")
             .with_suggested_command(format!(
                 "powerbi-cli source-template apply --project {} --handle {} --replace-existing --confirm {} --dry-run --json",
                 command_arg(&source_resolved.project_dir),
@@ -460,13 +551,17 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         }
         if !matches!(
             source_partition.source_kind.as_str(),
-            "sqlDatabase" | "postgresqlDatabase" | "odbcDataSource" | "externalFile"
+            "sqlDatabase"
+                | "postgresqlDatabase"
+                | "odbcDataSource"
+                | "externalFile"
+                | "sharePointFiles"
         ) {
             return Err(CliError::invalid_args(format!(
                 "source-template apply refuses confirmed replacement of source kind {}",
                 source_partition.source_kind
             ))
-            .with_hint("Only recognized credential-free SQL, PostgreSQL, ODBC, and external-file sources can be retargeted. Rebuild unknown or web sources from a reviewed source package."));
+            .with_hint("Only recognized credential-free SQL, PostgreSQL, ODBC, external-file, and SharePoint sources can be retargeted. Rebuild unknown or web sources from a reviewed source package."));
         }
         if source_partition
             .safety
@@ -513,19 +608,31 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         shell_arg(&plan.handle)
     );
     let validate = format!("powerbi-cli validate --strict {} --json", project_arg);
-    let requires_desktop_authentication = record.kind != "excel";
-    let instructions = if record.kind == "excel" {
-        vec![
+    let requires_desktop_authentication = matches!(
+        record.kind.as_str(),
+        "sql" | "postgres" | "odbc" | "sharepoint"
+    );
+    let instructions = match record.kind.as_str() {
+        "excel" => vec![
             "Ensure the configured Excel workbook exists at the materialized path.",
             "Open the PBIP in Power BI Desktop and refresh the semantic model.",
             "If the project moves, reapply the Excel source template with the workbook's new absolute path.",
-        ]
-    } else {
-        vec![
+        ],
+        "csv" => vec![
+            "Ensure the configured CSV file exists at the materialized path.",
+            "Open the PBIP in Power BI Desktop and refresh the semantic model.",
+            "If the project moves, reapply the CSV source template with the file's new absolute path.",
+        ],
+        "folder" => vec![
+            "Ensure the configured folder exists and contains files matching the stored pattern.",
+            "Open the PBIP in Power BI Desktop and refresh the semantic model.",
+            "If the project moves, reapply the folder source template with the new absolute path.",
+        ],
+        _ => vec![
             "Open the PBIP in Power BI Desktop on the work machine.",
-            "When prompted, choose the appropriate database authentication method and enter credentials in Power BI Desktop.",
+            "When prompted, choose the appropriate source authentication method and enter credentials in Power BI Desktop.",
             "Refresh the semantic model. Credentials are not stored in the PBIP project.",
-        ]
+        ],
     };
 
     Ok(json!({
@@ -683,9 +790,21 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                 options.sql_schema = Some(take_value(args, &mut i, "--schema")?);
             }
             "--object" => options.object = Some(take_value(args, &mut i, "--object")?),
-            "--file" | "--path" => options.file = Some(take_value(args, &mut i, "--file")?),
+            "--file" => options.file = Some(take_value(args, &mut i, "--file")?),
+            "--path" => options.path = Some(take_value(args, &mut i, "--path")?),
             "--item" | "--sheet" => options.item = Some(take_value(args, &mut i, "--item")?),
             "--item-kind" => options.item_kind = Some(take_value(args, &mut i, "--item-kind")?),
+            "--delimiter" => options.delimiter = Some(take_value(args, &mut i, "--delimiter")?),
+            "--encoding" => options.encoding = Some(take_value(args, &mut i, "--encoding")?),
+            "--has-header" => {
+                let value = take_value(args, &mut i, "--has-header")?;
+                options.has_header = Some(parse_bool_flag("--has-header", &value)?);
+            }
+            "--pattern" => options.pattern = Some(take_value(args, &mut i, "--pattern")?),
+            "--site-url" | "--site" => {
+                options.site_url = Some(take_value(args, &mut i, "--site-url")?)
+            }
+            "--library" => options.library = Some(take_value(args, &mut i, "--library")?),
             "--description" => {
                 options.description = Some(take_value(args, &mut i, "--description")?)
             }
@@ -744,7 +863,7 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
     }
     if options.kind.is_none() {
         return Err(CliError::invalid_args("source-template add requires --kind")
-            .with_hint("Supported kinds are `sql`, `postgres`, `odbc`, and `excel`; CSV and generic M templates are planned.")
+            .with_hint("Supported kinds are `sql`, `postgres`, `odbc`, `excel`, `csv`, `folder`, and `sharepoint`.")
             .with_suggested_command(
                 "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             ));
@@ -770,9 +889,21 @@ fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
                 options.sql_schema = Some(take_value(args, &mut i, "--schema")?)
             }
             "--object" => options.object = Some(take_value(args, &mut i, "--object")?),
-            "--file" | "--path" => options.file = Some(take_value(args, &mut i, "--file")?),
+            "--file" => options.file = Some(take_value(args, &mut i, "--file")?),
+            "--path" => options.path = Some(take_value(args, &mut i, "--path")?),
             "--item" | "--sheet" => options.item = Some(take_value(args, &mut i, "--item")?),
             "--item-kind" => options.item_kind = Some(take_value(args, &mut i, "--item-kind")?),
+            "--delimiter" => options.delimiter = Some(take_value(args, &mut i, "--delimiter")?),
+            "--encoding" => options.encoding = Some(take_value(args, &mut i, "--encoding")?),
+            "--has-header" => {
+                let value = take_value(args, &mut i, "--has-header")?;
+                options.has_header = Some(parse_bool_flag("--has-header", &value)?);
+            }
+            "--pattern" => options.pattern = Some(take_value(args, &mut i, "--pattern")?),
+            "--site-url" | "--site" => {
+                options.site_url = Some(take_value(args, &mut i, "--site-url")?)
+            }
+            "--library" => options.library = Some(take_value(args, &mut i, "--library")?),
             "--replace-existing" => {
                 options.replace_existing = true;
                 i += 1;
@@ -834,6 +965,7 @@ fn materialize_template(
     options: &ApplyOptions,
 ) -> CliResult<(String, BTreeMap<String, String>)> {
     let kind = normalize_kind(Some(&record.kind))?;
+    validate_apply_kind_flags(options, &kind)?;
     let mut parameters = BTreeMap::new();
     let source = match kind.as_str() {
         "sql" | "postgres" => {
@@ -919,7 +1051,11 @@ fn materialize_template(
             reject_apply_flag_for_kind(&options.database, "--database", "excel", "--file")?;
             reject_apply_flag_for_kind(&options.sql_schema, "--schema", "excel", "--item-kind")?;
             reject_apply_flag_for_kind(&options.object, "--object", "excel", "--item")?;
-            let file = concrete_parameter(record, "file", options.file.as_deref())?;
+            let file = concrete_parameter(
+                record,
+                "file",
+                options.file.as_deref().or(options.path.as_deref()),
+            )?;
             let item = concrete_parameter(record, "item", options.item.as_deref())?;
             let item_kind = normalize_excel_item_kind(
                 options
@@ -943,6 +1079,88 @@ fn materialize_template(
                 file,
                 item,
                 item_kind,
+                description: record.description.clone(),
+            })
+            .m_template
+        }
+        "csv" => {
+            let file = concrete_parameter(
+                record,
+                "file",
+                options.file.as_deref().or(options.path.as_deref()),
+            )?;
+            let delimiter = concrete_parameter(record, "delimiter", options.delimiter.as_deref())?;
+            let encoding_text =
+                concrete_parameter(record, "encoding", options.encoding.as_deref())?;
+            let has_header_text = options
+                .has_header
+                .map(|value| value.to_string())
+                .or_else(|| record.parameters.get("hasHeader").cloned())
+                .ok_or_else(|| {
+                    CliError::validation_failed(
+                        "CSV source template is missing parameter hasHeader",
+                    )
+                })?;
+            let encoding = parse_csv_encoding(&encoding_text)?;
+            let has_header = parse_bool_flag("--has-header", &has_header_text)?;
+            validate_csv_file(&file)?;
+            validate_csv_delimiter(&delimiter)?;
+            validate_template_parameters(&[("file", &file), ("delimiter", &delimiter)])?;
+            parameters.insert("file".to_string(), file.clone());
+            parameters.insert("delimiter".to_string(), delimiter.clone());
+            parameters.insert("encoding".to_string(), encoding.to_string());
+            parameters.insert("hasHeader".to_string(), has_header.to_string());
+            csv_source_template(CsvSourceTemplateInput {
+                table: record.table.clone(),
+                partition: record.partition.clone(),
+                name: record.name.clone(),
+                file,
+                delimiter,
+                encoding,
+                has_header,
+                description: record.description.clone(),
+            })
+            .m_template
+        }
+        "folder" => {
+            let path = concrete_parameter(record, "path", options.path.as_deref())?;
+            let pattern = concrete_parameter(record, "pattern", options.pattern.as_deref())?;
+            validate_folder_pattern(&pattern)?;
+            validate_template_parameters(&[("path", &path), ("pattern", &pattern)])?;
+            parameters.insert("path".to_string(), path.clone());
+            parameters.insert("pattern".to_string(), pattern.clone());
+            folder_source_template(FolderSourceTemplateInput {
+                table: record.table.clone(),
+                partition: record.partition.clone(),
+                name: record.name.clone(),
+                path,
+                pattern,
+                description: record.description.clone(),
+            })
+            .m_template
+        }
+        "sharepoint" => {
+            let site_url = concrete_parameter(record, "siteUrl", options.site_url.as_deref())?;
+            let library = concrete_parameter(record, "library", options.library.as_deref())?;
+            let path = concrete_parameter(record, "path", options.path.as_deref())?;
+            validate_sharepoint_site_url(&site_url)?;
+            validate_sharepoint_library(&library)?;
+            validate_relative_source_path(&path)?;
+            validate_template_parameters(&[
+                ("siteUrl", &site_url),
+                ("library", &library),
+                ("path", &path),
+            ])?;
+            parameters.insert("siteUrl".to_string(), site_url.clone());
+            parameters.insert("library".to_string(), library.clone());
+            parameters.insert("path".to_string(), path.clone());
+            sharepoint_source_template(SharePointSourceTemplateInput {
+                table: record.table.clone(),
+                partition: record.partition.clone(),
+                name: record.name.clone(),
+                site_url,
+                library,
+                path,
                 description: record.description.clone(),
             })
             .m_template
@@ -979,46 +1197,95 @@ fn concrete_parameter(
     Ok(value)
 }
 
-fn add_excel_column_types(source: &str, columns: &[ColumnRecord]) -> String {
-    let transformations = columns
-        .iter()
-        .filter(|column| !column.is_calculated())
-        .filter_map(|column| {
-            let data_type = excel_m_type(column.data_type.as_deref()?)?;
-            let source_column = column.source_column.as_deref().unwrap_or(&column.name);
-            Some(format!(
-                "{{\"{}\", {data_type}}}",
-                source_column.replace('"', "\"\"")
-            ))
-        })
-        .collect::<Vec<_>>();
-    if transformations.is_empty() {
-        return source.to_string();
-    }
-
-    let marker = "\nin\n    PromotedHeaders";
-    let replacement = format!(
-        ",\n    TypedColumns = Table.TransformColumnTypes(PromotedHeaders, {{{}}}, \"en-US\")\nin\n    TypedColumns",
-        transformations.join(", ")
-    );
-    source.replacen(marker, &replacement, 1)
+fn validate_add_kind_flags(options: &AddOptions, kind: &str) -> CliResult<()> {
+    validate_kind_flags(
+        kind,
+        &[
+            (options.server.is_some(), "--server", &["sql", "postgres"]),
+            (options.dsn.is_some(), "--dsn", &["odbc"]),
+            (
+                options.database.is_some(),
+                "--database",
+                &["sql", "postgres", "odbc"],
+            ),
+            (
+                options.sql_schema.is_some(),
+                "--schema",
+                &["sql", "postgres", "odbc"],
+            ),
+            (
+                options.object.is_some(),
+                "--object",
+                &["sql", "postgres", "odbc"],
+            ),
+            (options.file.is_some(), "--file", &["excel", "csv"]),
+            (
+                options.path.is_some(),
+                "--path",
+                &["excel", "csv", "folder", "sharepoint"],
+            ),
+            (options.item.is_some(), "--item", &["excel"]),
+            (options.item_kind.is_some(), "--item-kind", &["excel"]),
+            (options.delimiter.is_some(), "--delimiter", &["csv"]),
+            (options.encoding.is_some(), "--encoding", &["csv"]),
+            (options.has_header.is_some(), "--has-header", &["csv"]),
+            (options.pattern.is_some(), "--pattern", &["folder"]),
+            (options.site_url.is_some(), "--site-url", &["sharepoint"]),
+            (options.library.is_some(), "--library", &["sharepoint"]),
+        ],
+    )
 }
 
-fn excel_m_type(data_type: &str) -> Option<&'static str> {
-    match data_type.trim().to_ascii_lowercase().as_str() {
-        "int64" => Some("Int64.Type"),
-        "double" => Some("type number"),
-        "decimal" => Some("Decimal.Type"),
-        "currency" => Some("Currency.Type"),
-        "datetime" => Some("type datetime"),
-        "datetimezone" => Some("type datetimezone"),
-        "date" => Some("type date"),
-        "time" => Some("type time"),
-        "boolean" => Some("type logical"),
-        "string" => Some("type text"),
-        "binary" => Some("type binary"),
-        _ => None,
+fn validate_apply_kind_flags(options: &ApplyOptions, kind: &str) -> CliResult<()> {
+    validate_kind_flags(
+        kind,
+        &[
+            (options.server.is_some(), "--server", &["sql", "postgres"]),
+            (options.dsn.is_some(), "--dsn", &["odbc"]),
+            (
+                options.database.is_some(),
+                "--database",
+                &["sql", "postgres", "odbc"],
+            ),
+            (
+                options.sql_schema.is_some(),
+                "--schema",
+                &["sql", "postgres", "odbc"],
+            ),
+            (
+                options.object.is_some(),
+                "--object",
+                &["sql", "postgres", "odbc"],
+            ),
+            (options.file.is_some(), "--file", &["excel", "csv"]),
+            (
+                options.path.is_some(),
+                "--path",
+                &["excel", "csv", "folder", "sharepoint"],
+            ),
+            (options.item.is_some(), "--item", &["excel"]),
+            (options.item_kind.is_some(), "--item-kind", &["excel"]),
+            (options.delimiter.is_some(), "--delimiter", &["csv"]),
+            (options.encoding.is_some(), "--encoding", &["csv"]),
+            (options.has_header.is_some(), "--has-header", &["csv"]),
+            (options.pattern.is_some(), "--pattern", &["folder"]),
+            (options.site_url.is_some(), "--site-url", &["sharepoint"]),
+            (options.library.is_some(), "--library", &["sharepoint"]),
+        ],
+    )
+}
+
+fn validate_kind_flags(kind: &str, flags: &[(bool, &str, &[&str])]) -> CliResult<()> {
+    for (present, flag, allowed) in flags {
+        if *present && !allowed.contains(&kind) {
+            return Err(CliError::invalid_args(format!(
+                "{flag} is not valid with source-template kind {kind}"
+            ))
+            .with_hint(format!("{flag} is supported for: {}.", allowed.join(", ")))
+            .with_suggested_command("powerbi-cli --json capabilities --for source-template"));
+        }
     }
+    Ok(())
 }
 
 fn reject_apply_flag_for_kind(
@@ -1206,13 +1473,13 @@ fn reject_flag_for_kind(
 
 fn unsupported_kind_error(kind: &str) -> CliError {
     CliError::invalid_args(format!(
-        "source-template add supports kinds sql, postgres, odbc, and excel; got {kind}"
+        "source-template add supports kinds sql, postgres, odbc, excel, csv, folder, and sharepoint; got {kind}"
     ))
     .with_hint(
-        "Use `--kind sql`, `--kind postgres`, `--kind odbc`, or `--kind excel`; CSV and generic M templates are planned.",
+        "Use `--kind sql`, `--kind postgres`, `--kind odbc`, `--kind excel`, `--kind csv`, `--kind folder`, or `--kind sharepoint`.",
     )
     .with_suggested_command(
-        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel> --dry-run --json",
+        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint> --dry-run --json",
     )
 }
 
@@ -1242,6 +1509,7 @@ fn normalize_kind_arg(value: &str) -> String {
         "sql" | "sql-server" | "sqlserver" => "sql".to_string(),
         "postgres" | "postgresql" => "postgres".to_string(),
         "excel" | "xlsx" | "xls" => "excel".to_string(),
+        "share-point" | "sharepoint-files" | "onedrive" | "one-drive" => "sharepoint".to_string(),
         "generic-m" | "genericm" | "m" => "generic-m".to_string(),
         other => other.to_string(),
     }

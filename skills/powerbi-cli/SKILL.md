@@ -95,22 +95,22 @@ pbi --json capabilities
 pbi features list --json
 pbi features list --for unsupported --json
 pbi features list --for drillthrough --json
-pbi --json capabilities --for scaffold
+pbi --json capabilities --for scaffold --compact
 pbi --json capabilities --for schema
 pbi --json capabilities --for profile
-pbi --json capabilities --for "report build"
+pbi --json capabilities --for "report build" --compact
 pbi --json capabilities --for "report spec"
-pbi --json capabilities --for inspect
-pbi --json capabilities --for validate
-pbi --json capabilities --for lint
+pbi --json capabilities --for inspect --compact
+pbi --json capabilities --for validate --compact
+pbi --json capabilities --for lint --compact
 pbi lint --rules --json
 pbi lint --explain dax.reference_self --json
 pbi lint --explain m.duplicate_step_name --json
-pbi --json capabilities --for diff
+pbi --json capabilities --for diff --compact
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
-pbi --json capabilities --for "model dax execute"
-pbi --json capabilities --for "model live export-tmdl"
+pbi --json capabilities --for "model dax execute" --compact
+pbi --json capabilities --for "model live export-tmdl" --compact
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
@@ -130,8 +130,11 @@ A focused `--for` response returns the matching commands and small shared
 contract fields. It deliberately leaves the large unrelated schema/visual
 catalogs null and names them in `omittedCatalogs`; run the returned
 `fullContractCommand` only when those catalogs are actually needed.
+When the canonical command path is already known exactly, append `--compact`
+to receive only its path, usage, flags, examples, proof level, follow-up fields,
+and output schema.
 
-Key live surfaces include package inspect/extract/import/source-pack/export-plan,
+Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
 schema validate/normalize, profile
 infer/validate/summarize, deterministic report planning, declarative report spec
 validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
@@ -145,7 +148,7 @@ advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
-PostgreSQL, ODBC, and Excel rebind metadata,
+PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive rebind metadata,
 handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
 one-shot desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
@@ -160,7 +163,7 @@ formatting list/show/extract/apply bundles, visual formatting set-text for
 title/alt-text patches, conditional-formatting readback list/show, handoff
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
-Treat planned CSV/generic-M source templates, filter sort and arbitrary expression
+Treat planned generic-M source templates, filter sort and arbitrary expression
 updates, bookmark state capture/create/update/grouping,
 slicer selection/sync mutation, interaction Default/reset semantics, unsupported
 slicer modes, style
@@ -255,6 +258,12 @@ supported.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.
+- `package work-pack` is the separate materialized work-machine variant. It
+  applies the same strict allowlist and content scans, requires every partition
+  to be a recognized credential-free live connector accepted by `handoff check
+  --target work`, and packages source metadata only—never imported rows, caches,
+  PBIX files, or local settings. Without `--out`, it writes the sibling
+  `<project>-work.pbit`.
 - If a command refuses an unsupported visual, format, source, or model feature,
   preserve the refusal. `error.code = "unsupported_feature"` is a stop sign, not
   an invitation to patch raw PBIR/TMDL by memory.
@@ -326,6 +335,7 @@ pbi --json package inspect template.pbit
 pbi --json package extract template.pbit --out-dir build/template-source
 pbi --json handoff check build/sales
 pbi --json package source-pack --project build/sales --out build/sales-source.pbit
+pbi --json package work-pack --project build/sales-live
 ```
 
 Extraction removes partial output if the entry-count, per-entry, total-size, or
@@ -605,6 +615,9 @@ pbi --json source-template add --project build/sales --table FactSales --kind sq
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind odbc --dsn "<dsn>" --database "<database>" --schema "<schema>" --object "<object>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --out-dir build/sales-rebind
 pbi --json source-template list --project build/sales-rebind
 pbi --json handoff rebind-plan build/sales-rebind --out build/sales-rebind/work-machine-rebind.md
@@ -615,7 +628,7 @@ Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`.
 `source-template apply` materializes one template into a generated dummy partition.
 For an intentional source-to-source retarget, `--replace-existing` also requires
 the exact `--confirm <partition-handle>` and accepts only recognized credential-free
-SQL, PostgreSQL, ODBC, or external-file sources. Unknown, web, credential-bearing,
+SQL, PostgreSQL, ODBC, external-file, or SharePoint sources. Unknown, web, credential-bearing,
 and unconfirmed sources are refused. Excel templates select one worksheet or Excel
 table, promote its headers, add explicit Power Query conversions from the model's
 TMDL column types, and materialize an absolute workbook path; reapply or patch the
@@ -978,7 +991,8 @@ pbi --json fixture verify build/sales --expected testdata/golden/sales-desktop-f
 ```
 
 Use `source-template add` before the final rebind plan when you know a
-credential-free SQL Server, PostgreSQL, ODBC, or Excel mapping. Missing templates
+credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, or
+SharePoint/OneDrive mapping. Missing templates
 produce structured findings and suggested commands; `--allow-unmapped` is useful
 while drafting. Write the final work-machine instructions with
 `handoff rebind-plan <project> --out <file.md>` and keep every credential in
@@ -1110,8 +1124,8 @@ High-value improvement targets:
 - generated proof/follow-up commands on every mutation;
 - strict validation diagnostics with machine-readable codes;
 - `handoff check` and source rebind planning;
-- Desktop rebind/refresh proof for SQL Server, PostgreSQL/Npgsql, and ODBC/DSN
-  source templates;
+- Desktop rebind/refresh proof for SQL Server, PostgreSQL/Npgsql, ODBC/DSN,
+  Excel, CSV, folder, and SharePoint/OneDrive source templates;
 - Desktop golden fixtures for visual binding and formatting.
 
 ## Verification

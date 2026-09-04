@@ -1186,7 +1186,15 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
     assert_eq!(source_feature_json["matchedFeatures"], Value::from(1));
     assert_eq!(
         source_feature_json["features"][0]["supportedKinds"],
-        json!(["sql", "postgres", "odbc", "excel"])
+        json!([
+            "sql",
+            "postgres",
+            "odbc",
+            "excel",
+            "csv",
+            "folder",
+            "sharepoint"
+        ])
     );
 
     let empty = run_powerbi(&["capabilities", "--json", "--for", "does-not-exist"]);

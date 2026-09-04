@@ -230,7 +230,15 @@ fn validate_proof_record_feature_ids(proof_records: &[LoadedDesktopProofRecord])
 
 fn supported_kinds(feature: &Feature) -> &'static [&'static str] {
     match feature.id {
-        "model.source-templates" => &["sql", "postgres", "odbc", "excel"],
+        "model.source-templates" => &[
+            "sql",
+            "postgres",
+            "odbc",
+            "excel",
+            "csv",
+            "folder",
+            "sharepoint",
+        ],
         _ => &[],
     }
 }
@@ -368,17 +376,19 @@ const FEATURE_CATALOG: &[Feature] = &[
         title: "PBIX/PBIT package boundary",
         category: "package",
         status: "supported",
-        support: "inspect-safe-metadata-extract-export-plan",
+        support: "inspect-safe-metadata-source-pack-work-pack-export-plan",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &[
             "package inspect",
             "package extract",
             "package import",
+            "package source-pack",
+            "package work-pack",
             "package export-plan",
         ],
         refusal_code: None,
-        reason: "The CLI can inspect package archives and extract/import actual source-like metadata entries; opaque binary PBIX/PBIT writing is refused with a Desktop handoff plan.",
+        reason: "The CLI can inspect package archives, extract/import actual source-like metadata entries, package dummy source projects, and package credential-free materialized live-source work variants; opaque binary PBIX/PBIT writing is refused with a Desktop handoff plan.",
         next_proof: &[
             "Add recent Microsoft sample package fixtures containing source entries where licensing permits",
             "Keep binary package export behind Desktop handoff until a documented writable format exists",
@@ -609,7 +619,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         title: "Credential-free source templates and rebind runbooks",
         category: "model",
         status: "supported",
-        support: "sidecar-sql-postgres-odbc-excel",
+        support: "sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &[
@@ -620,9 +630,9 @@ const FEATURE_CATALOG: &[Feature] = &[
             "handoff rebind-plan",
         ],
         refusal_code: None,
-        reason: "Credential-free SQL Server, PostgreSQL, ODBC, and Excel M templates are stored in sidecar metadata and can replace safe generated dummy partitions. An exact-handle confirmation gate also permits intentional retargeting of recognized credential-free existing sources without embedding credentials.",
+        reason: "Credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive M templates are stored in sidecar metadata and can replace safe generated dummy partitions. File-family templates emit explicit TMDL-derived type conversions. An exact-handle confirmation gate also permits intentional retargeting of recognized credential-free existing sources without embedding credentials.",
         next_proof: &[
-            "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, ODBC/DSN, and Excel projects in Power BI Desktop",
+            "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, ODBC/DSN, Excel, CSV, folder, and SharePoint/OneDrive projects in Power BI Desktop",
         ],
         reference_signals: &[],
         tags: &[
@@ -631,6 +641,9 @@ const FEATURE_CATALOG: &[Feature] = &[
             "postgres",
             "odbc",
             "excel",
+            "csv",
+            "folder",
+            "sharepoint",
             "handoff",
             "rebind",
         ],

@@ -1394,6 +1394,75 @@ fn focused_capabilities_omit_large_unrelated_catalogs() {
 }
 
 #[test]
+fn exact_compact_capabilities_return_only_the_documented_command_fields() {
+    let output = run_powerbi(&[
+        "capabilities",
+        "--for",
+        "report build",
+        "--compact",
+        "--json",
+    ]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    let value = stdout_json(&output);
+    assert_eq!(
+        value,
+        json!({
+            "path": "report build",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--json", "--format json"],
+            "examples": ["powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json", "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"],
+            "proofLevel": "unit-smoke",
+            "followUpFields": ["projectDir", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
+            "outputSchema": "powerbi-cli.report.build.v1"
+        })
+    );
+}
+
+#[test]
+fn compact_capabilities_are_documented_and_require_an_exact_path() {
+    let full = run_powerbi(&["capabilities", "--json"]);
+    assert_eq!(full.code, 0, "stderr: {}", full.stderr);
+    let full_value = stdout_json(&full);
+    assert_eq!(
+        full_value["responseShapes"]["capabilities.compact.v1"],
+        json!({
+            "appliesTo": "capabilities --for <exact-path> --compact",
+            "exactPathRequired": true,
+            "fields": ["path", "usage", "flags", "examples", "proofLevel", "followUpFields", "outputSchema"],
+            "additionalFields": false
+        })
+    );
+    let capability = command_by_path(
+        full_value["commands"].as_array().expect("commands"),
+        "capabilities",
+    );
+    assert!(
+        capability["flags"]
+            .as_array()
+            .expect("flags")
+            .contains(&json!("--compact"))
+    );
+
+    let missing_for = run_powerbi(&["capabilities", "--compact", "--json"]);
+    assert_eq!(missing_for.code, 2);
+    let missing_error = stderr_json(&missing_for);
+    assert_eq!(missing_error["error"]["code"], "invalid_args");
+    assert_eq!(
+        missing_error["error"]["suggestedCommands"],
+        json!(["powerbi-cli --json capabilities --for <exact-path> --compact"])
+    );
+
+    let non_exact = run_powerbi(&["capabilities", "--for", "build", "--compact", "--json"]);
+    assert_eq!(non_exact.code, 2);
+    let non_exact_error = stderr_json(&non_exact);
+    assert_eq!(non_exact_error["error"]["code"], "invalid_args");
+    assert_eq!(
+        non_exact_error["error"]["suggestedCommands"],
+        json!(["powerbi-cli --json capabilities --for \"build\""])
+    );
+}
+
+#[test]
 fn semantic_model_handles_percent_encode_colon_components_and_round_trip() {
     let temp = tempfile::tempdir().expect("tempdir");
     let schema_path = temp.path().join("colon.schema.json");

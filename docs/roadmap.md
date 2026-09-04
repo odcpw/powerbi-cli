@@ -69,7 +69,9 @@ Required contract rules:
 ### Foundation
 
 - `version`: report tool and contract version.
-- `capabilities [--for <filter>]`: advertise the live command contract.
+- `capabilities [--for <filter> [--compact]]`: advertise the live command
+  contract; exact compact lookup returns only the command syntax, examples,
+  proof level, follow-up fields, and output schema.
 - `doctor`: detect Power BI Desktop on Windows, report format assumptions, and
   warn about unsupported proof levels.
 - `schema validate|normalize`: validate or canonicalize a data-agnostic schema
@@ -81,11 +83,12 @@ Required contract rules:
   visuals, tables, columns, measures, relationships, and offline hazards.
 - `validate <project|pbip>`: parse required files, validate known schemas, check
   references, detect unsafe files, and report Desktop-proof status if available.
-- `package inspect|extract|import|export-plan`: inspect PBIX/PBIT archives,
+- `package inspect|extract|import|source-pack|work-pack|export-plan`: inspect PBIX/PBIT archives,
   extract safe metadata/source files, import real PBIP/PBIR/TMDL source entries
-  when present, and emit the Desktop export handoff. Binary export/compile/pack
-  remains refused unless a future implementation can prove valid Power BI
-  binary writing without opaque fallbacks.
+  when present, package dummy source projects or credential-free materialized
+  work variants under separate policies, and emit the Desktop export handoff.
+  Binary export/compile/pack remains refused unless a future implementation can
+  prove valid Power BI binary writing without opaque fallbacks.
 
 ### Project Authoring
 
@@ -370,8 +373,8 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for CSV and generic M; SQL Server, PostgreSQL,
-  ODBC, and Excel are implemented.
+- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
+  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
@@ -386,7 +389,11 @@ frozen until proven.
 - Extended source templates with typed Excel workbook sheet/table sources. Applying
   an Excel template promotes headers, emits explicit Power Query conversions from
   the table's TMDL column types, and materializes an absolute workbook path.
-  Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file
+- Extended source templates with typed CSV file, folder, and
+  SharePoint/OneDrive path sources. Applying them emits `Csv.Document`,
+  `Folder.Files`, or `SharePoint.Files` M plus explicit TMDL-derived column type
+  conversions; Desktop refresh proof remains pending on Windows.
+  Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
