@@ -356,6 +356,16 @@ separately with `model relationships add`. The command refuses replacement,
 credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table
 ingestion, and validates the project after every write.
 
+The generic semantic-model surface covers `model tables list/show/add/rename/delete`
+and `model columns list/show/add/update/delete`. Table handles use the form
+`table:<name>`; column handles use `column:<table>:<name>`. Literal `%` and `:`
+inside each component are encoded as `%25` and `%3A`. Table rename refuses when
+relationships, DAX, or variation metadata still reference the old name unless
+`--rename-references` is supplied. Column updates refuse unknown
+Desktop-authored properties in the targeted block, so annotations and
+extended properties are never silently dropped. All mutating commands support
+`--dry-run`, guarded `--in-place`, and isolated `--out-dir` output.
+
 The `regional-sales` archetype is deliberately dummy data, but keeps the
 column names and shape close enough to exercise a non-ASCII column
 (`Größenklasse`) and measure (`Umsatz Übersicht`), a model relationship, DAX
@@ -496,12 +506,20 @@ three pages.
   only after the MCP process tree is reaped. The output contains only a
   `definition/` TMDL tree; it is not a report export or full PBIX-to-PBIP
   conversion.
+- Programmatic semantic-model authoring covers `model tables list/show/add/rename/delete`
+  and `model columns list/show/add/update/delete` with stable percent-encoded
+  table/column handles, guarded output modes, and readback/validate commands.
+  Rename rewrites relationship, DAX, and variation references only when
+  `--rename-references` is explicit; otherwise it refuses with the reference
+  list. Column updates refuse unknown Desktop-authored properties instead of
+  dropping annotations or extended properties. `diff --scope model.tables` and
+  `diff --scope model.columns` provide semantic table/column changes.
 - Programmatic static-table authoring covers `model tables add-static` for a
   new disconnected single-string-column selector or a small 1-10-column string
   lookup dimension backed by a generated inline `#table` partition. Cells are
   bounded, short, and screened for credential-like text; the first column is a
-  unique key. Broader table/column CRUD, automatic relationships, and arbitrary
-  fact-table ingestion remain outside this guarded surface.
+  unique key. Automatic relationships and arbitrary fact-table ingestion remain
+  outside this guarded surface.
 - Programmatic DAX calculated column authoring covers `model calculated-columns
   list/show/add/update/delete` with explicit data types, guarded output modes,
   readback commands, and `diff --scope model.calculatedColumns`. Updates refuse

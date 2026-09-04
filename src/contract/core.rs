@@ -90,6 +90,14 @@ Usage:
   powerbi-cli lint --explain <rule-id> --json
   powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --json
   powerbi-cli model tables add-static --project <project-dir-or.pbip> --table <table> --column <column> --values-json '["One","Two"]' --dry-run --json
+  powerbi-cli model tables list --project <project-dir-or.pbip> --json
+  powerbi-cli model tables add --project <project-dir-or.pbip> --table <table> --column <column> --dry-run --json
+  powerbi-cli model tables rename --project <project-dir-or.pbip> --handle <table-handle> --new-name <table> --rename-references --dry-run --json
+  powerbi-cli model tables delete --project <project-dir-or.pbip> --handle <table-handle> --dry-run --json
+  powerbi-cli model columns list --project <project-dir-or.pbip> --json
+  powerbi-cli model columns add --project <project-dir-or.pbip> --table <table> --name <column> --data-type string --dry-run --json
+  powerbi-cli model columns update --project <project-dir-or.pbip> --handle <column-handle> --data-type string --dry-run --json
+  powerbi-cli model columns delete --project <project-dir-or.pbip> --handle <column-handle> --dry-run --json
   powerbi-cli model columns set-sort-by --project <project-dir-or.pbip> --table <table> --column <column> --by <sort-column> --dry-run --json
   powerbi-cli model calculated-columns list --project <project-dir-or.pbip> --json
   powerbi-cli model calculated-columns show --project <project-dir-or.pbip> --handle <column-handle> --json
@@ -323,9 +331,11 @@ Rules for agents:
 - Use `package inspect/extract/import/source-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only documented PBIP/PBIR/TMDL files and generated sidecars, refuses dot-directories/unknown files, and scans every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
 - For arbitrary dashboards, start with `schema validate`, `profile infer`, `report plan`, `report spec validate`, then `report build`.
 - After any scaffold, report build, or mutation, run the returned inspect and validate commands.
-- Use `diff <before> <after> --json` to verify measure-level semantic changes after mutations; pass `--scope model.calculatedColumns` for calculated columns or `--scope model.relationships` for relationships.
+- Use `diff <before> <after> --json` to verify semantic changes after mutations; pass `--scope model.tables`, `--scope model.columns`, `--scope model.calculatedColumns`, or `--scope model.relationships` for focused model diffs.
 - Use `model measures list/show/add/update/delete` for DAX measure authoring; `--expression-file <path|->` accepts UTF-8 multiline DAX as an alternative to `--expression` and trims trailing newlines. Updates refuse unsupported Desktop-authored TMDL metadata, local validation proves file structure, and Power BI Desktop remains the DAX compatibility oracle.
 - Use `model columns set-sort-by` to set or clear a same-table TMDL `sortByColumn` property with guarded output semantics.
+- Use `model tables list/show/add/rename/delete` for typed table inventory and guarded TMDL table CRUD. Table handles are `table:<name>` with literal `%` and `:` encoded as `%25` and `%3A`; renames refuse detected relationship/DAX/variation references unless `--rename-references` is supplied.
+- Use `model columns list/show/add/update/delete` for base and calculated column inventory and guarded TMDL column CRUD. Column handles are `column:<table>:<name>` with the same component encoding; updates refuse unknown Desktop-authored properties instead of dropping them.
 - Use `model calculated-columns list/show/add/update/delete` for DAX calculated column authoring; input type `date` normalizes to TMDL `dateTime` with a default `Short Date` format, updates refuse unsupported Desktop-authored TMDL metadata, and calculated columns may require refresh after Desktop opens the project.
 - Reuse returned semantic-model handles. Literal `%` and `:` inside table, column, measure, and partition components are encoded as `%25` and `%3A` so handles round-trip without ambiguity.
 - Use `model dax dependencies/lint/bridge-plan` to enumerate DAX expressions, static references, obvious broken dependencies, and validation boundaries. On an opted-in Windows oracle machine, `model dax execute` can run a bounded read-only EVALUATE query against the exact already-open PBIP or PBIX document; it never launches Desktop or returns the query text. `model live export-tmdl` uses the same exact live-engine identity and the pinned local Microsoft Modeling MCP to publish one credential-scanned semantic-model TMDL definition into a fresh output directory. It does not export report pages or claim full PBIX-to-PBIP conversion. PBIP live preflight ignores only each selected artifact's root `.pbi/` runtime directory; PBIX preflight verifies the package/report/DataModel shape. Strict offline validation, packaging, workflow, and handoff still reject PBIP runtime state.
@@ -402,6 +412,14 @@ pub(crate) fn robot_triage() -> Value {
             "inspect": "powerbi-cli --json inspect <project-dir-or.pbip>",
             "diff": "powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --json",
             "calculatedColumnList": "powerbi-cli model calculated-columns list --project <project-dir-or.pbip> --json",
+            "tableList": "powerbi-cli model tables list --project <project-dir-or.pbip> --json",
+            "tableAddDryRun": "powerbi-cli model tables add --project <project-dir-or.pbip> --table <table> --column <column> --dry-run --json",
+            "tableRenameDryRun": "powerbi-cli model tables rename --project <project-dir-or.pbip> --handle <table-handle> --new-name <table> --rename-references --dry-run --json",
+            "tableDeleteDryRun": "powerbi-cli model tables delete --project <project-dir-or.pbip> --handle <table-handle> --dry-run --json",
+            "columnList": "powerbi-cli model columns list --project <project-dir-or.pbip> --json",
+            "columnAddDryRun": "powerbi-cli model columns add --project <project-dir-or.pbip> --table <table> --name <column> --data-type string --dry-run --json",
+            "columnUpdateDryRun": "powerbi-cli model columns update --project <project-dir-or.pbip> --handle <column-handle> --data-type string --dry-run --json",
+            "columnDeleteDryRun": "powerbi-cli model columns delete --project <project-dir-or.pbip> --handle <column-handle> --dry-run --json",
             "calculatedColumnAddDryRun": "powerbi-cli model calculated-columns add --project <project-dir-or.pbip> --table <table> --name <column> --expression <dax> --data-type string --dry-run --json",
             "measureList": "powerbi-cli model measures list --project <project-dir-or.pbip> --json",
             "measureAddDryRun": "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
@@ -906,16 +924,16 @@ pub(crate) fn command_catalog() -> Vec<Value> {
         }),
         json!({
             "path": "diff",
-            "usage": "powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> [--scope model.measures|model.calculatedColumns|model.relationships] --json",
+            "usage": "powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> [--scope model.tables|model.columns|model.measures|model.calculatedColumns|model.relationships] --json",
             "summary": "Compare two PBIP projects using normalized semantic summaries and stable handles",
-            "tags": ["pbip", "tmdl", "diff", "semantic", "measure", "calculated-column", "relationship", "agent"],
+            "tags": ["pbip", "tmdl", "diff", "semantic", "table", "column", "measure", "calculated-column", "relationship", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "diffResult.v1",
-            "flags": ["--scope model.measures", "--scope model.calculatedColumns", "--scope model.relationships", "--json", "--format json"],
-            "examples": ["powerbi-cli diff build/sales build/sales-v2 --json", "powerbi-cli diff build/sales build/sales-v2 --scope model.calculatedColumns --json", "powerbi-cli diff build/sales build/sales-v2 --scope model.relationships --json"],
+            "flags": ["--scope model.tables", "--scope model.columns", "--scope model.measures", "--scope model.calculatedColumns", "--scope model.relationships", "--json", "--format json"],
+            "examples": ["powerbi-cli diff build/sales build/sales-v2 --json", "powerbi-cli diff build/sales build/sales-v2 --scope model.tables --json", "powerbi-cli diff build/sales build/sales-v2 --scope model.columns --json"],
             "followUpFields": ["same", "summary", "changes[].kind", "changes[].op", "changes[].handle", "changes[].fieldsChanged", "changes[].before", "changes[].after", "next"]
         }),
     ]);
@@ -1019,7 +1037,7 @@ fn schema_manifest() -> Value {
     let mut manifest = json!({
         "fields": ["name", "displayName", "locale", "tables", "relationships", "pages"],
         "tableFields": ["name", "columns", "measures", "rows"],
-        "columnFields": ["name", "dataType", "description", "formatString", "sourceColumn", "isHidden", "isKey", "summarizeBy", "sortByColumn"],
+        "columnFields": ["name", "expression", "dataType", "description", "formatString", "sourceColumn", "isHidden", "isKey", "summarizeBy", "sortByColumn"],
         "calculatedColumnFields": ["name", "expression", "dataType", "description", "formatString", "summarizeBy", "displayFolder", "isHidden"],
         "measureFields": ["name", "expression", "description", "formatString", "formatStringDefinition", "displayFolder"],
         "relationshipFields": ["name", "fromTable", "fromColumn", "toTable", "toColumn", "fromCardinality", "toCardinality", "crossFilteringBehavior", "isActive"],
@@ -1036,6 +1054,12 @@ fn schema_manifest() -> Value {
         "modelDaxBridgePlanFields": ["ok", "projectDir", "counts.measures", "counts.calculatedColumns", "daxInventory.measures[].handle", "daxInventory.measures[].expression", "daxInventory.calculatedColumns[].handle", "daxInventory.calculatedColumns[].expression", "bridge.required", "bridge.supportedEngines", "bridge.noFakeFallbacks", "validationBridge.offlineDaxParser.available", "next"],
         "modelDaxExecuteFields": ["ok", "exitCode", "document.kind", "document.path", "query.source", "query.lengthBytes", "query.fingerprint", "query.textReturned", "safety.readOnlyQueryFormsOnly", "safety.allowDataRead", "safety.exactOpenProjectMatchRequired", "safety.autoLaunch", "safety.modelWrites", "limits.maxRows", "limits.maxCellChars", "limits.timeoutMs", "stage", "engine.kind", "engine.desktopProcessId", "engine.modelProcessId", "engine.port", "columns[].ordinal", "columns[].name", "columns[].dataType", "rows", "counts.rows", "counts.columns", "counts.truncatedCells", "truncation.rows", "truncation.cells", "runtime.temporaryFilesRemoved", "diagnostics", "validation", "next"],
         "modelStaticTableMutationFields": ["ok", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.columns", "tablePlan.kind", "tablePlan.dataType", "tablePlan.dataTypes", "tablePlan.columnCount", "tablePlan.rowCount", "tablePlan.uniqueFirstColumn", "tablePlan.relationshipCount", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
+        "modelTablesListFields": ["schema", "projectDir", "pbip", "semanticModelDir", "counts.tables", "counts.columns", "counts.measures", "counts.partitions", "tables[].handle", "tables[].name", "tables[].path", "tables[].counts", "tables[].columns", "tables[].measures", "tables[].partitions", "next"],
+        "modelTablesShowFields": ["schema", "projectDir", "pbip", "semanticModelDir", "table.handle", "table.name", "table.counts", "table.columns", "table.measures", "table.partitions", "block", "next"],
+        "modelTableMutationFields": ["schema", "ok", "exitCode", "action", "dryRun", "mode", "projectModified", "rollback", "projectDir", "pbip", "semanticModelDir", "target", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand", "next"],
+        "modelColumnsListFields": ["schema", "projectDir", "pbip", "semanticModelDir", "filter.table", "counts.tables", "counts.columns", "columns[].handle", "columns[].table", "columns[].name", "columns[].isCalculated", "columns[].expression", "columns[].properties", "columns[].path", "columns[].lineRange", "next"],
+        "modelColumnsShowFields": ["schema", "projectDir", "pbip", "semanticModelDir", "column.handle", "column.table", "column.name", "column.isCalculated", "column.expression", "column.properties", "column.path", "column.lineRange", "block", "next"],
+        "modelColumnMutationFields": ["schema", "ok", "exitCode", "action", "dryRun", "mode", "projectModified", "rollback", "projectDir", "pbip", "semanticModelDir", "target", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand", "next"],
         "modelDaxDependenciesFields": ["analysisBoundary.daxEngineValidated", "counts", "expressions[].handle", "expressions[].tableColumns", "expressions[].measureReferences", "graph.edges", "findings", "validation", "next"],
         "modelAdvancedInventoryFields": ["families[].family", "families[].count", "families[].records[].handle", "families[].records[].summary", "validation", "next"],
         "packageInspectFields": ["package", "packageKind", "packageClass", "archive.kind", "archive.entries", "archive.byCategory", "sourceRoots", "support.canExtractSafeMetadata", "support.canImportSourceProject", "support.canWriteBinaryPackage", "entries[].name", "entries[].category", "entries[].safeForMetadataExtract", "next"],

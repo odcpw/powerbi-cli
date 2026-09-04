@@ -499,6 +499,36 @@ and receives `formatString: "Short Date"` unless an explicit format string is
 provided. Colon-bearing table and column names round-trip through percent-encoded
 handles returned by the CLI.
 
+### Author Tables And Columns
+
+Use the generic semantic-model commands for typed table and column inventory
+and guarded CRUD:
+
+```bash
+pbi --json capabilities --for "model tables"
+pbi --json model tables list --project build/sales
+pbi --json model tables show --project build/sales --handle table:FactSales
+pbi --json model tables add --project build/sales --table DimSegment --column Code --data-type string --dry-run
+pbi --json model tables rename --project build/sales --handle table:DimDate --new-name Calendar --rename-references --dry-run
+pbi --json model tables delete --project build/sales --handle table:DimSegment --dry-run
+pbi --json capabilities --for "model columns"
+pbi --json model columns list --project build/sales
+pbi --json model columns add --project build/sales --table FactSales --name Margin --data-type decimal --dry-run
+pbi --json model columns update --project build/sales --handle column:FactSales:Revenue --format-string '$#,##0' --dry-run
+pbi --json model columns delete --project build/sales --handle column:FactSales:Margin --dry-run
+pbi --json diff build/sales build/sales-v2 --scope model.tables
+pbi --json diff build/sales build/sales-v2 --scope model.columns
+```
+
+Table handles are `table:<name>` and column handles are
+`column:<table>:<name>`; literal `%` and `:` in every component are encoded as
+`%25` and `%3A`. Table rename refuses and lists relationship/DAX/variation
+references unless `--rename-references` is explicit. Column updates refuse a
+targeted block containing unknown Desktop-authored properties (including
+annotations or extended properties) rather than dropping them. Every mutation
+supports `--dry-run`, guarded `--in-place`, and isolated `--out-dir`; run the
+returned inspect and validate commands after applying a plan.
+
 ### Add A Small Selector Or Lookup Table
 
 Use the guarded static-table command for report controls such as a metric toggle
