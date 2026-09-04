@@ -65,6 +65,10 @@ pub(crate) fn lint_project(
     add_dax_findings(resolved, &deep, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
     add_desktop_compat_findings(resolved, &mut findings)?;
+    let design_lint = crate::design::lint::lint_report(resolved, &deep)?;
+    if let Some(design_findings) = design_lint["findings"].as_array() {
+        findings.extend(design_findings.iter().cloned());
+    }
     rules::ensure_finding_ids_registered(&findings, "code")?;
 
     let error_count = findings
@@ -91,6 +95,7 @@ pub(crate) fn lint_project(
             "info": info_count,
             "findings": findings.len()
         },
+        "designLint": design_lint,
         "findings": findings,
         "next": [
             format!("powerbi-cli inspect --deep {} --json", command_arg(&resolved.project_dir)),
@@ -256,8 +261,6 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                     page["path"].as_str(),
                 ));
             }
-            let page_width = page["width"].as_f64().unwrap_or(0.0);
-            let page_height = page["height"].as_f64().unwrap_or(0.0);
             let visuals = page["visuals"].as_array().cloned().unwrap_or_default();
             let mut visual_title_counts = BTreeMap::<String, usize>::new();
             for visual in &visuals {
@@ -334,15 +337,6 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                         ));
                     }
                 }
-                if visual_outside_page(&visual, page_width, page_height) {
-                    findings.push(finding(
-                        rules::REPORT_VISUAL_OUTSIDE_PAGE,
-                        "warning",
-                        &format!("visual is outside page bounds: {title}"),
-                        visual_handle,
-                        visual["path"].as_str(),
-                    ));
-                }
             }
         }
     }
@@ -408,15 +402,6 @@ fn add_dax_findings(
         findings.push(finding);
     }
     Ok(())
-}
-
-fn visual_outside_page(visual: &Value, page_width: f64, page_height: f64) -> bool {
-    let position = &visual["position"];
-    let x = position["x"].as_f64().unwrap_or(0.0);
-    let y = position["y"].as_f64().unwrap_or(0.0);
-    let width = position["width"].as_f64().unwrap_or(0.0);
-    let height = position["height"].as_f64().unwrap_or(0.0);
-    x < 0.0 || y < 0.0 || x + width > page_width || y + height > page_height
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

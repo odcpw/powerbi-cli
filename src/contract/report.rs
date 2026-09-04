@@ -243,19 +243,19 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report audit",
-            "usage": "powerbi-cli report audit --project <project-dir-or.pbip> [--profile agent-safe|handoff] [--include-raw] --json",
-            "summary": "Audit report PBIR state for persisted values, raw-literal risks, stale references, and handoff hygiene issues",
-            "tags": ["pbir", "report", "audit", "sanitize", "handoff", "safety", "agent"],
+            "usage": "powerbi-cli report audit --project <project-dir-or.pbip> [--profile agent-safe|handoff] [--rules design] [--include-raw] --json",
+            "summary": "Audit report PBIR state for persisted values, raw-literal risks, stale references, handoff hygiene, or deterministic design-system geometry findings",
+            "tags": ["pbir", "report", "audit", "sanitize", "handoff", "safety", "design", "agent"],
             "readOnly": true,
             "mutates": false,
             "writesDataCache": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.audit.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--profile agent-safe|handoff", "--include-raw", "--json", "--format json"],
-            "examples": ["powerbi-cli report audit --project build/sales --json", "powerbi-cli report audit --project build/sales --profile handoff --json"],
+            "flags": ["--project <project-dir-or.pbip>", "--profile agent-safe|handoff", "--rules design", "--include-raw", "--json", "--format json"],
+            "examples": ["powerbi-cli report audit --project build/sales --json", "powerbi-cli report audit --project build/sales --rules design --json", "powerbi-cli report audit --project build/sales --profile handoff --json"],
             "diagnosticCodes": crate::rules::rule_ids(),
-            "followUpFields": ["ok", "profile", "counts.findings", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].supportedAction", "sanitizePlanCommand", "next"]
+            "followUpFields": ["ok", "profile", "rules", "counts.findings", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].pointer", "findings[].supportedAction", "recommendedActions", "unsupportedActions", "sanitizePlanCommand", "next"]
         }),
         json!({
             "path": "report sanitize plan",
