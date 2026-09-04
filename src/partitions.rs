@@ -7,12 +7,16 @@ use crate::{CliError, CliResult, canonical_display, command_arg, resolve_project
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
+use crate::model_partitions_grouped_rank::add_grouped_rank_command;
+
 pub(crate) fn partitions_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "model partitions requires a subcommand: list, show",
+            "model partitions requires a subcommand: list, show, add-grouped-rank",
         )
-        .with_hint("Run `powerbi-cli model partitions list --project <project-dir-or.pbip> --json`.")
+        .with_hint(
+            "Run `powerbi-cli model partitions list --project <project-dir-or.pbip> --json`.",
+        )
         .with_suggested_command(
             "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
         ));
@@ -21,6 +25,7 @@ pub(crate) fn partitions_command(args: &[String]) -> CliResult<Value> {
     match action.as_str() {
         "list" => list_partitions(rest),
         "show" => show_partition(rest),
+        "add-grouped-rank" | "addGroupedRank" => add_grouped_rank_command(rest),
         "set-sql-template" | "set-m" | "set-dummy" => Err(CliError::invalid_args(format!(
             "model partitions {action} is deferred; source templates are sidecar metadata in this slice"
         ))

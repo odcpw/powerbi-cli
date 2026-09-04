@@ -253,6 +253,7 @@ cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-relationships --
 cargo run --bin powerbi-cli -- model partitions list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --include-source --json
+cargo run --bin powerbi-cli -- model partitions add-grouped-rank --project .\build\analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when "[IsEligible] = true" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
@@ -526,6 +527,15 @@ three pages.
   `annotation PowerBICli_SourceKind = ModelDerived` explicitly marks unknown M
   as model-derived: work handoff accepts it when no error finding remains, while
   offline handoff still requires review and rejects it.
+- Guarded refresh-time ranking covers `model partitions add-grouped-rank` for
+  a table with exactly one safe generated dummy partition. It resolves existing
+  group/order/rank columns to their Power Query source names, sorts the rows,
+  buffers each group, gives eligible rows a 1-based `Int64` index, gives
+  ineligible rows zero, recombines them, and finishes with an explicit
+  `Table.TransformColumnTypes`. The rank column must already be an `int64`
+  placeholder in the generated table. Live, unknown, unsafe, multi-partition,
+  and already transformed sources are refused; Desktop refresh is still the
+  semantic oracle.
 - Programmatic advanced semantic-model readback covers
   `model advanced inventory` plus `model roles|perspectives|cultures|expressions
   list/show` for TMDL metadata already present in a project. Mutating those

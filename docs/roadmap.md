@@ -274,6 +274,10 @@ validation, proof, then mutation breadth.
 - Implemented static DAX dependencies/lint over stored measures/calculated
   columns. This catches missing/ambiguous references, self references, and
   simple measure cycles, but does not claim engine validation.
+- Implemented `model partitions add-grouped-rank` for the pilot's standard
+  refresh-time ranking pattern: guarded generated partitions only, sort and
+  buffered index per group, zero for ineligible rows, and a final explicit
+  `Int64.Type` conversion.
 - Implemented advanced semantic-model readback inventory for roles,
   perspectives, cultures, and expressions already present in TMDL. Mutation
   remains planned.

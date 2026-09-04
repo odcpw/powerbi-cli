@@ -105,6 +105,7 @@ Usage:
   powerbi-cli model relationships delete --project <project-dir-or.pbip> --handle <relationship-handle> --dry-run --json
   powerbi-cli model partitions list --project <project-dir-or.pbip> --json
   powerbi-cli model partitions show --project <project-dir-or.pbip> --handle <partition-handle> [--include-source] --json
+  powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> --order-by <column> [--desc] --rank-column <column> --eligible-when <M-predicate> --dry-run --json
   powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json
   powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json
   powerbi-cli model dax lint --project <project-dir-or.pbip> --json
@@ -402,6 +403,7 @@ pub(crate) fn robot_triage() -> Value {
             "relationshipList": "powerbi-cli model relationships list --project <project-dir-or.pbip> --json",
             "relationshipAddDryRun": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --dry-run --json",
             "partitionList": "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
+            "partitionAddGroupedRankDryRun": "powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> --order-by <column> --desc --rank-column <column> --eligible-when <M-predicate> --dry-run --json",
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
             "modelDaxExecute": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
             "modelLiveExportTmdl": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read --json",

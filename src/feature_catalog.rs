@@ -569,6 +569,23 @@ const FEATURE_CATALOG: &[Feature] = &[
         ],
     },
     Feature {
+        id: "model.partition-grouped-rank",
+        title: "Refresh-time grouped rank partition generator",
+        category: "model",
+        status: "supported",
+        support: "safe-generated-partition-mutation",
+        proof_level: "schema-golden",
+        emits_pbir: false,
+        commands: &["model partitions add-grouped-rank"],
+        refusal_code: None,
+        reason: "A guarded generator appends sort, buffered per-group eligibility splitting, 1-based indexing, zero-ranked ineligible rows, recombination, and an explicit Int64 retype to one safe generated partition.",
+        next_proof: &[
+            "Refresh a grouped-rank analytics table in Power BI Desktop and verify ranks against bounded DAX queries",
+        ],
+        reference_signals: &[],
+        tags: &["semantic-model", "partition", "m", "rank", "performance"],
+    },
+    Feature {
         id: "workflow.source-profile",
         title: "Deterministic staged source-profile workflow",
         category: "workflow",
