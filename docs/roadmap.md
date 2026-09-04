@@ -136,6 +136,10 @@ object-specific writers and fixtures exist.
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
+- Missing required dashboard intent now returns the registered
+  `spec.missing_input` diagnostic with an RFC 6901 pointer, expected field,
+  reason, example, and `report spec fields` candidate command; documented
+  optional defaults are surfaced in `defaultsApplied[]`.
 - `report spec upgrade --spec <v1.json> --out <v2.json>`: losslessly migrate
   a strict v1 spec to normalized v2 by rewriting only `/schema`, preserving
   array order, and refusing unknown keys before output.
@@ -530,7 +534,10 @@ frozen until proven.
   transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
   public `apply --ops` command only after the individual kernels are converted.
 - Make operation JSON durable enough for another agent to inspect and replay.
-- Include generated proof commands in mutation outputs.
+- Include generated proof commands in mutation outputs. `report build` now
+  compiles v2 `proof` requirements into a deterministic `proofPlan` and
+  `next[]`; Desktop-dependent steps remain explicitly unavailable off Windows
+  until the T9 refresh/canvas oracle lands.
 
 ### Phase 9: Optional Bridges
 

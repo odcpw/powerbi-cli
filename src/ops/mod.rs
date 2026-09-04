@@ -16,18 +16,37 @@
 // consumers are registered without weakening clippy's correctness lints.
 #![allow(dead_code)]
 
+mod add_measure;
+mod add_relationship;
+mod add_visual;
+mod apply_theme_preset;
 mod handles;
 mod io;
 mod plan;
+mod set_interaction;
 mod set_object;
 mod set_position;
 mod transaction;
 
 #[allow(unused_imports)]
+pub(crate) use crate::report_drillthrough::{
+    SetDrillthroughKernel, parse_args as parse_set_drillthrough_args,
+};
+#[allow(unused_imports)]
+pub(crate) use crate::report_filter_add::{AddFilterKernel, parse_args as parse_add_filter_args};
+#[allow(unused_imports)]
+pub(crate) use add_measure::*;
+#[allow(unused_imports)]
+pub(crate) use add_relationship::*;
+#[allow(unused_imports)]
+pub(crate) use add_visual::*;
+pub(crate) use apply_theme_preset::*;
+#[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
 pub(crate) use io::*;
 pub(crate) use plan::*;
+pub(crate) use set_interaction::*;
 #[allow(unused_imports)]
 pub(crate) use set_object::{
     SetObjectKernel, apply as apply_set_object, execute as execute_set_object,
@@ -43,6 +62,20 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
+
+/// Return the concrete kernel registered for an operation variant.
+///
+/// The registry is intentionally additive: each converted mutation contributes
+/// one match arm while the public `ops apply` dispatcher remains a later bead.
+pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
+    match operation {
+        Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
+        Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
+        Op::SetObject(_) => Some(Box::new(SetObjectKernel::default())),
+        Op::SetPosition(_) => Some(Box::new(SetPositionKernel::default())),
+        _ => None,
+    }
+}
 
 /// A typed operation accepted by the operation-plan compiler.
 ///
@@ -135,6 +168,8 @@ pub(crate) struct AddFilter {
     pub(crate) target: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) display_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) condition: Option<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -490,7 +525,8 @@ pub(crate) fn schema_json() -> Value {
                         operation("addFilter", serde_json::json!({
                             "handle": {"type": "string"}, "scope": {"type": "string"},
                             "owner": {"type": "string"}, "filterType": {"type": "string"},
-                            "target": {}
+                            "target": {}, "name": {"type": "string"},
+                            "displayName": {"type": "string"}
                         }), &["handle", "scope", "owner", "filterType", "target"]),
                         operation("setDrillthrough", serde_json::json!({
                             "page": {"type": "string"}, "target": {"type": "string"},
@@ -571,6 +607,7 @@ mod tests {
                 filter_type: "Categorical".into(),
                 target: serde_json::json!({"table": "Customers", "column": "Segment"}),
                 name: Some("RevenueFilter".into()),
+                display_name: None,
                 condition: Some(serde_json::json!({"values": ["Enterprise"]})),
                 values: vec![serde_json::json!("Enterprise")],
                 relative: None,

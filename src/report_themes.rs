@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
 };
 use crate::input_safety::{InputKind, read_utf8};
+use crate::ops::{ApplyThemePreset, OpOutcome};
 use crate::pbir_themes::{
     THEME_BUNDLE_SCHEMA, list_report_themes, theme_record_json, theme_safety, theme_safety_json,
     write_theme_bundle, write_theme_json,
@@ -432,6 +433,104 @@ fn apply_theme_preset(args: &[String]) -> CliResult<Value> {
         "handoffCheckCommand": handoff,
         "next": [readback, validate, handoff]
     }))
+}
+
+/// Parse the builtin-preset form into the operation IR. Project and output
+/// mode flags are consumed for parity with the CLI; the staged transaction
+/// supplies the project and owns the eventual commit destination.
+pub(crate) fn parse_apply_theme_preset_operation(
+    args: &[String],
+) -> CliResult<(ApplyThemePreset, MutationMode)> {
+    let options = parse_apply_preset_args(args)?;
+    let preset_id = options.preset.as_deref().unwrap_or("risk-dashboard");
+    let preset = builtin_theme_preset(preset_id)?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "report themes apply-preset",
+        "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+        "powerbi-cli report themes apply-preset --project <project-dir-or.pbip> --preset risk-dashboard --dry-run --json",
+    )?;
+    Ok((
+        ApplyThemePreset {
+            preset: preset.id.to_string(),
+        },
+        mode,
+    ))
+}
+
+/// Apply a builtin theme preset against a resolved staged project.
+///
+/// The helper mirrors the existing `apply_theme_preset` mutation exactly,
+/// including resource package normalization and host-managed theme metadata.
+/// It writes only when the staged bytes actually change so replaying the same
+/// operation yields `changed: false`.
+pub(crate) fn apply_theme_preset_operation(
+    operation: &ApplyThemePreset,
+    project: &crate::ResolvedProject,
+) -> CliResult<OpOutcome> {
+    let preset = builtin_theme_preset(&operation.preset)?;
+    let bundle = builtin_theme_bundle(preset);
+    let report_json_path = report_json_path(project);
+    let mut report_json = read_json_value(&report_json_path)?;
+    let before_theme_collection = report_json["themeCollection"].clone();
+    let after_theme_collection =
+        normalized_theme_collection_for_bundle(&bundle["themeCollection"], &bundle, &report_json)?;
+    validate_theme_collection(&after_theme_collection, Path::new(preset.id))?;
+    let resource_changes = bundled_resource_changes(project, &bundle)?;
+    let before_resource_packages = report_json["resourcePackages"].clone();
+    upsert_registered_resource_package(&mut report_json, &bundle)?;
+    let after_resource_packages = report_json["resourcePackages"].clone();
+    let report_changed = before_theme_collection != after_theme_collection
+        || before_resource_packages != after_resource_packages;
+    let resources_changed = resource_changes
+        .iter()
+        .any(|change| change["before"] != change["after"]);
+    if report_changed {
+        report_json["themeCollection"] = after_theme_collection.clone();
+        write_json_atomic(&report_json_path, &report_json)?;
+    }
+    if resources_changed {
+        for change in &resource_changes {
+            if change["before"] == change["after"] {
+                continue;
+            }
+            let path = PathBuf::from(change["path"].as_str().unwrap_or_default());
+            write_theme_json(&path, &change["after"])?;
+        }
+    }
+
+    let mut changes = vec![
+        json!({
+            "kind": "pbir.report.themeCollection",
+            "action": "replace",
+            "path": canonical_display(&report_json_path),
+            "before": before_theme_collection,
+            "after": after_theme_collection
+        }),
+        json!({
+            "kind": "pbir.report.resourcePackages",
+            "action": "upsert-registered-theme-package",
+            "path": canonical_display(&report_json_path),
+            "before": before_resource_packages,
+            "after": after_resource_packages
+        }),
+    ];
+    changes.extend(resource_changes);
+    let project_arg = command_arg(&project.project_dir);
+    Ok(OpOutcome {
+        changed: report_changed || resources_changed,
+        changes,
+        readback: vec![
+            format!(
+                "powerbi-cli report themes show --project {} --json",
+                project_arg
+            ),
+            format!("powerbi-cli validate --strict {} --json", project_arg),
+            format!("powerbi-cli handoff check {} --json", project_arg),
+        ],
+        warnings: Vec::new(),
+        created_handles: vec!["theme:report".to_string()],
+    })
 }
 
 fn report_theme_json(
