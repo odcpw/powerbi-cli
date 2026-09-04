@@ -14,7 +14,7 @@ use crate::model::model_command;
 use crate::package::package_command;
 use crate::profile::profile_command;
 use crate::report::report_command;
-use crate::robot_docs::render_robot_docs;
+use crate::robot_docs::{render_robot_docs, verify_robot_docs};
 use crate::schema::schema_command;
 use crate::skill_package::skill_command;
 use crate::source_template::source_template_command;
@@ -223,18 +223,23 @@ fn robot_docs_output(args: &[String], force_json: bool) -> CliResult<CliOutput> 
         [render, rest @ ..] if render == "render" => {
             value_output(render_robot_docs(rest)?, force_json)
         }
+        [verify, rest @ ..] if verify == "verify" => {
+            value_output(verify_robot_docs(rest)?, force_json)
+        }
         [] => Err(
-            CliError::invalid_args("robot-docs requires a subcommand: guide or render")
+            CliError::invalid_args("robot-docs requires a subcommand: guide, render, or verify")
                 .with_hint(
-                    "Run `powerbi-cli robot-docs guide` or `powerbi-cli robot-docs render --check`.",
+                    "Run `powerbi-cli robot-docs guide`, `powerbi-cli robot-docs render --check`, or `powerbi-cli robot-docs verify`.",
                 )
                 .with_suggested_command("powerbi-cli robot-docs guide")
-                .with_suggested_command("powerbi-cli robot-docs render --check --json"),
+                .with_suggested_command("powerbi-cli robot-docs render --check --json")
+                .with_suggested_command("powerbi-cli robot-docs verify --json"),
         ),
         _ => Err(CliError::invalid_args("unknown robot-docs subcommand")
-            .with_hint("Run `powerbi-cli robot-docs guide` or `powerbi-cli robot-docs render --check`.")
+            .with_hint("Run `powerbi-cli robot-docs guide`, `powerbi-cli robot-docs render --check`, or `powerbi-cli robot-docs verify`.")
             .with_suggested_command("powerbi-cli robot-docs guide")
-            .with_suggested_command("powerbi-cli robot-docs render --check --json")),
+            .with_suggested_command("powerbi-cli robot-docs render --check --json")
+            .with_suggested_command("powerbi-cli robot-docs verify --json")),
     }
 }
 

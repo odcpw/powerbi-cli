@@ -65,6 +65,7 @@ Usage:
   powerbi-cli package export-plan --project <project-dir-or.pbip> --json
   powerbi-cli robot-docs guide [--json]
   powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]
+  powerbi-cli robot-docs verify [--root <repo-dir>] --json
   powerbi-cli --robot-triage
   powerbi-cli robot-triage
   powerbi-cli --json doctor
@@ -247,6 +248,7 @@ pub(crate) fn help_json() -> Value {
             "powerbi-cli features list --json",
             "powerbi-cli robot-docs guide",
             "powerbi-cli robot-docs render --check",
+            "powerbi-cli robot-docs verify --json",
             "powerbi-cli --json doctor",
             "powerbi-cli schema validate <schema.json> --json",
             "powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] --out <profile.json> --json",
@@ -392,6 +394,7 @@ pub(crate) fn robot_docs_json() -> Value {
         "markdown": robot_docs_markdown(),
         "followUpCommands": [
             "powerbi-cli --json capabilities",
+            "powerbi-cli robot-docs verify --json",
             "powerbi-cli --json doctor",
             "powerbi-cli --json validate <project-dir-or.pbip>"
         ]
@@ -850,6 +853,25 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "followUpFields": ["schema", "ok", "exitCode", "check", "sections", "root", "files[].path", "files[].changed", "files[].drift", "sources", "next"]
         }),
         json!({
+            "path": "robot-docs verify",
+            "usage": "powerbi-cli robot-docs verify [--root <repo-dir>] --json",
+            "summary": "Verify generated documentation, catalog discovery coverage, and command mentions against live catalogs",
+            "tags": ["agent", "docs", "contract", "check"],
+            "readOnly": true,
+            "mutates": false,
+            "mutatesProject": false,
+            "requiresOutput": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.robot-docs.verify.v1",
+            "diagnosticCodes": ["invalid_args", "file_not_found", "docs_drift", "docs.unknown_command", "docs.undocumented_command"],
+            "flags": ["--root <repo-dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli robot-docs verify --json", "powerbi-cli robot-docs verify --root <repo-dir> --json"],
+            "limitations": ["Verifies README.md and skills/powerbi-cli/SKILL.md without writing them; run robot-docs render to repair generated regions."],
+            "followUpFields": ["schema", "ok", "exitCode", "root", "checkedFiles", "catalogCommandCount", "findings", "checks", "next"]
+        }),
+        json!({
             "path": "--robot-triage",
             "aliases": ["robot-triage"],
             "usage": "powerbi-cli --robot-triage",
@@ -1197,6 +1219,8 @@ fn diagnostic_codes() -> Vec<Value> {
     vec![
         json!({"code": "invalid_args", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "docs_drift", "exitCode": EXIT_DOCS_DRIFT}),
+        json!({"code": "docs.unknown_command", "exitCode": EXIT_DOCS_DRIFT}),
+        json!({"code": "docs.undocumented_command", "exitCode": EXIT_DOCS_DRIFT}),
         json!({"code": "unsupported_feature", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "input_safety_violation", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "spec.unknown_field", "exitCode": EXIT_VALIDATION_FAILED}),

@@ -1,6 +1,6 @@
 mod common;
 
-use common::{run_powerbi, stderr_json, stdout_json};
+use common::{run_powerbi, run_powerbi_owned, stderr_json, stdout_json};
 use std::fs;
 use std::path::Path;
 
@@ -191,4 +191,76 @@ fn render_rejects_unknown_sections_and_catalog_paths_are_in_skill_region() {
             "generated SKILL discovery is missing catalog path {path}"
         );
     }
+}
+
+#[test]
+fn verify_checks_catalog_docs_and_discovery() {
+    let output = run_powerbi(&["robot-docs", "verify", "--json"]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    let value = stdout_json(&output);
+    assert_eq!(value["schema"], "powerbi-cli.robot-docs.verify.v1");
+    assert_eq!(value["ok"], true);
+    assert!(value["findings"].as_array().is_some_and(Vec::is_empty));
+    assert_eq!(value["checks"]["generatedRegions"], true);
+    assert_eq!(value["checks"]["catalogPathsInDiscovery"], true);
+    assert_eq!(value["checks"]["commandMentionsKnown"], true);
+}
+
+#[test]
+fn verify_reports_unknown_and_undocumented_commands_with_paths() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path().join("repo");
+    copy_documentation(&root);
+
+    let root_string = root.to_string_lossy().into_owned();
+    let render_args = vec![
+        "robot-docs".to_string(),
+        "render".to_string(),
+        "--root".to_string(),
+        root_string.clone(),
+        "--json".to_string(),
+    ];
+    let rendered = run_powerbi_owned(&render_args);
+    assert_eq!(rendered.code, 0, "stderr: {}", rendered.stderr);
+
+    let readme_path = root.join("README.md");
+    let readme = fs::read_to_string(&readme_path).expect("README");
+    let marker = "<!-- powerbi-cli:commands:start -->";
+    let mutated = readme.replacen(
+        marker,
+        "`powerbi-cli docs-not-a-real-command --json`\n<!-- powerbi-cli:commands:start -->",
+        1,
+    );
+    assert_ne!(mutated, readme);
+    fs::write(&readme_path, mutated).expect("write unknown command mention");
+
+    let skill_path = root.join("skills/powerbi-cli/SKILL.md");
+    let skill = fs::read_to_string(&skill_path).expect("SKILL");
+    let verify_line = skill
+        .lines()
+        .find(|line| line.contains("powerbi-cli robot-docs verify [--root <repo-dir>]"))
+        .expect("generated verify command");
+    let skill_without_verify = skill.replacen(&format!("{verify_line}\n"), "", 1);
+    assert_ne!(skill_without_verify, skill);
+    fs::write(&skill_path, skill_without_verify).expect("remove undocumented command");
+
+    let verify_args = vec![
+        "robot-docs".to_string(),
+        "verify".to_string(),
+        "--root".to_string(),
+        root_string,
+        "--json".to_string(),
+    ];
+    let verification = run_powerbi_owned(&verify_args);
+    assert_eq!(verification.code, 1, "verification must fail");
+    let error = stderr_json(&verification);
+    assert_eq!(error["error"]["code"], "docs_drift");
+    assert_eq!(error["error"]["exitCode"], 1);
+    let message = error["error"]["message"].as_str().expect("error message");
+    assert!(message.contains("docs.unknown_command"), "{message}");
+    assert!(message.contains("docs-not-a-real-command"), "{message}");
+    assert!(message.contains("docs.undocumented_command"), "{message}");
+    assert!(message.contains("robot-docs verify"), "{message}");
+    assert!(message.contains("README.md"), "{message}");
+    assert!(message.contains("skills/powerbi-cli/SKILL.md"), "{message}");
 }
