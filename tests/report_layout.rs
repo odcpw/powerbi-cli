@@ -104,6 +104,150 @@ fn named_template_out_dir_is_deterministic_and_keeps_source_unchanged() {
 }
 
 #[test]
+fn legacy_preset_aliases_are_byte_identical_to_named_templates() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let aliases = [
+        ("overview", "overview"),
+        ("dashboard", "overview"),
+        ("analysis", "time-series"),
+        ("focus", "time-series"),
+        ("detail", "drillthrough-detail"),
+        ("details", "drillthrough-detail"),
+        ("grid", "kpi-strip-trend-breakdown"),
+    ];
+
+    for (preset, template) in aliases {
+        let preset_output = run_powerbi(&[
+            "report",
+            "layout",
+            "auto",
+            "--project",
+            project_arg,
+            "--preset",
+            preset,
+            "--dry-run",
+            "--json",
+        ]);
+        assert_eq!(
+            preset_output.code, 0,
+            "preset {preset} stderr: {}",
+            preset_output.stderr
+        );
+        let template_output = run_powerbi(&[
+            "report",
+            "layout",
+            "auto",
+            "--project",
+            project_arg,
+            "--template",
+            template,
+            "--dry-run",
+            "--json",
+        ]);
+        assert_eq!(
+            template_output.code, 0,
+            "template {template} stderr: {}",
+            template_output.stderr
+        );
+        assert_eq!(
+            preset_output.stdout, template_output.stdout,
+            "legacy --preset {preset} must be byte-identical to --template {template}"
+        );
+    }
+}
+
+#[test]
+fn post_build_layout_matches_resolved_slot_coordinates_and_replays_as_a_noop() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = temp.path().join("built_sales");
+    let project_arg = project.to_str().expect("project path");
+    let build = run_powerbi(&[
+        "report",
+        "build",
+        "--schema",
+        "examples/sales.schema.json",
+        "--spec",
+        "examples/sales.dashboard.v2.json",
+        "--out-dir",
+        project_arg,
+        "--json",
+    ]);
+    assert_eq!(build.code, 0, "build stderr: {}", build.stderr);
+
+    let planned = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--template",
+        "overview",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(planned.code, 0, "planned stderr: {}", planned.stderr);
+    let planned_json = stdout_json(&planned);
+    let page = &planned_json["preview"]["pages"][0];
+    let slots = page["slots"].as_array().expect("resolved slots");
+    for assignment in page["assignments"].as_array().expect("assignments") {
+        let slot_name = assignment["slot"].as_str().expect("assignment slot");
+        let slot = slots
+            .iter()
+            .find(|slot| slot["name"] == slot_name)
+            .unwrap_or_else(|| panic!("missing resolved slot {slot_name}"));
+        for field in ["x", "y", "width", "height"] {
+            assert_eq!(
+                assignment["position"][field], slot["position"][field],
+                "assignment {slot_name} must use the resolved grid {field}"
+            );
+        }
+    }
+
+    let applied = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--template",
+        "overview",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(applied.code, 0, "apply stderr: {}", applied.stderr);
+    let applied_json = stdout_json(&applied);
+    assert_eq!(
+        applied_json["preview"]["pages"][0]["assignments"], page["assignments"],
+        "in-place application must use the same slot coordinates as its dry-run"
+    );
+
+    let replay = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--template",
+        "overview",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(replay.code, 0, "replay stderr: {}", replay.stderr);
+    let replay_json = stdout_json(&replay);
+    assert_eq!(
+        replay_json["changes"],
+        Value::Array(Vec::new()),
+        "replaying an applied grid layout must not produce additional writes"
+    );
+    assert_eq!(
+        replay_json["preview"]["pages"][0]["assignments"], page["assignments"],
+        "replayed layout must retain the original slot coordinates"
+    );
+}
+
+#[test]
 fn unknown_template_and_conflicting_layout_selectors_are_pointer_rich_refusals() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

@@ -316,7 +316,7 @@ pub(super) fn commands() -> Vec<Value> {
             "path": "report layout auto",
             "aliases": ["report layouts auto", "report layout arrange"],
             "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting",
+            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting; legacy overview|analysis|detail|grid presets are aliases for the corresponding named templates",
             "tags": ["pbir", "report", "layout", "visual", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
