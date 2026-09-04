@@ -253,6 +253,11 @@ validation, proof, then mutation breadth.
   including quoted names and the final step before `in`, reports both source
   positions, and ignores comments and string literals; triage carries the same
   finding and remediation path.
+- Implemented warning-only model completeness checks for missing or malformed
+  measure formats, visible relationship keys, suspicious both-direction
+  fact-to-dimension relationships, and columns unused by report, DAX, or
+  relationship references. Findings flow through lint, triage, fixture
+  scorecards, and the canonical rule explanations.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 

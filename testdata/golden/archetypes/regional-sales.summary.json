@@ -6,7 +6,7 @@
     "jsonFilesChecked": 20,
     "lintErrors": 0,
     "lintInfo": 0,
-    "lintWarnings": 0,
+    "lintWarnings": 1,
     "measures": 3,
     "pages": 3,
     "relationships": 1,
@@ -18,15 +18,21 @@
     "visuals": 9
   },
   "exitCode": 0,
-  "fingerprint": "d48db555339e874b",
+  "fingerprint": "5b0afa0f72b61c7a",
   "lint": {
     "counts": {
       "errors": 0,
-      "findings": 0,
+      "findings": 1,
       "info": 0,
-      "warnings": 0
+      "warnings": 1
     },
-    "findings": []
+    "findings": [
+      {
+        "code": "model.key_not_hidden",
+        "handle": "column:DimCustomer:CustomerKey",
+        "severity": "warning"
+      }
+    ]
   },
   "model": {
     "relationships": [

@@ -105,6 +105,7 @@ pbi --json capabilities --for validate --compact
 pbi --json capabilities --for lint --compact
 pbi lint --rules --json
 pbi lint --explain dax.reference_self --json
+pbi lint --explain dax.format_missing --json
 pbi lint --explain m.duplicate_step_name --json
 pbi --json capabilities --for diff --compact
 pbi --json capabilities --for package
@@ -477,6 +478,13 @@ pbi --json report wireframe export build/sales
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales
 ```
+
+The combined lint and triage scorecards also report model completeness
+warnings: measures without an explicit format, malformed custom format
+strings, visible relationship keys, suspicious both-direction
+fact-to-dimension relationships, and columns unused by visuals, measures, or
+relationships. Each finding has a stable handle and a remediation hint; use
+model dax lint when only DAX and measure-format diagnostics are needed.
 
 Use `report visuals list/show` handles for every visual mutation. Delete a
 visual only with `report visuals delete --dry-run`, then an output copy or a

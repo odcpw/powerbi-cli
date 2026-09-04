@@ -775,6 +775,12 @@ three pages.
   `in`); findings include both source positions and ignore comments/string
   literals. The registry includes a typed, currently empty design family so
   future design lint cannot introduce ad-hoc ids.
+- Model completeness lint adds warning-only checks for measures without an
+  explicit static or dynamic format, malformed custom format strings, visible
+  relationship keys, both-direction fact-to-dimension relationships, and
+  columns unused by visuals, measures, or relationships. Run lint or triage
+  for the combined scorecard, or model dax lint for the DAX format checks;
+  every finding carries a stable handle and a fix hint.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.
