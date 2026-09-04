@@ -1,6 +1,6 @@
 mod common;
 
-use common::{assert_unsupported_feature, run_powerbi, stdout_json};
+use common::{run_powerbi, stdout_json};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -52,17 +52,18 @@ fn diff_rejects_removed_volatile_flags() {
 }
 
 #[test]
-fn diff_rejects_unavailable_semantic_scope_as_unsupported_feature() {
-    let diff = run_powerbi(&[
-        "diff",
-        "before",
-        "after",
-        "--scope",
-        "model.tables",
-        "--json",
-    ]);
-    assert_eq!(diff.code, 2, "stderr: {}", diff.stderr);
-    assert_unsupported_feature(&diff.stderr, "unsupported diff scope: model.tables");
+fn diff_accepts_table_and_column_semantic_scopes() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    for scope in ["model.tables", "model.columns"] {
+        let diff = run_powerbi(&["diff", project_arg, project_arg, "--scope", scope, "--json"]);
+        assert_eq!(diff.code, 0, "stderr: {}", diff.stderr);
+        let value = stdout_json(&diff);
+        assert_eq!(value["scope"], scope);
+        assert_eq!(value["same"], true);
+        assert_eq!(value["summary"]["changes"], 0);
+    }
 }
 
 #[test]

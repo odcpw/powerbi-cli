@@ -101,8 +101,10 @@ Required contract rules:
 
 ### Semantic Model
 
-- `model tables list/show/add/update/delete`
-- `model columns list/show/add/update/delete`
+- `model tables list/show/add/rename/delete` (shipped guarded TMDL CRUD;
+  rename can rewrite references explicitly)
+- `model columns list/show/add/update/delete` (shipped guarded base and
+  calculated-column CRUD with unknown-metadata refusal)
 - `model measures list/show/add/update/delete`
 - `model dax dependencies|lint`
 - `model relationships list/show/add/update/delete`
