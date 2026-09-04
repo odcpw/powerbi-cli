@@ -738,16 +738,26 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
     assert_eq!(audit.code, 0, "stderr: {}", audit.stderr);
     let audit_json = stdout_json(&audit);
     assert_eq!(audit_json["ok"], Value::Bool(true));
-    assert_eq!(audit_json["counts"]["findings"], 2);
-    assert!(
-        audit_json["findings"]
-            .as_array()
-            .expect("audit findings")
+    assert_eq!(audit_json["counts"]["findings"], 3);
+    let audit_findings = audit_json["findings"].as_array().expect("audit findings");
+    assert_eq!(
+        audit_findings
             .iter()
-            .all(
-                |finding| finding["ruleId"] == "filter.possible_persisted_values"
-                    && finding["severity"] == "warning"
-            )
+            .filter(|finding| finding["ruleId"] == "filter.possible_persisted_values")
+            .count(),
+        2
+    );
+    assert_eq!(
+        audit_findings
+            .iter()
+            .filter(|finding| finding["ruleId"] == "model.key_not_hidden")
+            .count(),
+        1
+    );
+    assert!(
+        audit_findings
+            .iter()
+            .all(|finding| finding["severity"] == "warning")
     );
 
     let verify = run_powerbi(&[

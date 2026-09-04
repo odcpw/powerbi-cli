@@ -884,7 +884,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "path": "lint",
             "usage": "powerbi-cli lint (<project-dir-or.pbip> | --rules | --explain <rule-id>) --json",
             "summary": "Run typed PBIP/PBIR/TMDL quality checks or inspect the canonical lint and audit rule registry",
-            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "expansion", "agent"],
+            "tags": ["pbip", "pbir", "tmdl", "m", "dax", "model-completeness", "format-string", "unused-column", "validation", "lint", "buffer", "expansion", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
@@ -900,9 +900,11 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "diagnosticCodes": crate::rules::rule_ids(),
             "limitations": [
                 "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps. It fires only for table-producing step kinds `other` and `tableLiteral`, plus `navigation` steps that can be expensive. Function definitions (`(args) =>` / `each`), scalar literals, record literals, and list literals are classified via `stepKind` and suppressed. It does not prove folding or refresh performance and never fails validation by itself.",
-                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`."
+                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include stepKind.",
+                "dax.format_missing and dax.format_invalid inspect static measure formatString metadata without a Desktop formatting engine. Dynamic formatStringDefinition expressions count as explicit formats, while custom-format validation is intentionally structural and conservative.",
+                "model.key_not_hidden, model.relationship_direction_suspect, and model.column_unused are warning-only completeness heuristics over deep model/report metadata and static DAX references. They do not prove report intent, filter semantics, or Desktop compatibility."
             ],
-            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
+            "followUpFields": ["ok", "counts", "findings", "findings[].hint", "findings[].stepKind", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
         }),
         json!({
             "path": "diff",
@@ -1048,6 +1050,7 @@ fn schema_manifest() -> Value {
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
+        "lintFindingFields": ["code", "severity", "message", "handle", "path", "hint", "stepKind"],
         "lintRuleFamilies": crate::rules::rule_family_names(),
         "lintFindingCodes": crate::rules::rule_ids(),
         "desktopOpenFields": ["ok", "exitCode", "document", "preflight.mode", "preflight.defaulted", "preflight.applicable", "preflight.performed", "preflight.validationPerformed", "preflight.lintPerformed", "preflight.skipped", "preflight.ok", "session.state", "session.owned", "session.desktopProcessId", "session.desktopProcessCreationTimeUtc", "session.desktopExecutablePath", "session.receiptPath", "session.cleanupCommand", "session.priorSessionCleanup", "oracle", "validation", "proof", "diagnostics", "next"],

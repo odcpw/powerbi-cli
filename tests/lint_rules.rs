@@ -36,7 +36,7 @@ fn lint_rules_are_complete_documented_and_generated_into_capabilities() {
     );
     let rules = listed_json["rules"].as_array().expect("rules");
     assert_eq!(listed_json["count"], rules.len());
-    assert_eq!(rules.len(), 57);
+    assert_eq!(rules.len(), 62);
     for rule in rules {
         for field in [
             "id",
@@ -83,6 +83,13 @@ fn lint_rules_are_complete_documented_and_generated_into_capabilities() {
             "since"
         ])
     );
+    assert!(
+        capabilities_json["schemaManifest"]["lintFindingFields"]
+            .as_array()
+            .expect("lint finding fields")
+            .iter()
+            .any(|field| field == "hint")
+    );
     let commands = capabilities_json["commands"].as_array().expect("commands");
     for path in ["lint", "report audit"] {
         let command = commands
@@ -104,7 +111,7 @@ fn lint_rules_are_complete_documented_and_generated_into_capabilities() {
         .find(|command| command["path"] == "model dax lint")
         .expect("DAX lint command");
     let dax_ids = string_set(&dax["diagnosticCodes"], None);
-    assert_eq!(dax_ids.len(), 6);
+    assert_eq!(dax_ids.len(), 8);
     assert!(dax_ids.iter().all(|id| id.starts_with("dax.")));
     assert!(
         capabilities_json["contractNotes"]["explainFlagDiscipline"]

@@ -340,6 +340,53 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
     }
 
     let mut findings = Vec::new();
+    for measure in docs.iter().flat_map(|doc| doc.measures.iter()) {
+        let handle = measure.handle();
+        match measure_format_status(measure) {
+            MeasureFormatStatus::Missing => findings.push(format_finding(
+                rules::DAX_FORMAT_MISSING,
+                format!(
+                    "{handle} has no static formatString or dynamic formatStringDefinition; choose an explicit display format"
+                ),
+                &handle,
+                &measure.path,
+                "Set a deliberate --format-string or --format-string-definition on the measure, then re-run DAX lint.",
+            )),
+            MeasureFormatStatus::Invalid(reason) => findings.push(format_finding(
+                rules::DAX_FORMAT_INVALID,
+                format!(
+                    "{handle} has invalid formatString {:?}: {reason}",
+                    measure.format_string.as_deref().unwrap_or_default()
+                ),
+                &handle,
+                &measure.path,
+                "Replace the formatString with a balanced Power BI custom format such as #,##0.00, 0.0%, or Short Date.",
+            )),
+            MeasureFormatStatus::Valid => {}
+        }
+    }
+    for column in docs.iter().flat_map(|doc| doc.columns.iter()) {
+        let Some(format_string) = column.format_string.as_deref() else {
+            continue;
+        };
+        let format_string = format_string.trim();
+        if format_string.is_empty() {
+            continue;
+        }
+        if let Err(reason) = validate_format_string(format_string) {
+            let handle = column.handle();
+            findings.push(format_finding(
+                rules::DAX_FORMAT_INVALID,
+                format!(
+                    "{handle} has invalid formatString {:?}: {reason}",
+                    column.format_string.as_deref().unwrap_or_default()
+                ),
+                &handle,
+                &column.path,
+                "Replace the formatString with a balanced Power BI custom format such as #,##0.00, 0.0%, or Short Date.",
+            ));
+        }
+    }
     for expression in &expressions {
         for table_column in &expression.table_columns {
             if !table_column.resolved {
@@ -413,6 +460,120 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
         expressions,
         findings,
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum MeasureFormatStatus {
+    Missing,
+    Valid,
+    Invalid(String),
+}
+
+fn measure_format_status(measure: &MeasureRecord) -> MeasureFormatStatus {
+    if measure
+        .format_string_definition
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+        || measure
+            .block
+            .lines()
+            .any(|line| line.trim_start().starts_with("formatStringDefinition"))
+    {
+        return MeasureFormatStatus::Valid;
+    }
+    let Some(format_string) = measure.format_string.as_deref() else {
+        return MeasureFormatStatus::Missing;
+    };
+    let format_string = format_string.trim();
+    if format_string.is_empty() {
+        return MeasureFormatStatus::Missing;
+    }
+    match validate_format_string(format_string) {
+        Ok(()) => MeasureFormatStatus::Valid,
+        Err(reason) => MeasureFormatStatus::Invalid(reason),
+    }
+}
+
+/// Validate the structural subset of Power BI custom format strings that can
+/// be checked without a Desktop formatting engine. This deliberately accepts
+/// named formats and unknown tokens; it only rejects malformed quoting,
+/// escaping, sections, and bracket expressions that Desktop cannot parse.
+fn validate_format_string(format_string: &str) -> Result<(), String> {
+    let chars = format_string.chars().collect::<Vec<_>>();
+    if chars.is_empty() {
+        return Err("format string is empty".to_string());
+    }
+
+    let mut quoted = false;
+    let mut bracketed = false;
+    let mut bracket_has_content = false;
+    let mut escaped = false;
+    let mut sections = 1usize;
+    let mut index = 0usize;
+    while index < chars.len() {
+        let character = chars[index];
+        if character.is_control() {
+            return Err(format!("control character at position {}", index + 1));
+        }
+        if escaped {
+            escaped = false;
+            index += 1;
+            continue;
+        }
+        if quoted {
+            if character == '"' {
+                if chars.get(index + 1) == Some(&'"') {
+                    index += 2;
+                    continue;
+                }
+                quoted = false;
+            }
+            index += 1;
+            continue;
+        }
+        if bracketed {
+            match character {
+                ']' => {
+                    if !bracket_has_content {
+                        return Err(format!("empty '[' expression at position {}", index + 1));
+                    }
+                    bracketed = false;
+                }
+                '[' => return Err(format!("nested '[' at position {}", index + 1)),
+                _ if !character.is_whitespace() => bracket_has_content = true,
+                _ => {}
+            }
+            index += 1;
+            continue;
+        }
+        match character {
+            '"' => quoted = true,
+            '[' => {
+                bracketed = true;
+                bracket_has_content = false;
+            }
+            ']' => return Err(format!("unmatched ']' at position {}", index + 1)),
+            '\\' => escaped = true,
+            ';' => {
+                sections += 1;
+                if sections > 4 {
+                    return Err("format string has more than four sections".to_string());
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    if quoted {
+        return Err("unclosed quoted literal".to_string());
+    }
+    if bracketed {
+        return Err("unclosed '[' expression".to_string());
+    }
+    if escaped {
+        return Err("trailing escape character".to_string());
+    }
+    Ok(())
 }
 
 fn scalar_if_variables_used_as_tables(expression: &str) -> Vec<(String, Vec<String>)> {
@@ -1026,6 +1187,210 @@ fn dax_finding(code: &str, severity: &str, message: String, handle: &str, path: 
     })
 }
 
+fn format_finding(code: &str, message: String, handle: &str, path: &Path, hint: &str) -> Value {
+    json!({
+        "code": code,
+        "severity": "warning",
+        "message": message,
+        "handle": handle,
+        "path": canonical_display(path),
+        "hint": hint
+    })
+}
+
+#[derive(Debug, Clone)]
+struct ModelColumnEvidence {
+    table: String,
+    name: String,
+    handle: String,
+    path: Option<String>,
+    is_key: bool,
+    is_hidden: bool,
+}
+
+/// Add model-level completeness findings that need both deep report metadata
+/// and the static DAX reference graph. Keeping these checks here makes the
+/// model/DAX lint boundary explicit while allowing the top-level lint command
+/// and triage to consume the same deterministic findings.
+pub(crate) fn add_model_completeness_findings(
+    deep: &Value,
+    analysis: &DaxAnalysis,
+    findings: &mut Vec<Value>,
+) {
+    let mut columns = BTreeMap::<String, ModelColumnEvidence>::new();
+    if let Some(tables) = deep["model"]["tables"].as_array() {
+        for table in tables {
+            let Some(table_name) = table["name"].as_str() else {
+                continue;
+            };
+            let table_path = table["path"].as_str().map(ToOwned::to_owned);
+            let Some(table_columns) = table["columns"].as_array() else {
+                continue;
+            };
+            for column in table_columns {
+                let Some(column_name) = column["name"].as_str() else {
+                    continue;
+                };
+                let key = canonical_key(table_name, column_name);
+                columns.insert(
+                    key,
+                    ModelColumnEvidence {
+                        table: table_name.to_string(),
+                        name: column_name.to_string(),
+                        handle: column["handle"]
+                            .as_str()
+                            .map(ToOwned::to_owned)
+                            .unwrap_or_else(|| crate::tmdl::column_handle(table_name, column_name)),
+                        path: table_path.clone(),
+                        is_key: column["properties"]["isKey"].as_bool().unwrap_or(false),
+                        is_hidden: column["properties"]["isHidden"].as_bool().unwrap_or(false),
+                    },
+                );
+            }
+        }
+    }
+
+    let mut referenced_columns = BTreeSet::new();
+    for expression in &analysis.expressions {
+        for reference in expression
+            .table_columns
+            .iter()
+            .filter(|reference| reference.resolved)
+        {
+            referenced_columns.insert(canonical_key(&reference.table, &reference.column));
+        }
+    }
+
+    if let Some(pages) = deep["report"]["pages"].as_array() {
+        for page in pages {
+            let Some(visuals) = page["visuals"].as_array() else {
+                continue;
+            };
+            for visual in visuals {
+                let Some(bindings) = visual["bindings"].as_array() else {
+                    continue;
+                };
+                for binding in bindings {
+                    let (Some(table), Some(column)) =
+                        (binding["table"].as_str(), binding["column"].as_str())
+                    else {
+                        continue;
+                    };
+                    referenced_columns.insert(canonical_key(table, column));
+                }
+            }
+        }
+    }
+
+    let mut relationship_endpoints = BTreeSet::new();
+    if let Some(relationships) = deep["model"]["relationships"].as_array() {
+        for relationship in relationships {
+            let relationship_handle = relationship["handle"].as_str().unwrap_or("relationship");
+            let from_table = relationship["fromTable"].as_str();
+            let from_column = relationship["fromColumn"].as_str();
+            let to_table = relationship["toTable"].as_str();
+            let to_column = relationship["toColumn"].as_str();
+            if let (Some(table), Some(column)) = (from_table, from_column) {
+                let key = canonical_key(table, column);
+                relationship_endpoints.insert(key.clone());
+                referenced_columns.insert(key);
+            }
+            if let (Some(table), Some(column)) = (to_table, to_column) {
+                let key = canonical_key(table, column);
+                relationship_endpoints.insert(key.clone());
+                referenced_columns.insert(key);
+            }
+
+            let properties = &relationship["properties"];
+            let from_many = properties["fromCardinality"]
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("many"));
+            let from_one = properties["fromCardinality"]
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("one"));
+            let to_many = properties["toCardinality"]
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("many"));
+            let to_one = properties["toCardinality"]
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("one"));
+            let is_fact_dimension_cardinality = (from_many && to_one) || (from_one && to_many);
+            let both_directions = properties["crossFilteringBehavior"]
+                .as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case("bothDirections"));
+            if is_fact_dimension_cardinality && both_directions {
+                let from = match (from_table, from_column) {
+                    (Some(table), Some(column)) => format!("{table}[{column}]"),
+                    _ => "the fact endpoint".to_string(),
+                };
+                let to = match (to_table, to_column) {
+                    (Some(table), Some(column)) => format!("{table}[{column}]"),
+                    _ => "the dimension endpoint".to_string(),
+                };
+                findings.push(model_finding(
+                    rules::MODEL_RELATIONSHIP_DIRECTION_SUSPECT,
+                    format!(
+                        "{relationship_handle} filters a many-to-one relationship in both directions ({from} -> {to})"
+                    ),
+                    relationship_handle,
+                    relationship["path"].as_str(),
+                    "Prefer oneDirection from the fact table to the dimension; use bothDirections only with an explicit, reviewed ambiguity requirement.",
+                ));
+            }
+        }
+    }
+
+    for key in &relationship_endpoints {
+        let Some(column) = columns.get(key) else {
+            continue;
+        };
+        if column.is_key && !column.is_hidden {
+            findings.push(model_finding(
+                rules::MODEL_KEY_NOT_HIDDEN,
+                format!(
+                    "relationship key column {}[{}] remains visible to report authors",
+                    column.table, column.name
+                ),
+                &column.handle,
+                column.path.as_deref(),
+                "Hide relationship key columns with the model column visibility control while leaving the relationship endpoint intact.",
+            ));
+        }
+    }
+
+    for column in columns.values() {
+        if !referenced_columns.contains(&canonical_key(&column.table, &column.name)) {
+            findings.push(model_finding(
+                rules::MODEL_COLUMN_UNUSED,
+                format!(
+                    "model column {}[{}] is not referenced by a visual, measure, or relationship",
+                    column.table, column.name
+                ),
+                &column.handle,
+                column.path.as_deref(),
+                "Remove the column or document its intended use; otherwise hide or omit it before handoff to keep the model focused.",
+            ));
+        }
+    }
+}
+
+fn model_finding(
+    code: &str,
+    message: String,
+    handle: &str,
+    path: Option<&str>,
+    hint: &str,
+) -> Value {
+    json!({
+        "code": code,
+        "severity": "warning",
+        "message": message,
+        "handle": handle,
+        "path": path,
+        "hint": hint
+    })
+}
+
 fn parse_args(command: &str, args: &[String]) -> CliResult<DaxOptions> {
     let mut options = DaxOptions::default();
     let mut i = 0;
@@ -1113,4 +1478,84 @@ fn calculated_column_json(column: &ColumnRecord) -> Value {
             "end": column.end_line
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MeasureFormatStatus, measure_format_status, validate_format_string};
+    use crate::tmdl::MeasureRecord;
+    use std::path::PathBuf;
+
+    fn measure(
+        format_string: Option<&str>,
+        format_string_definition: Option<&str>,
+    ) -> MeasureRecord {
+        MeasureRecord {
+            table: "Sales".to_string(),
+            name: "Revenue".to_string(),
+            expression: "SUM(Sales[Revenue])".to_string(),
+            lineage_tag: None,
+            format_string: format_string.map(ToOwned::to_owned),
+            format_string_definition: format_string_definition.map(ToOwned::to_owned),
+            display_folder: None,
+            description: None,
+            is_hidden: false,
+            path: PathBuf::from("Sales.tmdl"),
+            start_line: 0,
+            end_line: 1,
+            block: String::new(),
+        }
+    }
+
+    #[test]
+    fn custom_format_parser_accepts_common_power_bi_patterns() {
+        for value in [
+            "#,##0.00",
+            "0.0%",
+            "$#,##0;($#,##0);-",
+            "[Red]#,##0",
+            "Short Date",
+            "0.0\\x",
+            "0.0;[Red]0.0;\"n/a\"",
+        ] {
+            validate_format_string(value)
+                .unwrap_or_else(|error| panic!("expected {value:?} to be valid: {error}"));
+        }
+    }
+
+    #[test]
+    fn custom_format_parser_rejects_unbalanced_or_oversegmented_patterns() {
+        for value in ["0.0[", "0.0]", "0.0\"text", "0.0\\", "0;0;0;0;0", "[]0"] {
+            assert!(
+                validate_format_string(value).is_err(),
+                "expected malformed format {value:?} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn measure_format_status_distinguishes_missing_dynamic_and_static_formats() {
+        assert_eq!(
+            measure_format_status(&measure(None, None)),
+            MeasureFormatStatus::Missing
+        );
+        assert_eq!(
+            measure_format_status(&measure(Some("0.0"), None)),
+            MeasureFormatStatus::Valid
+        );
+        assert_eq!(
+            measure_format_status(&measure(None, Some("SELECTEDVALUE(Format[Name])"))),
+            MeasureFormatStatus::Valid
+        );
+        let mut multiline = measure(None, None);
+        multiline.block = "    measure Revenue = 1\n        formatStringDefinition =\n            IF([IsPercent], \"0.0%\", \"#,##0\")\n".to_string();
+        assert_eq!(
+            measure_format_status(&multiline),
+            MeasureFormatStatus::Valid
+        );
+        assert!(matches!(
+            measure_format_status(&measure(Some("0.0["), None)),
+            MeasureFormatStatus::Invalid(_)
+        ));
+    }
 }

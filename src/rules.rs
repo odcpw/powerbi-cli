@@ -161,6 +161,11 @@ define_rules! {
     HANDOFF_CREDENTIAL_LIKE_TEXT => ("handoff.credential_like_text", Handoff, "error", "A handoff text file contains credential-like content.", "Remove or redact credentials and configure authentication only on the locked-down machine.", None),
     HANDOFF_PII_SUSPECT_TEXT => ("handoff.pii_suspect_text", Handoff, "warning", "A handoff text file contains PII-suspect row literals.", "Review and replace possible real rows with synthetic values.", None),
     HANDOFF_TEXT_SCAN_FAILED => ("handoff.text_scan_failed", Handoff, "error", "A handoff text file could not be read for safety scanning.", "Restore readable source text or remove the unreadable file before handoff.", None),
+    DAX_FORMAT_MISSING => ("dax.format_missing", Dax, "warning", "A measure has no static or dynamic format string, so its display unit is implicit.", "Set a deliberate --format-string or --format-string-definition on the measure, then re-run DAX lint.", None),
+    DAX_FORMAT_INVALID => ("dax.format_invalid", Dax, "warning", "A measure format string is not a balanced, supported custom format pattern.", "Replace the formatString with a balanced Power BI custom format such as #,##0.00, 0.0%, or Short Date.", None),
+    MODEL_KEY_NOT_HIDDEN => ("model.key_not_hidden", Model, "warning", "A relationship endpoint marked as a model key remains visible to report authors.", "Hide relationship key columns with the model column visibility control while leaving the relationship endpoint intact.", None),
+    MODEL_RELATIONSHIP_DIRECTION_SUSPECT => ("model.relationship_direction_suspect", Model, "warning", "A many-to-one fact-to-dimension relationship uses both-direction filtering.", "Prefer oneDirection from the fact table to the dimension; use bothDirections only with an explicit, reviewed ambiguity requirement.", None),
+    MODEL_COLUMN_UNUSED => ("model.column_unused", Model, "warning", "A model column is not referenced by a visual, measure, or relationship.", "Remove the column or document its intended use; otherwise hide or omit it before handoff to keep the model focused.", None),
 }
 
 pub(crate) fn all_rules() -> &'static [RuleDefinition] {
@@ -235,7 +240,7 @@ mod tests {
     #[test]
     fn every_registered_rule_has_unique_complete_documentation() {
         validate_registry().expect("valid documented registry");
-        assert_eq!(RULES.len(), 57);
+        assert_eq!(RULES.len(), 62);
     }
 
     #[test]

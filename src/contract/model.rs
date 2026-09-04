@@ -337,8 +337,8 @@ pub(super) fn commands() -> Vec<Value> {
             "path": "model dax lint",
             "aliases": ["model dax check"],
             "usage": "powerbi-cli model dax lint --project <project-dir-or.pbip> --json",
-            "summary": "Run static DAX reference lint for missing columns/measures, ambiguous measure names, self references, and measure dependency cycles",
-            "tags": ["tmdl", "semantic-model", "dax", "lint", "bpa", "agent", "no-fallback"],
+            "summary": "Run static DAX and measure-format lint for missing references, ambiguous names, self references, dependency cycles, and malformed or absent display formats",
+            "tags": ["tmdl", "semantic-model", "dax", "format-string", "lint", "bpa", "agent", "no-fallback"],
             "readOnly": true,
             "mutates": false,
             "writesDataCache": false,
@@ -348,8 +348,8 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
             "examples": ["powerbi-cli model dax lint --project build/sales --json"],
             "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Dax).map(|rule| rule.id).collect::<Vec<_>>(),
-            "limitations": ["Static reference lint only; Power BI Desktop remains the compatibility oracle for DAX syntax and semantics."],
-            "followUpFields": ["ok", "analysisBoundary", "counts.errors", "counts.warnings", "findings[].code", "validation", "next"]
+            "limitations": ["Static reference and custom-format shape lint only; Power BI Desktop remains the compatibility oracle for DAX syntax, semantics, and formatting behavior.", "Dynamic formatStringDefinition expressions count as explicit formats; static measure and column format validation is deliberately conservative and checks balanced literals, brackets, escapes, and section count."],
+            "followUpFields": ["ok", "analysisBoundary", "counts.errors", "counts.warnings", "findings[].code", "findings[].handle", "findings[].hint", "validation", "next"]
         }),
         json!({
             "path": "model dax execute",

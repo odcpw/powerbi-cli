@@ -237,6 +237,11 @@ validation, proof, then mutation breadth.
   lint, and M lint. `lint --rules` inventories it and `lint --explain
   <rule-id>` returns versioned remediation metadata; the empty design family is
   reserved for the future design-lint implementation.
+- Implemented warning-only model completeness checks for missing or malformed
+  measure formats, visible relationship keys, suspicious both-direction
+  fact-to-dimension relationships, and columns unused by report, DAX, or
+  relationship references. Findings flow through lint, triage, fixture
+  scorecards, and the canonical rule explanations.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 

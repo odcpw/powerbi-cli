@@ -6,7 +6,7 @@
     "jsonFilesChecked": 12,
     "lintErrors": 0,
     "lintInfo": 0,
-    "lintWarnings": 0,
+    "lintWarnings": 5,
     "measures": 2,
     "pages": 1,
     "relationships": 2,
@@ -18,15 +18,41 @@
     "visuals": 3
   },
   "exitCode": 0,
-  "fingerprint": "f9e7772a6975b1c3",
+  "fingerprint": "631006cddd32d835",
   "lint": {
     "counts": {
       "errors": 0,
-      "findings": 0,
+      "findings": 5,
       "info": 0,
-      "warnings": 0
+      "warnings": 5
     },
-    "findings": []
+    "findings": [
+      {
+        "code": "model.key_not_hidden",
+        "handle": "column:DimCustomer:CustomerKey",
+        "severity": "warning"
+      },
+      {
+        "code": "model.key_not_hidden",
+        "handle": "column:DimDate:DateKey",
+        "severity": "warning"
+      },
+      {
+        "code": "model.column_unused",
+        "handle": "column:DimCustomer:Segment",
+        "severity": "warning"
+      },
+      {
+        "code": "model.column_unused",
+        "handle": "column:DimDate:Date",
+        "severity": "warning"
+      },
+      {
+        "code": "model.column_unused",
+        "handle": "column:DimDate:Month",
+        "severity": "warning"
+      }
+    ]
   },
   "model": {
     "relationships": [
