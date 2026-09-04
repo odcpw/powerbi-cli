@@ -1,5 +1,6 @@
 use crate::cli_support::{required_project, take_value};
 use crate::desktop_target::{ResolvedDesktopTarget, resolve_desktop_target};
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 #[cfg(windows)]
 use crate::live_model::{
     LiveModelEndpoint, OperationDeadline, resolve_live_model_endpoint, windows_argument_path,
@@ -14,8 +15,9 @@ use crate::{EXIT_ORACLE_FAILED, EXIT_SUCCESS};
 #[cfg(windows)]
 use serde::Deserialize;
 use serde_json::{Value, json};
+#[cfg(windows)]
 use std::fs;
-use std::io::{self, Read};
+use std::io;
 use std::path::{Path, PathBuf};
 #[cfg(windows)]
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -620,22 +622,14 @@ fn load_query(options: &ExecuteOptions) -> CliResult<(String, Value)> {
         (query.clone(), json!({"kind": "inline"}))
     } else if let Some(path) = &options.query_file {
         if path == Path::new("-") {
-            let mut query = String::new();
-            io::stdin().read_to_string(&mut query).map_err(|err| {
-                CliError::unexpected(format!("read DAX query from standard input: {err}"))
-            })?;
+            let query = read_utf8_stream(
+                &mut io::stdin(),
+                InputKind::SourceText,
+                "DAX query from standard input",
+            )?;
             (query, json!({"kind": "stdin"}))
         } else {
-            let query = fs::read_to_string(path).map_err(|err| {
-                if err.kind() == io::ErrorKind::NotFound {
-                    CliError::file_not_found(format!(
-                        "DAX query file not found: {}",
-                        path.display()
-                    ))
-                } else {
-                    CliError::unexpected(format!("read DAX query file {}: {err}", path.display()))
-                }
-            })?;
+            let query = read_utf8(path, InputKind::SourceText)?;
             (
                 query,
                 json!({"kind": "file", "path": canonical_display(path)}),

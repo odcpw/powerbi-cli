@@ -20,6 +20,7 @@ use crate::{
 };
 
 const WORKFLOW_SYNTHESIZE_SCHEMA: &str = "powerbi-cli.workflow-synthesize.v1";
+const MAX_EXACT_M_INTEGER: u64 = 9_007_199_254_740_991;
 
 #[derive(Debug)]
 struct SynthesizeOptions {
@@ -27,6 +28,8 @@ struct SynthesizeOptions {
     expressions: PathBuf,
     output_dir: PathBuf,
     mappings: BTreeMap<(String, String), String>,
+    row_scale: Option<u64>,
+    seed: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -88,7 +91,11 @@ pub(crate) fn workflow_synthesize_command(args: &[String]) -> CliResult<Value> {
         &options.mappings,
         &defined_expressions,
     )?;
-    let shim = synthesize_navigation_shim(&expression_mappings)?;
+    let generation_parameters = options
+        .row_scale
+        .zip(options.seed)
+        .map(|(row_scale, seed)| SynthesizeGenerationParameters { row_scale, seed });
+    let shim = synthesize_navigation_shim(&expression_mappings, generation_parameters)?;
 
     let mut overrides = transformed_synthesize_tables(&source_root, &discovery.edits, &shim)?;
     let semantic_relative = resolved
@@ -148,6 +155,10 @@ pub(crate) fn workflow_synthesize_command(args: &[String]) -> CliResult<Value> {
         "projectDir": canonical_display(&output_resolved.project_dir),
         "pbip": canonical_display(&output_resolved.pbip_path),
         "expressions": canonical_display(&output_dir.join(expressions_relative)),
+        "generationParameters": generation_parameters.map(|parameters| json!({
+            "rowScale": parameters.row_scale,
+            "seed": parameters.seed
+        })),
         "mappings": mappings,
         "counts": {
             "navigationPairs": expression_mappings.len(),
@@ -171,6 +182,8 @@ fn parse_synthesize_args(args: &[String]) -> CliResult<SynthesizeOptions> {
     let mut expressions = None;
     let mut output_dir = None;
     let mut mappings = BTreeMap::new();
+    let mut row_scale = None;
+    let mut seed = None;
     let mut index = 0_usize;
     while index < args.len() {
         match args[index].as_str() {
@@ -234,15 +247,49 @@ fn parse_synthesize_args(args: &[String]) -> CliResult<SynthesizeOptions> {
                 }
                 index += 2;
             }
+            "--row-scale" => {
+                if row_scale.is_some() {
+                    return Err(synthesize_generation_args_error(
+                        "--row-scale may be specified only once",
+                    ));
+                }
+                row_scale = Some(parse_generation_integer(
+                    args.get(index + 1).ok_or_else(|| {
+                        synthesize_generation_args_error("--row-scale requires a positive integer")
+                    })?,
+                    "--row-scale",
+                    false,
+                )?);
+                index += 2;
+            }
+            "--seed" => {
+                if seed.is_some() {
+                    return Err(synthesize_generation_args_error(
+                        "--seed may be specified only once",
+                    ));
+                }
+                seed = Some(parse_generation_integer(
+                    args.get(index + 1).ok_or_else(|| {
+                        synthesize_generation_args_error("--seed requires an integer")
+                    })?,
+                    "--seed",
+                    true,
+                )?);
+                index += 2;
+            }
             other => {
                 return Err(CliError::invalid_args(format!(
                     "unknown workflow synthesize argument: {other}"
                 ))
                 .with_hint(
-                    "Use --project, --expressions, --out-dir, and optional repeated --map flags.",
+                    "Use --project, --expressions, --out-dir, optional repeated --map flags, and optional --row-scale/--seed generation parameters.",
                 ));
             }
         }
+    }
+    if row_scale.is_some() || seed.is_some() {
+        row_scale.get_or_insert(1);
+        seed.get_or_insert(0);
     }
     Ok(SynthesizeOptions {
         project: project
@@ -252,7 +299,39 @@ fn parse_synthesize_args(args: &[String]) -> CliResult<SynthesizeOptions> {
         output_dir: output_dir
             .ok_or_else(|| CliError::invalid_args("workflow synthesize requires --out-dir"))?,
         mappings,
+        row_scale,
+        seed,
     })
+}
+
+fn parse_generation_integer(value: &str, flag: &str, allow_zero: bool) -> CliResult<u64> {
+    let parsed = value.parse::<u64>().map_err(|_| {
+        synthesize_generation_args_error(format!(
+            "{flag} must be {} integer no greater than {MAX_EXACT_M_INTEGER}",
+            if allow_zero {
+                "a non-negative"
+            } else {
+                "a positive"
+            }
+        ))
+    })?;
+    if (!allow_zero && parsed == 0) || parsed > MAX_EXACT_M_INTEGER {
+        return Err(synthesize_generation_args_error(format!(
+            "{flag} must be {} integer no greater than {MAX_EXACT_M_INTEGER}",
+            if allow_zero {
+                "a non-negative"
+            } else {
+                "a positive"
+            }
+        )));
+    }
+    Ok(parsed)
+}
+
+fn synthesize_generation_args_error(message: impl Into<String>) -> CliError {
+    CliError::invalid_args(message)
+        .with_hint("Use exact non-negative integer literals; row scale must be at least one.")
+        .with_suggested_command("powerbi-cli capabilities --for workflow --json")
 }
 
 fn validate_synthesize_name(value: &str, label: &str) -> CliResult<()> {
@@ -513,15 +592,32 @@ fn upper_camel(value: &str) -> String {
     result
 }
 
-fn synthesize_navigation_shim(mappings: &BTreeMap<(String, String), String>) -> CliResult<String> {
+#[derive(Clone, Copy, Debug)]
+struct SynthesizeGenerationParameters {
+    row_scale: u64,
+    seed: u64,
+}
+
+fn synthesize_navigation_shim(
+    mappings: &BTreeMap<(String, String), String>,
+    generation_parameters: Option<SynthesizeGenerationParameters>,
+) -> CliResult<String> {
     let rows = mappings
         .iter()
         .map(|((schema, item), expression)| {
+            let expression = m_expression_reference(expression)?;
+            let expression = match generation_parameters {
+                Some(parameters) => format!(
+                    "{expression}({}, {})",
+                    parameters.row_scale, parameters.seed
+                ),
+                None => expression,
+            };
             Ok(format!(
                 "{{{}, {}, {}}}",
                 m_navigation_string(schema)?,
                 m_navigation_string(item)?,
-                m_expression_reference(expression)?
+                expression
             ))
         })
         .collect::<CliResult<Vec<_>>>()?;
@@ -818,4 +914,60 @@ fn synthesize_offline_safety(
         "serverStringMatches": server_matches,
         "forbiddenRuntimeFiles": forbidden_files
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generation_flags_fill_only_the_missing_paired_default() {
+        let row_only = parse_synthesize_args(&[
+            "--project".into(),
+            "p.pbip".into(),
+            "--expressions".into(),
+            "e.tmdl".into(),
+            "--out-dir".into(),
+            "out".into(),
+            "--row-scale".into(),
+            "25".into(),
+        ])
+        .expect("row-scale options");
+        assert_eq!(row_only.row_scale, Some(25));
+        assert_eq!(row_only.seed, Some(0));
+
+        let seed_only = parse_synthesize_args(&[
+            "--project".into(),
+            "p.pbip".into(),
+            "--expressions".into(),
+            "e.tmdl".into(),
+            "--out-dir".into(),
+            "out".into(),
+            "--seed".into(),
+            "9".into(),
+        ])
+        .expect("seed options");
+        assert_eq!(seed_only.row_scale, Some(1));
+        assert_eq!(seed_only.seed, Some(9));
+    }
+
+    #[test]
+    fn scaled_navigation_shim_passes_parameters_to_every_expression() {
+        let mappings = BTreeMap::from([
+            (("crm".into(), "customers".into()), "Customers".into()),
+            (("sales".into(), "orders".into()), "Order Generator".into()),
+        ]);
+        let shim = synthesize_navigation_shim(
+            &mappings,
+            Some(SynthesizeGenerationParameters {
+                row_scale: 100,
+                seed: 42,
+            }),
+        )
+        .expect("scaled shim");
+        assert_eq!(
+            shim,
+            "Database = #table({\"Schema\", \"Item\", \"Data\"}, {{\"crm\", \"customers\", Customers(100, 42)}, {\"sales\", \"orders\", #\"Order Generator\"(100, 42)}}),"
+        );
+    }
 }

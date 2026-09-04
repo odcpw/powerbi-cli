@@ -85,6 +85,26 @@ private metadata, unregistered data, links, and credential-bearing source text.
 See [`docs/source-profile-workflow.md`](docs/source-profile-workflow.md) for the
 complete profile shape and command contract.
 
+For offline Desktop refresh and performance QA, `workflow synthesize` can call
+shared M generator functions with an exact row scale and seed while replacing
+the live database root in a fresh project copy:
+
+```bash
+powerbi-cli workflow synthesize \
+  --project Report.pbip \
+  --expressions qa/generators.tmdl \
+  --out-dir ../powerbi-build/Report-QA-100x \
+  --row-scale 100 \
+  --seed 42 \
+  --json
+```
+
+Each mapped expression in a scaled run is invoked positionally as
+`Expression(rowScale, seed)`. Supplying only one option uses `1` for row scale
+or `0` for seed. Both values must be exact non-negative M integers and row scale
+must be positive. Re-run with the same pair for byte-identical partition M; vary
+the scale to reproduce load behavior without moving real data or credentials.
+
 This project does not generate `.pbix` or `.pbit` binaries directly. It can
 inspect and safely extract metadata/source files from PBIX/PBIT archives when
 those entries are present, and it can import PBIP/PBIR/TMDL source folders from
@@ -154,6 +174,19 @@ metadata, and unproven Power BI features fail with
 Use `powerbi-cli features list --json` to see which feature surfaces are
 supported, read-only, planned, or Desktop-golden gated.
 
+## Input Safety Limits
+
+User-supplied schema, profile, dashboard-spec, JSON bundle, intent, DAX/text,
+and binding files are read through bounded, strict-UTF-8, non-symlink input
+guards. Safety refusals use `error.code = "input_safety_violation"` (exit 10)
+with a hint and executable next command. `capabilities.limits` is the
+machine-readable source for every current and reserved surface limit, including
+`$include` depth/count, CSV/JSON rows and columns, PNG magic-byte checks, ops
+schema validation, snapshots, and harvested PBIR fragments. See
+[`docs/input-safety-contract.md`](docs/input-safety-contract.md) for the exact
+numbers and the APIs future command owners must call. Package archives and the
+staged workflow retain their stronger specialized streaming/identity policies.
+
 ## JSON Response Contract
 
 Successful JSON is family-specific; there is no mandatory five-field success
@@ -177,12 +210,21 @@ machine-readable contract is available at `capabilities.responseShapes`.
 ```powershell
 cargo build --bin powerbi-cli
 cargo run --bin powerbi-cli -- --json capabilities
+cargo run --bin powerbi-cli -- --json capabilities --for "report build" --compact
 ```
 
 The CLI is pure Rust and should compile on Windows, Linux, and macOS. Power BI
 Desktop open-proof is Windows-only, but PBIP/PBIR/TMDL scaffold and validation
 commands are normal filesystem operations and are covered by CI on all three
 platform families.
+
+## Testing
+
+Integration tests use one shared, structured CLI runner plus repository-backed
+archetype/spec helpers. Set `POWERBI_CLI_TEST_LOG=1` to emit each invocation as
+one JSON line containing argv, stdout, stderr, exit code, and elapsed time. See
+[`docs/testing.md`](docs/testing.md) for the focused e2e, snapshot, and nightly
+performance workflows.
 
 ## First Commands
 
@@ -199,6 +241,7 @@ cargo run --bin powerbi-cli -- package inspect .\template.pbit --json
 cargo run --bin powerbi-cli -- package extract .\template.pbit --out-dir .\build\template-source --json
 cargo run --bin powerbi-cli -- package import .\source.pbix --out-dir .\build\imported-source --json
 cargo run --bin powerbi-cli -- package source-pack --project .\build\sales --out .\build\sales-source.pbit --json
+cargo run --bin powerbi-cli -- package work-pack --project .\build\sales-live --json
 cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
@@ -228,6 +271,7 @@ cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model perspectives list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model cultures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model expressions list --project .\build\sales --json
+cargo run --bin powerbi-cli -- workflow synthesize --project .\Report.pbip --expressions .\qa\generators.tmdl --out-dir .\build\Report-QA --row-scale 100 --seed 42 --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --dry-run --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --out-dir .\build\sales-v2 --json
 cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-v2 --json
@@ -240,8 +284,12 @@ cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-relationships --
 cargo run --bin powerbi-cli -- model partitions list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --include-source --json
+cargo run --bin powerbi-cli -- model partitions add-grouped-rank --project .\build\analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when "[IsEligible] = true" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
@@ -364,6 +412,22 @@ three pages.
 
 ## Current Limits
 
+- Dashboard specs are strict at every supported object level. `report spec
+  validate` and `report build` reject unknown keys with
+  `spec.unknown_field`, an RFC 6901 `pointer`, and a `didYouMean` suggestion
+  when one is unambiguous; recognized sections that are not compiled still
+  return `unsupported_feature`. Run `report spec fields --json` for the key
+  catalog, adding `--schema` when exact model binding references are needed.
+  Both `powerbi-cli.dashboard.v1` and its v2 superset are accepted. V2 defines
+  model, style, layout, filter, slicer, visual-formatting, and proof sections;
+  sections whose compiler bead has not landed return `unsupported_feature`
+  with the owning bead id instead of being dropped. The checked-in
+  `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
+  subset and builds byte-identically to the v1 sales fixture.
+  Validation failures are returned on stdout as `errors[]` objects with required
+  `code` and `message` fields plus optional `pointer`, `didYouMean`, `hint`, and
+  `suggestedCommands`; they are not legacy error strings. The exact response
+  shape is published at `capabilities.responseShapes.reportSpecValidate`.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
@@ -379,7 +443,12 @@ three pages.
   real allowlisted PBIP/PBIR/TMDL source files exist inside the archive,
   `package source-pack` first refuses unknown files and files in dot-directories,
   then scans every included file for credentials and PII-suspect row literals;
-  non-dummy or unverified partition sources are also refused, and
+  non-dummy or unverified partition sources are also refused. The separate
+  `package work-pack` uses the same allowlist and scans, but requires every
+  partition to be a recognized credential-free materialized live source
+  accepted by `handoff check --target work`; it writes source metadata only,
+  never imported rows, caches, PBIX files, or local settings. Its default output
+  is the sibling `<project>-work.pbit`. Finally,
   `package export-plan` emits the Desktop handoff. `package export/compile/pack`
   is intentionally refused.
 - Package extraction streams through four default budgets: 10,000 archive
@@ -392,7 +461,8 @@ three pages.
   `definition.pbir`/definition JSON, semantic-model `.platform`/
   `definition.pbism`/definition TMDL, registered/shared JSON resources, and the
   generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-  `powerbi-cli.manifest.copy.json` sidecars. Other files—including every file
+  `powerbi-cli.manifest.copy.json` sidecars. A work-pack additionally contains
+  the generated `powerbi-cli.work-pack.json` class marker. Other files—including every file
   below `.git`, `.vscode`, `.powerbi-cli`, or another dot-directory—cause a
   deterministic refusal listing and no archive is written.
 - Programmatic visual authoring currently covers first-slice PBIR visual
@@ -523,20 +593,33 @@ three pages.
   `annotation PowerBICli_SourceKind = ModelDerived` explicitly marks unknown M
   as model-derived: work handoff accepts it when no error finding remains, while
   offline handoff still requires review and rejects it.
+- Guarded refresh-time ranking covers `model partitions add-grouped-rank` for
+  a table with exactly one safe generated dummy partition. It resolves existing
+  group/order/rank columns to their Power Query source names, sorts the rows,
+  buffers each group, gives eligible rows a 1-based `Int64` index, gives
+  ineligible rows zero, recombines them, and finishes with an explicit
+  `Table.TransformColumnTypes`. The rank column must already be an `int64`
+  placeholder in the generated table. Live, unknown, unsafe, multi-partition,
+  and already transformed sources are refused; Desktop refresh is still the
+  semantic oracle.
 - Programmatic advanced semantic-model readback covers
   `model advanced inventory` plus `model roles|perspectives|cultures|expressions
   list/show` for TMDL metadata already present in a project. Mutating those
   advanced surfaces remains blocked until object-specific writers and fixtures
   exist.
 - Source-template authoring covers `source-template list/show/add/apply` for
-  credential-free SQL Server, PostgreSQL, ODBC, and Excel rebind metadata stored
+  credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, and
+  SharePoint/OneDrive rebind metadata stored
   as sidecar JSON. PostgreSQL templates record current Npgsql compatibility guidance;
   ODBC templates accept only a bare DSN name (no `;`/`=` attributes) and record
-  that the named DSN must already exist there. `source-template apply` is the
+  that the named DSN must already exist there. CSV, folder, and SharePoint
+  templates render `Csv.Document`, `Folder.Files`, and `SharePoint.Files`
+  expressions with explicit TMDL-derived column type conversions.
+  `source-template apply` is the
   explicit materialization step that replaces one safe generated dummy partition.
   With `--replace-existing` and an exact `--confirm <partition-handle>`, it can also
-  intentionally retarget a recognized credential-free SQL, PostgreSQL, ODBC, or
-  external-file partition; unknown, web, credential-bearing, and unconfirmed
+  intentionally retarget a recognized credential-free SQL, PostgreSQL, ODBC,
+  external-file, or SharePoint partition; unknown, web, credential-bearing, and unconfirmed
   sources remain refused. Excel templates use `Excel.Workbook(File.Contents(...))`,
   promote the selected sheet/table headers, explicitly convert imported columns to
   their TMDL model types, and require an absolute workbook path when applied.
@@ -686,8 +769,12 @@ three pages.
   lists the single versioned registry used by lint, DAX/M checks, and report
   audit; `lint --explain <rule-id>` returns one rule's family, default severity,
   summary, remediation, optional sanitize action, and example finding without
-  requiring a project. The registry includes a typed, currently empty design
-  family so future design lint cannot introduce ad-hoc ids.
+  requiring a project. M lint raises the error-level
+  `m.duplicate_step_name` rule when a partition or named expression defines a
+  let-step name more than once (including quoted names and the final step before
+  `in`); findings include both source positions and ignore comments/string
+  literals. The registry includes a typed, currently empty design family so
+  future design lint cannot introduce ad-hoc ids.
 - Model completeness lint adds warning-only checks for measures without an
   explicit static or dynamic format, malformed custom format strings, visible
   relationship keys, both-direction fact-to-dimension relationships, and

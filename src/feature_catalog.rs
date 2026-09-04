@@ -230,7 +230,15 @@ fn validate_proof_record_feature_ids(proof_records: &[LoadedDesktopProofRecord])
 
 fn supported_kinds(feature: &Feature) -> &'static [&'static str] {
     match feature.id {
-        "model.source-templates" => &["sql", "postgres", "odbc", "excel"],
+        "model.source-templates" => &[
+            "sql",
+            "postgres",
+            "odbc",
+            "excel",
+            "csv",
+            "folder",
+            "sharepoint",
+        ],
         _ => &[],
     }
 }
@@ -263,7 +271,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["lint", "model dax lint", "report audit"],
         refusal_code: None,
-        reason: "Every lint and report-audit finding id is registered with family, severity, summary, remediation, optional sanitize action, and version metadata; agents can list or explain rules without opening a project.",
+        reason: "Every lint and report-audit finding id is registered with family, severity, summary, remediation, optional sanitize action, and version metadata; agents can list or explain rules without opening a project. M lint includes the error-level m.duplicate_step_name check for duplicate let identifiers.",
         next_proof: &[
             "Extend the typed design family when design lint ships without adding ad-hoc ids",
         ],
@@ -392,17 +400,19 @@ const FEATURE_CATALOG: &[Feature] = &[
         title: "PBIX/PBIT package boundary",
         category: "package",
         status: "supported",
-        support: "inspect-safe-metadata-extract-export-plan",
+        support: "inspect-safe-metadata-source-pack-work-pack-export-plan",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &[
             "package inspect",
             "package extract",
             "package import",
+            "package source-pack",
+            "package work-pack",
             "package export-plan",
         ],
         refusal_code: None,
-        reason: "The CLI can inspect package archives and extract/import actual source-like metadata entries; opaque binary PBIX/PBIT writing is refused with a Desktop handoff plan.",
+        reason: "The CLI can inspect package archives, extract/import actual source-like metadata entries, package dummy source projects, and package credential-free materialized live-source work variants; opaque binary PBIX/PBIT writing is refused with a Desktop handoff plan.",
         next_proof: &[
             "Add recent Microsoft sample package fixtures containing source entries where licensing permits",
             "Keep binary package export behind Desktop handoff until a documented writable format exists",
@@ -633,7 +643,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         title: "Credential-free source templates and rebind runbooks",
         category: "model",
         status: "supported",
-        support: "sidecar-sql-postgres-odbc-excel",
+        support: "sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint",
         proof_level: "unit-smoke",
         emits_pbir: false,
         commands: &[
@@ -644,9 +654,9 @@ const FEATURE_CATALOG: &[Feature] = &[
             "handoff rebind-plan",
         ],
         refusal_code: None,
-        reason: "Credential-free SQL Server, PostgreSQL, ODBC, and Excel M templates are stored in sidecar metadata and can replace safe generated dummy partitions. An exact-handle confirmation gate also permits intentional retargeting of recognized credential-free existing sources without embedding credentials.",
+        reason: "Credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive M templates are stored in sidecar metadata and can replace safe generated dummy partitions. File-family templates emit explicit TMDL-derived type conversions. An exact-handle confirmation gate also permits intentional retargeting of recognized credential-free existing sources without embedding credentials.",
         next_proof: &[
-            "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, ODBC/DSN, and Excel projects in Power BI Desktop",
+            "Manually rebind and refresh representative SQL Server, PostgreSQL/Npgsql, ODBC/DSN, Excel, CSV, folder, and SharePoint/OneDrive projects in Power BI Desktop",
         ],
         reference_signals: &[],
         tags: &[
@@ -655,9 +665,29 @@ const FEATURE_CATALOG: &[Feature] = &[
             "postgres",
             "odbc",
             "excel",
+            "csv",
+            "folder",
+            "sharepoint",
             "handoff",
             "rebind",
         ],
+    },
+    Feature {
+        id: "model.partition-grouped-rank",
+        title: "Refresh-time grouped rank partition generator",
+        category: "model",
+        status: "supported",
+        support: "safe-generated-partition-mutation",
+        proof_level: "schema-golden",
+        emits_pbir: false,
+        commands: &["model partitions add-grouped-rank"],
+        refusal_code: None,
+        reason: "A guarded generator appends sort, buffered per-group eligibility splitting, 1-based indexing, zero-ranked ineligible rows, recombination, and an explicit Int64 retype to one safe generated partition.",
+        next_proof: &[
+            "Refresh a grouped-rank analytics table in Power BI Desktop and verify ranks against bounded DAX queries",
+        ],
+        reference_signals: &[],
+        tags: &["semantic-model", "partition", "m", "rank", "performance"],
     },
     Feature {
         id: "workflow.source-profile",
@@ -673,6 +703,43 @@ const FEATURE_CATALOG: &[Feature] = &[
         next_proof: &[],
         reference_signals: &[],
         tags: &["workflow", "source-profile", "mcp", "pbip", "validation"],
+    },
+    Feature {
+        id: "report.dashboard-spec-v2",
+        title: "Strict dashboard spec v2 shape and compilation boundary",
+        category: "report",
+        status: "supported",
+        support: "strict-shape-partial-compile",
+        proof_level: "unit-smoke",
+        emits_pbir: true,
+        commands: &["report spec fields", "report spec validate", "report build"],
+        refusal_code: None,
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables and deny-unknown-fields models. The currently compiled subset is artifact-identical to v1; every recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        next_proof: &[
+            "Land the named T3 compiler bead for each currently refused v2 section",
+            "Promote generated v2 archetypes through the existing Desktop proof ladder",
+        ],
+        reference_signals: &[
+            "examples/sales.dashboard.v2.json: minimal compiled v2 parity fixture",
+        ],
+        tags: &["report", "dashboard", "spec", "v2", "compiler", "agent"],
+    },
+    Feature {
+        id: "workflow.synthetic-source",
+        title: "Offline deterministic synthetic source swap",
+        category: "workflow",
+        status: "supported",
+        support: "shared-m-expressions-with-scale-and-seed",
+        proof_level: "schema-golden",
+        emits_pbir: false,
+        commands: &["workflow synthesize"],
+        refusal_code: None,
+        reason: "A fresh project copy replaces recognized Database connector roots with shared M expressions; optional exact integer row-scale and seed values invoke deterministic generator functions.",
+        next_proof: &[
+            "Refresh multiple row scales in Power BI Desktop and record wall-time/canvas evidence",
+        ],
+        reference_signals: &[],
+        tags: &["workflow", "synthetic", "m", "scale", "seed", "offline"],
     },
     Feature {
         id: "report.pages",

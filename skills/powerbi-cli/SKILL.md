@@ -95,25 +95,27 @@ pbi --json capabilities
 pbi features list --json
 pbi features list --for unsupported --json
 pbi features list --for drillthrough --json
-pbi --json capabilities --for scaffold
+pbi --json capabilities --for scaffold --compact
 pbi --json capabilities --for schema
 pbi --json capabilities --for profile
-pbi --json capabilities --for "report build"
+pbi --json capabilities --for "report build" --compact
 pbi --json capabilities --for "report spec"
-pbi --json capabilities --for inspect
-pbi --json capabilities --for validate
-pbi --json capabilities --for lint
+pbi --json capabilities --for inspect --compact
+pbi --json capabilities --for validate --compact
+pbi --json capabilities --for lint --compact
 pbi lint --rules --json
 pbi lint --explain dax.reference_self --json
 pbi lint --explain dax.format_missing --json
-pbi --json capabilities --for diff
+pbi lint --explain m.duplicate_step_name --json
+pbi --json capabilities --for diff --compact
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
-pbi --json capabilities --for "model dax execute"
-pbi --json capabilities --for "model live export-tmdl"
+pbi --json capabilities --for "model dax execute" --compact
+pbi --json capabilities --for "model live export-tmdl" --compact
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
+pbi --json capabilities --for "workflow synthesize"
 pbi --json capabilities --for source-template
 pbi --json capabilities --for rebind
 pbi --json capabilities --for theme
@@ -129,8 +131,11 @@ A focused `--for` response returns the matching commands and small shared
 contract fields. It deliberately leaves the large unrelated schema/visual
 catalogs null and names them in `omittedCatalogs`; run the returned
 `fullContractCommand` only when those catalogs are actually needed.
+When the canonical command path is already known exactly, append `--compact`
+to receive only its path, usage, flags, examples, proof level, follow-up fields,
+and output schema.
 
-Key live surfaces include package inspect/extract/import/source-pack/export-plan,
+Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
 schema validate/normalize, profile
 infer/validate/summarize, deterministic report planning, declarative report spec
 validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
@@ -144,7 +149,7 @@ advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
-PostgreSQL, ODBC, and Excel rebind metadata,
+PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive rebind metadata,
 handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
 one-shot desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
@@ -159,7 +164,7 @@ formatting list/show/extract/apply bundles, visual formatting set-text for
 title/alt-text patches, conditional-formatting readback list/show, handoff
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
-Treat planned CSV/generic-M source templates, filter sort and arbitrary expression
+Treat planned generic-M source templates, filter sort and arbitrary expression
 updates, bookmark state capture/create/update/grouping,
 slicer selection/sync mutation, interaction Default/reset semantics, unsupported
 slicer modes, style
@@ -251,9 +256,21 @@ supported.
 - Treat package-extraction limits as a security boundary. Defaults are 10,000
   entries, 256 MiB per entry, 2 GiB total uncompressed, and 200:1 compression;
   raise them only with the matching explicit `--max-*` flag after inspection.
+- Treat `capabilities.limits` as the input-surface safety contract. Schema,
+  profile, spec, JSON bundle, intent, and DAX/text files have fixed byte limits,
+  strict UTF-8 decoding, and symlink refusal. Planned includes, rows, PNG
+  resources, ops, snapshots, and harvested fragments already have reserved
+  numeric limits and typed guards in `docs/input-safety-contract.md`; do not
+  bypass those guards or silently strip rejected content when adding a command.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.
+- `package work-pack` is the separate materialized work-machine variant. It
+  applies the same strict allowlist and content scans, requires every partition
+  to be a recognized credential-free live connector accepted by `handoff check
+  --target work`, and packages source metadata only—never imported rows, caches,
+  PBIX files, or local settings. Without `--out`, it writes the sibling
+  `<project>-work.pbit`.
 - If a command refuses an unsupported visual, format, source, or model feature,
   preserve the refusal. `error.code = "unsupported_feature"` is a stop sign, not
   an invitation to patch raw PBIR/TMDL by memory.
@@ -325,6 +342,7 @@ pbi --json package inspect template.pbit
 pbi --json package extract template.pbit --out-dir build/template-source
 pbi --json handoff check build/sales
 pbi --json package source-pack --project build/sales --out build/sales-source.pbit
+pbi --json package work-pack --project build/sales-live
 ```
 
 Extraction removes partial output if the entry-count, per-entry, total-size, or
@@ -368,6 +386,23 @@ materialization.
 
 Use this as the default data-agnostic dashboard loop. It keeps report intent in
 an explicit dashboard spec instead of relying on hidden inference:
+
+Dashboard spec keys are strict. Before authoring one, run `report spec fields`
+without a schema for the allowed-key catalog or with `--schema` for both the
+catalog and exact binding references. An unknown key returns
+`spec.unknown_field` with an RFC 6901 pointer and, when available, a
+`didYouMean` correction; do not bypass that diagnostic with raw PBIR edits.
+The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. A v2
+section is safe to retain before its compiler lands: compiled validation/build
+will return `unsupported_feature` with the owning T3 bead id, never silently
+discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
+  reference; `report spec upgrade` remains assigned to
+  `pbi-t2-dashboard-spec-v2-dsd.6`.
+  `report spec validate` writes validation failures to stdout as structured
+  `errors[]` objects (`code` and `message` are required; `pointer`,
+  `didYouMean`, `hint`, and `suggestedCommands` are optional). Consumers should
+  read `errors[].message`, never treat an entry as a bare string. See
+  `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
 ```bash
 pbi --json schema validate examples/sales.schema.json
@@ -420,6 +455,14 @@ Use `inspect --deep` before report or model edits. It returns tables, columns,
 measures, relationships, pages, visuals, bindings,
 handles, hazards, and proof status.
 
+M lint reports `m.duplicate_step_name` as an error when a partition or named
+expression defines the same `let` step identifier more than once. Quoted
+identifiers and the final step before `in` are included; comments and string
+literals are ignored. Each finding includes the first and duplicate one-based
+source positions. Use `pbi lint --explain m.duplicate_step_name --json` for the
+remediation contract, then rename or remove the duplicate before opening the
+project in Desktop.
+
 ### Repair And Verify An Existing Dashboard
 
 Use the exact command paths below instead of guessing shortened families:
@@ -430,6 +473,7 @@ pbi --json model dax dependencies --project build/sales
 pbi --json model dax lint --project build/sales
 pbi --json lint --rules
 pbi --json lint --explain dax.reference_self
+pbi --json lint --explain m.duplicate_step_name
 pbi --json report wireframe export build/sales
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales
@@ -542,6 +586,7 @@ pbi --json capabilities --for partition
 pbi --json model partitions list --project build/sales
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales"
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales" --include-source
+pbi --json model partitions add-grouped-rank --project build/analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when '[IsEligible] = true' --dry-run
 pbi --json handoff check build/sales
 pbi --json handoff check report/live.pbip --target work
 ```
@@ -563,6 +608,16 @@ findings. Credentials, caches, embedded data, and unannotated unknown partition
 sources still fail. Check `safeForWorkHandoff`, not
 `safeForOfflineHandoff`, in that workflow.
 
+For a disconnected refresh-time analytics table whose generated dummy source
+already includes an `int64` rank placeholder, generate the standard per-group
+rank chain with `model partitions add-grouped-rank`. The command accepts one or
+more existing source-backed group columns, one order column, optional `--desc`,
+and a bounded M row predicate. It buffers each group, assigns eligible rows
+1-based ranks and ineligible rows zero, and explicitly retypes the result. It
+refuses live/unknown/unsafe or multi-partition tables. Review `changes[].after`,
+then run the returned lint and strict-validation commands; Desktop refresh and a
+bounded DAX assertion remain required for semantic proof.
+
 ### Prepare Source Templates And Rebind Plans
 
 Use source-template and rebind-plan commands only when `capabilities` advertises
@@ -574,6 +629,9 @@ pbi --json source-template add --project build/sales --table FactSales --kind sq
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind odbc --dsn "<dsn>" --database "<database>" --schema "<schema>" --object "<object>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --out-dir build/sales-rebind
 pbi --json source-template list --project build/sales-rebind
 pbi --json handoff rebind-plan build/sales-rebind --out build/sales-rebind/work-machine-rebind.md
@@ -584,7 +642,7 @@ Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`.
 `source-template apply` materializes one template into a generated dummy partition.
 For an intentional source-to-source retarget, `--replace-existing` also requires
 the exact `--confirm <partition-handle>` and accepts only recognized credential-free
-SQL, PostgreSQL, ODBC, or external-file sources. Unknown, web, credential-bearing,
+SQL, PostgreSQL, ODBC, external-file, or SharePoint sources. Unknown, web, credential-bearing,
 and unconfirmed sources are refused. Excel templates select one worksheet or Excel
 table, promote its headers, add explicit Power Query conversions from the model's
 TMDL column types, and materialize an absolute workbook path; reapply or patch the
@@ -886,6 +944,21 @@ they are not a complete DAX engine.
 
 ### Handoff Between Home And Work
 
+For deterministic offline refresh/performance fixtures, supply shared M
+generator functions that accept positional `(rowScale, seed)` numeric
+arguments, then synthesize a fresh project outside the source tree:
+
+```bash
+pbi --json workflow synthesize --project Report.pbip --expressions qa/generators.tmdl --out-dir ../powerbi-build/Report-QA-100x --row-scale 100 --seed 42
+pbi --json lint ../powerbi-build/Report-QA-100x
+pbi --json validate --strict ../powerbi-build/Report-QA-100x
+```
+
+The same scale/seed pair emits byte-identical partition M. Supplying only one
+option uses row scale `1` or seed `0`; row scale must remain positive. Use this
+copy for Desktop refresh timing and canvas QA without carrying live connector
+text, credentials, or real rows.
+
 For a deterministic resource/source reorientation, prefer the fingerprinted workflow:
 
 ```bash
@@ -932,7 +1005,8 @@ pbi --json fixture verify build/sales --expected testdata/golden/sales-desktop-f
 ```
 
 Use `source-template add` before the final rebind plan when you know a
-credential-free SQL Server, PostgreSQL, ODBC, or Excel mapping. Missing templates
+credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, or
+SharePoint/OneDrive mapping. Missing templates
 produce structured findings and suggested commands; `--allow-unmapped` is useful
 while drafting. Write the final work-machine instructions with
 `handoff rebind-plan <project> --out <file.md>` and keep every credential in
@@ -1064,8 +1138,8 @@ High-value improvement targets:
 - generated proof/follow-up commands on every mutation;
 - strict validation diagnostics with machine-readable codes;
 - `handoff check` and source rebind planning;
-- Desktop rebind/refresh proof for SQL Server, PostgreSQL/Npgsql, and ODBC/DSN
-  source templates;
+- Desktop rebind/refresh proof for SQL Server, PostgreSQL/Npgsql, ODBC/DSN,
+  Excel, CSV, folder, and SharePoint/OneDrive source templates;
 - Desktop golden fixtures for visual binding and formatting.
 
 ## Verification
@@ -1077,6 +1151,21 @@ cargo fmt --check
 cargo check --all-targets
 cargo test --test cli_smoke '<focused-filter>' -- --nocapture
 ```
+
+For an invocation-by-invocation failure record, enable the shared integration
+test logger. Each CLI run is emitted as one JSON line with exact argv, stdout,
+stderr, exit code, and elapsed milliseconds:
+
+```bash
+POWERBI_CLI_TEST_LOG=1 cargo test --test e2e -- --nocapture
+```
+
+The offline e2e target runs the schema/profile/plan/spec/build/validate/handoff/
+lint/triage/fixture loop for every checked-in archetype. JSON contract snapshots
+use `tests/common::assert_json_snapshot`; update them only with
+`UPDATE_SNAPSHOTS=1` and review the resulting diff. Ignored performance budgets
+run through `cargo test --test perf -- --ignored`. The complete harness contract
+is documented in `docs/testing.md`.
 
 Broader loop:
 

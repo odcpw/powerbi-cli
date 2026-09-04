@@ -90,6 +90,50 @@ fn database_line(text: &str) -> &str {
         .trim()
 }
 
+fn install_scaled_expressions(path: &Path) {
+    fs::write(
+        path,
+        r#"expression SynthCustomers = (rowScale as number, seed as number) as table =>
+    let
+        RowCount = Number.RoundDown(rowScale),
+        Rows = List.Transform({0..RowCount - 1}, each {Number.Mod(_ + seed, 1000)})
+    in
+        #table(type table [Value = Int64.Type], Rows)
+
+expression SynthOrders = (rowScale as number, seed as number) as table =>
+    let
+        RowCount = Number.RoundDown(rowScale),
+        Rows = List.Transform({0..RowCount - 1}, each {Number.Mod((_ * 17) + seed, 1000)})
+    in
+        #table(type table [Value = Int64.Type], Rows)
+"#,
+    )
+    .expect("scaled synthetic expressions");
+}
+
+fn synthesize_with_scale(
+    fixture: &SynthesizeFixture,
+    output: &Path,
+    row_scale: &str,
+    seed: &str,
+) -> common::RunOutput {
+    run_powerbi(&[
+        "workflow",
+        "synthesize",
+        "--project",
+        fixture.pbip.to_str().expect("PBIP path"),
+        "--expressions",
+        fixture.expressions.to_str().expect("expressions path"),
+        "--out-dir",
+        output.to_str().expect("output path"),
+        "--row-scale",
+        row_scale,
+        "--seed",
+        seed,
+        "--json",
+    ])
+}
+
 #[test]
 fn workflow_synthesize_swaps_all_partitions_and_validates_offline_output() {
     let temp = tempfile::tempdir().expect("tempdir");
@@ -117,6 +161,7 @@ fn workflow_synthesize_swaps_all_partitions_and_validates_offline_output() {
     assert_eq!(result["offlineSafety"]["ok"], true);
     assert_eq!(result["counts"]["navigationPairs"], 2);
     assert_eq!(result["counts"]["partitionsModified"], 2);
+    assert!(result["generationParameters"].is_null());
 
     let orders = table_text(&output, "FactSales");
     let customers = table_text(&output, "DimCustomer");
@@ -223,6 +268,149 @@ fn workflow_synthesize_honors_pair_mapping_override() {
 }
 
 #[test]
+fn workflow_synthesize_row_scale_and_seed_match_two_m_goldens() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fixture = scaffold_live_fixture(temp.path());
+    install_scaled_expressions(&fixture.expressions);
+
+    for (row_scale, seed, golden) in [
+        (
+            "10",
+            "42",
+            include_str!("../testdata/golden/workflow-synthesize/row-scale-10-seed-42.database.m"),
+        ),
+        (
+            "1000",
+            "42",
+            include_str!(
+                "../testdata/golden/workflow-synthesize/row-scale-1000-seed-42.database.m"
+            ),
+        ),
+    ] {
+        let output = temp.path().join(format!("scaled-{row_scale}"));
+        let command = synthesize_with_scale(&fixture, &output, row_scale, seed);
+        assert_eq!(
+            command.code, 0,
+            "stdout: {}\nstderr: {}",
+            command.stdout, command.stderr
+        );
+        let result = stdout_json(&command);
+        assert_eq!(
+            result["generationParameters"]["rowScale"],
+            row_scale.parse::<u64>().unwrap()
+        );
+        assert_eq!(
+            result["generationParameters"]["seed"],
+            seed.parse::<u64>().unwrap()
+        );
+        let fact_sales = table_text(&output, "FactSales");
+        assert_eq!(database_line(&fact_sales), golden.trim());
+
+        let lint = run_powerbi(&["lint", output.to_str().expect("output path"), "--json"]);
+        assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
+        assert!(
+            stdout_json(&lint)["findings"]
+                .as_array()
+                .expect("lint findings")
+                .iter()
+                .all(|finding| !finding["code"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .starts_with("m.")),
+            "generated synthetic partition M must lint clean"
+        );
+    }
+}
+
+#[test]
+fn workflow_synthesize_scaled_output_is_byte_deterministic_and_seed_sensitive() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fixture = scaffold_live_fixture(temp.path());
+    install_scaled_expressions(&fixture.expressions);
+    let first = temp.path().join("first");
+    let second = temp.path().join("second");
+    let changed_seed = temp.path().join("changed-seed");
+
+    for (output, seed) in [(&first, "7"), (&second, "7"), (&changed_seed, "8")] {
+        let command = synthesize_with_scale(&fixture, output, "250", seed);
+        assert_eq!(command.code, 0, "stderr: {}", command.stderr);
+    }
+
+    let first_bytes = fs::read(
+        first
+            .join("SalesOperations.SemanticModel")
+            .join("definition")
+            .join("tables")
+            .join("FactSales.tmdl"),
+    )
+    .expect("first table bytes");
+    let second_bytes = fs::read(
+        second
+            .join("SalesOperations.SemanticModel")
+            .join("definition")
+            .join("tables")
+            .join("FactSales.tmdl"),
+    )
+    .expect("second table bytes");
+    let changed_seed_bytes = fs::read(
+        changed_seed
+            .join("SalesOperations.SemanticModel")
+            .join("definition")
+            .join("tables")
+            .join("FactSales.tmdl"),
+    )
+    .expect("changed-seed table bytes");
+    assert_eq!(first_bytes, second_bytes);
+    assert_ne!(first_bytes, changed_seed_bytes);
+}
+
+#[test]
+fn workflow_synthesize_refuses_invalid_generation_parameters_before_writing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let cases: &[&[&str]] = &[
+        &["--row-scale", "0"],
+        &["--row-scale", "-1"],
+        &["--row-scale", "9007199254740992"],
+        &["--seed", "-1"],
+        &["--seed", "9007199254740992"],
+        &["--row-scale", "2", "--row-scale", "3"],
+        &["--seed", "2", "--seed", "3"],
+    ];
+    for (case_index, flags) in cases.iter().enumerate() {
+        let output = temp.path().join(format!("missing-output-{case_index}"));
+        let mut args = vec![
+            "workflow",
+            "synthesize",
+            "--project",
+            "missing.pbip",
+            "--expressions",
+            "missing.tmdl",
+            "--out-dir",
+            output.to_str().expect("output path"),
+        ];
+        args.extend_from_slice(flags);
+        args.push("--json");
+        let command = run_powerbi(&args);
+        assert_eq!(command.code, 2, "stdout: {}", command.stdout);
+        let error: serde_json::Value =
+            serde_json::from_str(command.stderr.trim()).expect("error JSON");
+        assert_eq!(error["error"]["code"], "invalid_args");
+        assert!(error["error"]["hint"].is_string());
+        assert!(
+            error["error"]["suggestedCommands"]
+                .as_array()
+                .expect("suggested commands")
+                .iter()
+                .all(|command| command
+                    .as_str()
+                    .unwrap_or_default()
+                    .starts_with("powerbi-cli "))
+        );
+        assert!(!output.exists());
+    }
+}
+
+#[test]
 fn workflow_synthesize_refuses_output_inside_source_project() {
     let temp = tempfile::tempdir().expect("tempdir");
     let fixture = scaffold_live_fixture(temp.path());
@@ -256,7 +444,19 @@ fn capabilities_publish_synthesize_schema_golden_contract() {
         .expect("workflow synthesize contract");
     assert_eq!(contract["proofLevel"], "schema-golden");
     assert!(contract["usage"].as_str().expect("usage").contains("--map"));
-    assert!(contract["flags"].as_array().expect("flags").len() >= 6);
+    assert!(
+        contract["usage"]
+            .as_str()
+            .expect("usage")
+            .contains("--row-scale")
+    );
+    assert!(
+        contract["flags"]
+            .as_array()
+            .expect("flags")
+            .iter()
+            .any(|flag| flag.as_str().unwrap_or_default().starts_with("--seed"))
+    );
     assert!(
         !contract["examples"]
             .as_array()
@@ -269,4 +469,26 @@ fn capabilities_publish_synthesize_schema_golden_contract() {
             .expect("limitations")
             .is_empty()
     );
+
+    let features = run_powerbi(&[
+        "features",
+        "list",
+        "--for",
+        "workflow.synthetic-source",
+        "--json",
+    ]);
+    assert_eq!(features.code, 0, "stderr: {}", features.stderr);
+    let feature = stdout_json(&features)["features"]
+        .as_array()
+        .expect("features")
+        .first()
+        .expect("synthetic source feature")
+        .clone();
+    assert_eq!(feature["id"], "workflow.synthetic-source");
+    assert_eq!(feature["proofLevel"], "schema-golden");
+
+    let help = run_powerbi(&["--help"]);
+    assert_eq!(help.code, 0, "stderr: {}", help.stderr);
+    assert!(help.stdout.contains("--row-scale <n>"));
+    assert!(help.stdout.contains("--seed <s>"));
 }

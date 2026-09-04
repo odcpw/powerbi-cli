@@ -20,12 +20,345 @@ fn scaffold_sales_project(root: &Path) -> PathBuf {
     out_dir
 }
 
+#[test]
+fn grouped_rank_dry_run_is_deterministic_and_does_not_modify_the_project() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_grouped_rank_project(temp.path(), "rank-dry-run");
+    let path = signals_tmdl(&project);
+    let before = fs::read(&path).expect("table before dry-run");
+    let args = grouped_rank_args(&project, &["--dry-run"]);
+
+    let first = run_owned(&args);
+    let second = run_owned(&args);
+    assert_eq!(first.code, 0, "stderr: {}", first.stderr);
+    assert_eq!(second.code, 0, "stderr: {}", second.stderr);
+    let first_json = stdout_json(&first);
+    let second_json = stdout_json(&second);
+    assert_eq!(first_json, second_json);
+    assert_eq!(
+        first_json["schema"],
+        "powerbi-cli.model.partitions.addGroupedRank.v1"
+    );
+    assert_eq!(first_json["dryRun"], true);
+    assert_eq!(first_json["mode"], "dry-run");
+    assert_eq!(first_json["projectModified"], false);
+    assert_eq!(first_json["rank"]["direction"], "descending");
+    assert_eq!(first_json["rank"]["ineligibleRank"], 0);
+    assert_eq!(first_json["rank"]["eligibleRankStart"], 1);
+    let after = first_json["changes"][0]["after"]
+        .as_str()
+        .expect("after source block");
+    for required in [
+        "Table.Sort",
+        "Order.Descending",
+        "Table.Group",
+        "Table.Buffer",
+        "Table.AddIndexColumn",
+        "Table.AddColumn",
+        "each 0, Int64.Type",
+        "Table.TransformColumnTypes",
+    ] {
+        assert!(after.contains(required), "missing {required} in {after}");
+    }
+    assert_eq!(fs::read(&path).expect("table after dry-run"), before);
+}
+
+#[test]
+fn grouped_rank_out_dir_and_in_place_are_guarded_and_m_lint_clean() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_grouped_rank_project(temp.path(), "rank-source");
+    let source_before = fs::read(signals_tmdl(&project)).expect("source before");
+    let output = temp.path().join("rank-output");
+    let output_arg = output.to_str().expect("output path");
+    let out_args = grouped_rank_args(&project, &["--out-dir", output_arg]);
+    let out = run_owned(&out_args);
+    assert_eq!(
+        out.code, 0,
+        "stdout: {}\nstderr: {}",
+        out.stdout, out.stderr
+    );
+    assert_eq!(stdout_json(&out)["mode"], "out-dir");
+    assert_eq!(stdout_json(&out)["projectModified"], true);
+    assert_eq!(
+        fs::read(signals_tmdl(&project)).expect("source after"),
+        source_before
+    );
+    let output_text = fs::read_to_string(signals_tmdl(&output)).expect("output table");
+    assert!(output_text.contains("PowerBICliGroupedRankTyped"));
+
+    let lint = run_powerbi(&["lint", output_arg, "--json"]);
+    assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
+    let m_findings = stdout_json(&lint)["findings"]
+        .as_array()
+        .expect("lint findings")
+        .iter()
+        .filter(|finding| {
+            finding["code"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("m.")
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(m_findings.is_empty(), "M lint findings: {m_findings:#?}");
+    let validate = run_powerbi(&["validate", "--strict", output_arg, "--json"]);
+    assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
+
+    let in_place = run_owned(&grouped_rank_args(&project, &["--in-place"]));
+    assert_eq!(in_place.code, 0, "stderr: {}", in_place.stderr);
+    assert_eq!(stdout_json(&in_place)["mode"], "in-place");
+    assert_eq!(stdout_json(&in_place)["projectModified"], true);
+    assert!(
+        fs::read_to_string(signals_tmdl(&project))
+            .expect("in-place table")
+            .contains("PowerBICliGroupedRankTyped")
+    );
+}
+
+#[test]
+fn grouped_rank_refuses_live_unsafe_and_invalid_inputs_before_writing() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let live = scaffold_grouped_rank_project(temp.path(), "rank-live");
+    let live_path = signals_tmdl(&live);
+    let live_text = fs::read_to_string(&live_path).expect("live table");
+    let source_start = live_text.find("        source =").expect("source block");
+    fs::write(
+        &live_path,
+        format!(
+            "{}        source =\n            let\n                Source = PostgreSQL.Database(\"server.invalid\", \"warehouse\")\n            in\n                Source\n\n",
+            &live_text[..source_start]
+        ),
+    )
+    .expect("write live partition");
+    let live_before = fs::read(&live_path).expect("live before refusal");
+    let live_result = run_owned(&grouped_rank_args(&live, &["--dry-run"]));
+    assert_eq!(live_result.code, 2, "stdout: {}", live_result.stdout);
+    let live_error = stderr_json(&live_result);
+    assert_eq!(live_error["error"]["code"], "invalid_args");
+    assert!(
+        live_error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("safe generated dummy partition")
+    );
+    assert!(live_error["error"]["hint"].is_string());
+    assert!(live_error["error"]["suggestedCommands"].is_array());
+    assert_eq!(
+        fs::read(&live_path).expect("live after refusal"),
+        live_before
+    );
+
+    let unknown = scaffold_grouped_rank_project(temp.path(), "rank-unknown");
+    let unknown_path = signals_tmdl(&unknown);
+    let unknown_text = fs::read_to_string(&unknown_path).expect("unknown table");
+    let source_start = unknown_text.find("        source =").expect("source block");
+    fs::write(
+        &unknown_path,
+        format!(
+            "{}        source =\n            let\n                Source = Table.FromRecords({{}})\n            in\n                Source\n\n",
+            &unknown_text[..source_start]
+        ),
+    )
+    .expect("write unknown partition");
+    let unknown_before = fs::read(&unknown_path).expect("unknown before refusal");
+    let unknown_result = run_owned(&grouped_rank_args(&unknown, &["--dry-run"]));
+    assert_eq!(unknown_result.code, 2, "stdout: {}", unknown_result.stdout);
+    assert!(
+        stderr_json(&unknown_result)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("unknown (review)")
+    );
+    assert_eq!(
+        fs::read(&unknown_path).expect("unknown after refusal"),
+        unknown_before
+    );
+
+    let unsafe_generated = scaffold_grouped_rank_project(temp.path(), "rank-unsafe-generated");
+    let unsafe_path = signals_tmdl(&unsafe_generated);
+    let unsafe_text = fs::read_to_string(&unsafe_path)
+        .expect("unsafe generated table")
+        .replace("Sample Segment", "password=test-only-placeholder");
+    fs::write(&unsafe_path, unsafe_text).expect("write unsafe generated partition");
+    let unsafe_before = fs::read(&unsafe_path).expect("unsafe before refusal");
+    let unsafe_result = run_owned(&grouped_rank_args(&unsafe_generated, &["--dry-run"]));
+    assert_eq!(unsafe_result.code, 2, "stdout: {}", unsafe_result.stdout);
+    assert!(
+        stderr_json(&unsafe_result)["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("dummyMTable (unsafe)")
+    );
+    assert_eq!(
+        fs::read(&unsafe_path).expect("unsafe after refusal"),
+        unsafe_before
+    );
+
+    let valid = scaffold_grouped_rank_project(temp.path(), "rank-invalid");
+    for predicate in [
+        "[IsEligible], Injected = 1",
+        "Web.Contents(\"https://example.invalid\") <> null",
+        "Password = \"test-only-placeholder\"",
+    ] {
+        let mut args = grouped_rank_args(&valid, &["--dry-run"]);
+        let index = args
+            .iter()
+            .position(|value| value == "--eligible-when")
+            .expect("predicate flag");
+        args[index + 1] = predicate.to_string();
+        let result = run_owned(&args);
+        assert_eq!(
+            result.code, 2,
+            "predicate: {predicate}; stdout: {}",
+            result.stdout
+        );
+        let error = stderr_json(&result);
+        assert_eq!(error["error"]["code"], "invalid_args");
+        assert!(error["error"]["hint"].is_string());
+        assert!(
+            error["error"]["suggestedCommands"]
+                .as_array()
+                .expect("suggested commands")
+                .iter()
+                .all(|command| command
+                    .as_str()
+                    .unwrap_or_default()
+                    .starts_with("powerbi-cli "))
+        );
+    }
+
+    let missing_mode = run_owned(&grouped_rank_args(&valid, &[]));
+    assert_eq!(missing_mode.code, 2);
+    assert_eq!(stderr_json(&missing_mode)["error"]["code"], "invalid_args");
+}
+
+#[test]
+fn grouped_rank_is_discoverable_in_capabilities_features_and_help() {
+    let capabilities = run_powerbi(&[
+        "capabilities",
+        "--for",
+        "model partitions add-grouped-rank",
+        "--json",
+    ]);
+    assert_eq!(capabilities.code, 0, "stderr: {}", capabilities.stderr);
+    let value = stdout_json(&capabilities);
+    let contract = value["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["path"] == "model partitions add-grouped-rank")
+        .expect("grouped-rank contract");
+    assert_eq!(contract["proofLevel"], "schema-golden");
+    assert!(
+        contract["usage"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("--eligible-when")
+    );
+
+    let features = run_powerbi(&[
+        "features",
+        "list",
+        "--for",
+        "model.partition-grouped-rank",
+        "--json",
+    ]);
+    assert_eq!(features.code, 0, "stderr: {}", features.stderr);
+    assert_eq!(stdout_json(&features)["features"][0]["status"], "supported");
+
+    let help = run_powerbi(&["--help"]);
+    assert_eq!(help.code, 0, "stderr: {}", help.stderr);
+    assert!(help.stdout.contains("model partitions add-grouped-rank"));
+}
+
 fn fact_sales_tmdl(project: &Path) -> PathBuf {
     project
         .join("SalesOperations.SemanticModel")
         .join("definition")
         .join("tables")
         .join("FactSales.tmdl")
+}
+
+fn scaffold_grouped_rank_project(root: &Path, name: &str) -> PathBuf {
+    let schema = root.join(format!("{name}.schema.json"));
+    fs::write(
+        &schema,
+        serde_json::to_vec_pretty(&json!({
+            "name": "GroupedRankAnalytics",
+            "displayName": "Grouped Rank Analytics",
+            "tables": [{
+                "name": "Signals",
+                "columns": [
+                    {"name": "Segment", "dataType": "string"},
+                    {"name": "Score", "dataType": "double"},
+                    {"name": "IsEligible", "dataType": "boolean"},
+                    {"name": "GroupRank", "dataType": "int64"}
+                ],
+                "rows": [{
+                    "Segment": "Sample Segment",
+                    "Score": 1.25,
+                    "IsEligible": true,
+                    "GroupRank": 0
+                }]
+            }],
+            "relationships": [],
+            "pages": [{
+                "name": "ReportSectionOverview",
+                "displayName": "Overview",
+                "visuals": []
+            }]
+        }))
+        .expect("serialize grouped-rank schema"),
+    )
+    .expect("write grouped-rank schema");
+    let project = root.join(name);
+    let scaffold = run_powerbi(&[
+        "scaffold",
+        "--schema",
+        schema.to_str().expect("schema path"),
+        "--out-dir",
+        project.to_str().expect("project path"),
+        "--json",
+    ]);
+    assert_eq!(scaffold.code, 0, "stderr: {}", scaffold.stderr);
+    project
+}
+
+fn signals_tmdl(project: &Path) -> PathBuf {
+    project
+        .join("GroupedRankAnalytics.SemanticModel")
+        .join("definition")
+        .join("tables")
+        .join("Signals.tmdl")
+}
+
+fn grouped_rank_args(project: &Path, output_mode: &[&str]) -> Vec<String> {
+    let mut args = vec![
+        "model".to_string(),
+        "partitions".to_string(),
+        "add-grouped-rank".to_string(),
+        "--project".to_string(),
+        project.to_str().expect("project path").to_string(),
+        "--table".to_string(),
+        "Signals".to_string(),
+        "--group-by".to_string(),
+        "Segment".to_string(),
+        "--order-by".to_string(),
+        "Score".to_string(),
+        "--desc".to_string(),
+        "--rank-column".to_string(),
+        "GroupRank".to_string(),
+        "--eligible-when".to_string(),
+        "[IsEligible] = true and [Score] > 0".to_string(),
+    ];
+    args.extend(output_mode.iter().map(|value| (*value).to_string()));
+    args.push("--json".to_string());
+    args
+}
+
+fn run_owned(args: &[String]) -> common::RunOutput {
+    let borrowed = args.iter().map(String::as_str).collect::<Vec<_>>();
+    run_powerbi(&borrowed)
 }
 
 #[test]
@@ -853,7 +1186,15 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
     assert_eq!(source_feature_json["matchedFeatures"], Value::from(1));
     assert_eq!(
         source_feature_json["features"][0]["supportedKinds"],
-        json!(["sql", "postgres", "odbc", "excel"])
+        json!([
+            "sql",
+            "postgres",
+            "odbc",
+            "excel",
+            "csv",
+            "folder",
+            "sharepoint"
+        ])
     );
 
     let empty = run_powerbi(&["capabilities", "--json", "--for", "does-not-exist"]);

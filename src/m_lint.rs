@@ -1,8 +1,9 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::rules;
 use crate::tmdl::{ColumnRecord, load_table_documents};
 use crate::{CliError, CliResult, ResolvedProject, canonical_display};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -20,6 +21,12 @@ pub(super) fn buffer_reuse_findings(resolved: &ResolvedProject) -> CliResult<Vec
                 continue;
             };
             let handle = partition.handle();
+            findings.extend(duplicate_step_document_findings(
+                source,
+                "partition",
+                &handle,
+                &partition.path,
+            ));
             findings.extend(document_findings(
                 source,
                 "partition",
@@ -37,6 +44,12 @@ pub(super) fn buffer_reuse_findings(resolved: &ResolvedProject) -> CliResult<Vec
     }
 
     for expression in load_named_m_expressions(&resolved.semantic_model_dir)? {
+        findings.extend(duplicate_step_document_findings(
+            &expression.source,
+            "expression",
+            &format!("expression:{}", expression.name),
+            &expression.path,
+        ));
         findings.extend(document_findings(
             &expression.source,
             "expression",
@@ -45,6 +58,46 @@ pub(super) fn buffer_reuse_findings(resolved: &ResolvedProject) -> CliResult<Vec
         ));
     }
     Ok(findings)
+}
+
+fn duplicate_step_document_findings(
+    source: &str,
+    document_kind: &str,
+    handle: &str,
+    path: &Path,
+) -> Vec<Value> {
+    analyze_duplicate_step_names(source)
+        .into_iter()
+        .map(|duplicate| {
+            json!({
+                "code": rules::M_DUPLICATE_STEP_NAME,
+                "severity": "error",
+                "message": format!(
+                    "M query defines step `{}` more than once; duplicate names can surface as a cyclic-reference refresh error in Power BI Desktop (first at line {}, column {}; duplicate at line {}, column {})",
+                    duplicate.step,
+                    duplicate.first_position.line,
+                    duplicate.first_position.column,
+                    duplicate.duplicate_position.line,
+                    duplicate.duplicate_position.column,
+                ),
+                "handle": handle,
+                "path": canonical_display(path),
+                "documentKind": document_kind,
+                "step": duplicate.step,
+                "firstPosition": {
+                    "line": duplicate.first_position.line,
+                    "column": duplicate.first_position.column,
+                },
+                "duplicatePosition": {
+                    "line": duplicate.duplicate_position.line,
+                    "column": duplicate.duplicate_position.column,
+                },
+                "firstStepOrdinal": duplicate.first_step_ordinal,
+                "duplicateStepOrdinal": duplicate.duplicate_step_ordinal,
+                "analysisBoundary": "syntax"
+            })
+        })
+        .collect()
 }
 
 fn document_findings(source: &str, document_kind: &str, handle: &str, path: &Path) -> Vec<Value> {
@@ -154,8 +207,7 @@ fn load_named_m_expressions(semantic_model_dir: &Path) -> CliResult<Vec<NamedMEx
 
     let mut expressions = Vec::new();
     for path in paths {
-        let text = fs::read_to_string(&path)
-            .map_err(|error| CliError::unexpected(format!("read {}: {error}", path.display())))?;
+        let text = read_utf8(&path, InputKind::ProjectText)?;
         let lines = text.lines().collect::<Vec<_>>();
         let starts = lines
             .iter()
@@ -251,6 +303,35 @@ struct Step {
     rhs: Vec<Token>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SourcePosition {
+    line: usize,
+    column: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct DuplicateStep {
+    step: String,
+    first_position: SourcePosition,
+    duplicate_position: SourcePosition,
+    first_step_ordinal: usize,
+    duplicate_step_ordinal: usize,
+}
+
+#[derive(Debug, Clone)]
+struct SpannedToken {
+    token: Token,
+    /// Character offset into the M source. Positions are converted to
+    /// one-based line/column values only for reported duplicate names.
+    offset: usize,
+}
+
+#[derive(Debug)]
+struct SpannedStep {
+    name: String,
+    name_offset: usize,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct Reuse {
     step: String,
@@ -299,6 +380,32 @@ fn analyze_let_steps(source: &str) -> Vec<Reuse> {
         }
     }
     reuse
+}
+
+fn analyze_duplicate_step_names(source: &str) -> Vec<DuplicateStep> {
+    let tokens = lex_m_spanned(source);
+    let Some(let_index) = tokens.iter().position(|token| token.token == Token::Let) else {
+        return Vec::new();
+    };
+    let steps = parse_spanned_let_steps(&tokens[let_index + 1..]);
+    let mut first_seen = BTreeMap::<String, (SourcePosition, usize)>::new();
+    let mut duplicates = Vec::new();
+    for (index, step) in steps.iter().enumerate() {
+        let ordinal = index + 1;
+        let position = source_position(source, step.name_offset);
+        if let Some((first_position, first_ordinal)) = first_seen.get(&step.name) {
+            duplicates.push(DuplicateStep {
+                step: step.name.clone(),
+                first_position: *first_position,
+                duplicate_position: position,
+                first_step_ordinal: *first_ordinal,
+                duplicate_step_ordinal: ordinal,
+            });
+        } else {
+            first_seen.insert(step.name.clone(), (position, ordinal));
+        }
+    }
+    duplicates
 }
 
 fn analyze_untyped_expansions(
@@ -393,6 +500,63 @@ fn parse_let_body(tokens: &[Token]) -> (Vec<Step>, Vec<Token>) {
         })
         .collect();
     (steps, in_expr)
+}
+
+fn parse_spanned_let_steps(tokens: &[SpannedToken]) -> Vec<SpannedStep> {
+    let mut chunks = Vec::<Vec<SpannedToken>>::new();
+    let mut current = Vec::new();
+    let mut delimiter_depth = 0_usize;
+    let mut let_depth = 1_usize;
+    let mut in_in = false;
+    for token in tokens {
+        if in_in {
+            continue;
+        }
+        match &token.token {
+            Token::Open(_) => {
+                delimiter_depth += 1;
+                current.push(token.clone());
+            }
+            Token::Close(_) => {
+                delimiter_depth = delimiter_depth.saturating_sub(1);
+                current.push(token.clone());
+            }
+            Token::Let if delimiter_depth == 0 => {
+                let_depth += 1;
+                current.push(token.clone());
+            }
+            Token::In if delimiter_depth == 0 && let_depth == 1 => {
+                if !current.is_empty() {
+                    chunks.push(std::mem::take(&mut current));
+                }
+                in_in = true;
+            }
+            Token::In if delimiter_depth == 0 => {
+                let_depth = let_depth.saturating_sub(1);
+                current.push(token.clone());
+            }
+            Token::Comma if delimiter_depth == 0 && let_depth == 1 => {
+                if !current.is_empty() {
+                    chunks.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(token.clone()),
+        }
+    }
+
+    chunks
+        .into_iter()
+        .filter_map(|chunk| {
+            let equal = chunk.iter().position(|token| token.token == Token::Equal)?;
+            let (name, name_offset) = chunk[..equal].iter().find_map(|token| {
+                let Token::Identifier(name) = &token.token else {
+                    return None;
+                };
+                Some((name.clone(), token.offset))
+            })?;
+            Some(SpannedStep { name, name_offset })
+        })
+        .collect()
 }
 
 fn expand_output_columns(tokens: &[Token]) -> Vec<String> {
@@ -655,6 +819,13 @@ fn table_buffer_calls(tokens: &[Token]) -> impl Iterator<Item = (usize, Option<&
 }
 
 fn lex_m(source: &str) -> Vec<Token> {
+    lex_m_spanned(source)
+        .into_iter()
+        .map(|spanned| spanned.token)
+        .collect()
+}
+
+fn lex_m_spanned(source: &str) -> Vec<SpannedToken> {
     let chars = source.chars().collect::<Vec<_>>();
     let mut tokens = Vec::new();
     let mut index = 0;
@@ -679,15 +850,22 @@ fn lex_m(source: &str) -> Vec<Token> {
             index = (index + 2).min(chars.len());
             continue;
         }
+        let token_offset = index;
         if character == '"' {
             let (value, next) = quoted_identifier(&chars, index + 1);
-            tokens.push(Token::String(value));
+            tokens.push(SpannedToken {
+                token: Token::String(value),
+                offset: token_offset,
+            });
             index = next;
             continue;
         }
         if character == '#' && chars.get(index + 1) == Some(&'"') {
             let (name, next) = quoted_identifier(&chars, index + 2);
-            tokens.push(Token::Identifier(name));
+            tokens.push(SpannedToken {
+                token: Token::Identifier(name),
+                offset: token_offset,
+            });
             index = next;
             continue;
         }
@@ -700,7 +878,10 @@ fn lex_m(source: &str) -> Vec<Token> {
                     index += 1;
                 }
                 let word = chars[start..index].iter().collect::<String>();
-                tokens.push(Token::Identifier(format!("#{word}")));
+                tokens.push(SpannedToken {
+                    token: Token::Identifier(format!("#{word}")),
+                    offset: token_offset,
+                });
                 continue;
             }
         }
@@ -723,7 +904,10 @@ fn lex_m(source: &str) -> Vec<Token> {
             if index < chars.len() && matches!(chars[index], 'L' | 'D' | 'M' | 'l' | 'd' | 'm') {
                 index += 1;
             }
-            tokens.push(Token::Number);
+            tokens.push(SpannedToken {
+                token: Token::Number,
+                offset: token_offset,
+            });
             continue;
         }
         if character.is_alphabetic() || character == '_' {
@@ -733,29 +917,56 @@ fn lex_m(source: &str) -> Vec<Token> {
                 index += 1;
             }
             let word = chars[start..index].iter().collect::<String>();
-            tokens.push(match word.as_str() {
+            let token = match word.as_str() {
                 "let" => Token::Let,
                 "in" => Token::In,
                 _ => Token::Identifier(word),
+            };
+            tokens.push(SpannedToken {
+                token,
+                offset: token_offset,
             });
             continue;
         }
-        match character {
-            '=' if chars.get(index + 1) == Some(&'>') => {
-                tokens.push(Token::Arrow);
-                index += 2;
-                continue;
-            }
-            '=' => tokens.push(Token::Equal),
-            ',' => tokens.push(Token::Comma),
-            '(' | '[' | '{' => tokens.push(Token::Open(character)),
-            ')' | ']' | '}' => tokens.push(Token::Close(character)),
-            '.' => tokens.push(Token::Dot),
-            _ => {}
+        if character == '=' && chars.get(index + 1) == Some(&'>') {
+            tokens.push(SpannedToken {
+                token: Token::Arrow,
+                offset: token_offset,
+            });
+            index += 2;
+            continue;
+        }
+        let token = match character {
+            '=' => Some(Token::Equal),
+            ',' => Some(Token::Comma),
+            '(' | '[' | '{' => Some(Token::Open(character)),
+            ')' | ']' | '}' => Some(Token::Close(character)),
+            '.' => Some(Token::Dot),
+            _ => None,
+        };
+        if let Some(token) = token {
+            tokens.push(SpannedToken {
+                token,
+                offset: token_offset,
+            });
         }
         index += 1;
     }
     tokens
+}
+
+fn source_position(source: &str, offset: usize) -> SourcePosition {
+    let mut line = 1;
+    let mut column = 1;
+    for character in source.chars().take(offset) {
+        if character == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    SourcePosition { line, column }
 }
 
 fn quoted_identifier(chars: &[char], mut index: usize) -> (String, usize) {
@@ -778,7 +989,10 @@ fn quoted_identifier(chars: &[char], mut index: usize) -> (String, usize) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Reuse, StepKind, UntypedExpansion, analyze_let_steps, analyze_untyped_expansions};
+    use super::{
+        DuplicateStep, Reuse, SourcePosition, StepKind, UntypedExpansion,
+        analyze_duplicate_step_names, analyze_let_steps, analyze_untyped_expansions,
+    };
     use std::collections::BTreeSet;
 
     #[test]
@@ -947,5 +1161,42 @@ in
     Expanded
 "#;
         assert!(analyze_untyped_expansions(source, &numeric(&["Revenue"])).is_empty());
+    }
+
+    #[test]
+    fn detects_quoted_duplicate_step_in_implicit_final_chunk_and_ignores_text_and_comments() {
+        let source = r#"
+let
+    Source = #table(type table [Value = Int64.Type], {}),
+    #"Final Step" = Source,
+    // #"Final Step" = this is only a comment,
+    Text = "Final Step = this is only a string",
+    #"Final Step" = Text
+in
+    #"Final Step"
+"#;
+
+        assert_eq!(
+            analyze_duplicate_step_names(source),
+            vec![DuplicateStep {
+                step: "Final Step".to_string(),
+                first_position: SourcePosition { line: 4, column: 5 },
+                duplicate_position: SourcePosition { line: 7, column: 5 },
+                first_step_ordinal: 2,
+                duplicate_step_ordinal: 4,
+            }]
+        );
+    }
+
+    #[test]
+    fn does_not_compare_step_names_across_nested_let_scopes() {
+        let source = r#"
+let
+    Value = let Value = 1 in Value,
+    Result = Value
+in
+    Result
+"#;
+        assert!(analyze_duplicate_step_names(source).is_empty());
     }
 }

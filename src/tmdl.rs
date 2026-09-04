@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::rules;
 use crate::safety_scan::{contains_credential_like_text_str, generated_m_table_safety};
 use crate::{CliError, CliResult, ResolvedProject};
@@ -771,7 +772,12 @@ fn encode_handle_component(value: &str) -> String {
 pub(crate) fn partition_source_kind_is_external(source_kind: &str) -> bool {
     matches!(
         source_kind,
-        "postgresqlDatabase" | "sqlDatabase" | "odbcDataSource" | "webContents" | "externalFile"
+        "postgresqlDatabase"
+            | "sqlDatabase"
+            | "odbcDataSource"
+            | "webContents"
+            | "externalFile"
+            | "sharePointFiles"
     )
 }
 
@@ -780,8 +786,7 @@ pub(crate) fn same_name(left: &str, right: &str) -> bool {
 }
 
 pub(crate) fn parse_table_document(path: PathBuf) -> CliResult<TableDocument> {
-    let text = fs::read_to_string(&path)
-        .map_err(|err| CliError::file_not_found(format!("read {}: {err}", path.display())))?;
+    let text = read_utf8(&path, InputKind::ProjectText)?;
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
     let had_final_newline = text.ends_with('\n');
     let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
@@ -1526,6 +1531,13 @@ fn classify_partition_source(
             "partition source uses Odbc.DataSource; replace with dummy #table before home handoff",
         ));
         "odbcDataSource"
+    } else if normalized.contains("sharepoint.files(") {
+        findings.push(partition_finding(
+            rules::PARTITION_REAL_CONNECTOR_SHAREPOINT,
+            "error",
+            "partition source uses SharePoint.Files; replace with dummy #table before home handoff",
+        ));
+        "sharePointFiles"
     } else if normalized.contains("web.contents(") {
         findings.push(partition_finding(
             rules::PARTITION_REAL_CONNECTOR_WEB,

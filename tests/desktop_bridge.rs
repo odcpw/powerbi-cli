@@ -1,3 +1,6 @@
+mod common;
+
+use common::cli_command;
 use serde_json::Value;
 #[cfg(windows)]
 use serde_json::json;
@@ -8,28 +11,22 @@ use std::fs;
 use std::path::Path;
 #[cfg(windows)]
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::Output;
 #[cfg(windows)]
 use walkdir::WalkDir;
 
 const CACHE_ENV: &str = "POWERBI_CLI_MICROSOFT_CACHE_DIR";
 
 fn run_powerbi(args: &[&str], cache: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .env(CACHE_ENV, cache)
-        .output()
-        .expect("run powerbi-cli")
+    cli_command(args).env(CACHE_ENV, cache).output()
 }
 
 #[cfg(all(windows, debug_assertions))]
 fn run_powerbi_with_bridge_timeout(args: &[&str], cache: &Path, timeout_ms: u64) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
+    cli_command(args)
         .env(CACHE_ENV, cache)
         .env("POWERBI_CLI_TEST_BRIDGE_TIMEOUT_MS", timeout_ms.to_string())
         .output()
-        .expect("run powerbi-cli with Bridge timeout")
 }
 
 fn stdout_json(output: &Output) -> Value {

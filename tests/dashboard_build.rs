@@ -1,6 +1,6 @@
 mod common;
 
-use common::{run_powerbi, stdout_json};
+use common::{load_archetype, run_powerbi, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
@@ -73,19 +73,7 @@ fn generic_dashboard_build_validates_handoff_and_matches_golden() {
     assert_eq!(spec_json["compiled"]["counts"]["visuals"], Value::from(3));
     assert_eq!(spec_json["compiled"]["counts"]["bindings"], Value::from(6));
 
-    let build = run_powerbi(&[
-        "report",
-        "build",
-        "--schema",
-        "examples/sales.schema.json",
-        "--profile",
-        &profile_arg,
-        "--spec",
-        "examples/sales.dashboard.json",
-        "--out-dir",
-        &project_arg,
-        "--json",
-    ]);
+    let build = load_archetype("sales").build_into(&project);
     assert_eq!(build.code, 0, "stderr: {}", build.stderr);
     let build_json = stdout_json(&build);
     assert_eq!(
@@ -139,20 +127,17 @@ fn dashboard_build_emits_declared_visual_interactions() {
     let spec_path = temp.path().join("interactions.dashboard.json");
     let project = temp.path().join("interaction_project");
     let project_arg = path_arg(&project);
-    let mut spec: Value = serde_json::from_str(
-        &fs::read_to_string("examples/sales.dashboard.json").expect("sales spec"),
-    )
-    .expect("parse sales spec");
-    spec["pages"][0]["interactions"] = json!([{
-        "source": "customer_detail",
-        "target": "revenue_trend",
-        "type": "DataFilter"
-    }]);
-    fs::write(
-        &spec_path,
-        serde_json::to_vec_pretty(&spec).expect("spec json"),
-    )
-    .expect("write spec");
+    let mut spec = load_archetype("sales")
+        .spec_builder()
+        .set_interactions(
+            "overview",
+            json!([{
+                "source": "customer_detail",
+                "target": "revenue_trend",
+                "type": "DataFilter"
+            }]),
+        )
+        .write_to(&spec_path);
     let spec_arg = path_arg(&spec_path);
 
     let build = run_powerbi(&[
@@ -203,7 +188,7 @@ fn dashboard_build_emits_declared_visual_interactions() {
     ]);
     assert_eq!(invalid.code, 10);
     assert!(
-        stdout_json(&invalid)["errors"][0]
+        stdout_json(&invalid)["errors"][0]["message"]
             .as_str()
             .unwrap_or_default()
             .contains("source visual missing_visual does not exist")
@@ -1180,7 +1165,7 @@ fn dashboard_spec_validate_enforces_visual_binding_contracts() {
     let card_json = stdout_json(&card);
     assert_eq!(card_json["ok"], Value::Bool(false));
     assert!(
-        card_json["errors"][0]
+        card_json["errors"][0]["message"]
             .as_str()
             .unwrap_or_default()
             .contains("exactly one Values")
@@ -1229,7 +1214,7 @@ fn dashboard_spec_validate_enforces_visual_binding_contracts() {
     let scatter_json = stdout_json(&scatter);
     assert_eq!(scatter_json["ok"], Value::Bool(false));
     assert!(
-        scatter_json["errors"][0]
+        scatter_json["errors"][0]["message"]
             .as_str()
             .unwrap_or_default()
             .contains("exactly one X and exactly one Y")
@@ -1398,7 +1383,7 @@ fn dashboard_spec_validate_enforces_new_visual_binding_and_mode_contracts() {
                 .as_array()
                 .expect("validation errors")
                 .iter()
-                .filter_map(Value::as_str)
+                .filter_map(|error| error["message"].as_str())
                 .any(|error| error.contains(expected)),
             "{slug} errors: {}",
             result_json["errors"]

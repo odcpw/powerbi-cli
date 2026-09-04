@@ -1,4 +1,5 @@
 use crate::cli_support::{required_project, shell_arg, take_value};
+use crate::input_safety::{InputKind, read_utf8};
 use crate::inspect::deep_inspect;
 use crate::pbir_bookmarks::{bookmark_record_json, list_report_bookmarks};
 use crate::pbir_filters::{FilterOwner, filter_record_json, list_report_filters};
@@ -9,7 +10,6 @@ use crate::{
     resolve_project, validate_project,
 };
 use serde_json::{Value, json};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -571,8 +571,7 @@ fn raw_for_object(object: &Value, include_raw: bool) -> CliResult<Value> {
             "available": true,
             "kind": "text",
             "path": canonical_display(&path),
-            "text": fs::read_to_string(&path)
-                .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?
+            "text": read_utf8(&path, InputKind::ProjectText)?
         }),
     };
     Ok(raw)

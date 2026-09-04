@@ -69,7 +69,9 @@ Required contract rules:
 ### Foundation
 
 - `version`: report tool and contract version.
-- `capabilities [--for <filter>]`: advertise the live command contract.
+- `capabilities [--for <filter> [--compact]]`: advertise the live command
+  contract; exact compact lookup returns only the command syntax, examples,
+  proof level, follow-up fields, and output schema.
 - `doctor`: detect Power BI Desktop on Windows, report format assumptions, and
   warn about unsupported proof levels.
 - `schema validate|normalize`: validate or canonicalize a data-agnostic schema
@@ -81,11 +83,12 @@ Required contract rules:
   visuals, tables, columns, measures, relationships, and offline hazards.
 - `validate <project|pbip>`: parse required files, validate known schemas, check
   references, detect unsafe files, and report Desktop-proof status if available.
-- `package inspect|extract|import|export-plan`: inspect PBIX/PBIT archives,
+- `package inspect|extract|import|source-pack|work-pack|export-plan`: inspect PBIX/PBIT archives,
   extract safe metadata/source files, import real PBIP/PBIR/TMDL source entries
-  when present, and emit the Desktop export handoff. Binary export/compile/pack
-  remains refused unless a future implementation can prove valid Power BI
-  binary writing without opaque fallbacks.
+  when present, package dummy source projects or credential-free materialized
+  work variants under separate policies, and emit the Desktop export handoff.
+  Binary export/compile/pack remains refused unless a future implementation can
+  prove valid Power BI binary writing without opaque fallbacks.
 
 ### Project Authoring
 
@@ -120,7 +123,12 @@ object-specific writers and fixtures exist.
 ### Report Authoring
 
 - `report spec validate`: check a declarative dashboard spec against the schema
-  and visual catalog before writing files.
+  and visual catalog before writing files. The spec key walker is strict at
+  every supported node and reports `spec.unknown_field` with an RFC 6901
+  pointer; `report spec fields` publishes the same versioned allowed-key
+  tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
+  its not-yet-compiled sections return `unsupported_feature` with their owning
+  T3 bead id.
 - `report build --schema <schema> [--profile <profile>] [--spec <spec>]`:
   compile schema/profile/spec inputs into an offline-safe PBIP project through
   proven scaffold/report primitives.
@@ -194,6 +202,9 @@ validation, proof, then mutation breadth.
   errors.
 - Require generated follow-up commands on every mutation.
 - Keep `skills/powerbi-cli/SKILL.md` aligned with the live binary.
+- Enforce the shared input-surface contract: fixed byte/row/column/depth/count
+  budgets, strict decoding, traversal/symlink refusal, PNG sniffing, and one
+  `input_safety_violation` diagnostic, exposed under `capabilities.limits`.
 - The mutation-mode contract spine is complete: mutating command modules share
   the output-mode type and diagnostic helpers from `src/cli_support.rs`.
 
@@ -237,6 +248,11 @@ validation, proof, then mutation breadth.
   lint, and M lint. `lint --rules` inventories it and `lint --explain
   <rule-id>` returns versioned remediation metadata; the empty design family is
   reserved for the future design-lint implementation.
+- Implemented the error-level `m.duplicate_step_name` M lint rule. It catches
+  duplicate `let` identifiers in partition and named-expression sources,
+  including quoted names and the final step before `in`, reports both source
+  positions, and ignores comments and string literals; triage carries the same
+  finding and remediation path.
 - Implemented warning-only model completeness checks for missing or malformed
   measure formats, visible relationship keys, suspicious both-direction
   fact-to-dimension relationships, and columns unused by report, DAX, or
@@ -288,6 +304,10 @@ validation, proof, then mutation breadth.
 - Implemented static DAX dependencies/lint over stored measures/calculated
   columns. This catches missing/ambiguous references, self references, and
   simple measure cycles, but does not claim engine validation.
+- Implemented `model partitions add-grouped-rank` for the pilot's standard
+  refresh-time ranking pattern: guarded generated partitions only, sort and
+  buffered index per group, zero for ineligible rows, and a final explicit
+  `Int64.Type` conversion.
 - Implemented advanced semantic-model readback inventory for roles,
   perspectives, cultures, and expressions already present in TMDL. Mutation
   remains planned.
@@ -361,8 +381,8 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for CSV and generic M; SQL Server, PostgreSQL,
-  ODBC, and Excel are implemented.
+- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
+  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
@@ -377,7 +397,11 @@ frozen until proven.
 - Extended source templates with typed Excel workbook sheet/table sources. Applying
   an Excel template promotes headers, emits explicit Power Query conversions from
   the table's TMDL column types, and materializes an absolute workbook path.
-  Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file
+- Extended source templates with typed CSV file, folder, and
+  SharePoint/OneDrive path sources. Applying them emits `Csv.Document`,
+  `Folder.Files`, or `SharePoint.Files` M plus explicit TMDL-derived column type
+  conversions; Desktop refresh proof remains pending on Windows.
+  Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
@@ -392,6 +416,10 @@ frozen until proven.
   formatting payloads, applies them by visual type and ordinal, and refuses
   copied literal text unless `--allow-literal-text` is explicit. Field bindings
   and data roles are never copied by style apply.
+- Offline QA synthesis accepts exact `--row-scale` and `--seed` values and
+  passes them to shared M generator functions, so the same seed is
+  byte-deterministic while multiple scales reproduce Desktop refresh cost
+  without live data or credentials.
 - Implemented first filter slice: `report filters list/show` inventories raw
   report/page/visual PBIR filter containers, returns stable filter handles, and
   warns when filter metadata may contain selected semantic-model values.
@@ -483,6 +511,10 @@ frozen until proven.
 - `cargo test --all-targets`
 - Scaffold/inspect/validate smoke tests on Windows, Linux, and macOS.
 - Golden summary tests for checked-in PBIP fixture folders.
+- The offline `tests/e2e.rs` loop covers every checked-in dashboard archetype;
+  `POWERBI_CLI_TEST_LOG=1` makes each step a self-contained JSON log record.
+- Ignored wall-time/resource targets live in `tests/perf.rs` and run in the
+  scheduled Linux performance workflow.
 
 ### Format Tests
 

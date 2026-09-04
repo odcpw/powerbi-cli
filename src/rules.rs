@@ -143,6 +143,7 @@ define_rules! {
     PARTITION_REAL_CONNECTOR_ODBC => ("partition.real_connector.odbc", Handoff, "error", "A partition uses Odbc.DataSource and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
     PARTITION_REAL_CONNECTOR_WEB => ("partition.real_connector.web", Handoff, "error", "A partition uses Web.Contents and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
     PARTITION_REAL_CONNECTOR_FILE => ("partition.real_connector.file", Handoff, "error", "A partition reads an external file and is unsafe for offline handoff.", "Replace it with a generated dummy table before offline handoff.", None),
+    PARTITION_REAL_CONNECTOR_SHAREPOINT => ("partition.real_connector.sharepoint", Handoff, "error", "A partition uses SharePoint.Files and is unsafe for offline handoff.", "Replace it with a generated dummy table for offline use, or audit explicitly for the work target and authenticate only in Power BI Desktop.", None),
     PARTITION_DUMMY_TABLE_SHAPE_UNVERIFIED => ("partition.dummy_table_shape_unverified", Handoff, "warning", "A #table partition does not match the proven generated shape.", "Regenerate the dummy partition from the schema or correct its columns and row arity.", None),
     PARTITION_PII_SUSPECT_LITERAL => ("partition.pii_suspect_literal", Handoff, "warning", "Dummy partition literals may contain personal or long free-text values.", "Replace suspect values with synthetic placeholders before offline handoff.", None),
     PARTITION_SOURCE_UNKNOWN => ("partition.source_unknown", Handoff, "warning", "A partition source is not a recognized safe dummy or supported connector.", "Classify or replace the source explicitly; do not rely on an unknown M expression.", None),
@@ -166,6 +167,7 @@ define_rules! {
     MODEL_KEY_NOT_HIDDEN => ("model.key_not_hidden", Model, "warning", "A relationship endpoint marked as a model key remains visible to report authors.", "Hide relationship key columns with the model column visibility control while leaving the relationship endpoint intact.", None),
     MODEL_RELATIONSHIP_DIRECTION_SUSPECT => ("model.relationship_direction_suspect", Model, "warning", "A many-to-one fact-to-dimension relationship uses both-direction filtering.", "Prefer oneDirection from the fact table to the dimension; use bothDirections only with an explicit, reviewed ambiguity requirement.", None),
     MODEL_COLUMN_UNUSED => ("model.column_unused", Model, "warning", "A model column is not referenced by a visual, measure, or relationship.", "Remove the column or document its intended use; otherwise hide or omit it before handoff to keep the model focused.", None),
+    M_DUPLICATE_STEP_NAME => ("m.duplicate_step_name", M, "error", "An M let expression defines the same step name more than once, which can surface as a cyclic-reference refresh error in Power BI Desktop.", "Rename or remove the duplicate M step; lint reports the first and duplicate source positions, including quoted identifiers, before Desktop handoff.", None),
 }
 
 pub(crate) fn all_rules() -> &'static [RuleDefinition] {
@@ -236,11 +238,13 @@ mod tests {
         RULES, RuleFamily, ensure_finding_ids_registered, rules_for_family, validate_registry,
     };
     use serde_json::json;
+    use std::collections::BTreeSet;
 
     #[test]
     fn every_registered_rule_has_unique_complete_documentation() {
         validate_registry().expect("valid documented registry");
-        assert_eq!(RULES.len(), 62);
+        let unique_ids = RULES.iter().map(|rule| rule.id).collect::<BTreeSet<_>>();
+        assert_eq!(RULES.len(), unique_ids.len());
     }
 
     #[test]

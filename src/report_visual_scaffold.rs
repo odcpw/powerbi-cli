@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, required_project, set_mode_with_contract,
     shell_arg, take_report_value as take_value, target_project,
 };
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 use crate::pbir::{PageRecord, PageSelector, find_page, load_report_snapshot};
 use crate::pbir_visual_factory::SLICER_MIN_HEIGHT;
 use crate::project_io::write_json_atomic;
@@ -11,7 +12,7 @@ use crate::{
 };
 use serde_json::{Map, Value, json};
 use std::fs;
-use std::io::{self, Read};
+use std::io;
 use std::path::{Path, PathBuf};
 
 const VISUAL_CONTAINER_SCHEMA: &str = "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json";
@@ -815,22 +816,15 @@ fn load_paragraphs(options: &ScaffoldOptions) -> CliResult<Vec<String>> {
 }
 
 fn read_paragraphs_source(path: &str) -> CliResult<String> {
-    let bytes = if path == "-" {
-        let mut bytes = Vec::new();
-        io::stdin()
-            .read_to_end(&mut bytes)
-            .map_err(|err| CliError::unexpected(format!("read paragraphs from stdin: {err}")))?;
-        bytes
+    let text = if path == "-" {
+        read_utf8_stream(
+            &mut io::stdin(),
+            InputKind::SourceText,
+            "paragraphs from stdin",
+        )?
     } else {
-        fs::read(path).map_err(|err| {
-            CliError::file_not_found(format!("read paragraphs file {path}: {err}"))
-        })?
+        read_utf8(Path::new(path), InputKind::SourceText)?
     };
-    let text = String::from_utf8(bytes).map_err(|_| {
-        CliError::invalid_args(format!("paragraphs file is not valid UTF-8: {path}"))
-            .with_hint("Save the paragraphs as UTF-8 text and retry.")
-            .with_suggested_command(ScaffoldKind::Textbox.dry_run_command())
-    })?;
     Ok(text.trim_start_matches('\u{feff}').to_string())
 }
 

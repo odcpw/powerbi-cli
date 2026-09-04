@@ -1,18 +1,14 @@
+mod common;
+
+use common::{RunOutput, cli_command};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const ACCEPTANCE_SENTINEL: &str = ".powerbi-acceptance-out";
 const ACCEPTANCE_SENTINEL_CONTENT: &str = "powerbi-cli acceptance harness output\n";
-
-struct RunOutput {
-    code: i32,
-    stdout: String,
-    stderr: String,
-}
 
 struct Harness {
     root: PathBuf,
@@ -144,6 +140,9 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let project = h.root.join("EverythingAcceptance");
     let scaffold_project = h.root.join("ScaffoldSmoke");
     let package = h.root.join("source-bearing-template.pbit");
+    let work_schema = h.root.join("work-pack.schema.json");
+    let work_project = h.root.join("WorkPackAcceptance");
+    let work_package = h.root.join("work-pack-acceptance.pbit");
     let package_extract_dir = h.root.join("package_extract");
     let package_import_dir = h.root.join("package_import");
     let fixture_summary = h.root.join("everything.summary.json");
@@ -158,6 +157,18 @@ fn everything_acceptance_invokes_every_catalog_command() {
 
     write_json(&schema, &acceptance_schema());
     write_json(&spec, &acceptance_dashboard());
+    write_json(
+        &work_schema,
+        &json!({
+            "name": "WorkPackAcceptance",
+            "displayName": "Work Pack Acceptance",
+            "tables": [{
+                "name": "Metrics",
+                "columns": [{"name": "Key", "dataType": "int64", "isKey": true}],
+                "rows": [{"Key": 0}]
+            }]
+        }),
+    );
     fs::write(
         &dax_file,
         "DIVIDE(\n    [Total Cost],\n    [Total Incidents]\n)\n",
@@ -391,6 +402,83 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &p(&package),
             "--json",
         ]),
+    );
+    h.ok(
+        "scaffold",
+        &svec([
+            "scaffold",
+            "--schema",
+            &p(&work_schema),
+            "--out-dir",
+            &p(&work_project),
+            "--json",
+        ]),
+    );
+    h.ok(
+        "source-template add",
+        &svec([
+            "source-template",
+            "add",
+            "--project",
+            &p(&work_project),
+            "--table",
+            "Metrics",
+            "--kind",
+            "sql",
+            "--server",
+            "<server>",
+            "--database",
+            "<database>",
+            "--schema",
+            "dbo",
+            "--object",
+            "Metrics",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "source-template apply",
+        &svec([
+            "source-template",
+            "apply",
+            "--project",
+            &p(&work_project),
+            "--handle",
+            "source-template:Metrics:Metrics",
+            "--server",
+            "db.example.internal",
+            "--database",
+            "analytics",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    let work_pack = h.ok(
+        "package work-pack",
+        &svec([
+            "package",
+            "work-pack",
+            "--project",
+            &p(&work_project),
+            "--out",
+            &p(&work_package),
+            "--json",
+        ]),
+    );
+    assert_eq!(work_pack["packageClass"], "work-package");
+    assert_eq!(
+        work_pack["sourcePolicy"],
+        "recognized-credential-free-materialized-live-partitions-only"
+    );
+    assert!(
+        work_package.is_file(),
+        "work-pack should write into harness root"
+    );
+    fs::remove_file(&work_package).expect("remove disposable work-pack archive");
+    assert!(
+        !work_package.exists(),
+        "acceptance harness must not leave a work-pack archive behind"
     );
     h.ok(
         "package inspect",
@@ -829,6 +917,11 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "partition:FactIncidents:FactIncidents",
             "--json",
         ]),
+    );
+    h.code(
+        "model partitions add-grouped-rank",
+        2,
+        &svec(["model", "partitions", "add-grouped-rank", "--json"]),
     );
     h.ok(
         "model dax bridge-plan",
@@ -2355,16 +2448,7 @@ fn assert_capability_coverage(coverage: &BTreeSet<String>) {
 }
 
 fn run_powerbi(args: &[String]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
+    cli_command(args).env_remove("POWERBI_DESKTOP_ORACLE").run()
 }
 
 fn stdout_json(output: &RunOutput) -> Value {
