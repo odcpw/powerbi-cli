@@ -984,9 +984,13 @@ const FEATURE_CATALOG: &[Feature] = &[
         support: "read-write-layout",
         proof_level: "unit-smoke",
         emits_pbir: true,
-        commands: &["report design-plan", "report layout auto"],
+        commands: &[
+            "report design-plan",
+            "report layout auto",
+            "report wireframe export",
+        ],
         refusal_code: None,
-        reason: "The design planner profiles local TMDL/PBIR metadata and report layout auto resolves the embedded eleven-template twelve-column grid (with page-size and grid overrides), then rewrites only visual position blocks through the shared position mutation boundary with guarded mutation modes.",
+        reason: "The design planner profiles local TMDL/PBIR metadata, report layout auto resolves the embedded eleven-template twelve-column grid (with page-size and grid overrides) and rewrites only visual position blocks through the shared position mutation boundary, and report wireframe export renders the same grid plus deep-inspection geometry as deterministic offline JSON/SVG/HTML previews.",
         next_proof: &[
             "Desktop screenshot fixture to assert generated layouts are visually readable across page sizes",
         ],

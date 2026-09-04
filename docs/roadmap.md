@@ -263,7 +263,8 @@ validation, proof, then mutation breadth.
   partitions, pages, visuals, bindings, filters, themes, proof state, and
   offline hazards.
 - Return stable handles from every inspected object.
-- Add `report wireframe export` as JSON first, HTML/SVG later if useful.
+- Add `report wireframe export` as deterministic JSON plus offline HTML/SVG
+  previews with grid slots, visual geometry, and lint markers.
 - Add `diff` over normalized `inspect --deep` summaries early; semantic diffs
   are how agents verify mutations.
 

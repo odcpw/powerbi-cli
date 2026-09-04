@@ -290,17 +290,26 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report wireframe export",
-            "usage": "powerbi-cli report wireframe export <project-dir-or.pbip> --json",
-            "summary": "Export report pages, visual geometry, bindings, and report handles as JSON without Power BI Desktop",
+            "usage": "powerbi-cli report wireframe export <project-dir-or.pbip> [--format json|svg|html] [--template <name>] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--out <path> | --dry-run] --json",
+            "summary": "Export report pages, deterministic grid slots, visual geometry, bindings, and lint markers as JSON, SVG, or HTML without Power BI Desktop",
             "tags": ["pbir", "report", "wireframe", "layout", "agent"],
-            "readOnly": true,
-            "mutates": false,
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesArtifact": true,
+            "requiresOutput": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
-            "outputSchema": "reportWireframe.v1",
-            "flags": ["--json", "--format json"],
-            "examples": ["powerbi-cli report wireframe export build/sales --json"],
-            "followUpFields": ["handles", "pages", "counts", "next", "warnings", "errors"]
+            "outputSchema": "powerbi-cli.report.wireframe.v2",
+            "outputSchemas": ["powerbi-cli.report.wireframe.v1", "powerbi-cli.report.wireframe.v2"],
+            "flags": ["--format json|svg|html", "--template <name>", "--page-size 1280x720|1920x1080", "--grid <columns=12,gutter=16,margin=24,rowUnit=8>", "--out <path>", "--dry-run", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report wireframe export build/sales --json",
+                "powerbi-cli report wireframe export build/sales --format svg --out proof/sales-wireframe --json",
+                "powerbi-cli report wireframe export build/sales --format html --dry-run --json"
+            ],
+            "followUpFields": ["ok", "format", "dryRun", "mode", "template", "grid", "geometrySource", "gridSource", "handles", "pages[].slots[]", "pages[].visuals[]", "pages[].lintMarkers[]", "artifacts[]", "counts", "next", "warnings", "errors"],
+            "diagnosticCodes": ["input_safety_violation", "invalid_args", "validation_failed"]
         }),
         json!({
             "path": "report layout auto",
