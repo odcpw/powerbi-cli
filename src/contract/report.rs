@@ -272,8 +272,8 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report layout auto",
             "aliases": ["report layouts auto", "report layout arrange"],
-            "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--preset overview|analysis|detail|grid] [--margin <n>] [--gap <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Reposition existing visuals into deterministic responsive canvas slots without changing bindings or formatting",
+            "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting",
             "tags": ["pbir", "report", "layout", "visual", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -282,9 +282,9 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.layout.autoMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--handle <page-handle>", "--preset overview|analysis|detail|grid", "--margin <n>", "--gap <n>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
-            "examples": ["powerbi-cli report layout auto --project build/sales --page page:ReportSectionOverview --preset overview --dry-run --json"],
-            "followUpFields": ["dryRun", "mode", "layoutPlan.pages", "layoutPlan.changedVisuals", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
+            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--handle <page-handle>", "--template <name>", "--preset overview|analysis|detail|grid", "--page-size 1280x720|1920x1080", "--grid <columns=12,gutter=16,margin=24,rowUnit=8>", "--margin <n>", "--gap <n>", "--gutter <n>", "--row-unit <n>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli report layout auto --project build/sales --page page:ReportSectionOverview --template overview --dry-run --json", "powerbi-cli report layout auto --project build/sales --template scatter-focus --page-size 1920x1080 --grid columns=12,gutter=20,margin=32,rowUnit=8 --out-dir build/sales-layout --json"],
+            "followUpFields": ["dryRun", "mode", "layoutPlan.template", "layoutPlan.grid", "layoutPlan.pages", "layoutPlan.changedVisuals", "preview.pages[].template", "preview.pages[].slots[]", "preview.pages[].assignments[]", "preview.pages[].invariants", "warnings[].code", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "report pages list",
