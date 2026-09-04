@@ -1,3 +1,4 @@
+use crate::input_safety::{INPUT_SAFETY_ERROR_CODE, InputKind, read_utf8};
 use crate::partitions::partition_summary_json;
 use crate::rebind_plan::rebind_plan;
 use crate::rules;
@@ -13,7 +14,6 @@ use crate::{
     resolve_project, validate_project,
 };
 use serde_json::{Value, json};
-use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -417,7 +417,7 @@ fn add_project_file_hazards(
             }));
         }
         if is_handoff_text_file(&relative) {
-            match fs::read_to_string(path) {
+            match read_utf8(path, InputKind::ProjectText) {
                 Ok(text) => {
                     if contains_credential_like_text_str(&text) {
                         findings.push(json!({
@@ -438,10 +438,11 @@ fn add_project_file_hazards(
                         }));
                     }
                 }
+                Err(err) if err.code == INPUT_SAFETY_ERROR_CODE => return Err(err),
                 Err(err) => findings.push(json!({
                     "code": rules::HANDOFF_TEXT_SCAN_FAILED,
                     "severity": "error",
-                    "message": format!("could not read handoff text file {relative}: {err}"),
+                    "message": format!("could not read handoff text file {relative}: {}", err.message),
                     "handle": Value::Null,
                     "path": canonical_display(path)
                 })),

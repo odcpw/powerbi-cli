@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8, validate_text};
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::project_io::write_json_pretty;
 use crate::report_build::compile_dashboard_summary;
@@ -5,7 +6,6 @@ use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{CliError, CliResult, EXIT_SUCCESS, canonical_display, command_arg};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -558,6 +558,7 @@ fn load_optional_profile(path: Option<&Path>) -> CliResult<Option<Value>> {
 
 fn load_intent_text(intent: Option<&str>, objective: Option<&str>) -> CliResult<String> {
     if let Some(objective) = objective.filter(|value| !value.trim().is_empty()) {
+        validate_text(objective, InputKind::Intent)?;
         return Ok(objective.trim().to_string());
     }
     let Some(intent) = intent.filter(|value| !value.trim().is_empty()) else {
@@ -571,10 +572,9 @@ fn load_intent_text(intent: Option<&str>, objective: Option<&str>) -> CliResult<
     };
     let path = Path::new(intent);
     if path.is_file() {
-        return fs::read_to_string(path).map_err(|err| {
-            CliError::file_not_found(format!("read intent {}: {err}", path.display()))
-        });
+        return read_utf8(path, InputKind::Intent);
     }
+    validate_text(intent, InputKind::Intent)?;
     Ok(intent.to_string())
 }
 

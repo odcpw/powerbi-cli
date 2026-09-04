@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes,
 };
+use crate::input_safety::{InputKind, read_utf8};
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
     slicer_between_data_type_is_supported,
@@ -16,7 +17,6 @@ use crate::{
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -1378,9 +1378,12 @@ fn load_optional_value(path: Option<&Path>, label: &str) -> CliResult<Option<Val
 }
 
 fn load_json_value(path: &Path, label: &str) -> CliResult<Value> {
-    let text = fs::read_to_string(path).map_err(|err| {
-        CliError::file_not_found(format!("read {label} {}: {err}", path.display()))
-    })?;
+    let kind = if label == "dashboard spec" {
+        InputKind::DashboardSpec
+    } else {
+        InputKind::JsonArtifact
+    };
+    let text = read_utf8(path, kind)?;
     serde_json::from_str(&text)
         .map_err(|err| CliError::invalid_args(format!("parse {label} {}: {err}", path.display())))
 }

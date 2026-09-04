@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::rules;
 use crate::tmdl::{ColumnRecord, load_table_documents};
 use crate::{CliError, CliResult, ResolvedProject, canonical_display};
@@ -206,8 +207,7 @@ fn load_named_m_expressions(semantic_model_dir: &Path) -> CliResult<Vec<NamedMEx
 
     let mut expressions = Vec::new();
     for path in paths {
-        let text = fs::read_to_string(&path)
-            .map_err(|error| CliError::unexpected(format!("read {}: {error}", path.display())))?;
+        let text = read_utf8(&path, InputKind::ProjectText)?;
         let lines = text.lines().collect::<Vec<_>>();
         let starts = lines
             .iter()

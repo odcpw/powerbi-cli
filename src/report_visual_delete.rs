@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, required_project_with_suggestion,
     set_mode_with_contract, shell_arg, take_report_value as take_value, target_project,
 };
+use crate::input_safety::{InputKind, read_bytes};
 use crate::pbir::{VisualSelector, find_visual, load_report_snapshot, visual_detail};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
@@ -87,12 +88,7 @@ pub(crate) fn delete_visual(args: &[String]) -> CliResult<Value> {
 }
 
 fn remove_visual_container(visual_path: &Path, visual_dir: &Path) -> CliResult<()> {
-    let original_visual = fs::read(visual_path).map_err(|err| {
-        CliError::unexpected(format!(
-            "read visual file before deletion {}: {err}",
-            visual_path.display()
-        ))
-    })?;
+    let original_visual = read_bytes(visual_path, InputKind::JsonArtifact)?;
     let original_permissions = prepare_visual_dir_for_removal(visual_dir)?;
 
     if let Err(err) = fs::remove_file(visual_path) {

@@ -1,5 +1,6 @@
 //! Native PBIP, PBIR, and TMDL project validation.
 
+use crate::input_safety::{InputKind, read_bytes, read_utf8};
 use crate::pbir_bindings::visual_query_state_errors;
 use crate::pbir_visual_factory::{BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT};
 use crate::{
@@ -380,8 +381,7 @@ fn is_json_like(path: &Path) -> bool {
 }
 
 fn has_utf8_bom(path: &Path) -> CliResult<bool> {
-    let bytes = fs::read(path)
-        .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+    let bytes = read_bytes(path, InputKind::ProjectText)?;
     Ok(bytes.starts_with(&[0xEF, 0xBB, 0xBF]))
 }
 
@@ -1198,8 +1198,7 @@ fn check_semantic_model(
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) == Some("tmdl") {
             report.tables += 1;
-            let text = fs::read_to_string(&path)
-                .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+            let text = read_utf8(&path, InputKind::ProjectText)?;
             report.measures += text
                 .lines()
                 .filter(|line| line.trim_start().starts_with("measure "))
@@ -1275,8 +1274,7 @@ fn check_variation_references(
         .collect::<BTreeSet<_>>();
     let mut hierarchy_names = BTreeMap::<String, BTreeSet<String>>::new();
     for table in tables {
-        let text = fs::read_to_string(&table.path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", table.path.display())))?;
+        let text = read_utf8(&table.path, InputKind::ProjectText)?;
         let names = text
             .lines()
             .filter_map(|line| line.trim().strip_prefix("hierarchy "))
@@ -1287,8 +1285,7 @@ fn check_variation_references(
     }
 
     for table in tables {
-        let text = fs::read_to_string(&table.path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", table.path.display())))?;
+        let text = read_utf8(&table.path, InputKind::ProjectText)?;
         for (index, line) in text.lines().enumerate() {
             let trimmed = line.trim();
             if let Some(value) = trimmed.strip_prefix("relationship:") {

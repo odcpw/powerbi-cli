@@ -20,6 +20,7 @@ mod fixture;
 mod guid_util;
 mod handoff;
 mod help;
+mod input_safety;
 mod inspect;
 mod json_io;
 mod lint;

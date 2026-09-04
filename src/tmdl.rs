@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::rules;
 use crate::safety_scan::{contains_credential_like_text_str, generated_m_table_safety};
 use crate::{CliError, CliResult, ResolvedProject};
@@ -785,8 +786,7 @@ pub(crate) fn same_name(left: &str, right: &str) -> bool {
 }
 
 pub(crate) fn parse_table_document(path: PathBuf) -> CliResult<TableDocument> {
-    let text = fs::read_to_string(&path)
-        .map_err(|err| CliError::file_not_found(format!("read {}: {err}", path.display())))?;
+    let text = read_utf8(&path, InputKind::ProjectText)?;
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
     let had_final_newline = text.ends_with('\n');
     let normalized = text.replace("\r\n", "\n").replace('\r', "\n");

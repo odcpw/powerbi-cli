@@ -3,6 +3,7 @@ use crate::cli_support::{
     target_project,
 };
 use crate::handoff::handoff_command;
+use crate::input_safety::{InputKind, read_bytes};
 use crate::lint::lint_project;
 use crate::pbir_bookmarks::{bookmark_record_json, list_report_bookmarks};
 use crate::pbir_filters::{
@@ -1010,8 +1011,7 @@ fn project_fingerprint(resolved: &ResolvedProject) -> CliResult<String> {
                 .unwrap_or(path)
                 .to_string_lossy()
                 .replace('\\', "/");
-            let bytes = fs::read(path)
-                .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+            let bytes = read_bytes(path, InputKind::ProjectText)?;
             inputs.push((relative, bytes));
         }
     }

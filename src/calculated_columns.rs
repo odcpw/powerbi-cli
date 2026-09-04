@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
 };
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 use crate::project_io::write_text_atomic_validated;
 use crate::tmdl::{
     CalculatedColumnDefinition, ColumnRecord, ColumnSelector, MutationPlan, TableDocument,
@@ -12,9 +13,8 @@ use crate::{
     resolve_project, validate_project,
 };
 use serde_json::{Value, json};
-use std::fs;
-use std::io::{self, Read};
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 pub(crate) fn calculated_columns_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
@@ -684,15 +684,13 @@ fn require_selector(selector: &ColumnSelector, action: &str) -> CliResult<()> {
 
 fn read_expression_file(path: &str) -> CliResult<String> {
     let text = if path == "-" {
-        let mut text = String::new();
-        io::stdin()
-            .read_to_string(&mut text)
-            .map_err(|err| CliError::unexpected(format!("read expression from stdin: {err}")))?;
-        text
+        read_utf8_stream(
+            &mut io::stdin(),
+            InputKind::SourceText,
+            "expression from stdin",
+        )?
     } else {
-        fs::read_to_string(path).map_err(|err| {
-            CliError::file_not_found(format!("read expression file {path}: {err}"))
-        })?
+        read_utf8(Path::new(path), InputKind::SourceText)?
     };
     let expression = text
         .trim_start_matches('\u{feff}')
