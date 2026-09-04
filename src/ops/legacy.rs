@@ -285,8 +285,18 @@ fn append_one(args: &mut Vec<String>, flag: &str, value: &Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ops::{OpPlan, ProjectIndex, kernel_for};
+    use crate::ops::{OpPlan, PageKernel, ProjectIndex, kernel_for};
+    use crate::{ResolvedProject, resolve_project, scaffold_schema_value};
     use serde_json::json;
+    use std::path::Path;
+
+    fn scaffold(root: &Path) -> ResolvedProject {
+        let schema = serde_json::from_str(include_str!("../../examples/sales.schema.json"))
+            .expect("sales schema");
+        scaffold_schema_value(schema, Path::new("examples/sales.schema.json"), root, false)
+            .expect("scaffold project");
+        resolve_project(root).expect("resolve project")
+    }
 
     #[test]
     fn parser_canonicalizes_repeated_flags_and_excludes_project_transport() {
@@ -328,9 +338,12 @@ mod tests {
             Op::AddStaticTable(payload.clone()),
             Op::SetSortBy(payload.clone()),
             Op::SourceTemplateApply(payload.clone()),
-            // The remaining operation variants are added to the registry in
-            // their child commits; this first commit proves the shared
-            // envelope and model-family registrations.
+            Op::AddPage(payload.clone()),
+            Op::UpdatePage(payload.clone()),
+            Op::ReorderPages(payload.clone()),
+            Op::SetActivePage(payload.clone()),
+            Op::DeleteEmptyPage(payload.clone()),
+            Op::ClonePage(payload),
         ];
         for operation in operations {
             let value = serde_json::to_value(&operation).expect("serialize operation");
@@ -372,5 +385,38 @@ mod tests {
             kernel_for(&Op::AddStaticTable(MutationPayload::default())).is_some(),
             true
         );
+    }
+
+    #[test]
+    fn page_kernel_applies_existing_writer_to_transaction_copy() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let project = scaffold(&temp.path().join("project"));
+        let args = [
+            "--display-name",
+            "Operations",
+            "--name",
+            "ReportSectionOperations",
+            "--dry-run",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+        let (payload, _) = parse_args(&args).expect("parse page add");
+        let operation = Op::AddPage(payload);
+        let index = ProjectIndex::from_project(&project).expect("project index");
+        let plan = OpPlan::new(vec![operation]);
+        let validated = plan.validate(&index).expect("valid page plan");
+        let mut transaction = Transaction::begin(project).expect("transaction");
+        let mut kernel = PageKernel;
+        let receipt = transaction
+            .apply_all(&validated, &mut kernel)
+            .expect("apply");
+        assert!(receipt.outcomes[0].changed);
+        assert!(!receipt.outcomes[0].changes.is_empty());
+        assert!(receipt.outcomes[0]
+            .readback
+            .iter()
+            .all(|command| !command.contains(transaction.work_dir().to_string_lossy().as_ref())));
+        assert!(!receipt.changes.is_empty());
     }
 }

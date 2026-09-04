@@ -24,6 +24,7 @@ mod handles;
 mod io;
 mod legacy;
 mod model_kernels;
+mod page_kernels;
 mod plan;
 mod set_interaction;
 mod transaction;
@@ -47,6 +48,7 @@ pub(crate) use handles::*;
 pub(crate) use io::*;
 pub(crate) use legacy::*;
 pub(crate) use model_kernels::*;
+pub(crate) use page_kernels::*;
 pub(crate) use plan::*;
 pub(crate) use set_interaction::*;
 #[allow(unused_imports)]
@@ -83,8 +85,8 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         | Op::ReorderPages(_)
         | Op::SetActivePage(_)
         | Op::DeleteEmptyPage(_)
-        | Op::ClonePage(_)
-        | Op::SetBindings(_)
+        | Op::ClonePage(_) => Some(Box::new(PageKernel)),
+        Op::SetBindings(_)
         | Op::SetDisplayName(_)
         | Op::SetTopNGuard(_)
         | Op::SetDrilldownHierarchy(_)
