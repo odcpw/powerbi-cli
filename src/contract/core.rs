@@ -291,6 +291,14 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         return Ok(compact_capability(&command));
     }
     let focused = filter.is_some();
+    // Focused discovery still needs the proof vocabulary and recorded fixture
+    // catalog when an agent asks specifically about Desktop.  Keep those
+    // larger, unrelated catalogs out of other focused queries (for example
+    // `validate`) so the bounded focused response remains useful and stable.
+    let desktop_scope = filter.as_deref().is_some_and(|value| {
+        let value = value.trim().to_ascii_lowercase();
+        value == "desktop" || value.starts_with("desktop ")
+    });
     let mut commands = command_catalog();
     if let Some(filter) = &filter {
         commands.retain(|command| command_matches_filter(command, filter));
@@ -337,10 +345,23 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "commands": commands,
         "schemaManifest": if focused { Value::Null } else { schema_manifest() },
         "generatedVisualContract": if focused { Value::Null } else { generated_visual_contract() },
-        "desktopProofedArchetypes": if focused { Value::Null } else { desktop_proofed_archetypes() },
+        "desktopProofedArchetypes": if !focused || desktop_scope {
+            desktop_proofed_archetypes()
+        } else {
+            Value::Null
+        },
         "formatTargets": if focused { Value::Null } else { format_targets() },
         "omittedCatalogs": if focused {
-            json!(["responseShapes", "schemaManifest", "generatedVisualContract", "desktopProofedArchetypes", "formatTargets"])
+            let mut omitted = vec![
+                "responseShapes",
+                "schemaManifest",
+                "generatedVisualContract",
+            ];
+            if !desktop_scope {
+                omitted.push("desktopProofedArchetypes");
+            }
+            omitted.push("formatTargets");
+            json!(omitted)
         } else {
             json!([])
         },
@@ -353,7 +374,11 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         // needed for the requested family, while broad explanatory catalogs
         // stay on the full capabilities surface so focused JSON remains
         // bounded as the command catalog grows.
-        "proofLevels": if focused { Value::Null } else { json!(proof_levels()) },
+        "proofLevels": if !focused || desktop_scope {
+            json!(proof_levels())
+        } else {
+            Value::Null
+        },
         "architectureGuardrails": if focused { Value::Null } else { json!(architecture_guardrails()) },
         "designRules": if focused { Value::Null } else { json!(design_rules()) }
     }))
