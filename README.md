@@ -171,6 +171,7 @@ machine-readable contract is available at `capabilities.responseShapes`.
 ```powershell
 cargo build --bin powerbi-cli
 cargo run --bin powerbi-cli -- --json capabilities
+cargo run --bin powerbi-cli -- --json capabilities --for "report build" --compact
 ```
 
 The CLI is pure Rust and should compile on Windows, Linux, and macOS. Power BI

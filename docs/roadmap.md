@@ -66,7 +66,9 @@ Required contract rules:
 ### Foundation
 
 - `version`: report tool and contract version.
-- `capabilities [--for <filter>]`: advertise the live command contract.
+- `capabilities [--for <filter> [--compact]]`: advertise the live command
+  contract; exact compact lookup returns only the command syntax, examples,
+  proof level, follow-up fields, and output schema.
 - `doctor`: detect Power BI Desktop on Windows, report format assumptions, and
   warn about unsupported proof levels.
 - `schema validate|normalize`: validate or canonicalize a data-agnostic schema

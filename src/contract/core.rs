@@ -53,7 +53,7 @@ pub(crate) fn help_text() -> String {
 Usage:
   powerbi-cli version --json
   powerbi-cli triage <project-dir-or.pbip> --json
-  powerbi-cli --json capabilities [--for <filter>]
+  powerbi-cli --json capabilities [--for <filter> [--compact]]
   powerbi-cli features list [--for <feature-filter>] --json
   powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json
   powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json
@@ -230,7 +230,36 @@ pub(crate) fn help_json() -> Value {
 }
 
 pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
-    let filter = parse_filter(args, "capabilities")?;
+    let options = parse_capabilities_options(args)?;
+    let filter = options.filter;
+    if options.compact {
+        let exact_path = filter.as_deref().ok_or_else(|| {
+            CliError::invalid_args("capabilities --compact requires --for <exact-path>")
+                .with_hint("Pass the exact canonical command path shown by capabilities.")
+                .with_suggested_command(
+                    "powerbi-cli --json capabilities --for <exact-path> --compact",
+                )
+        })?;
+        let command = command_catalog()
+            .into_iter()
+            .find(|command| {
+                command["path"]
+                    .as_str()
+                    .is_some_and(|path| path.eq_ignore_ascii_case(exact_path))
+            })
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "no command has the exact canonical path `{exact_path}`"
+                ))
+                .with_hint(
+                    "Run focused capabilities without --compact to search paths, summaries, and tags.",
+                )
+                .with_suggested_command(format!(
+                    "powerbi-cli --json capabilities --for \"{exact_path}\""
+                ))
+            })?;
+        return Ok(compact_capability(&command));
+    }
     let focused = filter.is_some();
     let mut commands = command_catalog();
     if let Some(filter) = &filter {
@@ -484,8 +513,15 @@ pub(crate) fn robot_triage() -> Value {
     })
 }
 
-fn parse_filter(args: &[String], command: &str) -> CliResult<Option<String>> {
+#[derive(Debug, Default, PartialEq, Eq)]
+struct CapabilitiesOptions {
+    filter: Option<String>,
+    compact: bool,
+}
+
+fn parse_capabilities_options(args: &[String]) -> CliResult<CapabilitiesOptions> {
     let mut filter = None;
+    let mut compact = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -497,16 +533,40 @@ fn parse_filter(args: &[String], command: &str) -> CliResult<Option<String>> {
                 );
                 i += 2;
             }
+            "--compact" => {
+                compact = true;
+                i += 1;
+            }
             other => {
-                return Err(CliError::invalid_args(format!("unknown {command} flag: {other}"))
-                    .with_hint(format!(
-                        "Run `powerbi-cli --json {command}` or `powerbi-cli --json {command} --for <filter>`."
-                    ))
-                    .with_suggested_command(format!("powerbi-cli --json {command}")));
+                return Err(CliError::invalid_args(format!(
+                    "unknown capabilities flag: {other}"
+                ))
+                    .with_hint(
+                        "Run `powerbi-cli --json capabilities` or `powerbi-cli --json capabilities --for <filter> [--compact]`.",
+                    )
+                    .with_suggested_command("powerbi-cli --json capabilities"));
             }
         }
     }
-    Ok(filter)
+    Ok(CapabilitiesOptions { filter, compact })
+}
+
+fn compact_capability(command: &Value) -> Value {
+    let fields = [
+        "path",
+        "usage",
+        "flags",
+        "examples",
+        "proofLevel",
+        "followUpFields",
+        "outputSchema",
+    ];
+    Value::Object(
+        fields
+            .into_iter()
+            .map(|field| (field.to_string(), command[field].clone()))
+            .collect(),
+    )
 }
 
 fn command_matches_filter(command: &Value, filter: &str) -> bool {
@@ -582,16 +642,16 @@ pub(crate) fn command_catalog() -> Vec<Value> {
     let mut commands = vec![
         json!({
             "path": "capabilities",
-            "usage": "powerbi-cli --json capabilities [--for <filter>]",
-            "summary": "List the agent-facing command contract; focused queries omit unrelated large catalogs",
+            "usage": "powerbi-cli --json capabilities [--for <filter> [--compact]]",
+            "summary": "List the agent-facing command contract; focused queries omit unrelated large catalogs and exact compact queries return one minimal command record",
             "tags": ["agent", "discovery", "contract"],
             "readOnly": true,
             "mutates": false,
             "stability": "stable-shape",
             "proofLevel": "unit-smoke",
-            "outputSchema": "capabilities.v1",
-            "flags": ["--for <filter>", "--json", "--format json"],
-            "examples": ["powerbi-cli --json capabilities", "powerbi-cli capabilities --json --for scaffold"],
+            "outputSchema": "capabilities.v1 | capabilities.compact.v1",
+            "flags": ["--for <filter>", "--compact", "--json", "--format json"],
+            "examples": ["powerbi-cli --json capabilities", "powerbi-cli capabilities --json --for scaffold", "powerbi-cli --json capabilities --for \"report build\" --compact"],
             "followUpFields": ["scope", "commands[].usage", "commands[].examples", "exitCodes", "omittedCatalogs", "fullContractCommand", "schemaManifest"]
         }),
         json!({
@@ -1233,6 +1293,12 @@ fn proof_levels() -> Vec<Value> {
 
 fn response_shapes() -> Value {
     json!({
+        "capabilities.compact.v1": {
+            "appliesTo": "capabilities --for <exact-path> --compact",
+            "exactPathRequired": true,
+            "fields": ["path", "usage", "flags", "examples", "proofLevel", "followUpFields", "outputSchema"],
+            "additionalFields": false
+        },
         "success": {
             "transport": "stdout",
             "familySpecific": true,
@@ -1292,6 +1358,30 @@ fn design_rules() -> Vec<&'static str> {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn compact_capabilities_options_accept_either_flag_order() {
+        for args in [
+            vec![
+                "--for".to_string(),
+                "report build".to_string(),
+                "--compact".to_string(),
+            ],
+            vec![
+                "--compact".to_string(),
+                "--for".to_string(),
+                "report build".to_string(),
+            ],
+        ] {
+            assert_eq!(
+                parse_capabilities_options(&args).expect("compact options"),
+                CapabilitiesOptions {
+                    filter: Some("report build".to_string()),
+                    compact: true,
+                }
+            );
+        }
+    }
 
     #[test]
     fn proof_level_vocabulary_is_ordered_and_closed_across_catalogs() {

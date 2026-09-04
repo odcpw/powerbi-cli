@@ -95,19 +95,19 @@ pbi --json capabilities
 pbi features list --json
 pbi features list --for unsupported --json
 pbi features list --for drillthrough --json
-pbi --json capabilities --for scaffold
+pbi --json capabilities --for scaffold --compact
 pbi --json capabilities --for schema
 pbi --json capabilities --for profile
-pbi --json capabilities --for "report build"
+pbi --json capabilities --for "report build" --compact
 pbi --json capabilities --for "report spec"
-pbi --json capabilities --for inspect
-pbi --json capabilities --for validate
-pbi --json capabilities --for lint
-pbi --json capabilities --for diff
+pbi --json capabilities --for inspect --compact
+pbi --json capabilities --for validate --compact
+pbi --json capabilities --for lint --compact
+pbi --json capabilities --for diff --compact
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
-pbi --json capabilities --for "model dax execute"
-pbi --json capabilities --for "model live export-tmdl"
+pbi --json capabilities --for "model dax execute" --compact
+pbi --json capabilities --for "model live export-tmdl" --compact
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
@@ -126,6 +126,9 @@ A focused `--for` response returns the matching commands and small shared
 contract fields. It deliberately leaves the large unrelated schema/visual
 catalogs null and names them in `omittedCatalogs`; run the returned
 `fullContractCommand` only when those catalogs are actually needed.
+When the canonical command path is already known exactly, append `--compact`
+to receive only its path, usage, flags, examples, proof level, follow-up fields,
+and output schema.
 
 Key live surfaces include package inspect/extract/import/source-pack/export-plan,
 schema validate/normalize, profile
