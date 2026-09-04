@@ -930,7 +930,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: true,
         commands: &["report design-plan", "report layout auto"],
         refusal_code: None,
-        reason: "The design planner profiles local TMDL/PBIR metadata and auto-layout rewrites only visual position blocks with guarded mutation modes.",
+        reason: "The design planner profiles local TMDL/PBIR metadata and report layout auto resolves the embedded eleven-template twelve-column grid (with page-size and grid overrides), then rewrites only visual position blocks through the shared position mutation boundary with guarded mutation modes.",
         next_proof: &[
             "Desktop screenshot fixture to assert generated layouts are visually readable across page sizes",
         ],

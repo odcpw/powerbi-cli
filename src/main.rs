@@ -9,6 +9,7 @@ mod cli_support;
 mod contract;
 mod dashboard_scaffold;
 mod dax_execute;
+mod design;
 mod desktop;
 mod desktop_proof;
 mod desktop_session;

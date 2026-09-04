@@ -1876,7 +1876,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["report", "wireframe", "export", &project_arg, "--json"]),
     );
     write_json(&wireframe, &wireframe_json);
-    h.ok(
+    let layout_json = h.ok(
         "report layout auto",
         &svec([
             "report",
@@ -1886,11 +1886,21 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &project_arg,
             "--page",
             &visual_catalog,
-            "--preset",
-            "grid",
+            "--template",
+            "kpi-strip-trend-breakdown",
             "--in-place",
             "--json",
         ]),
+    );
+    assert_eq!(layout_json["ok"], Value::Bool(true));
+    assert_eq!(layout_json["preview"]["svg"], Value::Bool(false));
+    assert_eq!(
+        layout_json["preview"]["pages"][0]["template"]["name"],
+        Value::from("kpi-strip-trend-breakdown")
+    );
+    assert_eq!(
+        layout_json["preview"]["pages"][0]["invariants"]["overlapFree"],
+        Value::Bool(true)
     );
     h.ok(
         "report design-plan",

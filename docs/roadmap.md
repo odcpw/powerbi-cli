@@ -507,7 +507,14 @@ frozen until proven.
   selectors and conditional-formatting authoring remain Desktop-fixture gated.
 - Implemented first design/layout slices: `report design-plan` profiles local
   TMDL/PBIR metadata and emits agent-ready visual commands; `report layout auto`
-  rewrites only visual `position` blocks; `report drilldown set-hierarchy`
+  now resolves a deterministic twelve-column grid through named templates
+  (`overview`, `time-series`, `ranking`, `distribution`, `comparison`,
+  `detail-table`, `drillthrough-detail`, `exception-list`, `matrix-focus`,
+  `scatter-focus`, and `kpi-strip-trend-breakdown`), returning slot assignments
+  and SVG-free JSON previews with overlap/minimum-size invariants while
+  rewriting only visual `position` blocks; standard and wide page-size presets
+  plus explicit grid overrides are supported, and legacy `--preset` values map
+  to the corresponding named templates. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
 

@@ -173,7 +173,7 @@ pbi report query --project build/sales --selector kind:visual --json
 pbi report audit --project build/sales --json
 pbi report sanitize plan --project build/sales --json
 pbi report sanitize apply --project build/sales --dry-run --json
-pbi report layout auto --project build/sales --page page:ReportSectionOverview --preset overview --dry-run --json
+pbi report layout auto --project build/sales --page page:ReportSectionOverview --template overview --dry-run --json
 pbi report pages show --project build/sales --handle page:ReportSectionOverview --json
 pbi report pages clone --project build/sales --from page:ReportSectionOverview --new-name ReportSectionOverviewCopy --visual-prefix Copy --dry-run --json
 pbi report drillthrough show --project build/sales --page page:ReportSectionOverview --json
@@ -194,6 +194,18 @@ pbi report visuals set-topn-guard --project build/sales --handle <visual-handle>
 pbi report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
 pbi report visuals set-display-name --project build/sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 ```
+
+`report layout auto --template` uses the deterministic twelve-column design
+grid and eleven named page templates: `overview`, `time-series`, `ranking`,
+`distribution`, `comparison`, `detail-table`, `drillthrough-detail`,
+`exception-list`, `matrix-focus`, `scatter-focus`, and
+`kpi-strip-trend-breakdown`. Each template supplies named slots, preferred
+visual families, and minimum-size diagnostics. The command returns an
+SVG-free JSON preview with overlap/minimum-size invariants and accepts standard
+(1280x720), wide (1920x1080), or explicit `--page-size` and `--grid` values;
+mutations support `--dry-run`, `--out-dir`, and guarded `--in-place`. Legacy
+`--preset overview|analysis|detail|grid` values remain aliases for the named
+templates.
 
 A focused `--for` response returns the matching commands and small shared
 contract fields. It deliberately leaves the large unrelated schema/visual
