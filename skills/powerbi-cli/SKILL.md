@@ -105,6 +105,7 @@ pbi --json capabilities --for validate
 pbi --json capabilities --for lint
 pbi lint --rules --json
 pbi lint --explain dax.reference_self --json
+pbi lint --explain m.duplicate_step_name --json
 pbi --json capabilities --for diff
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
@@ -437,6 +438,14 @@ Use `inspect --deep` before report or model edits. It returns tables, columns,
 measures, relationships, pages, visuals, bindings,
 handles, hazards, and proof status.
 
+M lint reports `m.duplicate_step_name` as an error when a partition or named
+expression defines the same `let` step identifier more than once. Quoted
+identifiers and the final step before `in` are included; comments and string
+literals are ignored. Each finding includes the first and duplicate one-based
+source positions. Use `pbi lint --explain m.duplicate_step_name --json` for the
+remediation contract, then rename or remove the duplicate before opening the
+project in Desktop.
+
 ### Repair And Verify An Existing Dashboard
 
 Use the exact command paths below instead of guessing shortened families:
@@ -447,6 +456,7 @@ pbi --json model dax dependencies --project build/sales
 pbi --json model dax lint --project build/sales
 pbi --json lint --rules
 pbi --json lint --explain dax.reference_self
+pbi --json lint --explain m.duplicate_step_name
 pbi --json report wireframe export build/sales
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales

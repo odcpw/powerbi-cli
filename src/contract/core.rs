@@ -886,7 +886,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "path": "lint",
             "usage": "powerbi-cli lint (<project-dir-or.pbip> | --rules | --explain <rule-id>) --json",
             "summary": "Run typed PBIP/PBIR/TMDL quality checks or inspect the canonical lint and audit rule registry",
-            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "expansion", "agent"],
+            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "expansion", "duplicate-steps", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
@@ -902,9 +902,10 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "diagnosticCodes": crate::rules::rule_ids(),
             "limitations": [
                 "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps. It fires only for table-producing step kinds `other` and `tableLiteral`, plus `navigation` steps that can be expensive. Function definitions (`(args) =>` / `each`), scalar literals, record literals, and list literals are classified via `stepKind` and suppressed. It does not prove folding or refresh performance and never fails validation by itself.",
-                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`."
+                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`.",
+                "m.duplicate_step_name is a syntax error over partition and named-expression M let steps. It reports the first and duplicate one-based source line/column positions, including quoted identifiers and the final step before `in`; comments and string literals are ignored. Rename or remove the duplicate before opening the project in Desktop."
             ],
-            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
+            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "findings[].firstPosition", "findings[].duplicatePosition", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
         }),
         json!({
             "path": "diff",

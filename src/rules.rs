@@ -161,6 +161,7 @@ define_rules! {
     HANDOFF_CREDENTIAL_LIKE_TEXT => ("handoff.credential_like_text", Handoff, "error", "A handoff text file contains credential-like content.", "Remove or redact credentials and configure authentication only on the locked-down machine.", None),
     HANDOFF_PII_SUSPECT_TEXT => ("handoff.pii_suspect_text", Handoff, "warning", "A handoff text file contains PII-suspect row literals.", "Review and replace possible real rows with synthetic values.", None),
     HANDOFF_TEXT_SCAN_FAILED => ("handoff.text_scan_failed", Handoff, "error", "A handoff text file could not be read for safety scanning.", "Restore readable source text or remove the unreadable file before handoff.", None),
+    M_DUPLICATE_STEP_NAME => ("m.duplicate_step_name", M, "error", "An M let expression defines the same step name more than once, which can surface as a cyclic-reference refresh error in Power BI Desktop.", "Rename or remove the duplicate M step; lint reports the first and duplicate source positions, including quoted identifiers, before Desktop handoff.", None),
 }
 
 pub(crate) fn all_rules() -> &'static [RuleDefinition] {
@@ -235,7 +236,7 @@ mod tests {
     #[test]
     fn every_registered_rule_has_unique_complete_documentation() {
         validate_registry().expect("valid documented registry");
-        assert_eq!(RULES.len(), 57);
+        assert_eq!(RULES.len(), 58);
     }
 
     #[test]
