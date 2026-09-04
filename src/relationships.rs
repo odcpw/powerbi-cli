@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
 };
+use crate::ops::AddRelationship;
 use crate::project_io::write_text_atomic_validated;
 use crate::relationship_tmdl::{
     RelationshipDefinition, RelationshipMutationPlan, RelationshipRecord, RelationshipSelector,
@@ -253,6 +254,49 @@ fn mutate_relationship(action: Action, args: &[String]) -> CliResult<Value> {
         "validateCommand": validate,
         "next": [readback, inspect, validate]
     }))
+}
+
+/// Parse the existing `model relationships add` flags into the typed
+/// operation payload while retaining the command parser's diagnostics and
+/// output-mode contract. The project path remains an argv concern; operation
+/// callers resolve their project into a [`crate::ops::Transaction`].
+pub(crate) fn parse_add_operation_args(
+    args: &[String],
+) -> CliResult<(AddRelationship, MutationMode)> {
+    let options = parse_mutation_args(Action::Add, args)?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "model relationships add",
+        "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+        "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --dry-run --json",
+    )?;
+    let from_table = options
+        .from_table
+        .clone()
+        .expect("validated add from table");
+    let from_column = options
+        .from_column
+        .clone()
+        .expect("validated add from column");
+    let to_table = options.to_table.clone().expect("validated add to table");
+    let to_column = options.to_column.clone().expect("validated add to column");
+    let name = options.selector.name.clone().unwrap_or_else(|| {
+        default_relationship_name(&from_table, &from_column, &to_table, &to_column)
+    });
+    Ok((
+        AddRelationship {
+            handle: crate::relationship_tmdl::relationship_handle(&name),
+            from_table,
+            from_column,
+            to_table,
+            to_column,
+            from_cardinality: options.from_cardinality,
+            to_cardinality: options.to_cardinality,
+            cross_filtering_behavior: options.cross_filtering_behavior,
+            is_active: options.is_active,
+        },
+        mode,
+    ))
 }
 
 fn build_mutation_plan(

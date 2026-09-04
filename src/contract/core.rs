@@ -80,6 +80,8 @@ Usage:
   powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json
   powerbi-cli desktop harvest-reference --project <saved.pbip> --visual <handle> --out <reference.json> --json
   powerbi-cli desktop screenshot <project-dir-or.pbip-or.pbix> --out <evidence.png> --json
+  powerbi-cli desktop refresh-check <project-dir-or.pbip-or.pbix> --json
+  powerbi-cli desktop canvas-check <project-dir-or.pbip-or.pbix> --page <page> --expect <values.json> --json
   powerbi-cli desktop bridge status [--pid <pid>] --json
   powerbi-cli desktop bridge reload --project <project-dir-or.pbip> --pid <pid> --json
   powerbi-cli desktop bridge screenshot-page --project <project-dir-or.pbip> --pid <pid> --page <id> --out <new.png> --json
@@ -393,7 +395,7 @@ Rules for agents:
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
 - Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP preflight defaults to `strict`; use `--preflight normal` for structural validation without lint or explicit `--preflight skip` when a known lint defect must not block a Desktop proof loop. PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1` or `--enable-oracle`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
-- Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features and returns proof/handoff follow-up commands.
+- Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features, turns v2 `proof` into a deterministic `proofPlan`, and returns proof/handoff follow-up commands without executing them.
 - Use `report spec fields --schema <schema.json> [--profile <profile.json>]` to get exact column/measure binding references before writing a dashboard spec.
 - Use `report spec schema --json` to retrieve the draft 2020-12 JSON Schema for
   both dashboard-spec versions, and `report spec explain --schema <schema.json>
@@ -947,7 +949,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchemas": ["powerbi-cli.profile.infer.v1", "powerbi-cli.profile.infer.v2"],
             "flags": ["--schema <schema.json>", "--rows <rows.csv|rows.json>", "--out <profile.json>", "--include-data-values", "--redact (deprecated no-op)", "--json", "--format json"],
             "examples": ["powerbi-cli profile infer --schema examples/sales.schema.json --out build/sales.profile.json --json", "powerbi-cli profile infer --schema examples/sales.schema.json --rows build/sales.csv --out build/sales.profile.json --json"],
-            "followUpFields": ["profile", "profile.schema", "profile.dataValues", "profile.tables", "profile.candidates", "profile.diagnostics", "profile.grainConflicts", "deprecations", "next"]
+            "followUpFields": ["profile", "profile.schema", "profile.dataValues", "profile.tables", "profile.relationships[]", "profile.candidates", "profile.diagnostics", "profile.grainConflicts", "deprecations", "next"]
         }),
         json!({
             "path": "profile validate",
@@ -962,7 +964,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.profile.validate.v1",
             "flags": ["<profile.json>", "--json", "--format json"],
             "examples": ["powerbi-cli profile validate build/sales.profile.json --json"],
-            "followUpFields": ["ok", "summary", "errors", "next"]
+            "followUpFields": ["ok", "summary", "summary.shape.kind", "summary.shape.facts[]", "summary.shape.dimensions[]", "summary.shape.dateTables[]", "summary.shape.keyCandidates[]", "summary.shape.highCardinality[]", "errors", "next"]
         }),
         json!({
             "path": "profile summarize",
@@ -977,7 +979,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.profile.summary.v1",
             "flags": ["<profile.json>", "--json", "--format json"],
             "examples": ["powerbi-cli profile summarize build/sales.profile.json --json"],
-            "followUpFields": ["ok", "summary", "errors"]
+            "followUpFields": ["ok", "summary", "summary.shape.kind", "summary.shape.facts[]", "summary.shape.dimensions[]", "summary.shape.dateTables[]", "summary.shape.keyCandidates[]", "summary.shape.highCardinality[]", "errors"]
         }),
         json!({
             "path": "inspect",
@@ -1185,15 +1187,17 @@ fn schema_manifest() -> Value {
         "sourceTemplateFields": ["handle", "name", "partitionHandle", "table", "partition", "kind", "parameters", "mTemplate", "description", "safety"],
         "sourceTemplateKinds": ["sql", "postgres", "odbc", "excel"],
         "rebindPlanFields": ["handle", "partitionHandle", "table", "partition", "currentSourceKind", "sourceRange", "template", "mTemplate", "manualSteps"],
-        "profileFields": ["schema", "dataValues", "source", "source.kind", "source.format", "source.schemaPath", "source.rowsPath", "source.table", "source.rowCount", "source.columnCount", "tables", "tables[].name", "tables[].role", "tables[].rowCount", "tables[].grainConflicts", "tables[].columns", "tables[].columns[].name", "tables[].columns[].dataType", "tables[].columns[].isKey", "tables[].columns[].nullCount", "tables[].columns[].nullRate", "tables[].columns[].distinctCount", "tables[].columns[].min", "tables[].columns[].max", "tables[].columns[].timeCoverage", "tables[].columns[].topValues", "tables[].columns[].topValueCounts", "tables[].columns[].valuesRedacted", "tables[].columns[].typeCoercion", "tables[].columns[].coercionDiagnostics", "tables[].columns[].roles", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "grainConflicts", "diagnostics", "warnings"],
+        "profileFields": ["schema", "dataValues", "source", "source.kind", "source.format", "source.schemaPath", "source.rowsPath", "source.table", "source.rowCount", "source.columnCount", "tables", "tables[].name", "tables[].role", "tables[].rowCount", "tables[].grainConflicts", "tables[].columns", "tables[].columns[].name", "tables[].columns[].dataType", "tables[].columns[].isKey", "tables[].columns[].nullCount", "tables[].columns[].nullRate", "tables[].columns[].distinctCount", "tables[].columns[].min", "tables[].columns[].max", "tables[].columns[].timeCoverage", "tables[].columns[].topValues", "tables[].columns[].topValueCounts", "tables[].columns[].valuesRedacted", "tables[].columns[].typeCoercion", "tables[].columns[].coercionDiagnostics", "tables[].columns[].roles", "relationships", "relationships[].fromTable", "relationships[].fromColumn", "relationships[].toTable", "relationships[].toColumn", "relationships[].fromCardinality", "relationships[].toCardinality", "relationships[].cardinality", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "grainConflicts", "diagnostics", "warnings"],
+        "profileSummaryFields": ["schema", "dataValues", "tables", "columns", "tableRoles", "candidateFactTables", "candidateDateColumns", "candidateNumericColumns", "candidateCategoryColumns", "grainConflicts", "diagnostics", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]"],
         "dashboardSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
-        "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
+        "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].text", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
         "intentVersions": ["intent.v1"],
         "intentFields": ["schema", "audience", "questions[]", "kpis[].name", "kpis[].measure", "kpis[].target", "comparisons[]", "periods[]", "drillPaths[]", "alerts[].measure", "alerts[].op", "alerts[].threshold", "alerts[].semantic", "filterDimensions[]", "preferredArchetypes[]", "pageFlow[]", "handoff.target", "handoff.sourceKinds[]"],
         "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
+        "reportSpecValidateFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "errors[].field", "errors[].reason", "errors[].candidatesCommand", "errors[].example", "next"],
         "reportSpecUpgradeFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
-        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
+        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "profileSummary.shape.dimensions[]", "profileSummary.shape.dateTables[]", "profileSummary.shape.keyCandidates[]", "profileSummary.shape.highCardinality[]", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
         "lintFindingFields": ["code", "severity", "message", "handle", "path", "hint", "stepKind"],
@@ -1337,8 +1341,19 @@ fn schema_manifest() -> Value {
         "intent.pageFlow",
         "intent.handoff",
         "profileSummary",
+        "shape.kind",
+        "shape.facts[]",
+        "shape.dimensions[]",
+        "shape.dateTables[]",
+        "shape.keyCandidates[]",
+        "shape.highCardinality[]",
+        "shape.warnings[]",
+        "shape.hypotheses[]",
+        "shape.relationships[]",
         "spec",
         "compiled.counts",
+        "compiled.defaultsApplied",
+        "defaultsApplied",
         "decisions",
         "warnings",
         "warnings[].code",
@@ -1461,14 +1476,19 @@ fn response_shapes() -> Value {
             "transport": "stderr",
             "topLevelRequiredFields": ["error"],
             "requiredFields": ["error.code", "error.exitCode", "error.message"],
-            "optionalFields": ["error.hint", "error.suggestedCommands"],
+            "optionalFields": ["error.hint", "error.suggestedCommands", "error.pointer", "error.didYouMean", "error.field", "error.reason", "error.candidatesCommand", "error.example"],
             "shape": {
                 "error": {
                     "code": "<diagnostic-code>",
                     "exitCode": "<integer>",
                     "message": "<text>",
                     "hint": "<optional-text>",
-                    "suggestedCommands": ["<executable powerbi-cli command template>"]
+                    "suggestedCommands": ["<executable powerbi-cli command template>"],
+                    "pointer": "<optional RFC 6901 JSON pointer>",
+                    "field": "<optional expected field>",
+                    "reason": "<optional explanation>",
+                    "candidatesCommand": "<optional executable candidate query>",
+                    "example": "<optional example value>"
                 }
             }
         },
@@ -1476,12 +1496,13 @@ fn response_shapes() -> Value {
             "schema": "powerbi-cli.report.spec.validate.v1",
             "transport": "stdout",
             "validationFailure": "exitCode=10 with ok=false (or ok=null for shape-only validation)",
+            "optionalFields": ["proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks"],
             "errors": {
                 "type": "array",
                 "item": {
                     "type": "object",
                     "requiredFields": ["code", "message"],
-                    "optionalFields": ["pointer", "didYouMean", "hint", "suggestedCommands"],
+                    "optionalFields": ["pointer", "didYouMean", "hint", "suggestedCommands", "field", "reason", "candidatesCommand", "example"],
                     "pointer": "RFC 6901 JSON pointer into the submitted dashboard spec when available"
                 }
             }

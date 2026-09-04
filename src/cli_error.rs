@@ -1,3 +1,4 @@
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
@@ -27,6 +28,10 @@ pub(crate) struct CliError {
 struct ErrorDetails {
     pointer: Option<String>,
     did_you_mean: Option<String>,
+    field: Option<String>,
+    reason: Option<String>,
+    candidates_command: Option<String>,
+    example: Option<Value>,
 }
 
 impl CliError {
@@ -81,6 +86,26 @@ impl CliError {
         self
     }
 
+    pub(crate) fn with_field(mut self, field: impl Into<String>) -> Self {
+        self.details_mut().field = Some(field.into());
+        self
+    }
+
+    pub(crate) fn with_reason(mut self, reason: impl Into<String>) -> Self {
+        self.details_mut().reason = Some(reason.into());
+        self
+    }
+
+    pub(crate) fn with_candidates_command(mut self, command: impl Into<String>) -> Self {
+        self.details_mut().candidates_command = Some(command.into());
+        self
+    }
+
+    pub(crate) fn with_example(mut self, example: Value) -> Self {
+        self.details_mut().example = Some(example);
+        self
+    }
+
     pub(crate) fn pointer(&self) -> Option<&str> {
         self.details
             .as_deref()
@@ -91,6 +116,30 @@ impl CliError {
         self.details
             .as_deref()
             .and_then(|details| details.did_you_mean.as_deref())
+    }
+
+    pub(crate) fn field(&self) -> Option<&str> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.field.as_deref())
+    }
+
+    pub(crate) fn reason(&self) -> Option<&str> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.reason.as_deref())
+    }
+
+    pub(crate) fn candidates_command(&self) -> Option<&str> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.candidates_command.as_deref())
+    }
+
+    pub(crate) fn example(&self) -> Option<&Value> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.example.as_ref())
     }
 
     fn details_mut(&mut self) -> &mut ErrorDetails {

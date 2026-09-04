@@ -49,6 +49,7 @@ mod pbir_slicers;
 mod pbir_themes;
 mod pbir_visual_factory;
 mod profile;
+mod profile_shape;
 mod project_io;
 mod project_resolution;
 #[cfg(test)]
@@ -77,6 +78,7 @@ mod report_objects;
 mod report_page_mutations;
 mod report_pages;
 mod report_plan;
+mod report_proof;
 mod report_slicer_clear;
 mod report_slicers;
 mod report_spec_explain;

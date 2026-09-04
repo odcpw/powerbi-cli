@@ -445,6 +445,25 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["desktop", "open-check", &project_arg, "--json"]),
     );
     h.code(
+        "desktop refresh-check",
+        2,
+        &svec(["desktop", "refresh-check", &project_arg, "--json"]),
+    );
+    h.code(
+        "desktop canvas-check",
+        2,
+        &svec([
+            "desktop",
+            "canvas-check",
+            &project_arg,
+            "--page",
+            "Overview",
+            "--expect",
+            "values.json",
+            "--json",
+        ]),
+    );
+    h.code(
         "desktop screenshot",
         desktop_oracle_exit,
         &svec([

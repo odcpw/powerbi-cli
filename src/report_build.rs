@@ -8,6 +8,7 @@ use crate::pbir_visual_factory::{
     slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
@@ -50,6 +51,7 @@ struct BuildResponse<'a> {
     compiled: &'a CompiledDashboard,
     profile: Option<&'a Value>,
     scaffold: Option<Value>,
+    proof_plan: Option<&'a ProofPlan>,
 }
 
 pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
@@ -62,10 +64,13 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         "powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --dry-run --json",
     )?;
     let schema_path = options.schema.ok_or_else(|| {
-        CliError::invalid_args("report build requires --schema <schema.json>")
-            .with_suggested_command(
-                "powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json",
-            )
+        spec_missing_input_with_command(
+            "/schema",
+            "schema",
+            "report build needs a schema manifest to resolve model fields and emit a PBIP project",
+            json!({"--schema": "<schema.json>"}),
+            "powerbi-cli schema validate <schema.json> --json",
+        )
     })?;
     let schema_value = load_schema_value(&schema_path)?;
     let spec_value = load_optional_value(options.spec.as_deref(), "dashboard spec")?;
@@ -74,6 +79,11 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
     }
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let compiled = compile_dashboard(&schema_value, spec_value.as_ref())?;
+    let dry_run_proof_plan = if mode == MutationMode::DryRun {
+        compile_proof_plan(spec_value.as_ref(), None)?
+    } else {
+        None
+    };
     let schema_validation = validate_schema_value(&compiled.schema);
     if !schema_validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
@@ -102,6 +112,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
             compiled: &compiled,
             profile: profile_value.as_ref(),
             scaffold: None,
+            proof_plan: dry_run_proof_plan.as_ref(),
         }));
     }
 
@@ -111,6 +122,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
                 "powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             )
     })?;
+    let proof_plan = compile_proof_plan(spec_value.as_ref(), Some(&out_dir))?;
     let scaffold = scaffold_schema_value(
         compiled.schema.clone(),
         &schema_path,
@@ -127,6 +139,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         compiled: &compiled,
         profile: profile_value.as_ref(),
         scaffold: Some(scaffold),
+        proof_plan: proof_plan.as_ref(),
     }))
 }
 
@@ -171,14 +184,22 @@ pub(crate) fn compiled_schema_for_explain(schema: &Value, spec: &Value) -> CliRe
 fn spec_validate(args: &[String]) -> CliResult<Value> {
     let options = parse_spec_validate_args(args)?;
     let spec_path = options.spec.ok_or_else(|| {
-        CliError::invalid_args("report spec validate requires --spec <dashboard.json>")
-            .with_suggested_command(
-                "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
-            )
+        spec_missing_input_with_command(
+            "/spec",
+            "spec",
+            "report spec validate needs a dashboard spec document",
+            json!({"--spec": "<dashboard.json>"}),
+            "powerbi-cli report spec fields --json",
+        )
     })?;
     let normalized_spec = normalize_spec_file(&spec_path)?;
     let spec_value = normalized_spec.value;
     let known_fields = validate_known_fields(&spec_value);
+    let proof_plan_result = if known_fields.is_ok() {
+        compile_proof_plan(Some(&spec_value), None)
+    } else {
+        Ok(None)
+    };
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let (ok, validation_level, errors, warnings, compiled, schema_path) = if let Some(schema_path) =
         options.schema.as_deref()
@@ -210,16 +231,17 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
             ),
         }
     } else {
-        let errors = match known_fields {
-            Ok(_) => validate_spec_shape(&spec_value)
+        let errors = match (known_fields, &proof_plan_result) {
+            (Ok(_), Ok(_)) => validate_spec_shape(&spec_value)
                 .into_iter()
                 .map(Value::String)
                 .collect(),
-            Err(error) => vec![spec_error_json(&error)],
+            (Ok(_), Err(error)) | (Err(_), Err(error)) => vec![spec_error_json(error)],
+            (Err(error), Ok(_)) => vec![spec_error_json(&error)],
         };
         let warnings = if errors.is_empty() {
             vec![
-                "schema was not provided; shape-only validation cannot prove field references, measures, visual roles, or build compatibility".to_string()
+            "schema was not provided; shape-only validation cannot prove field references, measures, visual roles, or build compatibility".to_string()
             ]
         } else {
             Vec::new()
@@ -244,9 +266,38 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         "normalizedFrom": normalized_spec.normalized_from,
         "profileSummary": profile_value.as_ref().map(profile_summary),
         "compiled": compiled.as_ref().map(compiled_summary),
+        "defaultsApplied": compiled
+            .as_ref()
+            .map(|compiled| Value::Array(compiled.defaults_applied.clone()))
+            .unwrap_or_else(|| {
+                if validation_level == "shape-only" && errors.is_empty() {
+                    json!([{
+                        "pointer": "/schema",
+                        "field": "schema",
+                        "value": "shape-only",
+                        "reason": "schema input was omitted; shape-only validation is the documented fallback"
+                    }])
+                } else {
+                    Value::Array(Vec::new())
+                }
+            }),
+        "proofPlan": proof_plan_result
+            .as_ref()
+            .ok()
+            .and_then(Option::as_ref)
+            .map(|plan| plan.value.clone()),
         "warnings": warnings,
         "errors": errors,
-        "next": next_for_spec_validate(&spec_path, schema_path.as_deref(), ok, validation_level)
+        "next": next_for_spec_validate(
+            &spec_path,
+            schema_path.as_deref(),
+            ok,
+            validation_level,
+            proof_plan_result
+                .as_ref()
+                .ok()
+                .and_then(Option::as_ref),
+        )
     }))
 }
 
@@ -260,6 +311,18 @@ fn spec_error_json(error: &CliError) -> Value {
     }
     if let Some(did_you_mean) = error.did_you_mean() {
         value["didYouMean"] = Value::String(did_you_mean.to_string());
+    }
+    if let Some(field) = error.field() {
+        value["field"] = Value::String(field.to_string());
+    }
+    if let Some(reason) = error.reason() {
+        value["reason"] = Value::String(reason.to_string());
+    }
+    if let Some(candidates_command) = error.candidates_command() {
+        value["candidatesCommand"] = Value::String(candidates_command.to_string());
+    }
+    if let Some(example) = error.example() {
+        value["example"] = example.clone();
     }
     if let Some(hint) = &error.hint {
         value["hint"] = Value::String(hint.clone());
@@ -277,11 +340,472 @@ fn spec_error_json(error: &CliError) -> Value {
     value
 }
 
+const SPEC_FIELDS_COMMAND: &str = "powerbi-cli report spec fields --schema <schema.json> --json";
+
+/// Build the one structured diagnostic used when a dashboard spec cannot be
+/// compiled without inventing user intent. Keeping this constructor in the
+/// compiler lets the planner and report-spec validator expose the same
+/// machine-readable contract on stderr and stdout respectively.
+pub(crate) fn spec_missing_input(
+    pointer: impl Into<String>,
+    field: impl Into<String>,
+    reason: impl Into<String>,
+    example: Value,
+) -> CliError {
+    spec_missing_input_with_command(pointer, field, reason, example, SPEC_FIELDS_COMMAND)
+}
+
+pub(crate) fn spec_missing_input_with_command(
+    pointer: impl Into<String>,
+    field: impl Into<String>,
+    reason: impl Into<String>,
+    example: Value,
+    candidates_command: impl Into<String>,
+) -> CliError {
+    let pointer = pointer.into();
+    let field = field.into();
+    let reason = reason.into();
+    let candidates_command = candidates_command.into();
+    CliError::new(
+        "spec.missing_input",
+        EXIT_VALIDATION_FAILED,
+        format!("required dashboard-spec input `{field}` is missing: {reason}"),
+    )
+    .with_pointer(pointer)
+    .with_field(field)
+    .with_reason(reason)
+    .with_candidates_command(candidates_command.clone())
+    .with_example(example)
+    .with_hint("Supply the required value; no dashboard-spec default is applied when it would change user intent.")
+    .with_suggested_command(candidates_command)
+}
+
+fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> {
+    let Some(root) = spec.as_object() else {
+        return Ok(());
+    };
+    let is_v2 = root.get("schema").and_then(Value::as_str) == Some("powerbi-cli.dashboard.v2");
+    let model = ModelIndex::from_schema(schema);
+
+    if let Some(model_object) = root.get("model").and_then(Value::as_object)
+        && let Some(patterns) = model_object
+            .get("measurePatterns")
+            .and_then(Value::as_array)
+    {
+        for (index, pattern) in patterns.iter().enumerate() {
+            let Some(pattern_object) = pattern.as_object() else {
+                continue;
+            };
+            let needs_date = pattern_object
+                .get("pattern")
+                .and_then(Value::as_str)
+                .is_some_and(measure_pattern_needs_date);
+            if needs_date && !has_nonempty_string(pattern_object.get("date")) {
+                return Err(spec_missing_input(
+                    format!("/model/measurePatterns/{index}/date"),
+                    "model.measurePatterns[].date",
+                    "this measure pattern references a period-aware calculation and needs a date column",
+                    json!({"date": "DimDate[Date]"}),
+                ));
+            }
+        }
+    }
+
+    let semantic_tokens = root
+        .get("style")
+        .and_then(Value::as_object)
+        .and_then(|style| style.get("tokens"))
+        .and_then(Value::as_object)
+        .and_then(|tokens| tokens.get("semantic"))
+        .and_then(Value::as_object);
+    let mut referenced_tokens = BTreeSet::new();
+    for page in root
+        .get("pages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(page) = page.as_object() else {
+            continue;
+        };
+        for visual in page
+            .get("visuals")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(conditional) = visual.get("conditionalFormatting") {
+                collect_semantic_tokens(conditional, false, &mut referenced_tokens);
+            }
+        }
+    }
+    for token in referenced_tokens {
+        if !semantic_tokens.is_some_and(|tokens| {
+            tokens.get(&token).is_some_and(|value| {
+                !value.is_null() && value.as_str().is_none_or(|value| !value.trim().is_empty())
+            })
+        }) {
+            return Err(spec_missing_input(
+                format!("/style/tokens/semantic/{}", escape_pointer_token(&token)),
+                "style.tokens.semantic",
+                format!(
+                    "conditional formatting uses semantic color `{token}`, but no matching style token is defined"
+                ),
+                json!({"style": {"tokens": {"semantic": {token.clone(): "#2E7D32"}}}}),
+            ));
+        }
+    }
+
+    if let Some(layout) = root.get("layout").and_then(Value::as_object)
+        && let Some(rail) = layout.get("rail").and_then(Value::as_object)
+    {
+        validate_slicer_fields(rail.get("slicers"), "/layout/rail/slicers", &model)?;
+    }
+
+    for (page_index, page) in root
+        .get("pages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        let Some(page) = page.as_object() else {
+            continue;
+        };
+        if let Some(drillthrough) = page.get("drillthrough").and_then(Value::as_object)
+            && !has_nonempty_string(drillthrough.get("target"))
+        {
+            return Err(spec_missing_input(
+                format!("/pages/{page_index}/drillthrough/target"),
+                "pages[].drillthrough.target",
+                "a drillthrough page must name the column that receives the bound filter",
+                json!({"target": "DimCustomer[CustomerName]"}),
+            ));
+        }
+        validate_slicer_fields(
+            page.get("slicers"),
+            &format!("/pages/{page_index}/slicers"),
+            &model,
+        )?;
+
+        let template = page.get("template").and_then(Value::as_str);
+        for (visual_index, visual) in page
+            .get("visuals")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            let Some(visual) = visual.as_object() else {
+                continue;
+            };
+            let visual_pointer = format!("/pages/{page_index}/visuals/{visual_index}");
+            if let (Some(template), Some(slot)) = (
+                template.filter(|template| !template.trim().is_empty()),
+                visual.get("slot").and_then(Value::as_str),
+            ) && !template_slot_allowed(template, slot)
+            {
+                return Err(spec_missing_input(
+                    format!("{visual_pointer}/slot"),
+                    "visuals[].slot",
+                    format!("slot `{slot}` is not defined by page template `{template}`"),
+                    json!({"slot": "primary"}),
+                ));
+            }
+
+            if let Some(topn) = visual.get("topnGuard").and_then(Value::as_object) {
+                let measure_count = visual_measure_binding_count(visual, &model);
+                if measure_count > 1 && !has_nonempty_string(topn.get("orderBy")) {
+                    return Err(spec_missing_input(
+                        format!("{visual_pointer}/topnGuard/orderBy"),
+                        "visuals[].topnGuard.orderBy",
+                        "a TopN guard with multiple measures needs an explicit measure ordering",
+                        json!({"orderBy": "FactSales[Total Revenue]"}),
+                    ));
+                }
+            }
+
+            let has_uncompiled_section = [
+                "sort",
+                "drilldown",
+                "topnGuard",
+                "filters",
+                "format",
+                "conditionalFormatting",
+                "slot",
+                "subtitle",
+            ]
+            .iter()
+            .any(|field| visual.contains_key(*field));
+            if has_uncompiled_section {
+                continue;
+            }
+
+            let requested_type = visual
+                .get("type")
+                .or_else(|| visual.get("visualType"))
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty());
+            let Some(requested_type) = requested_type else {
+                return Err(spec_missing_input(
+                    format!("{visual_pointer}/type"),
+                    "visuals[].type",
+                    "the compiler cannot choose a visual family without changing the requested dashboard intent",
+                    json!({"type": "card"}),
+                ));
+            };
+            let bindings = visual
+                .get("bindings")
+                .and_then(Value::as_array)
+                .map_or(0, Vec::len);
+            if bindings == 0 {
+                let has_text = visual_text(visual).is_some();
+                if !has_text || !requested_type.eq_ignore_ascii_case("textbox") {
+                    return Err(spec_missing_input(
+                        format!("{visual_pointer}/bindings"),
+                        "visuals[].bindings",
+                        "the visual has no field bindings; provide the required role bindings instead of defaulting to an empty card",
+                        json!({"bindings": [{"role": "Values", "field": "FactSales[Total Revenue]"}]}),
+                    ));
+                }
+            }
+
+            if is_v2 && requested_type.eq_ignore_ascii_case("slicer") {
+                validate_visual_slicer_binding(
+                    visual.get("bindings"),
+                    &format!("{visual_pointer}/bindings"),
+                    &model,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_slicer_fields(
+    slicers: Option<&Value>,
+    pointer: &str,
+    model: &ModelIndex,
+) -> CliResult<()> {
+    let Some(slicers) = slicers.and_then(Value::as_array) else {
+        return Ok(());
+    };
+    for (index, slicer) in slicers.iter().enumerate() {
+        let Some(slicer) = slicer.as_object() else {
+            continue;
+        };
+        let field_pointer = format!("{pointer}/{index}/field");
+        let Some(field) = slicer.get("field").and_then(Value::as_str) else {
+            return Err(spec_missing_input(
+                field_pointer,
+                "slicers[].field",
+                "a slicer needs a model column to populate its filter values",
+                json!({"field": "DimCustomer[Segment]"}),
+            ));
+        };
+        if !matches!(
+            model.resolve_field(field),
+            Ok(FieldRef {
+                kind: FieldKind::Column,
+                ..
+            })
+        ) {
+            return Err(spec_missing_input(
+                field_pointer,
+                "slicers[].field",
+                format!("`{field}` is not a resolvable model column"),
+                json!({"field": "DimCustomer[Segment]"}),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_visual_slicer_binding(
+    bindings: Option<&Value>,
+    pointer: &str,
+    model: &ModelIndex,
+) -> CliResult<()> {
+    let Some(bindings) = bindings.and_then(Value::as_array) else {
+        return Ok(());
+    };
+    for (index, binding) in bindings.iter().enumerate() {
+        let Some(binding) = binding.as_object() else {
+            continue;
+        };
+        let role = binding.get("role").and_then(Value::as_str);
+        if role.is_some_and(|role| role.eq_ignore_ascii_case("values")) {
+            let field_value = binding
+                .get("field")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| {
+                    let table = binding.get("table").and_then(Value::as_str)?;
+                    let column = binding.get("column").and_then(Value::as_str)?;
+                    Some(format!("{table}[{column}]"))
+                });
+            let field_pointer = format!("{pointer}/{index}/field");
+            let Some(field) = field_value else {
+                return Err(spec_missing_input(
+                    field_pointer,
+                    "visuals[].bindings[].field",
+                    "a slicer Values role must identify a model column, not a missing measure or inferred aggregation",
+                    json!({"field": "DimCustomer[Segment]"}),
+                ));
+            };
+            if !matches!(
+                model.resolve_field(&field),
+                Ok(FieldRef {
+                    kind: FieldKind::Column,
+                    ..
+                })
+            ) {
+                return Err(spec_missing_input(
+                    field_pointer,
+                    "visuals[].bindings[].field",
+                    format!("`{field}` is not a model column; slicers cannot bind measures"),
+                    json!({"field": "DimCustomer[Segment]"}),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn visual_measure_binding_count(visual: &Map<String, Value>, model: &ModelIndex) -> usize {
+    visual
+        .get("bindings")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_object)
+        .filter(|binding| {
+            binding.contains_key("measure")
+                || binding
+                    .get("field")
+                    .and_then(Value::as_str)
+                    .and_then(|field| model.resolve_field(field).ok())
+                    .is_some_and(|field| field.kind == FieldKind::Measure)
+        })
+        .count()
+}
+
+fn visual_text(visual: &Map<String, Value>) -> Option<&str> {
+    visual
+        .get("text")
+        .or_else(|| visual.get("title"))
+        .or_else(|| visual.get("subtitle"))
+        .and_then(Value::as_str)
+        .filter(|text| !text.trim().is_empty())
+        .map(str::trim)
+}
+
+fn measure_pattern_needs_date(pattern: &str) -> bool {
+    let pattern = pattern.to_ascii_lowercase();
+    [
+        "date", "time", "period", "yoy", "ytd", "mom", "qoq", "prior", "trend",
+    ]
+    .iter()
+    .any(|needle| pattern.contains(needle))
+}
+
+fn collect_semantic_tokens(value: &Value, semantic_context: bool, tokens: &mut BTreeSet<String>) {
+    match value {
+        Value::Object(object) => {
+            for (key, value) in object {
+                let key_context = semantic_context
+                    || key.to_ascii_lowercase().contains("semantic")
+                    || key.to_ascii_lowercase().contains("token");
+                collect_semantic_tokens(value, key_context, tokens);
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                collect_semantic_tokens(value, semantic_context, tokens);
+            }
+        }
+        Value::String(value) => {
+            let value = value.trim();
+            let explicit_semantic =
+                value.starts_with("semantic.") || value.starts_with("semantic:");
+            if !semantic_context && !explicit_semantic {
+                return;
+            }
+            let token = value
+                .strip_prefix("semantic.")
+                .or_else(|| value.strip_prefix("semantic:"))
+                .unwrap_or(value)
+                .trim();
+            if !token.is_empty()
+                && !token.starts_with('#')
+                && !token.starts_with("rgb")
+                && !token.starts_with("rgba")
+                && token.chars().all(|character| {
+                    character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.')
+                })
+            {
+                tokens.insert(token.to_string());
+            }
+        }
+        _ => {}
+    }
+}
+
+fn template_slot_allowed(template: &str, slot: &str) -> bool {
+    let templates = [
+        "kpi-strip-trend-breakdown",
+        "overview",
+        "time-series",
+        "ranking",
+        "distribution",
+        "comparison",
+        "detail-table",
+        "drillthrough-detail",
+        "exception-list",
+        "matrix-focus",
+        "scatter-focus",
+    ];
+    if !templates
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(template.trim()))
+    {
+        // Unknown template names are still owned by the layout compiler. Let
+        // the normal unsupported-feature boundary report that section rather
+        // than guessing a slot catalogue for an unrecognized template.
+        return true;
+    }
+    [
+        "heading",
+        "kpi.1",
+        "kpi.2",
+        "kpi.3",
+        "kpi.4",
+        "primary",
+        "secondary",
+        "tertiary",
+        "detail",
+        "rail",
+    ]
+    .iter()
+    .any(|name| name.eq_ignore_ascii_case(slot.trim()))
+}
+
+fn has_nonempty_string(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+}
+
+fn escape_pointer_token(value: &str) -> String {
+    value.replace('~', "~0").replace('/', "~1")
+}
+
 #[derive(Debug)]
 struct CompiledDashboard {
     schema: Value,
     operations: Vec<Value>,
     warnings: Vec<Value>,
+    defaults_applied: Vec<Value>,
 }
 
 fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<CompiledDashboard> {
@@ -296,10 +820,31 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
                 .into_iter()
                 .map(|message| json!({"code": "report_build.legacy_schema", "message": message}))
                 .collect(),
+            defaults_applied: vec![json!({
+                "pointer": "/spec",
+                "field": "spec",
+                "value": "schema.pages",
+                "reason": "the optional dashboard spec was omitted; pages embedded in the schema are used"
+            })],
         });
     };
     validate_known_fields(spec)?;
-    reject_uncompiled_v2_sections(spec)?;
+    validate_required_spec_inputs(schema, spec)?;
+    // `proof` is metadata compiled by the side-effect-free proof planner below.
+    // Keep the existing v2 refusal boundary for every other recognized section
+    // without changing the shared walker while adjacent spec work lands.
+    let sections_to_check = if spec.get("proof").is_some() {
+        let mut stripped = spec.clone();
+        stripped
+            .as_object_mut()
+            .expect("validated dashboard spec object")
+            .remove("proof");
+        stripped
+    } else {
+        spec.clone()
+    };
+    reject_uncompiled_v2_sections(&sections_to_check)?;
+    let _proof_plan = compile_proof_plan(Some(spec), None)?;
     if spec.get("report").is_none() && spec.get("pages").is_some() {
         let (schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
         return Ok(CompiledDashboard {
@@ -311,6 +856,7 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
                 .into_iter()
                 .map(|message| json!({"code": "report_build.legacy_spec", "message": message}))
                 .collect(),
+            defaults_applied: Vec::new(),
         });
     }
 
@@ -333,7 +879,8 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         apply_model_extensions(merged_object, spec_object)?;
     }
     let model = ModelIndex::from_schema(&merged);
-    let pages = compile_pages(spec_object, &model)?;
+    let mut defaults_applied = Vec::new();
+    let pages = compile_pages(spec_object, &model, &mut defaults_applied)?;
     if !pages.is_empty() {
         merged
             .as_object_mut()
@@ -362,6 +909,7 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         schema: merged,
         operations,
         warnings: Vec::new(),
+        defaults_applied,
     })
 }
 
@@ -443,7 +991,11 @@ fn add_measure_to_schema(schema: &mut Map<String, Value>, measure: &Value) -> Cl
     Ok(())
 }
 
-fn compile_pages(spec: &Map<String, Value>, model: &ModelIndex) -> CliResult<Vec<Value>> {
+fn compile_pages(
+    spec: &Map<String, Value>,
+    model: &ModelIndex,
+    defaults_applied: &mut Vec<Value>,
+) -> CliResult<Vec<Value>> {
     let mut pages = Vec::new();
     for (page_index, page) in spec
         .get("pages")
@@ -485,7 +1037,7 @@ fn compile_pages(spec: &Map<String, Value>, model: &ModelIndex) -> CliResult<Vec
                 "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json",
             ));
         }
-        let visuals = compile_visuals(page_index, page, model)?;
+        let visuals = compile_visuals(page_index, page, model, defaults_applied)?;
         out.insert("visuals".to_string(), Value::Array(visuals));
         let interactions = compile_interactions(page_index, page)?;
         if !interactions.is_empty() {
@@ -585,6 +1137,7 @@ fn compile_visuals(
     page_index: usize,
     page: &Map<String, Value>,
     model: &ModelIndex,
+    defaults_applied: &mut Vec<Value>,
 ) -> CliResult<Vec<Value>> {
     let mut visuals = Vec::new();
     for (visual_index, visual) in page
@@ -642,7 +1195,7 @@ fn compile_visuals(
         if let Some(title) = visual.get("title").and_then(Value::as_str) {
             out.insert("title".to_string(), Value::String(title.to_string()));
         }
-        apply_layout(visual_index, visual, &mut out);
+        apply_layout(page_index, visual_index, visual, &mut out, defaults_applied);
         validate_minimum_visual_size(page_index, visual_index, &visual_type, slicer_mode, &out)?;
         let bindings = compile_bindings(page_index, visual_index, &visual_type, visual, model)?;
         validate_binding_contract(page_index, visual_index, &visual_type, &bindings)?;
@@ -747,32 +1300,96 @@ fn compile_bindings(
                 "pages[{page_index}].visuals[{visual_index}].bindings[{binding_index}] must be an object"
             ))
         })?;
-        let role = normalize_role(
-            visual_type,
-            &required_string(binding, "role", "visual binding")?,
-        )?;
+        let binding_pointer =
+            format!("/pages/{page_index}/visuals/{visual_index}/bindings/{binding_index}");
+        let role_value = binding
+            .get("role")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| {
+                spec_missing_input(
+                    format!("{binding_pointer}/role"),
+                    "visuals[].bindings[].role",
+                    "every visual binding must declare the field-well role it populates",
+                    json!({"role": "Values"}),
+                )
+            })?;
+        let role = normalize_role(visual_type, role_value)?;
         let mut out = Map::new();
         out.insert("role".to_string(), Value::String(role));
-        if let Some(field) = binding.get("field").and_then(Value::as_str) {
-            let field = model.resolve_field(field)?;
+        if let Some(field) = binding
+            .get("field")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        {
+            let field = model.resolve_field(field).map_err(|error| {
+                if error
+                    .message
+                    .contains("dashboard spec field reference does not exist in schema")
+                {
+                    spec_missing_input(
+                        format!("{binding_pointer}/field"),
+                        "visuals[].bindings[].field",
+                        error.message,
+                        json!({"field": "FactSales[Total Revenue]"}),
+                    )
+                } else {
+                    error
+                }
+            })?;
             out.insert("table".to_string(), Value::String(field.table));
             match field.kind {
                 FieldKind::Column => out.insert("column".to_string(), Value::String(field.name)),
                 FieldKind::Measure => out.insert("measure".to_string(), Value::String(field.name)),
             };
         } else {
-            let table = required_string(binding, "table", "visual binding")?;
-            let column = binding.get("column").and_then(Value::as_str);
-            let measure = binding.get("measure").and_then(Value::as_str);
+            let table = binding
+                .get("table")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| {
+                    spec_missing_input(
+                        format!("{binding_pointer}/table"),
+                        "visuals[].bindings[].table",
+                        "a structured binding needs a table so its column or measure can be resolved",
+                        json!({"table": "FactSales"}),
+                    )
+                })?;
+            let column = binding
+                .get("column")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty());
+            let measure = binding
+                .get("measure")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty());
             match (column, measure) {
                 (Some(column), None) => {
-                    model.resolve_structured_field(&table, column, FieldKind::Column)?;
-                    out.insert("table".to_string(), Value::String(table));
+                    model
+                        .resolve_structured_field(table, column, FieldKind::Column)
+                        .map_err(|error| {
+                            spec_missing_input(
+                                format!("{binding_pointer}/column"),
+                                "visuals[].bindings[].column",
+                                error.message,
+                                json!({"column": "Total Revenue"}),
+                            )
+                        })?;
+                    out.insert("table".to_string(), Value::String(table.to_string()));
                     out.insert("column".to_string(), Value::String(column.to_string()));
                 }
                 (None, Some(measure)) => {
-                    model.resolve_structured_field(&table, measure, FieldKind::Measure)?;
-                    out.insert("table".to_string(), Value::String(table));
+                    model
+                        .resolve_structured_field(table, measure, FieldKind::Measure)
+                        .map_err(|error| {
+                            spec_missing_input(
+                                format!("{binding_pointer}/measure"),
+                                "visuals[].bindings[].measure",
+                                error.message,
+                                json!({"measure": "Total Revenue"}),
+                            )
+                        })?;
+                    out.insert("table".to_string(), Value::String(table.to_string()));
                     out.insert("measure".to_string(), Value::String(measure.to_string()));
                 }
                 (Some(_), Some(_)) => {
@@ -781,8 +1398,11 @@ fn compile_bindings(
                     ));
                 }
                 (None, None) => {
-                    return Err(CliError::invalid_args(
-                        "visual binding requires field or table plus column/measure",
+                    return Err(spec_missing_input(
+                        format!("{binding_pointer}/field"),
+                        "visuals[].bindings[].field",
+                        "a binding must identify a field, or provide table plus exactly one column or measure",
+                        json!({"field": "FactSales[Total Revenue]"}),
                     ));
                 }
             }
@@ -1086,7 +1706,13 @@ fn validate_binding_contract(
     Ok(())
 }
 
-fn apply_layout(visual_index: usize, visual: &Map<String, Value>, out: &mut Map<String, Value>) {
+fn apply_layout(
+    page_index: usize,
+    visual_index: usize,
+    visual: &Map<String, Value>,
+    out: &mut Map<String, Value>,
+    defaults_applied: &mut Vec<Value>,
+) {
     let layout = visual.get("layout").and_then(Value::as_object);
     for key in ["x", "y", "width", "height"] {
         if let Some(value) = visual
@@ -1103,6 +1729,31 @@ fn apply_layout(visual_index: usize, visual: &Map<String, Value>, out: &mut Map<
         out.insert("y".to_string(), Value::from(y));
         out.insert("width".to_string(), Value::from(560.0));
         out.insert("height".to_string(), Value::from(184.0));
+        let pointer = format!("/pages/{page_index}/visuals/{visual_index}");
+        defaults_applied.push(json!({
+            "pointer": format!("{pointer}/x"),
+            "field": "visuals[].layout.x",
+            "value": x,
+            "reason": "no explicit visual layout was supplied; the deterministic two-column grid applies"
+        }));
+        defaults_applied.push(json!({
+            "pointer": format!("{pointer}/y"),
+            "field": "visuals[].layout.y",
+            "value": y,
+            "reason": "no explicit visual layout was supplied; the deterministic two-column grid applies"
+        }));
+        defaults_applied.push(json!({
+            "pointer": format!("{pointer}/width"),
+            "field": "visuals[].layout.width",
+            "value": 560.0,
+            "reason": "no explicit visual layout was supplied; the deterministic two-column grid applies"
+        }));
+        defaults_applied.push(json!({
+            "pointer": format!("{pointer}/height"),
+            "field": "visuals[].layout.height",
+            "value": 184.0,
+            "reason": "no explicit visual layout was supplied; the deterministic two-column grid applies"
+        }));
     }
 }
 
@@ -1298,6 +1949,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             "spec": response.spec_path.map(canonical_display)
         },
         "compiled": compiled,
+        "defaultsApplied": response.compiled.defaults_applied,
         "changes": changes,
         "profileSummary": response.profile.map(profile_summary),
         "executedPrimitives": if response.changed { vec![json!({"command": "scaffold", "reason": "report build compiled schema/spec into scaffold-compatible manifest"})] } else { Vec::new() },
@@ -1319,7 +1971,14 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             "requiredForCompatibility": "desktop-canvas-refresh",
             "note": "report build writes local PBIP/PBIR/TMDL metadata; Desktop canvas/refresh proof is a separate oracle step"
         },
-        "next": next_for_build(response.out_dir, response.dry_run, response.schema_path, response.spec_path)
+        "proofPlan": response.proof_plan.map(|plan| plan.value.clone()),
+        "next": next_for_build(
+            response.out_dir,
+            response.dry_run,
+            response.schema_path,
+            response.spec_path,
+            response.proof_plan,
+        )
     })
 }
 
@@ -1336,7 +1995,8 @@ fn compiled_summary(compiled: &CompiledDashboard) -> Value {
             "bindings": validation.counts.bindings,
             "rows": validation.counts.rows
         },
-        "tables": validation.tables
+        "tables": validation.tables,
+        "defaultsApplied": compiled.defaults_applied
     })
 }
 
@@ -1345,17 +2005,22 @@ fn next_for_build(
     dry_run: bool,
     schema_path: &Path,
     spec_path: Option<&Path>,
+    proof_plan: Option<&ProofPlan>,
 ) -> Vec<String> {
     if dry_run {
-        return vec![format!(
+        let mut commands = vec![format!(
             "powerbi-cli report build --schema {}{} --out-dir <project-dir> --json",
             command_arg(schema_path),
             spec_path
                 .map(|path| format!(" --spec {}", command_arg(path)))
                 .unwrap_or_default()
         )];
+        if let Some(plan) = proof_plan {
+            commands.extend(plan.next.iter().cloned());
+        }
+        return commands;
     }
-    out_dir
+    let mut commands = out_dir
         .map(|path| {
             vec![
                 format!("powerbi-cli inspect --deep {} --json", command_arg(path)),
@@ -1368,7 +2033,11 @@ fn next_for_build(
                 format!("powerbi-cli desktop open-check {} --json", command_arg(path)),
             ]
         })
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if let Some(plan) = proof_plan {
+        commands.extend(plan.next.iter().cloned());
+    }
+    commands
 }
 
 fn next_for_spec_validate(
@@ -1376,6 +2045,7 @@ fn next_for_spec_validate(
     schema_path: Option<&Path>,
     ok: bool,
     validation_level: &str,
+    proof_plan: Option<&ProofPlan>,
 ) -> Vec<String> {
     if !ok {
         return Vec::new();
@@ -1392,6 +2062,9 @@ fn next_for_spec_validate(
             "powerbi-cli report spec validate --schema <schema.json> --spec {} --json",
             command_arg(spec_path)
         ));
+    }
+    if let Some(plan) = proof_plan {
+        commands.extend(plan.next.iter().cloned());
     }
     commands
 }
