@@ -470,6 +470,13 @@ resolve to an exact model measure or the command returns `spec.missing_input`
 with its pointer and measure candidates. Fields that the starter planner does
 not compile remain visible in `warnings[]` with their owning bead. The
 free-form `--objective` form remains available for quick question-only plans.
+The response also includes an evidence-backed `shape` classification and the
+same shape under `profileSummary` when a profile is supplied. It reports flat,
+star, snowflake, or multi-fact only when schema relationships, cardinalities,
+row-count ratios, and profile column signals support that verdict; otherwise
+it returns `ambiguous` with competing hypotheses. Date-like columns without a
+related date dimension produce a date-table proposal, and high-cardinality
+categorical columns are called out as possible noise.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
