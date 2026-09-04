@@ -372,6 +372,18 @@ three pages.
 
 ## Current Limits
 
+- Dashboard specs are strict at every supported object level. `report spec
+  validate` and `report build` reject unknown keys with
+  `spec.unknown_field`, an RFC 6901 `pointer`, and a `didYouMean` suggestion
+  when one is unambiguous; recognized sections that are not compiled still
+  return `unsupported_feature`. Run `report spec fields --json` for the key
+  catalog, adding `--schema` when exact model binding references are needed.
+  Both `powerbi-cli.dashboard.v1` and its v2 superset are accepted. V2 defines
+  model, style, layout, filter, slicer, visual-formatting, and proof sections;
+  sections whose compiler bead has not landed return `unsupported_feature`
+  with the owning bead id instead of being dropped. The checked-in
+  `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
+  subset and builds byte-identically to the v1 sales fixture.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
