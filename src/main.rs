@@ -81,6 +81,7 @@ mod report_plan;
 mod report_proof;
 mod report_slicer_clear;
 mod report_slicers;
+mod report_spec_explain;
 mod report_spec_fields;
 mod report_spec_normalize;
 mod report_spec_schema;

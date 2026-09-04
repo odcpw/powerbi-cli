@@ -817,6 +817,14 @@ fn supported_pairs() -> Vec<String> {
         .collect()
 }
 
+/// Return the closed visual-format key catalog used by both the formatting
+/// command and dashboard-spec schema generation. Keeping this derived from
+/// `OBJECT_CATALOG` prevents the declarative schema from drifting away from
+/// the proven T4 formatting surface.
+pub(crate) fn format_catalog_keys() -> Vec<String> {
+    supported_pairs()
+}
+
 fn supported_pairs_hint() -> String {
     format!(
         "Supported object/property pairs: {}.",

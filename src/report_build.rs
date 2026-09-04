@@ -9,6 +9,7 @@ use crate::pbir_visual_factory::{
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_proof::{ProofPlan, compile_proof_plan};
+use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
 use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
@@ -147,9 +148,11 @@ pub(crate) fn spec_command(args: &[String]) -> CliResult<Value> {
         [action, rest @ ..] if action == "validate" => spec_validate(rest),
         [action, rest @ ..] if action == "normalize" => normalize_command(rest),
         [action, rest @ ..] if action == "fields" => fields_command(rest),
+        [action, rest @ ..] if action == "schema" => crate::report_spec_schema::schema_command(rest),
+        [action, rest @ ..] if action == "explain" => explain_command(rest),
         [action, rest @ ..] if action == "upgrade" => upgrade_command(rest),
         [] => Err(CliError::invalid_args(
-            "report spec requires a subcommand: validate, normalize, fields, or upgrade",
+            "report spec requires a subcommand: validate, normalize, fields, schema, explain, or upgrade",
         )
             .with_suggested_command(
                 "powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json",
@@ -168,6 +171,14 @@ pub(crate) fn spec_command(args: &[String]) -> CliResult<Value> {
 pub(crate) fn compile_dashboard_summary(schema: &Value, spec: &Value) -> CliResult<Value> {
     let compiled = compile_dashboard(schema, Some(spec))?;
     Ok(compiled_summary(&compiled))
+}
+
+/// Compile a sanitized dashboard spec for the read-only `report spec explain`
+/// surface. The explain command removes recognized-but-uncompiled sections
+/// before calling this helper, while the normal build path retains its strict
+/// refusal behavior.
+pub(crate) fn compiled_schema_for_explain(schema: &Value, spec: &Value) -> CliResult<Value> {
+    Ok(compile_dashboard(schema, Some(spec))?.schema)
 }
 
 fn spec_validate(args: &[String]) -> CliResult<Value> {

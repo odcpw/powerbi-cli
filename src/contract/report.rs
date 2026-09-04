@@ -84,6 +84,38 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
         }),
         json!({
+            "path": "report spec schema",
+            "usage": "powerbi-cli report spec schema [--version v1|v2|all] --json",
+            "summary": "Emit the draft 2020-12 JSON Schema generated from the strict v1/v2 dashboard-spec key catalog",
+            "tags": ["report", "dashboard", "spec", "schema", "json-schema", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.schema.v1",
+            "flags": ["--version v1|v2|all", "--json", "--format json"],
+            "examples": ["powerbi-cli report spec schema --json", "powerbi-cli report spec schema --version v2 --json"],
+            "followUpFields": ["$schema", "$id", "$defs.v1", "$defs.v2", "oneOf"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
+        }),
+        json!({
+            "path": "report spec explain",
+            "usage": "powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json",
+            "summary": "Compile a strict dashboard spec to a deterministic staged operation plan without writing a project",
+            "tags": ["report", "dashboard", "spec", "explain", "plan", "dry-run", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.spec.explain.v1",
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
+            "examples": ["powerbi-cli report spec explain --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --json"],
+            "followUpFields": ["ok", "specVersion", "plan.stages", "plan.ops", "handles.declared", "handles.references", "layout.pages[].slots", "defaults.perVisual", "proofPlan.commands", "proofPlan.unavailable", "unsupportedSections", "warnings", "next"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
+        }),
+        json!({
             "path": "report spec upgrade",
             "usage": "powerbi-cli report spec upgrade --spec <v1.json> (--dry-run | --out <v2.json> [--force]) --json",
             "summary": "Losslessly rewrite a strict powerbi-cli.dashboard.v1 spec as normalized powerbi-cli.dashboard.v2 JSON",

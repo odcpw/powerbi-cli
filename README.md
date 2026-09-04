@@ -278,7 +278,9 @@ cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.js
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
+cargo run --bin powerbi-cli -- report spec schema --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
+cargo run --bin powerbi-cli -- report spec explain --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
@@ -589,6 +591,11 @@ This generated snapshot keeps status and proof claims aligned with
   defaults remain explicit in `defaultsApplied[]`. These are not legacy error
   strings. The exact response shape is published at
   `capabilities.responseShapes.reportSpecValidate`.
+- `report spec schema --json` emits a draft 2020-12 JSON Schema for the v1 and
+  v2 key surfaces. `report spec explain --schema <schema.json> --spec
+  <dashboard.json> [--profile <profile.json>] --json` previews the typed,
+  staged operation plan, stable handles, layout coordinates, defaults,
+  unsupported sections, and proof commands without writing a project.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
