@@ -313,7 +313,11 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "contractNotes": {
             "explainFlagDiscipline": "--explain <id> always takes an identifier. Whole-artifact explanations are subcommands, such as report spec explain and report plan explain."
         },
-        "responseShapes": response_shapes(),
+        // The response-shape catalog includes the internal ops.v1 spine and
+        // is intentionally emitted only by full discovery. Focused command
+        // discovery must stay small and omit unrelated catalogs, matching the
+        // null-shaped schemaManifest/generatedVisualContract fields below.
+        "responseShapes": if focused { Value::Null } else { response_shapes() },
         "featurePolicy": feature_policy_json(),
         "filter": filter,
         "scope": if focused { "focused" } else { "full" },
@@ -325,7 +329,7 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "desktopProofedArchetypes": if focused { Value::Null } else { desktop_proofed_archetypes() },
         "formatTargets": if focused { Value::Null } else { format_targets() },
         "omittedCatalogs": if focused {
-            json!(["schemaManifest", "generatedVisualContract", "desktopProofedArchetypes", "formatTargets"])
+            json!(["responseShapes", "schemaManifest", "generatedVisualContract", "desktopProofedArchetypes", "formatTargets"])
         } else {
             json!([])
         },
