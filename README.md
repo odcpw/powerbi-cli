@@ -327,6 +327,7 @@ cargo run --bin powerbi-cli -- source-template add --project .\build\sales --tab
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
+cargo run --bin powerbi-cli -- handoff rebind-check .\build\sales-live --partition partition:FactSales:FactSales --json
 cargo run --bin powerbi-cli -- fixture normalize .\build\sales --out .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- fixture verify .\build\sales --expected .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- desktop open .\build\sales --json
@@ -783,6 +784,13 @@ This generated snapshot keeps status and proof claims aligned with
   transformation calls stay within the workflow/source-profile closed grammar;
   credential-like text, hard-coded paths, unknown functions, and computed calls
   are refused with a pointer into the M text.
+- `handoff rebind-check` is the offline, credential-free gate after a work-machine
+  rebind. It checks every selected partition for a concrete supported connector,
+  validates SQL/PostgreSQL/ODBC/SharePoint syntax, probes only local file/folder
+  paths for existence and readability, and reports per-partition findings plus
+  strict native validation. It never opens a database, SharePoint, or Desktop
+  connection; use the returned `desktop open` command for separate refresh and
+  canvas proof.
 - Programmatic report layout authoring covers `report pages
   list/show/add/update/reorder/set-active/delete-empty`, `report visuals
   list/show/add/clone/delete`, guarded `report visuals set-position`, and guarded
@@ -908,6 +916,10 @@ This generated snapshot keeps status and proof claims aligned with
   files, and unknown partition sources. The result reports `target`,
   `sourceMode`, `safeForOfflineHandoff`, and `safeForWorkHandoff` explicitly.
   Structurally valid literal tables with PII-suspect rows remain `review`.
+- `handoff rebind-check` verifies that a rebinding is materialized and
+  credential-free without evaluating Power Query. It returns `safe`, `review`,
+  or `unsafe`, stable partition handles, registered finding codes, and a
+  `refresh.status` of `not-run` to make the Desktop boundary explicit.
 - Dashboard specs and strict PBIR validation reject slicers shorter than Power
   BI's 76-pixel minimum, preventing a common source of clipped controls before
   the report reaches Desktop.

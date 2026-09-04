@@ -243,9 +243,9 @@ list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
 PostgreSQL, ODBC, Excel, CSV, folder, SharePoint/OneDrive, and closed-grammar
 generic-M rebind metadata,
-handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
-one-shot desktop open-check/screenshot and Linux-capable desktop
-harvest-reference,
+handoff rebind-plan and offline handoff rebind-check, fixture normalize/verify,
+managed desktop open/close plus one-shot desktop open-check/screenshot and
+Linux-capable desktop harvest-reference,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
@@ -433,7 +433,7 @@ required for manual canvas/refresh proof together with
 | Matching Desktop window title appeared | `desktop open-check` with `proof.observedStage=desktop-window`, `windowObserved=true`, and `titleMatched=true`; matching is exact on the normalized project stem | Manual/screen-agent canvas inspection |
 | Reviewable screen evidence was captured | `desktop screenshot <project> --out <outside-project.png>` with `screenshot.captured=true` and `screenshot.foregroundVerified=true` | Human or screen-agent review of the PNG plus refresh/canvas inspection |
 | Report canvas rendered and refreshed correctly | Manual Desktop canvas/refresh inspection and a committed proof record | Future `desktop-canvas-refresh` automation; window/title/screenshot signals alone are insufficient |
-| Work-machine rebind is prepared | `source-template add` plus `handoff rebind-plan` | successful Desktop refresh at work |
+| Work-machine rebind is prepared | `source-template add` plus `handoff rebind-plan` and post-apply `handoff rebind-check` | successful Desktop refresh at work |
 
 Always name what remains unproven. Validation can prove local file invariants;
 Desktop proves Power BI compatibility.
@@ -800,8 +800,8 @@ bounded DAX assertion remain required for semantic proof.
 
 ### Prepare Source Templates And Rebind Plans
 
-Use source-template and rebind-plan commands only when `capabilities` advertises
-them:
+Use source-template, rebind-plan, and rebind-check commands only when
+`capabilities` advertises them:
 
 ```bash
 pbi --json capabilities --for source-template
@@ -816,7 +816,9 @@ pbi --json source-template add --project build/sales --table FactSales --kind ge
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --out-dir build/sales-rebind
 pbi --json source-template list --project build/sales-rebind
 pbi --json handoff rebind-plan build/sales-rebind --out build/sales-rebind/work-machine-rebind.md
-pbi --json handoff check build/sales-rebind
+pbi --json source-template apply --project build/sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir build/sales-live
+pbi --json handoff check build/sales-live --target work
+pbi --json handoff rebind-check build/sales-live --partition partition:FactSales:FactSales
 ```
 
 Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`.
@@ -837,6 +839,15 @@ named DSN there. The rebind runbook includes these prerequisites and post-refres
 checks. `--out` refuses to overwrite an existing runbook unless `--force` is
 passed, and credential detection redacts response content and suppresses the
 runbook write entirely.
+
+After `source-template apply` on the work machine, run
+`pbi --json handoff rebind-check build/sales-live`. This offline gate checks
+every selected partition for a concrete non-placeholder source, validates
+SQL/PostgreSQL/ODBC/SharePoint call shapes, probes only local paths, and runs
+strict native validation. It emits stable per-partition findings and
+`refresh.status: not-run`; follow its `desktop open` command for the separate
+authenticated refresh and canvas proof. Rebind-check never evaluates M or
+opens a source connection.
 
 The `generic-m` kind accepts one complete expression through `--m-template` or
 `--m-file`. It reuses the workflow/source-profile closed grammar: a direct
@@ -1192,6 +1203,7 @@ The target workflow is:
 pbi --json validate build/sales
 pbi --json handoff check build/sales
 pbi --json handoff rebind-plan build/sales --allow-unmapped
+pbi --json handoff rebind-check build/sales-live --partition partition:FactSales:FactSales
 pbi --json fixture normalize build/sales --out testdata/golden/sales-desktop-filter-contract.summary.json
 pbi --json fixture verify build/sales --expected testdata/golden/sales-desktop-filter-contract.summary.json
 ```
