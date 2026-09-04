@@ -1,3 +1,4 @@
+use crate::handoff_rebind_check::rebind_check;
 use crate::input_safety::{INPUT_SAFETY_ERROR_CODE, InputKind, read_utf8};
 use crate::partitions::partition_summary_json;
 use crate::rebind_plan::rebind_plan;
@@ -19,21 +20,23 @@ use walkdir::WalkDir;
 
 pub(crate) fn handoff_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
-        return Err(
-            CliError::invalid_args("handoff requires a subcommand: check, rebind-plan")
-                .with_hint("Run `powerbi-cli handoff check <project-dir-or.pbip> --json`.")
-                .with_suggested_command("powerbi-cli handoff check <project-dir-or.pbip> --json"),
-        );
+        return Err(CliError::invalid_args(
+            "handoff requires a subcommand: check, rebind-plan, rebind-check",
+        )
+        .with_hint("Run `powerbi-cli handoff check <project-dir-or.pbip> --json`.")
+        .with_suggested_command("powerbi-cli handoff check <project-dir-or.pbip> --json"));
     };
 
     match action.as_str() {
         "check" => check_handoff(rest),
         "rebind" | "rebind-plan" => rebind_plan(rest),
+        "rebind-check" | "rebindCheck" => rebind_check(rest),
         _ => Err(
             CliError::invalid_args(format!("unknown handoff command: {action}"))
-                .with_hint("Run `powerbi-cli handoff check <project-dir-or.pbip> --json` or `powerbi-cli handoff rebind-plan <project-dir-or.pbip> --json`.")
+                .with_hint("Run `powerbi-cli handoff check <project-dir-or.pbip> --json`, `powerbi-cli handoff rebind-plan <project-dir-or.pbip> --json`, or `powerbi-cli handoff rebind-check <project-dir-or.pbip> --json`.")
                 .with_suggested_command("powerbi-cli handoff check <project-dir-or.pbip> --json")
-                .with_suggested_command("powerbi-cli handoff rebind-plan <project-dir-or.pbip> --json"),
+                .with_suggested_command("powerbi-cli handoff rebind-plan <project-dir-or.pbip> --json")
+                .with_suggested_command("powerbi-cli handoff rebind-check <project-dir-or.pbip> --json"),
         ),
     }
 }

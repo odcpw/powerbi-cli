@@ -454,6 +454,17 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    h.ok(
+        "handoff rebind-check",
+        &svec([
+            "handoff",
+            "rebind-check",
+            &p(&work_project),
+            "--partition",
+            "partition:Metrics:Metrics",
+            "--json",
+        ]),
+    );
     let work_pack = h.ok(
         "package work-pack",
         &svec([

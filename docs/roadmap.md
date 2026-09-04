@@ -174,6 +174,8 @@ visual binding is too strict to invent by memory.
 - `handoff check`: verify a project is safe to take home.
 - `handoff rebind-plan`: produce work-machine instructions mapping dummy
   partitions to real source templates without storing credentials.
+- `handoff rebind-check`: verify every rebound partition offline (connector
+  syntax and local path readability only) before the separate Desktop refresh.
 
 ### Proof
 
@@ -404,6 +406,12 @@ frozen until proven.
   Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
+- Implemented offline `handoff rebind-check`: it reports deterministic,
+  per-partition materialization state and registered findings for placeholders,
+  incomplete connector syntax, unknown sources, and missing/unreadable local
+  paths. It runs strict native validation and deliberately never opens a source
+  or Desktop connection; `refresh.status` remains `not-run` until the returned
+  Desktop handoff command is performed on the work machine.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
   applies raw report-level theme bundles from `themeCollection` and already
   present registered theme JSON resources. Per-visual raw formatting bundle
