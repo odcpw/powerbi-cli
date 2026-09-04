@@ -123,6 +123,12 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   levels. The closed ladder is `unit-smoke < schema-golden <
   desktop-golden-pending < manual-desktop-canvas-refresh <
   desktop-canvas-refresh`.
+  Committed records under `testdata/desktop-proof/` use the strict
+  `powerbi-cli.desktop-proof.v1` shape. They name the linked feature IDs and
+  explicit evidence signals; the embedded loader rejects overclaims and
+  `features list` reports the maximum valid level per feature. Placeholder
+  records can remain `desktop-golden-pending`, while launch, title, or
+  screenshot evidence alone cannot claim canvas/refresh compatibility.
   `desktop screenshot` captures the primary display only after the foreground
   window PID is verified as the selected Desktop process or one of its process
   descendants. `desktop open` and idempotent `desktop close` provide one bounded,

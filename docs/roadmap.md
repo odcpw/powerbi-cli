@@ -56,6 +56,9 @@ Required contract rules:
 - `features list --json` must advertise supported, read-only, planned, and
   explicitly refused Power BI feature surfaces, including proof level and
   refusal code.
+- Desktop proof records use the strict embedded `powerbi-cli.desktop-proof.v1`
+  contract. Feature levels are the maximum validated linked-record level and
+  catalog baseline; records that overclaim their explicit signals are rejected.
 - Current and future agent operating guidance lives in
   `skills/powerbi-cli/SKILL.md`.
 - `capabilities --json` should advertise architecture guardrails so subagents

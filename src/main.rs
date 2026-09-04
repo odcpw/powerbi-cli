@@ -10,6 +10,7 @@ mod contract;
 mod dashboard_scaffold;
 mod dax_execute;
 mod desktop;
+mod desktop_proof;
 mod desktop_session;
 mod desktop_target;
 mod diff;
