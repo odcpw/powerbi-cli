@@ -2,8 +2,10 @@
 
 use super::{desktop, integrations, model, report, workflow_pkg};
 use crate::feature_catalog::{feature_catalog_schema_fields, feature_policy_json};
+use crate::input_safety;
 use crate::visual_catalog::{
     schema_golden_visual_type_names, supported_visual_type_names, visual_type_contracts,
+    visual_type_role_rules,
 };
 use crate::{
     CliError, CliResult, EXIT_FILE_NOT_FOUND, EXIT_INVALID_ARGS, EXIT_ORACLE_FAILED,
@@ -53,12 +55,13 @@ pub(crate) fn help_text() -> String {
 Usage:
   powerbi-cli version --json
   powerbi-cli triage <project-dir-or.pbip> --json
-  powerbi-cli --json capabilities [--for <filter>]
+  powerbi-cli --json capabilities [--for <filter> [--compact]]
   powerbi-cli features list [--for <feature-filter>] --json
   powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json
   powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json
   powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> --json
   powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json
+  powerbi-cli package work-pack --project <project-dir-or.pbip> [--out <archive.pbit>] --json
   powerbi-cli package export-plan --project <project-dir-or.pbip> --json
   powerbi-cli robot-docs guide [--json]
   powerbi-cli --robot-triage
@@ -71,7 +74,7 @@ Usage:
   powerbi-cli workflow plan --project <project-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json
   powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
   powerbi-cli workflow verify --plan <plan.json> --json
-  powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json
+  powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] [--row-scale <n>] [--seed <s>] --json
   powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] --json
   powerbi-cli desktop close --json
   powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json
@@ -107,6 +110,7 @@ Usage:
   powerbi-cli model relationships delete --project <project-dir-or.pbip> --handle <relationship-handle> --dry-run --json
   powerbi-cli model partitions list --project <project-dir-or.pbip> --json
   powerbi-cli model partitions show --project <project-dir-or.pbip> --handle <partition-handle> [--include-source] --json
+  powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> --order-by <column> [--desc] --rank-column <column> --eligible-when <M-predicate> --dry-run --json
   powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json
   powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json
   powerbi-cli model dax lint --project <project-dir-or.pbip> --json
@@ -119,7 +123,7 @@ Usage:
   powerbi-cli model expressions list --project <project-dir-or.pbip> --json
   powerbi-cli source-template list --project <project-dir-or.pbip> --json
   powerbi-cli source-template show --project <project-dir-or.pbip> --handle <source-template-handle> --json
-  powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel> --dry-run --json
+  powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint> --dry-run --json
   powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json
   powerbi-cli report design-plan --project <project-dir-or.pbip> --json
   powerbi-cli report tree --project <project-dir-or.pbip> --json
@@ -187,6 +191,7 @@ Usage:
   powerbi-cli report visuals delete --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json
   powerbi-cli report visuals set-position --project <project-dir-or.pbip> --handle <visual-handle> --x <n> --y <n> --dry-run --json
   powerbi-cli report visuals set-bindings --project <project-dir-or.pbip> --handle <visual-handle> --bindings-json <json> --dry-run --json
+  powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json
   powerbi-cli report visuals set-topn-guard --project <project-dir-or.pbip> --handle <visual-handle> --field <Table.Column> --order-by <Table.Measure> --top <N> --dry-run --json
   powerbi-cli report visuals set-object --project <project-dir-or.pbip> --handle <visual-handle> --object <name> --property <name> --value <raw> --dry-run --json
   powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> --handle <visual-handle> --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> --display-name <text> --dry-run --json
@@ -232,7 +237,36 @@ pub(crate) fn help_json() -> Value {
 }
 
 pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
-    let filter = parse_filter(args, "capabilities")?;
+    let options = parse_capabilities_options(args)?;
+    let filter = options.filter;
+    if options.compact {
+        let exact_path = filter.as_deref().ok_or_else(|| {
+            CliError::invalid_args("capabilities --compact requires --for <exact-path>")
+                .with_hint("Pass the exact canonical command path shown by capabilities.")
+                .with_suggested_command(
+                    "powerbi-cli --json capabilities --for <exact-path> --compact",
+                )
+        })?;
+        let command = command_catalog()
+            .into_iter()
+            .find(|command| {
+                command["path"]
+                    .as_str()
+                    .is_some_and(|path| path.eq_ignore_ascii_case(exact_path))
+            })
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "no command has the exact canonical path `{exact_path}`"
+                ))
+                .with_hint(
+                    "Run focused capabilities without --compact to search paths, summaries, and tags.",
+                )
+                .with_suggested_command(format!(
+                    "powerbi-cli --json capabilities --for \"{exact_path}\""
+                ))
+            })?;
+        return Ok(compact_capability(&command));
+    }
     let focused = filter.is_some();
     let mut commands = command_catalog();
     if let Some(filter) = &filter {
@@ -263,6 +297,7 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "globalFlags": global_flags(),
         "exitCodes": exit_codes(),
         "diagnosticCodes": diagnostic_codes(),
+        "limits": input_safety::limits_json(),
         "contractNotes": {
             "explainFlagDiscipline": "--explain <id> always takes an identifier. Whole-artifact explanations are subcommands, such as report spec explain and report plan explain."
         },
@@ -318,7 +353,8 @@ Rules for agents:
 - Start with `powerbi-cli --json capabilities` and trust that payload over memory.
 - Use `powerbi-cli version --json` for a cheap provenance check before relying on cached command knowledge.
 - Use `powerbi-cli features list --json` to distinguish supported, read-only, planned, and explicitly refused Power BI feature surfaces. If a command returns `error.code = "unsupported_feature"`, stop or choose a supported workflow; do not raw-patch guessed PBIR/TMDL.
-- Use `package inspect/extract/import/source-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only documented PBIP/PBIR/TMDL files and generated sidecars, refuses dot-directories/unknown files, and scans every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
+- Read `capabilities.limits` before supplying files. Schema, profile, spec, JSON bundle, intent, and source-text reads are byte-bounded, strict UTF-8, and refuse symlinks; planned include, rows, PNG, ops, snapshot, and harvested-fragment surfaces have reserved numeric contracts there. Safety refusals use `input_safety_violation`; do not bypass them or silently strip content.
+- Use `package inspect/extract/import/source-pack/work-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only dummy partitions. `work-pack` uses the same strict file allowlist but requires every partition to be a recognized credential-free materialized live source accepted by `handoff check --target work`; it contains source metadata, never imported rows or caches. Both scan every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
 - For arbitrary dashboards, start with `schema validate`, `profile infer`, `report plan`, `report spec validate`, then `report build`.
 - After any scaffold, report build, or mutation, run the returned inspect and validate commands.
 - Use `diff <before> <after> --json` to verify measure-level semantic changes after mutations; pass `--scope model.calculatedColumns` for calculated columns or `--scope model.relationships` for relationships.
@@ -330,8 +366,8 @@ Rules for agents:
 - Use `model advanced inventory`, `model roles list/show`, `model perspectives list/show`, `model cultures list/show`, and `model expressions list/show` for advanced TMDL readback. Mutations remain fixture-gated.
 - Use `model relationships list/show/add/update/delete` for model relationships. Endpoint rewiring is delete+add in this alpha surface; `update` changes active state and cross-filtering behavior.
 - Use `model partitions list/show` to inspect generated dummy M partitions and their offline safety classification.
-- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, ODBC, or Excel rebind metadata as sidecar JSON.
-- Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
+- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, or SharePoint/OneDrive rebind metadata as sidecar JSON.
+- Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
 - Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP preflight defaults to `strict`; use `--preflight normal` for structural validation without lint or explicit `--preflight skip` when a known lint defect must not block a Desktop proof loop. PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1` or `--enable-oracle`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
@@ -396,6 +432,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportSpecValidate": "powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json",
             "reportBuild": "powerbi-cli report build --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             "packageSourcePack": "powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json",
+            "packageWorkPack": "powerbi-cli package work-pack --project <project-dir-or.pbip> --json",
             "scaffold": "powerbi-cli --json scaffold --schema examples/sales.schema.json --out-dir build/sales",
             "inspect": "powerbi-cli --json inspect <project-dir-or.pbip>",
             "diff": "powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --json",
@@ -407,10 +444,11 @@ pub(crate) fn robot_triage() -> Value {
             "relationshipList": "powerbi-cli model relationships list --project <project-dir-or.pbip> --json",
             "relationshipAddDryRun": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --dry-run --json",
             "partitionList": "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
+            "partitionAddGroupedRankDryRun": "powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> --order-by <column> --desc --rank-column <column> --eligible-when <M-predicate> --dry-run --json",
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
             "modelDaxExecute": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
             "modelLiveExportTmdl": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read --json",
-            "workflowSynthesize": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> --json",
+            "workflowSynthesize": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--row-scale <n>] [--seed <s>] --json",
             "sourceTemplateList": "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
@@ -489,8 +527,15 @@ pub(crate) fn robot_triage() -> Value {
     })
 }
 
-fn parse_filter(args: &[String], command: &str) -> CliResult<Option<String>> {
+#[derive(Debug, Default, PartialEq, Eq)]
+struct CapabilitiesOptions {
+    filter: Option<String>,
+    compact: bool,
+}
+
+fn parse_capabilities_options(args: &[String]) -> CliResult<CapabilitiesOptions> {
     let mut filter = None;
+    let mut compact = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -502,16 +547,40 @@ fn parse_filter(args: &[String], command: &str) -> CliResult<Option<String>> {
                 );
                 i += 2;
             }
+            "--compact" => {
+                compact = true;
+                i += 1;
+            }
             other => {
-                return Err(CliError::invalid_args(format!("unknown {command} flag: {other}"))
-                    .with_hint(format!(
-                        "Run `powerbi-cli --json {command}` or `powerbi-cli --json {command} --for <filter>`."
-                    ))
-                    .with_suggested_command(format!("powerbi-cli --json {command}")));
+                return Err(CliError::invalid_args(format!(
+                    "unknown capabilities flag: {other}"
+                ))
+                    .with_hint(
+                        "Run `powerbi-cli --json capabilities` or `powerbi-cli --json capabilities --for <filter> [--compact]`.",
+                    )
+                    .with_suggested_command("powerbi-cli --json capabilities"));
             }
         }
     }
-    Ok(filter)
+    Ok(CapabilitiesOptions { filter, compact })
+}
+
+fn compact_capability(command: &Value) -> Value {
+    let fields = [
+        "path",
+        "usage",
+        "flags",
+        "examples",
+        "proofLevel",
+        "followUpFields",
+        "outputSchema",
+    ];
+    Value::Object(
+        fields
+            .into_iter()
+            .map(|field| (field.to_string(), command[field].clone()))
+            .collect(),
+    )
 }
 
 fn command_matches_filter(command: &Value, filter: &str) -> bool {
@@ -587,17 +656,17 @@ pub(crate) fn command_catalog() -> Vec<Value> {
     let mut commands = vec![
         json!({
             "path": "capabilities",
-            "usage": "powerbi-cli --json capabilities [--for <filter>]",
-            "summary": "List the agent-facing command contract; focused queries omit unrelated large catalogs",
+            "usage": "powerbi-cli --json capabilities [--for <filter> [--compact]]",
+            "summary": "List the agent-facing command contract; focused queries omit unrelated large catalogs and exact compact queries return one minimal command record",
             "tags": ["agent", "discovery", "contract"],
             "readOnly": true,
             "mutates": false,
             "stability": "stable-shape",
             "proofLevel": "unit-smoke",
-            "outputSchema": "capabilities.v1",
-            "flags": ["--for <filter>", "--json", "--format json"],
-            "examples": ["powerbi-cli --json capabilities", "powerbi-cli capabilities --json --for scaffold"],
-            "followUpFields": ["scope", "commands[].usage", "commands[].examples", "exitCodes", "omittedCatalogs", "fullContractCommand", "schemaManifest"]
+            "outputSchema": "capabilities.v1 | capabilities.compact.v1",
+            "flags": ["--for <filter>", "--compact", "--json", "--format json"],
+            "examples": ["powerbi-cli --json capabilities", "powerbi-cli capabilities --json --for scaffold", "powerbi-cli --json capabilities --for \"report build\" --compact"],
+            "followUpFields": ["scope", "commands[].usage", "commands[].examples", "exitCodes", "limits", "omittedCatalogs", "fullContractCommand", "schemaManifest"]
         }),
         json!({
             "path": "version",
@@ -882,7 +951,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "path": "lint",
             "usage": "powerbi-cli lint (<project-dir-or.pbip> | --rules | --explain <rule-id>) --json",
             "summary": "Run typed PBIP/PBIR/TMDL quality checks or inspect the canonical lint and audit rule registry",
-            "tags": ["pbip", "pbir", "tmdl", "m", "validation", "lint", "buffer", "expansion", "agent"],
+            "tags": ["pbip", "pbir", "tmdl", "m", "dax", "model-completeness", "format-string", "unused-column", "validation", "lint", "buffer", "expansion", "duplicate-steps", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
@@ -898,9 +967,12 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "diagnosticCodes": crate::rules::rule_ids(),
             "limitations": [
                 "m.unbuffered_reuse is a warning-only heuristic over partition and named-expression M let steps. It fires only for table-producing step kinds `other` and `tableLiteral`, plus `navigation` steps that can be expensive. Function definitions (`(args) =>` / `each`), scalar literals, record literals, and list literals are classified via `stepKind` and suppressed. It does not prove folding or refresh performance and never fails validation by itself.",
-                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`."
+                "m.untyped_expansion is a warning-only heuristic over literal Table.ExpandTableColumn name lists in partition M; it warns only when an expanded column maps to a numeric TMDL sourceColumn without Table.TransformColumnTypes, and never fails validation by itself. Findings include `stepKind`.",
+                "m.duplicate_step_name is a syntax error over partition and named-expression M let steps. It reports the first and duplicate one-based source line/column positions, including quoted identifiers and the final step before `in`; comments and string literals are ignored. Rename or remove the duplicate before opening the project in Desktop.",
+                "dax.format_missing and dax.format_invalid inspect static measure formatString metadata without a Desktop formatting engine. Dynamic formatStringDefinition expressions count as explicit formats, while custom-format validation is intentionally structural and conservative.",
+                "model.key_not_hidden, model.relationship_direction_suspect, and model.column_unused are warning-only completeness heuristics over deep model/report metadata and static DAX references. They do not prove report intent, filter semantics, or Desktop compatibility."
             ],
-            "followUpFields": ["ok", "counts", "findings", "findings[].stepKind", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
+            "followUpFields": ["ok", "counts", "findings", "findings[].hint", "findings[].stepKind", "findings[].firstPosition", "findings[].duplicatePosition", "families", "rules[].id", "rule.id", "exampleFinding", "next"]
         }),
         json!({
             "path": "diff",
@@ -1001,6 +1073,8 @@ fn diagnostic_codes() -> Vec<Value> {
     vec![
         json!({"code": "invalid_args", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "unsupported_feature", "exitCode": EXIT_INVALID_ARGS}),
+        json!({"code": "input_safety_violation", "exitCode": EXIT_VALIDATION_FAILED}),
+        json!({"code": "spec.unknown_field", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "file_not_found", "exitCode": EXIT_FILE_NOT_FOUND}),
         json!({"code": "validation_failed", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "integrity_failed", "exitCode": EXIT_VALIDATION_FAILED}),
@@ -1031,7 +1105,7 @@ fn schema_manifest() -> Value {
             "appliesTo": ["table", "measure", "column", "partition"]
         },
         "partitionFields": ["handle", "table", "name", "expressionKind", "mode", "sourceKind", "offlineSafety", "sourcePreview", "source", "sourceIncluded"],
-        "partitionSourceKinds": ["dummyMTable", "modelDerived", "sqlDatabase", "postgresqlDatabase", "odbcDataSource", "webContents", "externalFile", "unknown", "missing"],
+        "partitionSourceKinds": ["dummyMTable", "modelDerived", "sqlDatabase", "postgresqlDatabase", "odbcDataSource", "webContents", "externalFile", "sharePointFiles", "unknown", "missing"],
         "modelDaxBridgePlanFields": ["ok", "projectDir", "counts.measures", "counts.calculatedColumns", "daxInventory.measures[].handle", "daxInventory.measures[].expression", "daxInventory.calculatedColumns[].handle", "daxInventory.calculatedColumns[].expression", "bridge.required", "bridge.supportedEngines", "bridge.noFakeFallbacks", "validationBridge.offlineDaxParser.available", "next"],
         "modelDaxExecuteFields": ["ok", "exitCode", "document.kind", "document.path", "query.source", "query.lengthBytes", "query.fingerprint", "query.textReturned", "safety.readOnlyQueryFormsOnly", "safety.allowDataRead", "safety.exactOpenProjectMatchRequired", "safety.autoLaunch", "safety.modelWrites", "limits.maxRows", "limits.maxCellChars", "limits.timeoutMs", "stage", "engine.kind", "engine.desktopProcessId", "engine.modelProcessId", "engine.port", "columns[].ordinal", "columns[].name", "columns[].dataType", "rows", "counts.rows", "counts.columns", "counts.truncatedCells", "truncation.rows", "truncation.cells", "runtime.temporaryFilesRemoved", "diagnostics", "validation", "next"],
         "modelStaticTableMutationFields": ["ok", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.columns", "tablePlan.kind", "tablePlan.dataType", "tablePlan.dataTypes", "tablePlan.columnCount", "tablePlan.rowCount", "tablePlan.uniqueFirstColumn", "tablePlan.relationshipCount", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
@@ -1042,11 +1116,14 @@ fn schema_manifest() -> Value {
         "sourceTemplateKinds": ["sql", "postgres", "odbc", "excel"],
         "rebindPlanFields": ["handle", "partitionHandle", "table", "partition", "currentSourceKind", "sourceRange", "template", "mTemplate", "manualSteps"],
         "profileFields": ["schema", "source", "tables", "tables[].role", "tables[].rowCount", "tables[].columns", "tables[].columns[].roles", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "warnings"],
+        "dashboardSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
-        "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
+        "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
+        "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
         "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
+        "lintFindingFields": ["code", "severity", "message", "handle", "path", "hint", "stepKind"],
         "lintRuleFamilies": crate::rules::rule_family_names(),
         "lintFindingCodes": crate::rules::rule_ids(),
         "validationFindingCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
@@ -1100,7 +1177,7 @@ fn schema_manifest() -> Value {
         "reportThemePresetFields": ["presets[].id", "presets[].name", "presets[].command", "preset.id", "preset.bundle", "preset.fingerprint"],
         "visualFields": ["name", "visualType", "title", "mode", "bindings", "x", "y", "z", "width", "height", "tabOrder"],
         "visualBindingFields": ["role", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
-        "visualCatalogFields": ["supportedVisualTypes", "visualTypes[].visualType", "visualTypes[].aliases", "visualTypes[].proofLevel", "visualTypes[].roles", "templateOnlyVisualTypes", "plannedVisualTypes", "next"],
+        "visualCatalogFields": ["supportedVisualTypes", "visualTypes[].visualType", "visualTypes[].aliases", "visualTypes[].proofLevel", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].proofLevel", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"],
         "visualFormattingFields": ["rawIncluded", "formatObjectContainerCount", "formatCardCount", "formatPropertyCount", "unsupportedContainerCount", "literalValueCount", "sources", "objectNames", "containers", "safety"],
         "visualFormattingContainerFields": ["source", "objectName", "shape", "unsupportedShape", "cardCount", "propertyCount", "selectorCount", "literalValueCount", "propertyNames", "cards", "raw"],
         "visualFormattingBundleFields": ["schema", "bundleVersion", "sourceFingerprint", "source.visual", "formatting.visualObjects", "formatting.topLevelObjects", "summary", "safety"],
@@ -1113,6 +1190,7 @@ fn schema_manifest() -> Value {
         "visualCloneMutationFields": ["dryRun", "mode", "source.handle", "target.handle", "clonePlan.strategy", "clonePlan.sourcePath", "clonePlan.targetPath", "clonePlan.position.before", "clonePlan.position.after", "changes[].path", "changes[].after", "readbackCommand", "slicerReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "visualDeleteMutationFields": ["dryRun", "mode", "target.handle", "target.page.handle", "deletePlan.before", "deletePlan.after", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "visualBindingMutationFields": ["bindingPlan.before", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
+        "visualBindingRepairFields": ["dryRun", "changed", "target.handle", "rule", "repairs[].ruleId", "repairs[].action", "repairPlan.before", "repairPlan.after", "repairPlan.op", "previewCommand", "applyCommand", "readbackCommand", "validateCommand"],
         "columnDataTypes": ["string", "int64", "double", "decimal", "date", "dateTime", "boolean"],
         "samples": ["examples/sales.schema.json", "examples/archetypes/regional-sales.schema.json"]
     });
@@ -1144,6 +1222,22 @@ fn schema_manifest() -> Value {
         "validation",
         "next"
     ]);
+    manifest["packageWorkPackFields"] = json!([
+        "ok",
+        "changed",
+        "dryRun",
+        "projectDir",
+        "pbip",
+        "package",
+        "packageKind",
+        "packageClass",
+        "sourcePolicy",
+        "entries[].name",
+        "entries[].category",
+        "entries[].generated",
+        "validation",
+        "next"
+    ]);
     manifest["reportPlanFields"] = json!([
         "ok",
         "schemaPath",
@@ -1165,6 +1259,7 @@ fn generated_visual_contract() -> Value {
         "summary": "Generated dashboard specs and report visuals add use this small visual role contract. Exact card, tableEx, lineChart, scatterChart, and hundredPercentStackedColumnChart visual.json goldens replicate Desktop-rendered shapes from the 2026-08 production pilot and carry schema-golden proof. Use clone/template workflows for visuals outside the catalog.",
         "supportedVisualTypes": supported_visual_type_names(),
         "visualTypes": visual_type_contracts(),
+        "rules": visual_type_role_rules(),
         "schemaGoldenVisualTypes": schema_golden_visual_type_names(),
         "desktopGoldenPendingVisualTypes": supported_visual_type_names().into_iter().filter(|visual_type| !schema_golden_visual_type_names().contains(visual_type)).collect::<Vec<_>>(),
         "bindingManualDesktopCanvasRefreshVisualTypes": ["pieChart", "donutChart", "pivotTable", "slicer"],
@@ -1247,6 +1342,12 @@ fn proof_levels() -> Vec<Value> {
 
 fn response_shapes() -> Value {
     json!({
+        "capabilities.compact.v1": {
+            "appliesTo": "capabilities --for <exact-path> --compact",
+            "exactPathRequired": true,
+            "fields": ["path", "usage", "flags", "examples", "proofLevel", "followUpFields", "outputSchema"],
+            "additionalFields": false
+        },
         "success": {
             "transport": "stdout",
             "familySpecific": true,
@@ -1272,6 +1373,20 @@ fn response_shapes() -> Value {
                     "message": "<text>",
                     "hint": "<optional-text>",
                     "suggestedCommands": ["<executable powerbi-cli command template>"]
+                }
+            }
+        },
+        "reportSpecValidate": {
+            "schema": "powerbi-cli.report.spec.validate.v1",
+            "transport": "stdout",
+            "validationFailure": "exitCode=10 with ok=false (or ok=null for shape-only validation)",
+            "errors": {
+                "type": "array",
+                "item": {
+                    "type": "object",
+                    "requiredFields": ["code", "message"],
+                    "optionalFields": ["pointer", "didYouMean", "hint", "suggestedCommands"],
+                    "pointer": "RFC 6901 JSON pointer into the submitted dashboard spec when available"
                 }
             }
         },
@@ -1316,6 +1431,30 @@ fn design_rules() -> Vec<&'static str> {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn compact_capabilities_options_accept_either_flag_order() {
+        for args in [
+            vec![
+                "--for".to_string(),
+                "report build".to_string(),
+                "--compact".to_string(),
+            ],
+            vec![
+                "--compact".to_string(),
+                "--for".to_string(),
+                "report build".to_string(),
+            ],
+        ] {
+            assert_eq!(
+                parse_capabilities_options(&args).expect("compact options"),
+                CapabilitiesOptions {
+                    filter: Some("report build".to_string()),
+                    compact: true,
+                }
+            );
+        }
+    }
 
     #[test]
     fn proof_level_vocabulary_is_ordered_and_closed_across_catalogs() {

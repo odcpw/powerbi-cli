@@ -3,26 +3,46 @@
 #![allow(dead_code)]
 
 use serde_json::{Value, json};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-pub struct RunOutput {
-    pub code: i32,
-    pub stdout: String,
-    pub stderr: String,
+mod fixtures;
+mod run;
+mod snapshots;
+
+pub type ArchetypeFixture = fixtures::ArchetypeFixture;
+pub type DashboardSpecBuilder = fixtures::DashboardSpecBuilder;
+pub type CliCommand = run::CliCommand;
+pub type CliRun = run::CliRun;
+pub type RunOutput = run::RunOutput;
+
+pub fn archetype_names() -> &'static [&'static str] {
+    fixtures::archetype_names()
 }
 
-pub fn run_powerbi(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
+pub fn load_archetype(name: &str) -> ArchetypeFixture {
+    fixtures::load_archetype(name)
+}
+
+pub fn cli_command<I, S>(args: I) -> CliCommand
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    run::cli_command(args)
+}
+
+pub fn run_powerbi(args: &[&str]) -> CliRun {
+    run::run_powerbi(args)
+}
+
+pub fn run_powerbi_owned(args: &[String]) -> CliRun {
+    run::run_powerbi_owned(args)
+}
+
+pub fn assert_json_snapshot(name: &str, value: &Value) {
+    snapshots::assert_json_snapshot(name, value);
 }
 
 pub fn stdout_json(output: &RunOutput) -> Value {
@@ -45,11 +65,6 @@ pub fn assert_unsupported_feature(stderr: &str, message_fragment: &str) -> Value
         "expected error message to contain {message_fragment:?}: {value}"
     );
     value
-}
-
-pub fn run_powerbi_owned(args: &[String]) -> RunOutput {
-    let args = args.iter().map(String::as_str).collect::<Vec<_>>();
-    run_powerbi(&args)
 }
 
 pub fn scaffold_sales(root: &Path) -> PathBuf {

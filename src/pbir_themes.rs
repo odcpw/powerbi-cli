@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::project_io::write_json_atomic;
 use crate::safety_scan::{CREDENTIAL_NEEDLES, contains_credential_like_text};
 use crate::{CliError, CliResult, ResolvedProject, canonical_display};
@@ -34,7 +35,11 @@ pub(crate) struct ThemeFinding {
 
 pub(crate) fn list_report_themes(resolved: &ResolvedProject) -> CliResult<Vec<ReportThemeRecord>> {
     let report_json_path = resolved.report_dir.join("definition").join("report.json");
-    let report_json_text = fs::read_to_string(&report_json_path).unwrap_or_default();
+    let report_json_text = if report_json_path.is_file() {
+        read_utf8(&report_json_path, InputKind::ProjectText)?
+    } else {
+        String::new()
+    };
     let mut themes = Vec::new();
 
     for entry in WalkDir::new(&resolved.report_dir) {
@@ -86,8 +91,7 @@ pub(crate) fn list_report_themes(resolved: &ResolvedProject) -> CliResult<Vec<Re
 }
 
 pub(crate) fn read_theme_json(path: &Path) -> CliResult<Value> {
-    let text = fs::read_to_string(path)
-        .map_err(|err| CliError::file_not_found(format!("read theme {}: {err}", path.display())))?;
+    let text = read_utf8(path, InputKind::JsonArtifact)?;
     let value = serde_json::from_str(&text).map_err(|err| {
         CliError::validation_failed(format!("parse theme JSON {}: {err}", path.display()))
     })?;

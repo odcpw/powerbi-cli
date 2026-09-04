@@ -8,7 +8,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
-            "summary": "Compile a data schema plus optional profile/dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -27,7 +27,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report spec validate",
             "usage": "powerbi-cli report spec validate [--schema <schema.json>] --spec <dashboard.json> [--profile <profile.json>] --json",
-            "summary": "Validate a dashboard spec shape, and compile-check it against a schema/profile when --schema is supplied before report build",
+            "summary": "Validate a strict powerbi-cli.dashboard.v1 or v2 shape, and compile-check it against a schema/profile when --schema is supplied before report build",
             "tags": ["report", "dashboard", "spec", "schema", "profile", "validation", "agent"],
             "readOnly": true,
             "mutates": false,
@@ -42,12 +42,14 @@ pub(super) fn commands() -> Vec<Value> {
             "validationLevels": [
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
-            ]
+            ],
+            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
         }),
         json!({
             "path": "report spec fields",
-            "usage": "powerbi-cli report spec fields --schema <schema.json> [--profile <profile.json>] --json",
-            "summary": "List exact column and measure binding references for writing dashboard specs without guessing raw schema JSON",
+            "usage": "powerbi-cli report spec fields [--schema <schema.json>] [--profile <profile.json>] --json",
+            "summary": "List the strict dashboard-spec key catalog and, when a schema is supplied, exact column and measure binding references",
             "tags": ["report", "dashboard", "spec", "fields", "schema", "profile", "bindings", "agent"],
             "readOnly": true,
             "mutates": false,
@@ -56,8 +58,8 @@ pub(super) fn commands() -> Vec<Value> {
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.spec.fields.v1",
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--json", "--format json"],
-            "examples": ["powerbi-cli report spec fields --schema examples/sales.schema.json --profile examples/sales.profile.json --json"],
-            "followUpFields": ["ok", "exitCode", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
+            "examples": ["powerbi-cli report spec fields --json", "powerbi-cli report spec fields --schema examples/sales.schema.json --profile examples/sales.profile.json --json"],
+            "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
         }),
         json!({
             "path": "report plan",
@@ -1062,18 +1064,18 @@ pub(super) fn commands() -> Vec<Value> {
             "path": "report visuals catalog",
             "aliases": ["report visuals types", "report visuals visual-types"],
             "usage": "powerbi-cli report visuals catalog [--visual-type <type-or-alias>] --json",
-            "summary": "Return generated visual types, aliases, binding roles, template-only visual types, and planned visual families for agent-safe report authoring",
+            "summary": "Return generated visual types plus complete fixture-backed role, projection, exclusivity, and runtime-parity rules for agent-safe report authoring",
             "tags": ["pbir", "report", "visual", "catalog", "chart", "binding", "combo", "pareto", "pie", "donut", "matrix", "slicer", "agent"],
             "readOnly": true,
             "mutates": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
-            "outputSchema": "powerbi-cli.report.visuals.catalog.v1",
+            "outputSchema": "powerbi-cli.report.visuals.catalog.v2",
             "flags": ["--visual-type <type-or-alias>", "--type <type-or-alias>", "--json", "--format json"],
             "supportedVisualTypes": supported_visual_type_names(),
             "examples": ["powerbi-cli report visuals catalog --json", "powerbi-cli report visuals catalog --visual-type line --json"],
             "limitations": ["Raw columns are supported in proven categorical/table roles and as explicit Sum aggregations for scatter X/Y/Size and hundredPercentStackedColumnChart Y; other value roles require measures.", "scatterChart rejects Details; use Category for detail identity.", "A model field may appear only once per generated visual until Desktop-authored duplicate queryRef numbering is available.", "Explicit binding sort currently supports one projected measure with sortDirection=Descending."],
-            "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "templateOnlyVisualTypes", "plannedVisualTypes", "next"]
+            "followUpFields": ["supportedVisualTypes", "visualTypes[].proofLevel", "visualTypes[].bindingProofLevel", "visualTypes[].proofNote", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"]
         }),
         json!({
             "path": "report visuals add",
@@ -1214,6 +1216,24 @@ pub(super) fn commands() -> Vec<Value> {
             "examples": ["powerbi-cli report visuals set-bindings --project build/sales --handle <visual-handle> --bindings-json '[{\"role\":\"Values\",\"table\":\"FactSales\",\"measure\":\"Total Revenue\",\"sortDirection\":\"Descending\"}]' --dry-run --json", "powerbi-cli report visuals set-bindings --project build/sales --handle <visual-handle> --clear-bindings --dry-run --json"],
             "limitations": ["Scatter X/Y/Size and hundredPercentStackedColumnChart Y columns are emitted as explicit Function 0 Sum aggregations; other raw measure/value-role columns remain refused.", "scatterChart rejects Details and directs callers to Category.", "Repeated use of one model field returns unsupported_feature pending Desktop-authored duplicate queryRef numbering.", "Explicit sort accepts one projected measure with Descending direction only."],
             "followUpFields": ["dryRun", "bindingPlan.before", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"]
+        }),
+        json!({
+            "path": "report visuals repair-bindings",
+            "aliases": ["report visuals repairBindings"],
+            "usage": "powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --dry-run --json",
+            "summary": "Inspect one existing visual against the fixture-backed role map and propose the minimal proven set-bindings op for mechanical runtime-parity defects",
+            "tags": ["pbir", "report", "visual", "binding", "repair", "runtime-parity", "dry-run", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "requiresOutput": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "schema-golden",
+            "outputSchema": "powerbi-cli.report.visuals.bindingRepair.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-handle>", "--dry-run", "--json", "--format json"],
+            "examples": ["powerbi-cli report visuals repair-bindings --project build/sales --handle <visual-handle> --dry-run --json"],
+            "limitations": ["Repairs only mechanically proven role aliases and Sum aggregation wrappers; it never invents, drops, or substitutes fields.", "Missing required roles, duplicate fields, unproven field kinds, and unsupported visual families return unsupported_feature without writing.", "The returned op is a report.visuals.setBindings proposal; apply it through the returned set-bindings preview/apply commands."],
+            "followUpFields": ["dryRun", "changed", "target.handle", "rule", "repairs[].ruleId", "repairs[].action", "repairPlan.before", "repairPlan.after", "repairPlan.op", "previewCommand", "applyCommand", "readbackCommand", "validateCommand"]
         }),
         json!({
             "path": "report visuals set-topn-guard",

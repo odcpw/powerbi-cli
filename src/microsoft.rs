@@ -1,4 +1,5 @@
 use crate::child_process::{spawn_contained, terminate_after_exit, terminate_and_wait};
+use crate::input_safety::{InputKind, read_bytes};
 use crate::project_io::write_text_atomic;
 use crate::{CliError, CliResult, EXIT_ORACLE_UNAVAILABLE, EXIT_SUCCESS, EXIT_VALIDATION_FAILED};
 use serde::{Deserialize, Serialize};
@@ -314,9 +315,7 @@ pub(crate) fn validate_official_report(resolved: &crate::ResolvedProject) -> Cli
 }
 
 fn ensure_single_report_artifact(resolved: &crate::ResolvedProject) -> CliResult<()> {
-    let bytes = fs::read(&resolved.pbip_path).map_err(|error| {
-        CliError::file_not_found(format!("read {}: {error}", resolved.pbip_path.display()))
-    })?;
+    let bytes = read_bytes(&resolved.pbip_path, InputKind::JsonArtifact)?;
     if bytes.len() > 1024 * 1024 {
         return Err(CliError::validation_failed(
             "PBIP entry file exceeds the 1 MiB official-validation resolution limit",

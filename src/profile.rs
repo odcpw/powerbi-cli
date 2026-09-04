@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -397,9 +398,7 @@ pub(crate) fn profile_summary(profile: &Value) -> Value {
 }
 
 pub(crate) fn load_profile_value(path: &Path) -> CliResult<Value> {
-    let text = fs::read_to_string(path).map_err(|err| {
-        CliError::file_not_found(format!("read profile {}: {err}", path.display()))
-    })?;
+    let text = read_utf8(path, InputKind::Profile)?;
     serde_json::from_str(&text)
         .map_err(|err| CliError::invalid_args(format!("parse profile {}: {err}", path.display())))
 }

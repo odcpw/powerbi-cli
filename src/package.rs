@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::project_io::copy_project_dir;
 use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect_text};
 use crate::tmdl::load_table_documents;
@@ -18,6 +19,43 @@ const DEFAULT_MAX_ARCHIVE_ENTRIES: usize = 10_000;
 const DEFAULT_MAX_ENTRY_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const DEFAULT_MAX_COMPRESSION_RATIO: u64 = 200;
+const WORK_PACK_MANIFEST_NAME: &str = "powerbi-cli.work-pack.json";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectPackKind {
+    Source,
+    Work,
+}
+
+impl ProjectPackKind {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Source => "package source-pack",
+            Self::Work => "package work-pack",
+        }
+    }
+
+    fn package_class(self) -> &'static str {
+        match self {
+            Self::Source => "source-package",
+            Self::Work => "work-package",
+        }
+    }
+
+    fn content_label(self) -> &'static str {
+        match self {
+            Self::Source => "source package",
+            Self::Work => "work package",
+        }
+    }
+
+    fn validation_label(self) -> &'static str {
+        match self {
+            Self::Source => "source packaging",
+            Self::Work => "work packaging",
+        }
+    }
+}
 
 #[derive(Debug)]
 struct PackageOptions {
@@ -90,7 +128,7 @@ enum EntryCategory {
 pub(crate) fn package_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "package requires a subcommand: inspect, extract, import, source-pack, or export-plan",
+            "package requires a subcommand: inspect, extract, import, source-pack, work-pack, or export-plan",
         )
         .with_hint("Use package commands for archive metadata doors; PBIX/PBIT opaque Desktop binary export is not guessed.")
         .with_suggested_command("powerbi-cli package inspect <file.pbix|file.pbit|file.zip> --json"));
@@ -100,7 +138,10 @@ pub(crate) fn package_command(args: &[String]) -> CliResult<Value> {
         "inspect" | "info" => inspect_package(rest),
         "extract" | "unpack" => extract_package(rest, false),
         "import" => extract_package(rest, true),
-        "source-pack" | "source-package" | "source-zip" => source_pack(rest),
+        "source-pack" | "source-package" | "source-zip" => {
+            project_pack(rest, ProjectPackKind::Source)
+        }
+        "work-pack" | "work-package" => project_pack(rest, ProjectPackKind::Work),
         "export-plan" | "pbit-plan" | "template-plan" => export_plan(rest),
         "export" | "compile" | "pack" => Err(CliError::unsupported_feature(
             "PBIX/PBIT binary export is not implemented because Microsoft documents Desktop export, not a public PBIP-to-PBIT writer format.",
@@ -419,23 +460,36 @@ fn cleanup_partial_extraction(out_dir: &Path, preserve_empty_directory: bool) ->
     Ok(())
 }
 
-fn source_pack(args: &[String]) -> CliResult<Value> {
-    let options = parse_source_pack_args(args)?;
+fn project_pack(args: &[String], kind: ProjectPackKind) -> CliResult<Value> {
+    let options = parse_project_pack_args(args, kind)?;
+    let command = kind.command();
     let project = options.project.ok_or_else(|| {
-        CliError::invalid_args("package source-pack requires --project <project-dir-or.pbip>")
-            .with_hint("Pass a PBIP source project. The command writes a deterministic source archive, not an opaque Desktop data package.")
-            .with_suggested_command("powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --json")
-    })?;
-    let out_file = options.out_file.as_ref().ok_or_else(|| {
-        CliError::invalid_args("package source-pack requires --out <archive.pbit|archive.pbix|archive.zip>")
-            .with_hint("Choose the handoff archive path explicitly; existing files are refused unless --force is set.")
-            .with_suggested_command("powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --json")
+        CliError::invalid_args(format!(
+            "{command} requires --project <project-dir-or.pbip>"
+        ))
+        .with_hint("Pass a PBIP source project. The command writes a deterministic source archive, not an opaque Desktop data package.")
+        .with_suggested_command(format!(
+            "powerbi-cli {command} --project <project-dir-or.pbip> --out report-{}.pbit --json",
+            if kind == ProjectPackKind::Source { "source" } else { "work" }
+        ))
     })?;
     let resolved = resolve_project(&project)?;
+    let out_file = match options.out_file {
+        Some(path) => path,
+        None if kind == ProjectPackKind::Work => default_work_pack_path(&resolved.project_dir)?,
+        None => {
+            return Err(CliError::invalid_args(
+                "package source-pack requires --out <archive.pbit|archive.pbix|archive.zip>",
+            )
+            .with_hint("Choose the handoff archive path explicitly; existing files are refused unless --force is set.")
+            .with_suggested_command("powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --json"));
+        }
+    };
     let validation = validate_project(&resolved)?;
     if !validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
-            "project is not valid for source packaging: {}",
+            "project is not valid for {}: {}",
+            kind.validation_label(),
             validation
                 .errors
                 .iter()
@@ -448,7 +502,7 @@ fn source_pack(args: &[String]) -> CliResult<Value> {
             command_arg(&resolved.project_dir)
         )));
     }
-    reject_source_pack_output(&resolved.project_dir, out_file, options.force)?;
+    reject_project_pack_output(&resolved.project_dir, &out_file, options.force, kind)?;
     let files = source_project_files(&resolved.project_dir)?;
     let mut unapproved_files = Vec::new();
     for file in &files {
@@ -460,7 +514,8 @@ fn source_pack(args: &[String]) -> CliResult<Value> {
     unapproved_files.sort();
     if !unapproved_files.is_empty() {
         return Err(CliError::validation_failed(format!(
-            "project contains unapproved source-package files: {}",
+            "project contains unapproved {} files: {}",
+            kind.package_class(),
             unapproved_files.join(", ")
         ))
         .with_hint("Source packages allow only PBIP/PBIR/TMDL project files and the documented generated sidecars; remove unknown files and every dot-directory before handoff.")
@@ -480,7 +535,13 @@ fn source_pack(args: &[String]) -> CliResult<Value> {
         })
         .collect::<CliResult<Vec<_>>>()?;
     archive_entries.sort_by(|a, b| a.0.cmp(&b.0));
-    scan_source_archive_content(&resolved, &archive_entries)?;
+    scan_project_archive_content(&resolved, &archive_entries, kind)?;
+
+    let work_manifest = (kind == ProjectPackKind::Work).then(work_pack_manifest);
+    let generated_entries = work_manifest
+        .as_ref()
+        .map(|bytes| vec![(WORK_PACK_MANIFEST_NAME, bytes.as_slice())])
+        .unwrap_or_default();
 
     if !options.dry_run {
         if let Some(parent) = out_file
@@ -491,44 +552,68 @@ fn source_pack(args: &[String]) -> CliResult<Value> {
                 CliError::unexpected(format!("create {}: {err}", parent.display()))
             })?;
         }
-        write_source_archive(out_file, &archive_entries)?;
+        write_source_archive(&out_file, &archive_entries, &generated_entries)?;
     }
 
-    Ok(json!({
-        "schema": "powerbi-cli.package.sourcePack.v1",
+    let mut response_entries = archive_entries
+        .iter()
+        .map(|(name, path)| {
+            let mut entry = json!({
+                "name": name,
+                "path": canonical_display(path),
+                "category": source_pack_project_file_category(&resolved, name).map(EntryCategory::as_str).unwrap_or("unknown")
+            });
+            if kind == ProjectPackKind::Work {
+                entry["generated"] = Value::Bool(false);
+            }
+            entry
+        })
+        .collect::<Vec<_>>();
+    if kind == ProjectPackKind::Work {
+        response_entries.push(json!({
+            "name": WORK_PACK_MANIFEST_NAME,
+            "path": Value::Null,
+            "category": EntryCategory::MetadataJson.as_str(),
+            "generated": true
+        }));
+    }
+
+    let mut response = json!({
+        "schema": if kind == ProjectPackKind::Source { "powerbi-cli.package.sourcePack.v1" } else { "powerbi-cli.package.workPack.v1" },
         "ok": true,
         "exitCode": EXIT_SUCCESS,
         "changed": !options.dry_run,
         "dryRun": options.dry_run,
         "projectDir": canonical_display(&resolved.project_dir),
         "pbip": canonical_display(&resolved.pbip_path),
-        "package": canonical_display(out_file),
-        "packageKind": package_kind(out_file),
-        "packageClass": "source-package",
+        "package": canonical_display(&out_file),
+        "packageKind": package_kind(&out_file),
+        "packageClass": kind.package_class(),
         "canWriteBinaryPackage": false,
         "desktopBinaryCompatible": false,
         "noFakeFallbacks": true,
         "counts": {
-            "entries": archive_entries.len(),
+            "entries": archive_entries.len() + generated_entries.len(),
             "unapprovedRejected": unapproved_files.len(),
             "contentScanFailures": 0
         },
-        "entries": archive_entries.iter().map(|(name, path)| json!({
-            "name": name,
-            "path": canonical_display(path),
-            "category": source_pack_project_file_category(&resolved, name).map(EntryCategory::as_str).unwrap_or("unknown")
-        })).collect::<Vec<_>>(),
+        "entries": response_entries,
         "validation": {
             "ok": true,
             "warnings": validation.warnings,
             "errors": validation.errors
         },
         "next": [
-            format!("powerbi-cli package inspect {} --json", command_arg(out_file)),
-            format!("powerbi-cli package import {} --out-dir <empty-dir> --json", command_arg(out_file)),
+            format!("powerbi-cli package inspect {} --json", command_arg(&out_file)),
+            format!("powerbi-cli package import {} --out-dir <empty-dir> --json", command_arg(&out_file)),
             format!("powerbi-cli desktop open-check {} --json", command_arg(&resolved.project_dir))
         ]
-    }))
+    });
+    if kind == ProjectPackKind::Work {
+        response["sourcePolicy"] =
+            Value::String("recognized-credential-free-materialized-live-partitions-only".into());
+    }
+    Ok(response)
 }
 
 fn export_plan(args: &[String]) -> CliResult<Value> {
@@ -756,7 +841,16 @@ fn package_has_pbip_source(entries: &[PackageEntry]) -> bool {
 }
 
 fn package_class(entries: &[PackageEntry]) -> &'static str {
-    if package_has_pbip_source(entries) && !entries.iter().any(|entry| entry.category.is_unsafe()) {
+    if entries
+        .iter()
+        .any(|entry| entry.name.eq_ignore_ascii_case(WORK_PACK_MANIFEST_NAME))
+        && package_has_pbip_source(entries)
+        && !entries.iter().any(|entry| entry.category.is_unsafe())
+    {
+        "work-package"
+    } else if package_has_pbip_source(entries)
+        && !entries.iter().any(|entry| entry.category.is_unsafe())
+    {
         "source-package"
     } else if package_has_pbip_source(entries) {
         "source-bearing-desktop-package"
@@ -958,6 +1052,7 @@ fn source_pack_file_category(relative_name: &str) -> Option<EntryCategory> {
     if parts.len() == 1 {
         return match lower[0].as_str() {
             name if name.ends_with(".pbip") => Some(EntryCategory::Pbip),
+            "powerbi-cli.work-pack.json" => Some(EntryCategory::MetadataJson),
             ".gitignore" | "powerbi_handoff.md" => Some(EntryCategory::Unknown),
             "powerbi-cli.manifest.copy.json" => Some(EntryCategory::MetadataJson),
             _ => None,
@@ -1087,17 +1182,17 @@ fn report_definition_json_is_approved(parts: &[String]) -> bool {
     }
 }
 
-fn scan_source_archive_content(
+fn scan_project_archive_content(
     resolved: &crate::ResolvedProject,
     entries: &[(String, PathBuf)],
+    kind: ProjectPackKind,
 ) -> CliResult<()> {
     let mut credential_files = BTreeSet::new();
     let mut pii_review_files = BTreeSet::new();
     let mut non_dummy_partition_files = BTreeSet::new();
+    let mut embedded_row_partition_files = BTreeSet::new();
     for (name, path) in entries {
-        let bytes = fs::read(path)
-            .map_err(|err| CliError::unexpected(format!("scan {}: {err}", path.display())))?;
-        let text = String::from_utf8_lossy(&bytes);
+        let text = read_utf8(path, InputKind::ProjectText)?;
         if contains_credential_like_text_str(&text) {
             credential_files.insert(name.clone());
         }
@@ -1107,6 +1202,9 @@ fn scan_source_archive_content(
     }
     for doc in load_table_documents(resolved)? {
         let doc_relative = canonical_project_relative_name(&resolved.project_dir, &doc.path)?;
+        if kind == ProjectPackKind::Work && doc.partitions.is_empty() {
+            non_dummy_partition_files.insert(doc_relative.clone());
+        }
         for partition in doc.partitions {
             if partition
                 .safety
@@ -1124,14 +1222,29 @@ fn scan_source_archive_content(
             {
                 credential_files.insert(doc_relative.clone());
             }
-            if partition.source_kind != "dummyMTable" {
+            let source_is_refused = match kind {
+                ProjectPackKind::Source => partition.source_kind != "dummyMTable",
+                ProjectPackKind::Work => {
+                    !crate::handoff::partition_is_safe_materialized_work_source(&partition)
+                }
+            };
+            if source_is_refused {
                 non_dummy_partition_files.insert(doc_relative.clone());
+            }
+            if kind == ProjectPackKind::Work
+                && partition
+                    .source
+                    .as_deref()
+                    .is_some_and(contains_embedded_m_rows)
+            {
+                embedded_row_partition_files.insert(doc_relative.clone());
             }
         }
     }
     if credential_files.is_empty()
         && pii_review_files.is_empty()
         && non_dummy_partition_files.is_empty()
+        && embedded_row_partition_files.is_empty()
     {
         return Ok(());
     }
@@ -1150,18 +1263,49 @@ fn scan_source_archive_content(
     }
     if !non_dummy_partition_files.is_empty() {
         reasons.push(format!(
-            "non-dummy or unverified partition source in {}",
+            "{} in {}",
+            if kind == ProjectPackKind::Source {
+                "non-dummy or unverified partition source"
+            } else {
+                "partition source is not a recognized credential-free materialized live connector"
+            },
             non_dummy_partition_files
                 .into_iter()
                 .collect::<Vec<_>>()
                 .join(", ")
         ));
     }
+    if !embedded_row_partition_files.is_empty() {
+        reasons.push(format!(
+            "embedded M row constructors in {}",
+            embedded_row_partition_files
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     Err(CliError::validation_failed(format!(
-        "source package content scan failed: {}",
+        "{} content scan failed: {}",
+        kind.content_label(),
         reasons.join("; ")
     ))
-    .with_hint("Remove credentials and real row data, replace external or unverified partitions with generated dummy tables, then rerun handoff check before creating the archive."))
+    .with_hint(if kind == ProjectPackKind::Source {
+        "Remove credentials and real row data, replace external or unverified partitions with generated dummy tables, then rerun handoff check before creating the archive."
+    } else {
+        "Remove credentials, caches, and embedded rows; materialize every partition with a recognized live connector; then run handoff check --target work before creating the archive."
+    }))
+}
+
+fn contains_embedded_m_rows(source: &str) -> bool {
+    let normalized = source.to_ascii_lowercase();
+    [
+        "#table",
+        "table.fromrows(",
+        "table.fromrecords(",
+        "table.fromcolumns(",
+    ]
+    .iter()
+    .any(|constructor| normalized.contains(constructor))
 }
 
 fn canonical_project_relative_name(project_dir: &Path, path: &Path) -> CliResult<String> {
@@ -1173,14 +1317,21 @@ fn canonical_project_relative_name(project_dir: &Path, path: &Path) -> CliResult
     project_relative_name(&project_abs, &path_abs)
 }
 
-fn reject_source_pack_output(project_dir: &Path, out_file: &Path, force: bool) -> CliResult<()> {
+fn reject_project_pack_output(
+    project_dir: &Path,
+    out_file: &Path,
+    force: bool,
+    kind: ProjectPackKind,
+) -> CliResult<()> {
+    let command = kind.command();
     if out_file.exists() && !force {
         return Err(CliError::invalid_args(format!(
-            "source package output already exists: {}",
+            "{} output already exists: {}",
+            kind.content_label(),
             out_file.display()
         ))
         .with_hint("Pass --force after reviewing the existing archive, or choose a new --out path.")
-        .with_suggested_command("powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --force --json"));
+        .with_suggested_command(format!("powerbi-cli {command} --project <project-dir-or.pbip> --out report-{}.pbit --force --json", if kind == ProjectPackKind::Source { "source" } else { "work" })));
     }
     let project_abs = project_dir.canonicalize().map_err(|err| {
         CliError::unexpected(format!("canonicalize {}: {err}", project_dir.display()))
@@ -1202,16 +1353,21 @@ fn reject_source_pack_output(project_dir: &Path, out_file: &Path, force: bool) -
         .unwrap_or(out_abs);
     if comparable_out.starts_with(&project_abs) {
         return Err(CliError::invalid_args(format!(
-            "source package output must not be written inside the project: {}",
+            "{} output must not be written inside the project: {}",
+            kind.content_label(),
             comparable_out.display()
         ))
         .with_hint("Writing the archive into the project would package the package on later runs.")
-        .with_suggested_command("powerbi-cli package source-pack --project <project-dir-or.pbip> --out <outside-project>/report-source.pbit --json"));
+        .with_suggested_command(format!("powerbi-cli {command} --project <project-dir-or.pbip> --out <outside-project>/report-{}.pbit --json", if kind == ProjectPackKind::Source { "source" } else { "work" })));
     }
     Ok(())
 }
 
-fn write_source_archive(path: &Path, entries: &[(String, PathBuf)]) -> CliResult<()> {
+fn write_source_archive(
+    path: &Path,
+    entries: &[(String, PathBuf)],
+    generated_entries: &[(&str, &[u8])],
+) -> CliResult<()> {
     let file = File::create(path)
         .map_err(|err| CliError::unexpected(format!("create {}: {err}", path.display())))?;
     let mut zip = zip::ZipWriter::new(file);
@@ -1225,6 +1381,15 @@ fn write_source_archive(path: &Path, entries: &[(String, PathBuf)]) -> CliResult
                 "write {} from {} to {}: {err}",
                 name,
                 source.display(),
+                path.display()
+            ))
+        })?;
+    }
+    for (name, bytes) in generated_entries {
+        zip.start_file(name, options).map_err(zip_error)?;
+        zip.write_all(bytes).map_err(|err| {
+            CliError::unexpected(format!(
+                "write generated {name} to {}: {err}",
                 path.display()
             ))
         })?;
@@ -1413,7 +1578,11 @@ fn parse_export_plan_args(args: &[String]) -> CliResult<PackageOptions> {
     Ok(options)
 }
 
-fn parse_source_pack_args(args: &[String]) -> CliResult<PackageOptions> {
+fn parse_project_pack_args(
+    args: &[String],
+    pack_kind: ProjectPackKind,
+) -> CliResult<PackageOptions> {
+    let command = pack_kind.command();
     let mut options = PackageOptions::default();
     let mut i = 0;
     while i < args.len() {
@@ -1436,24 +1605,45 @@ fn parse_source_pack_args(args: &[String]) -> CliResult<PackageOptions> {
                 let kind = take_value(args, &mut i, "--kind")?;
                 if !matches!(kind.as_str(), "pbit" | "pbix" | "zip") {
                     return Err(CliError::invalid_args(format!(
-                        "package source-pack kind must be pbit, pbix, or zip: {kind}"
+                        "{command} kind must be pbit, pbix, or zip: {kind}"
                     ))
                     .with_hint("The kind controls the archive file extension convention only; the output remains a source archive.")
-                    .with_suggested_command("powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --json"));
+                    .with_suggested_command(format!("powerbi-cli {command} --project <project-dir-or.pbip> --out report-{}.pbit --json", if pack_kind == ProjectPackKind::Source { "source" } else { "work" })));
                 }
             }
             other => {
                 return Err(CliError::invalid_args(format!(
-                    "unknown package source-pack flag: {other}"
+                    "unknown {command} flag: {other}"
                 ))
-                .with_hint("Run `powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --json`.")
-                .with_suggested_command(
-                    "powerbi-cli package source-pack --project <project-dir-or.pbip> --out report-source.pbit --json",
-                ));
+                .with_hint(format!("Run `powerbi-cli {command} --project <project-dir-or.pbip> --out report-{}.pbit --json`.", if pack_kind == ProjectPackKind::Source { "source" } else { "work" }))
+                .with_suggested_command(format!("powerbi-cli {command} --project <project-dir-or.pbip> --out report-{}.pbit --json", if pack_kind == ProjectPackKind::Source { "source" } else { "work" })));
             }
         }
     }
     Ok(options)
+}
+
+fn default_work_pack_path(project_dir: &Path) -> CliResult<PathBuf> {
+    let name = project_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| {
+            CliError::invalid_args("cannot derive a work-pack name from the project path")
+        })?;
+    let parent = project_dir.parent().unwrap_or_else(|| Path::new("."));
+    Ok(parent.join(format!("{name}-work.pbit")))
+}
+
+fn work_pack_manifest() -> Vec<u8> {
+    serde_json::to_vec_pretty(&json!({
+        "schema": "powerbi-cli.package.workPackManifest.v1",
+        "packageClass": "work-package",
+        "sourcePolicy": "recognized-credential-free-materialized-live-partitions-only",
+        "containsImportedData": false,
+        "credentialsEmbedded": false
+    }))
+    .expect("serialize static work-pack manifest")
 }
 
 fn required_package(package: Option<PathBuf>, command: &str) -> CliResult<PathBuf> {

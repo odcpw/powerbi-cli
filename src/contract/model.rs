@@ -301,6 +301,23 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["partition.handle", "partition.sourcePreview", "partition.source", "partition.sourceIncluded", "partition.offlineSafety", "block", "next"]
         }),
         json!({
+            "path": "model partitions add-grouped-rank",
+            "usage": "powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> [--group-by <column> ...] --order-by <column> [--desc] --rank-column <int64-column> --eligible-when <M-predicate> (--dry-run | --out-dir <dir> | --in-place) --json",
+            "summary": "Append a deterministic refresh-time grouped-rank M chain to one safe generated dummy partition, assigning zero to ineligible rows and explicitly retyping the rank",
+            "tags": ["tmdl", "semantic-model", "partition", "m", "rank", "group", "performance", "mutation", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "schema-golden",
+            "outputSchema": "powerbi-cli.model.partitions.addGroupedRank.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--group-by <column>", "--order-by <column>", "--desc", "--rank-column <int64-column>", "--eligible-when <M-predicate>", "--dry-run", "--out-dir <dir>", "--in-place", "--json", "--format json"],
+            "examples": ["powerbi-cli model partitions add-grouped-rank --project build/analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when '[IsEligible] = true' --dry-run --json"],
+            "limitations": ["The selected table must have exactly one partition, and it must be a safe generated dummy #table source. Live, unknown, already transformed, credential-bearing, and multi-partition sources are refused.", "Group, order, and rank inputs must be existing non-calculated source columns. The rank column must be int64 and is treated as a generated placeholder that the M chain replaces.", "The eligibility predicate is bounded and checked as a single row-expression fragment; connector/file/global/dynamic-evaluation access and credential-like text are refused. Desktop refresh remains the semantic oracle."],
+            "followUpFields": ["dryRun", "mode", "projectModified", "target.handle", "rank", "changes[].before", "changes[].after", "readbackCommand", "lintCommand", "validateCommand", "handoffCheckCommand", "next"]
+        }),
+        json!({
             "path": "model dax bridge-plan",
             "aliases": ["model dax plan", "model dax validate-plan"],
             "usage": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> [--engine desktop|xmla|tabular-editor] --json",
@@ -337,8 +354,8 @@ pub(super) fn commands() -> Vec<Value> {
             "path": "model dax lint",
             "aliases": ["model dax check"],
             "usage": "powerbi-cli model dax lint --project <project-dir-or.pbip> --json",
-            "summary": "Run static DAX reference lint for missing columns/measures, ambiguous measure names, self references, and measure dependency cycles",
-            "tags": ["tmdl", "semantic-model", "dax", "lint", "bpa", "agent", "no-fallback"],
+            "summary": "Run static DAX and measure-format lint for missing references, ambiguous names, self references, dependency cycles, and malformed or absent display formats",
+            "tags": ["tmdl", "semantic-model", "dax", "format-string", "lint", "bpa", "agent", "no-fallback"],
             "readOnly": true,
             "mutates": false,
             "writesDataCache": false,
@@ -348,8 +365,8 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
             "examples": ["powerbi-cli model dax lint --project build/sales --json"],
             "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Dax).map(|rule| rule.id).collect::<Vec<_>>(),
-            "limitations": ["Static reference lint only; Power BI Desktop remains the compatibility oracle for DAX syntax and semantics."],
-            "followUpFields": ["ok", "analysisBoundary", "counts.errors", "counts.warnings", "findings[].code", "validation", "next"]
+            "limitations": ["Static reference and custom-format shape lint only; Power BI Desktop remains the compatibility oracle for DAX syntax, semantics, and formatting behavior.", "Dynamic formatStringDefinition expressions count as explicit formats; static measure and column format validation is deliberately conservative and checks balanced literals, brackets, escapes, and section count."],
+            "followUpFields": ["ok", "analysisBoundary", "counts.errors", "counts.warnings", "findings[].code", "findings[].handle", "findings[].hint", "validation", "next"]
         }),
         json!({
             "path": "model dax execute",

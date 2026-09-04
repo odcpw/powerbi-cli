@@ -1,4 +1,5 @@
 use crate::cli_support::{required_project, take_value};
+use crate::input_safety::{InputKind, read_utf8};
 use crate::{
     CliError, CliResult, canonical_display, command_arg, resolve_project, validate_project,
 };
@@ -253,8 +254,7 @@ fn load_family_records(
 }
 
 fn parse_records_from_file(family: AdvancedFamily, path: &Path) -> CliResult<Vec<AdvancedRecord>> {
-    let text = fs::read_to_string(path)
-        .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+    let text = read_utf8(path, InputKind::ProjectText)?;
     let lines = text.lines().map(ToOwned::to_owned).collect::<Vec<_>>();
     if family != AdvancedFamily::Expressions {
         let name = lines

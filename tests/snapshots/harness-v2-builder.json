@@ -1,0 +1,15 @@
+{
+  "filterCount": 1,
+  "jsonPointer": "/pages/0",
+  "pageId": "overview",
+  "schema": "powerbi-cli.dashboard.v2",
+  "style": {
+    "preset": "corporate-neutral"
+  },
+  "visualIds": [
+    "revenue_card",
+    "revenue_trend",
+    "customer_detail",
+    "margin_card"
+  ]
+}

@@ -1,46 +1,13 @@
+mod common;
+
+use common::{RunOutput, cli_command, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::fs;
-use std::process::Command;
-
-struct RunOutput {
-    code: i32,
-    stdout: String,
-    stderr: String,
-}
-
-fn run_powerbi(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
-}
 
 #[cfg(windows)]
 fn run_powerbi_without_oracle(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary without Desktop oracle");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
-}
-
-fn stdout_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stdout.trim()).expect("stdout JSON")
-}
-
-fn stderr_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stderr.trim()).expect("stderr JSON")
+    cli_command(args).env_remove("POWERBI_DESKTOP_ORACLE").run()
 }
 
 fn command_paths(value: &Value) -> Vec<String> {
@@ -249,6 +216,13 @@ fn capabilities_include_agent_contract_metadata() {
             .any(|code| code["code"] == "unsupported_feature")
     );
     assert!(
+        value["diagnosticCodes"]
+            .as_array()
+            .expect("diagnosticCodes")
+            .iter()
+            .any(|code| code["code"] == "spec.unknown_field" && code["exitCode"] == 10)
+    );
+    assert!(
         value["globalFlags"]
             .as_array()
             .expect("globalFlags")
@@ -355,6 +329,22 @@ fn capabilities_include_agent_contract_metadata() {
             .expect("dashboard spec fields")
             .iter()
             .any(|field| field == "pages[].visuals[].bindings[].field")
+    );
+    assert_eq!(
+        value["schemaManifest"]["dashboardSpecVersions"],
+        json!(["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"])
+    );
+    assert!(
+        value["schemaManifest"]["dashboardSpecV2AllowedFields"]
+            .as_array()
+            .expect("v2 allowed fields")
+            .iter()
+            .any(|node| node["node"] == "pages[].visuals[].format"
+                && node["fields"]
+                    .as_array()
+                    .expect("format fields")
+                    .iter()
+                    .any(|field| field == "title.show"))
     );
     assert!(
         value["schemaManifest"]["profileFields"]
@@ -717,11 +707,9 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
 #[test]
 fn desktop_close_is_idempotent_without_an_owned_session() {
     let state = tempfile::tempdir().expect("Desktop session state");
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("run desktop close");
+        .output();
 
     if cfg!(windows) {
         assert!(output.status.success());
@@ -762,11 +750,9 @@ fn desktop_close_discards_a_stale_receipt_without_targeting_any_process() {
     )
     .expect("write stale receipt");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("close stale Desktop session");
+        .output();
 
     assert!(output.status.success());
     let value: Value = serde_json::from_slice(&output.stdout).expect("close JSON");
@@ -785,11 +771,9 @@ fn desktop_close_retains_an_invalid_receipt_for_explicit_recovery() {
     let receipt = state.path().join("desktop-session.json");
     fs::write(&receipt, b"not-json").expect("write invalid receipt");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("close invalid Desktop session");
+        .output();
 
     assert!(!output.status.success());
     let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
@@ -810,11 +794,9 @@ fn desktop_lifecycle_lock_refuses_concurrent_mutation() {
     let lock = state.path().join("desktop-session.lock");
     fs::write(&lock, b"other-operation").expect("write lifecycle lock");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("run concurrent Desktop close");
+        .output();
 
     assert_eq!(output.status.code(), Some(10));
     let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
@@ -1408,6 +1390,75 @@ fn focused_capabilities_omit_large_unrelated_catalogs() {
         focused.stdout.len() < 20_000,
         "focused discovery unexpectedly returned {} bytes",
         focused.stdout.len()
+    );
+}
+
+#[test]
+fn exact_compact_capabilities_return_only_the_documented_command_fields() {
+    let output = run_powerbi(&[
+        "capabilities",
+        "--for",
+        "report build",
+        "--compact",
+        "--json",
+    ]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    let value = stdout_json(&output);
+    assert_eq!(
+        value,
+        json!({
+            "path": "report build",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--json", "--format json"],
+            "examples": ["powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json", "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"],
+            "proofLevel": "unit-smoke",
+            "followUpFields": ["projectDir", "compiled.counts", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "next"],
+            "outputSchema": "powerbi-cli.report.build.v1"
+        })
+    );
+}
+
+#[test]
+fn compact_capabilities_are_documented_and_require_an_exact_path() {
+    let full = run_powerbi(&["capabilities", "--json"]);
+    assert_eq!(full.code, 0, "stderr: {}", full.stderr);
+    let full_value = stdout_json(&full);
+    assert_eq!(
+        full_value["responseShapes"]["capabilities.compact.v1"],
+        json!({
+            "appliesTo": "capabilities --for <exact-path> --compact",
+            "exactPathRequired": true,
+            "fields": ["path", "usage", "flags", "examples", "proofLevel", "followUpFields", "outputSchema"],
+            "additionalFields": false
+        })
+    );
+    let capability = command_by_path(
+        full_value["commands"].as_array().expect("commands"),
+        "capabilities",
+    );
+    assert!(
+        capability["flags"]
+            .as_array()
+            .expect("flags")
+            .contains(&json!("--compact"))
+    );
+
+    let missing_for = run_powerbi(&["capabilities", "--compact", "--json"]);
+    assert_eq!(missing_for.code, 2);
+    let missing_error = stderr_json(&missing_for);
+    assert_eq!(missing_error["error"]["code"], "invalid_args");
+    assert_eq!(
+        missing_error["error"]["suggestedCommands"],
+        json!(["powerbi-cli --json capabilities --for <exact-path> --compact"])
+    );
+
+    let non_exact = run_powerbi(&["capabilities", "--for", "build", "--compact", "--json"]);
+    assert_eq!(non_exact.code, 2);
+    let non_exact_error = stderr_json(&non_exact);
+    assert_eq!(non_exact_error["error"]["code"], "invalid_args");
+    assert_eq!(
+        non_exact_error["error"]["suggestedCommands"],
+        json!(["powerbi-cli --json capabilities --for \"build\""])
     );
 }
 

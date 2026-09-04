@@ -1,5 +1,6 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::inspect::deep_inspect;
-use crate::model_dax::{add_cycle_findings, analyze_dax};
+use crate::model_dax::{add_cycle_findings, add_model_completeness_findings, analyze_dax};
 use crate::rules;
 use crate::tmdl::load_table_documents;
 use crate::{
@@ -61,7 +62,7 @@ pub(crate) fn lint_project(
     add_pbir_metadata_findings(resolved, &mut findings)?;
     add_report_findings(&deep, &mut findings);
     add_model_findings(&deep, &mut findings);
-    add_dax_findings(resolved, &mut findings)?;
+    add_dax_findings(resolved, &deep, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
     add_desktop_compat_findings(resolved, &mut findings)?;
     rules::ensure_finding_ids_registered(&findings, "code")?;
@@ -375,7 +376,11 @@ fn add_model_findings(deep: &Value, findings: &mut Vec<Value>) {
     }
 }
 
-fn add_dax_findings(resolved: &ResolvedProject, findings: &mut Vec<Value>) -> CliResult<()> {
+fn add_dax_findings(
+    resolved: &ResolvedProject,
+    deep: &Value,
+    findings: &mut Vec<Value>,
+) -> CliResult<()> {
     let docs = match load_table_documents(resolved) {
         Ok(docs) => docs,
         Err(err) if err.code == "file_not_found" => return Ok(()),
@@ -383,6 +388,10 @@ fn add_dax_findings(resolved: &ResolvedProject, findings: &mut Vec<Value>) -> Cl
     };
     let mut analysis = analyze_dax(&docs);
     add_cycle_findings(&mut analysis);
+    // Model completeness uses the same static DAX graph so columns referenced
+    // by a measure are not reported as unused. DAX-only lint remains scoped to
+    // the analysis findings returned by `model dax lint`.
+    add_model_completeness_findings(deep, &analysis, findings);
     for finding in analysis.findings {
         findings.push(finding);
     }
@@ -481,8 +490,7 @@ fn add_desktop_compat_findings(
         if !path.is_file() {
             continue;
         }
-        let text = fs::read_to_string(&path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+        let text = read_utf8(&path, InputKind::ProjectText)?;
         findings.extend(relationship_comment_findings(
             &text,
             &canonical_display(&path),
