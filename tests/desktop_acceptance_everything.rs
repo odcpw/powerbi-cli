@@ -826,6 +826,11 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    h.code(
+        "model partitions add-grouped-rank",
+        2,
+        &svec(["model", "partitions", "add-grouped-rank", "--json"]),
+    );
     h.ok(
         "model dax bridge-plan",
         &svec([

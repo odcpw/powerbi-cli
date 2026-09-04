@@ -72,7 +72,7 @@ Usage:
   powerbi-cli workflow plan --project <project-or.pbip> --profile <source-profile.json> --out <new-plan.json> --out-dir <new-project-dir> [--resource <name>=<path>] --json
   powerbi-cli workflow run --plan <plan.json> --confirm <plan-fingerprint> --json
   powerbi-cli workflow verify --plan <plan.json> --json
-  powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json
+  powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] [--row-scale <n>] [--seed <s>] --json
   powerbi-cli desktop open <project-dir-or.pbip-or.pbix> [--preflight strict|normal|skip] --json
   powerbi-cli desktop close --json
   powerbi-cli desktop open-check <project-dir-or.pbip-or.pbix> --json
@@ -108,6 +108,7 @@ Usage:
   powerbi-cli model relationships delete --project <project-dir-or.pbip> --handle <relationship-handle> --dry-run --json
   powerbi-cli model partitions list --project <project-dir-or.pbip> --json
   powerbi-cli model partitions show --project <project-dir-or.pbip> --handle <partition-handle> [--include-source] --json
+  powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> --order-by <column> [--desc] --rank-column <column> --eligible-when <M-predicate> --dry-run --json
   powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json
   powerbi-cli model dax dependencies --project <project-dir-or.pbip> --json
   powerbi-cli model dax lint --project <project-dir-or.pbip> --json
@@ -409,10 +410,11 @@ pub(crate) fn robot_triage() -> Value {
             "relationshipList": "powerbi-cli model relationships list --project <project-dir-or.pbip> --json",
             "relationshipAddDryRun": "powerbi-cli model relationships add --project <project-dir-or.pbip> --from-table <table> --from-column <column> --to-table <table> --to-column <column> --dry-run --json",
             "partitionList": "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
+            "partitionAddGroupedRankDryRun": "powerbi-cli model partitions add-grouped-rank --project <project-dir-or.pbip> --table <table> --group-by <column> --order-by <column> --desc --rank-column <column> --eligible-when <M-predicate> --dry-run --json",
             "modelDaxBridgePlan": "powerbi-cli model dax bridge-plan --project <project-dir-or.pbip> --json",
             "modelDaxExecute": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model dax execute --project <project-dir-or.pbip-or.pbix> --query-file <query.dax> --allow-data-read --json",
             "modelLiveExportTmdl": "POWERBI_DESKTOP_ORACLE=1 powerbi-cli model live export-tmdl --document <project-dir-or.pbip-or.pbix> --out-dir <fresh-dir> --allow-model-read --json",
-            "workflowSynthesize": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> --json",
+            "workflowSynthesize": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--row-scale <n>] [--seed <s>] --json",
             "sourceTemplateList": "powerbi-cli source-template list --project <project-dir-or.pbip> --json",
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",

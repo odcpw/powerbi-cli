@@ -113,6 +113,7 @@ pbi --json capabilities --for "model live export-tmdl"
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
+pbi --json capabilities --for "workflow synthesize"
 pbi --json capabilities --for source-template
 pbi --json capabilities --for rebind
 pbi --json capabilities --for theme
@@ -546,6 +547,7 @@ pbi --json capabilities --for partition
 pbi --json model partitions list --project build/sales
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales"
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales" --include-source
+pbi --json model partitions add-grouped-rank --project build/analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when '[IsEligible] = true' --dry-run
 pbi --json handoff check build/sales
 pbi --json handoff check report/live.pbip --target work
 ```
@@ -566,6 +568,16 @@ contract, remains non-home-safe, and never overrides credential or other error
 findings. Credentials, caches, embedded data, and unannotated unknown partition
 sources still fail. Check `safeForWorkHandoff`, not
 `safeForOfflineHandoff`, in that workflow.
+
+For a disconnected refresh-time analytics table whose generated dummy source
+already includes an `int64` rank placeholder, generate the standard per-group
+rank chain with `model partitions add-grouped-rank`. The command accepts one or
+more existing source-backed group columns, one order column, optional `--desc`,
+and a bounded M row predicate. It buffers each group, assigns eligible rows
+1-based ranks and ineligible rows zero, and explicitly retypes the result. It
+refuses live/unknown/unsafe or multi-partition tables. Review `changes[].after`,
+then run the returned lint and strict-validation commands; Desktop refresh and a
+bounded DAX assertion remain required for semantic proof.
 
 ### Prepare Source Templates And Rebind Plans
 
@@ -889,6 +901,21 @@ branch. `model dax lint` and `validate --strict` catch common direct uses, but
 they are not a complete DAX engine.
 
 ### Handoff Between Home And Work
+
+For deterministic offline refresh/performance fixtures, supply shared M
+generator functions that accept positional `(rowScale, seed)` numeric
+arguments, then synthesize a fresh project outside the source tree:
+
+```bash
+pbi --json workflow synthesize --project Report.pbip --expressions qa/generators.tmdl --out-dir ../powerbi-build/Report-QA-100x --row-scale 100 --seed 42
+pbi --json lint ../powerbi-build/Report-QA-100x
+pbi --json validate --strict ../powerbi-build/Report-QA-100x
+```
+
+The same scale/seed pair emits byte-identical partition M. Supplying only one
+option uses row scale `1` or seed `0`; row scale must remain positive. Use this
+copy for Desktop refresh timing and canvas QA without carrying live connector
+text, credentials, or real rows.
 
 For a deterministic resource/source reorientation, prefer the fingerprinted workflow:
 

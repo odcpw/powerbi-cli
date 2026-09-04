@@ -85,6 +85,26 @@ private metadata, unregistered data, links, and credential-bearing source text.
 See [`docs/source-profile-workflow.md`](docs/source-profile-workflow.md) for the
 complete profile shape and command contract.
 
+For offline Desktop refresh and performance QA, `workflow synthesize` can call
+shared M generator functions with an exact row scale and seed while replacing
+the live database root in a fresh project copy:
+
+```bash
+powerbi-cli workflow synthesize \
+  --project Report.pbip \
+  --expressions qa/generators.tmdl \
+  --out-dir ../powerbi-build/Report-QA-100x \
+  --row-scale 100 \
+  --seed 42 \
+  --json
+```
+
+Each mapped expression in a scaled run is invoked positionally as
+`Expression(rowScale, seed)`. Supplying only one option uses `1` for row scale
+or `0` for seed. Both values must be exact non-negative M integers and row scale
+must be positive. Re-run with the same pair for byte-identical partition M; vary
+the scale to reproduce load behavior without moving real data or credentials.
+
 This project does not generate `.pbix` or `.pbit` binaries directly. It can
 inspect and safely extract metadata/source files from PBIX/PBIT archives when
 those entries are present, and it can import PBIP/PBIR/TMDL source folders from
@@ -236,6 +256,7 @@ cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model perspectives list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model cultures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model expressions list --project .\build\sales --json
+cargo run --bin powerbi-cli -- workflow synthesize --project .\Report.pbip --expressions .\qa\generators.tmdl --out-dir .\build\Report-QA --row-scale 100 --seed 42 --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --dry-run --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --out-dir .\build\sales-v2 --json
 cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-v2 --json
@@ -248,6 +269,7 @@ cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-relationships --
 cargo run --bin powerbi-cli -- model partitions list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --include-source --json
+cargo run --bin powerbi-cli -- model partitions add-grouped-rank --project .\build\analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when "[IsEligible] = true" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
@@ -543,6 +565,15 @@ three pages.
   `annotation PowerBICli_SourceKind = ModelDerived` explicitly marks unknown M
   as model-derived: work handoff accepts it when no error finding remains, while
   offline handoff still requires review and rejects it.
+- Guarded refresh-time ranking covers `model partitions add-grouped-rank` for
+  a table with exactly one safe generated dummy partition. It resolves existing
+  group/order/rank columns to their Power Query source names, sorts the rows,
+  buffers each group, gives eligible rows a 1-based `Int64` index, gives
+  ineligible rows zero, recombines them, and finishes with an explicit
+  `Table.TransformColumnTypes`. The rank column must already be an `int64`
+  placeholder in the generated table. Live, unknown, unsafe, multi-partition,
+  and already transformed sources are refused; Desktop refresh is still the
+  semantic oracle.
 - Programmatic advanced semantic-model readback covers
   `model advanced inventory` plus `model roles|perspectives|cultures|expressions
   list/show` for TMDL metadata already present in a project. Mutating those
