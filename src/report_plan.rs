@@ -1,4 +1,5 @@
 use crate::input_safety::{InputKind, read_utf8, validate_text};
+use crate::planner_rules::{RulePlan, evaluate as evaluate_planner_rules};
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::profile_shape::classify;
 use crate::project_io::write_json_pretty;
@@ -22,6 +23,7 @@ struct PlanOptions {
     objective: Option<String>,
     out: Option<PathBuf>,
     force: bool,
+    explain_rules: bool,
 }
 
 /// The normalized, agent-facing report intent contract.
@@ -146,11 +148,19 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     let shape_for_profile_summary = shape.clone();
     let model = PlanModel::new(&schema_value, profile_value.as_ref());
     let (mut planned, intent) = build_dashboard_plan(&schema_value, &model, loaded_intent.intent)?;
+    let intent_value = serde_json::to_value(&intent).map_err(|error| {
+        CliError::validation_failed(format!("normalized intent cannot be serialized: {error}"))
+    })?;
+    let planner_context = planner_context(&model, &planned.spec, &intent, &shape);
+    let rule_plan = evaluate_planner_rules(&shape, &intent_value, &planner_context)?;
+    append_rule_decisions(&mut planned.decisions, &rule_plan);
+    let v2_spec = build_v2_spec(&planned.spec, &intent, &rule_plan);
     planned.decisions.insert(
         0,
         json!({
             "kind": "model-shape",
             "selected": shape["kind"],
+            "ruleId": "planner.overview",
             "shape": shape,
             "reason": "deterministic classification from schema relationships, cardinalities, row ratios, and profile column signals"
         }),
@@ -197,6 +207,10 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         "profileSummary": profile_summary_value,
         "shape": planned.decisions[0]["shape"],
         "spec": planned.spec,
+        "specV2": v2_spec,
+        "planner": rule_plan.to_value(),
+        "ruleExplanations": rule_plan.explanations,
+        "explainRules": options.explain_rules,
         "compiled": compiled,
         "defaultsApplied": defaults_applied,
         "decisions": planned.decisions,
@@ -360,17 +374,20 @@ fn build_dashboard_plan(
 
     decisions.push(json!({
         "kind": "fact-table",
+        "ruleId": "planner.overview",
         "selected": model.fact_tables.first(),
         "reason": "first profile fact table, falling back to first schema table"
     }));
     decisions.push(json!({
         "kind": "primary-measure",
+        "ruleId": "planner.overview",
         "selected": primary_measure.reference,
         "generated": primary_measure.generated
     }));
     if let Some(category) = primary_category.as_ref() {
         decisions.push(json!({
             "kind": "primary-category",
+            "ruleId": "planner.category-ranking",
             "selected": category.reference
         }));
     } else {
@@ -382,6 +399,7 @@ fn build_dashboard_plan(
     if let Some(date) = date_column.as_ref() {
         decisions.push(json!({
             "kind": "date-axis",
+            "ruleId": "planner.time-series",
             "selected": date.reference
         }));
     } else {
@@ -509,6 +527,406 @@ fn build_dashboard_plan(
     ))
 }
 
+fn planner_context(model: &PlanModel<'_>, spec: &Value, intent: &Intent, shape: &Value) -> Value {
+    let mut measures = model.existing_measures.clone();
+    if let Some(spec_measures) = spec
+        .get("model")
+        .and_then(|model| model.get("measures"))
+        .and_then(Value::as_array)
+    {
+        for measure in spec_measures {
+            let Some(name) = measure.get("name").and_then(Value::as_str) else {
+                continue;
+            };
+            let table = measure
+                .get("table")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let choice = MeasureChoice {
+                name: name.to_string(),
+                reference: field_reference(table, name),
+                generated: true,
+            };
+            if !measures
+                .iter()
+                .any(|existing| existing.reference.eq_ignore_ascii_case(&choice.reference))
+            {
+                measures.push(choice);
+            }
+        }
+    }
+    let primary_measure = intent
+        .kpis
+        .iter()
+        .filter_map(|kpi| kpi.measure.as_deref())
+        .find_map(|reference| {
+            measures.iter().find(|measure| {
+                measure.reference.eq_ignore_ascii_case(reference)
+                    || measure.name.eq_ignore_ascii_case(reference)
+            })
+        })
+        .or_else(|| measures.first())
+        .map(|measure| measure.reference.clone());
+    let secondary_measure = measures.get(1).map(|measure| measure.reference.clone());
+    let primary_category = model
+        .category_columns
+        .first()
+        .map(|field| field.reference.clone());
+    let time_axis = model
+        .date_columns
+        .first()
+        .map(|field| field.reference.clone());
+    let mut detail_columns = model
+        .all_schema_columns()
+        .into_iter()
+        .map(|field| field.reference)
+        .collect::<Vec<_>>();
+    if detail_columns.is_empty() {
+        detail_columns.extend(
+            model
+                .category_columns
+                .iter()
+                .chain(model.date_columns.iter())
+                .chain(model.numeric_columns.iter())
+                .map(|field| field.reference.clone()),
+        );
+    }
+    detail_columns.sort();
+    detail_columns.dedup();
+    let high_cardinality_count = shape
+        .get("highCardinality")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    let mut context = Map::new();
+    context.insert("always".to_string(), Value::Bool(true));
+    context.insert(
+        "hasTimeAxis".to_string(),
+        Value::Bool(
+            time_axis.is_some()
+                || shape["dateTables"]
+                    .as_array()
+                    .is_some_and(|v| !v.is_empty()),
+        ),
+    );
+    context.insert("measureCount".to_string(), Value::from(measures.len()));
+    context.insert(
+        "declaredMeasureCount".to_string(),
+        Value::from(model.existing_measures.len()),
+    );
+    context.insert(
+        "categoryCount".to_string(),
+        Value::from(model.category_columns.len()),
+    );
+    context.insert(
+        "columnCount".to_string(),
+        Value::from(model.all_schema_columns().len()),
+    );
+    context.insert(
+        "targetCount".to_string(),
+        Value::from(
+            intent
+                .kpis
+                .iter()
+                .filter(|kpi| kpi.target.is_some())
+                .count(),
+        ),
+    );
+    context.insert("alertCount".to_string(), Value::from(intent.alerts.len()));
+    context.insert(
+        "highCardinalityCount".to_string(),
+        Value::from(high_cardinality_count),
+    );
+    context.insert(
+        "factCount".to_string(),
+        Value::from(shape["facts"].as_array().map_or(0, Vec::len)),
+    );
+    context.insert(
+        "shapeKind".to_string(),
+        shape.get("kind").cloned().unwrap_or(Value::Null),
+    );
+    context.insert(
+        "questionCount".to_string(),
+        Value::from(intent.questions.len()),
+    );
+    context.insert(
+        "primaryMeasure".to_string(),
+        primary_measure.map(Value::String).unwrap_or(Value::Null),
+    );
+    context.insert(
+        "secondaryMeasure".to_string(),
+        secondary_measure.map(Value::String).unwrap_or(Value::Null),
+    );
+    context.insert(
+        "primaryCategory".to_string(),
+        primary_category.map(Value::String).unwrap_or(Value::Null),
+    );
+    context.insert(
+        "timeAxis".to_string(),
+        time_axis.map(Value::String).unwrap_or(Value::Null),
+    );
+    context.insert(
+        "detailColumns".to_string(),
+        Value::Array(
+            detail_columns
+                .clone()
+                .into_iter()
+                .map(Value::String)
+                .collect(),
+        ),
+    );
+    context.insert(
+        "alertColumns".to_string(),
+        Value::Array(
+            detail_columns
+                .into_iter()
+                .take(4)
+                .map(Value::String)
+                .collect(),
+        ),
+    );
+    Value::Object(context)
+}
+
+fn append_rule_decisions(decisions: &mut Vec<Value>, rule_plan: &RulePlan) {
+    for explanation in &rule_plan.explanations {
+        let proposal = &explanation["proposal"];
+        decisions.push(json!({
+            "kind": "planner-rule",
+            "ruleId": explanation["ruleId"],
+            "selected": proposal["archetype"],
+            "score": explanation["score"],
+            "reason": explanation["summary"],
+            "evidence": explanation["evidence"],
+            "proposal": proposal
+        }));
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ProposalSlot {
+    page: String,
+    template: String,
+    slot: String,
+    proposal: Value,
+}
+
+/// The single placement boundary for planner proposals.  It intentionally
+/// emits only semantic slots today; the concurrent grid engine can replace
+/// this function without changing catalog conditions, scores, or evidence.
+fn assign_proposal_slots(proposals: &[Value]) -> Vec<ProposalSlot> {
+    proposals
+        .iter()
+        .map(|proposal| {
+            let archetype = proposal["archetype"].as_str().unwrap_or("overview");
+            let page = proposal["page"].as_str().unwrap_or("overview").to_string();
+            let slot = match archetype {
+                "overview" | "kpi-overview" => "kpi.1",
+                "time-series" | "ranking" | "comparison" => "primary",
+                "exception-list" | "detail-table" | "drillthrough-detail" => "detail",
+                _ => "secondary",
+            };
+            ProposalSlot {
+                page,
+                template: proposal["template"]
+                    .as_str()
+                    .unwrap_or("overview")
+                    .to_string(),
+                slot: slot.to_string(),
+                proposal: proposal.clone(),
+            }
+        })
+        .collect()
+}
+
+fn build_v2_spec(legacy_spec: &Value, intent: &Intent, rule_plan: &RulePlan) -> Value {
+    let placements = assign_proposal_slots(&rule_plan.proposals);
+    let mut page_ids = vec!["overview".to_string()];
+    for placement in &placements {
+        if !page_ids.contains(&placement.page) {
+            page_ids.push(placement.page.clone());
+        }
+    }
+    let primary_measure = legacy_spec
+        .get("model")
+        .and_then(|model| model.get("measures"))
+        .and_then(Value::as_array)
+        .and_then(|measures| measures.first())
+        .and_then(|measure| {
+            let table = measure.get("table").and_then(Value::as_str)?;
+            let name = measure.get("name").and_then(Value::as_str)?;
+            Some(field_reference(table, name))
+        })
+        .or_else(|| {
+            legacy_spec
+                .get("pages")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .flat_map(|page| page.get("visuals").and_then(Value::as_array))
+                .flatten()
+                .flat_map(|visual| visual.get("bindings").and_then(Value::as_array))
+                .flatten()
+                .find_map(|binding| {
+                    (binding.get("role").and_then(Value::as_str) == Some("Values"))
+                        .then(|| binding.get("field").and_then(Value::as_str))
+                        .flatten()
+                        .map(ToOwned::to_owned)
+                })
+        });
+    let mut pages = Vec::new();
+    for page_id in page_ids {
+        let page_placements = placements
+            .iter()
+            .filter(|placement| placement.page == page_id)
+            .collect::<Vec<_>>();
+        // Shape-specific page proposals are deliberately separate from visual
+        // proposals.  Prefer their template for the overview page so the
+        // model-shape verdict changes the v2 structure without coupling the
+        // rule catalog to layout coordinates or visual counts.
+        let template = if page_id == "overview" {
+            page_placements
+                .iter()
+                .find(|placement| {
+                    placement.proposal["archetype"]
+                        .as_str()
+                        .is_some_and(|archetype| archetype.starts_with("shape-"))
+                })
+                .map(|placement| placement.template.as_str())
+                .or_else(|| {
+                    page_placements
+                        .first()
+                        .map(|placement| placement.template.as_str())
+                })
+                .unwrap_or("overview")
+        } else {
+            page_placements
+                .first()
+                .map(|placement| placement.template.as_str())
+                .unwrap_or("overview")
+        };
+        let mut visuals = page_placements
+            .iter()
+            .enumerate()
+            .filter_map(|(index, placement)| {
+                proposal_visual(&placement.proposal, &placement.slot, index)
+            })
+            .collect::<Vec<_>>();
+        if page_id == "overview"
+            && visuals.is_empty()
+            && let Some(measure) = primary_measure.as_deref()
+        {
+            visuals.push(json!({
+                "id": "planner_overview_kpi",
+                "type": "card",
+                "title": "Primary KPI",
+                "slot": "kpi.1",
+                "bindings": [{"role": "Values", "field": measure}]
+            }));
+        }
+        let display_name = page_display_name(&page_id);
+        pages.push(json!({
+            "id": page_id,
+            "displayName": display_name,
+            "template": template,
+            "heading": display_name,
+            "subtitle": format!("{} plan", one_line(&intent.text)),
+            "visuals": visuals
+        }));
+    }
+    let report = legacy_spec.get("report").cloned().unwrap_or_else(|| {
+        json!({
+            "name": "PowerBIDashboard",
+            "displayName": "Power BI Dashboard",
+            "questions": intent_questions(intent),
+            "audience": intent.audience.as_deref().unwrap_or("agent-authored Power BI users")
+        })
+    });
+    let model = legacy_spec.get("model").cloned();
+    let mut output = json!({
+        "schema": "powerbi-cli.dashboard.v2",
+        "report": report,
+        "layout": {
+            "grid": {"columns": 12, "gutter": "spacing.md", "margin": "spacing.lg"},
+            "pageSize": {"width": 1280, "height": 720},
+            "rail": {"side": "left", "slicers": []}
+        },
+        "style": {
+            "preset": "planner-default",
+            "tokens": {
+                "semantic": {
+                    "good": "semantic.good",
+                    "bad": "semantic.bad",
+                    "neutral": "semantic.neutral",
+                    "warning": "semantic.warning",
+                    "emphasis": "semantic.emphasis"
+                }
+            }
+        },
+        "pages": pages,
+        "proof": {"desktop": {"level": "desktop-golden-pending"}}
+    });
+    if let Some(model) = model {
+        output["model"] = model;
+    }
+    output
+}
+
+fn proposal_visual(proposal: &Value, slot: &str, index: usize) -> Option<Value> {
+    let family = proposal["visualFamily"].as_str()?;
+    let visual_type = match family {
+        "gauge" => "card",
+        "lineChart" | "barChart" | "scatterChart" | "tableEx" => family,
+        _ => return None,
+    };
+    let archetype = proposal["archetype"].as_str().unwrap_or("visual");
+    let title = match archetype {
+        "time-series" => "Trend",
+        "ranking" => "Ranking",
+        "comparison" => "Comparison",
+        "kpi-overview" => "Target KPI",
+        "exception-list" => "Exceptions",
+        "detail-table" | "drillthrough-detail" => "Detail",
+        _ => "Planned visual",
+    };
+    let mut bindings = Vec::new();
+    for binding in proposal["bindings"].as_array().into_iter().flatten() {
+        let role = match binding["role"].as_str().unwrap_or("Values") {
+            "Value" => "Values",
+            other => other,
+        };
+        if let Some(fields) = binding["fields"].as_array() {
+            for field in fields.iter().filter_map(Value::as_str) {
+                bindings.push(json!({"role": role, "field": field}));
+            }
+        } else if let Some(field) = binding["field"].as_str() {
+            bindings.push(json!({"role": role, "field": field}));
+        }
+    }
+    let mut visual = json!({
+        "id": format!("planner_{}_{}", archetype.replace('-', "_"), index),
+        "type": visual_type,
+        "title": title,
+        "slot": slot,
+        "bindings": bindings
+    });
+    if proposal["semanticColor"] == "warning" {
+        visual["conditionalFormatting"] = json!([{"semantic": "warning"}]);
+    }
+    Some(visual)
+}
+
+fn page_display_name(page: &str) -> &'static str {
+    match page {
+        "overview" => "Overview",
+        "trend" => "Trend",
+        "breakdown" => "Breakdown",
+        "comparison" => "Comparison",
+        "exceptions" => "Exceptions",
+        "detail" => "Detail",
+        _ => "Analysis",
+    }
+}
+
 impl<'a> PlanModel<'a> {
     fn new(schema: &'a Value, profile: Option<&'a Value>) -> Self {
         let mut fact_tables = profile_fact_tables(profile);
@@ -614,6 +1032,32 @@ impl<'a> PlanModel<'a> {
         fields
     }
 
+    fn all_schema_columns(&self) -> Vec<FieldChoice> {
+        let mut fields = Vec::new();
+        for (table_name, table) in schema_tables(self.schema) {
+            for column in table
+                .get("columns")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let Some(name) = column.get("name").and_then(Value::as_str) else {
+                    continue;
+                };
+                fields.push(FieldChoice {
+                    table: table_name.clone(),
+                    name: name.to_string(),
+                    data_type: column
+                        .get("dataType")
+                        .and_then(Value::as_str)
+                        .map(ToOwned::to_owned),
+                    reference: field_reference(&table_name, name),
+                });
+            }
+        }
+        dedupe_fields(fields)
+    }
+
     fn has_column(&self, table: &str, column: &str) -> bool {
         schema_tables(self.schema)
             .into_iter()
@@ -699,6 +1143,10 @@ fn parse_plan_args(args: &[String]) -> CliResult<PlanOptions> {
             }
             "--force" => {
                 options.force = true;
+                i += 1;
+            }
+            "--explain-rules" | "--explain" => {
+                options.explain_rules = true;
                 i += 1;
             }
             other if other.starts_with('-') => {
@@ -1603,6 +2051,7 @@ fn resolve_intent_kpis(
         kpi.measure = Some(choice.reference.clone());
         decisions.push(json!({
             "kind": "kpi-measure",
+            "ruleId": "planner.measure-target",
             "kpi": kpi.name,
             "selected": choice.reference,
             "reason": "exact case-insensitive intent KPI/name match"

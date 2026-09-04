@@ -143,8 +143,9 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report plan",
-            "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] --json",
-            "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text)",
+            "aliases": ["report plan explain"],
+            "usage": "powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json",
+            "summary": "Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text)",
             "tags": ["report", "dashboard", "plan", "intent", "spec", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -153,12 +154,12 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.plan.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|intent.json|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|intent.json|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--explain-rules", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.dashboard.json --json",
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"
             ],
-            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].shape", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "specV2", "planner.schema", "planner.version", "planner.rules[]", "planner.rules[].ruleId", "planner.rules[].score", "planner.rules[].summary", "planner.rules[].evidence[]", "planner.rules[].proposal", "planner.proposals[]", "planner.proposals[].kind", "planner.proposals[].ruleId", "planner.proposals[].ruleIds[]", "planner.proposals[].score", "planner.proposals[].archetype", "planner.proposals[].template", "planner.proposals[].visualFamily", "planner.proposals[].bindings[]", "planner.proposals[].bindings[].role", "planner.proposals[].bindings[].field", "planner.proposals[].bindings[].fields[]", "planner.proposals[].bindings[].source", "planner.proposals[].evidence[]", "planner.proposals[].priority", "planner.proposals[].sizeClass", "planner.proposals[].semanticColor", "planner.proposals[].page", "ruleExplanations[]", "ruleExplanations[].ruleId", "ruleExplanations[].score", "ruleExplanations[].summary", "ruleExplanations[].evidence[]", "ruleExplanations[].proposal", "explainRules", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].ruleId", "decisions[].shape", "decisions[].score", "decisions[].evidence[]", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
             "diagnosticCodes": ["spec.invalid_intent", "spec.missing_input", "input_safety_violation", "invalid_args"]
         }),
         json!({
