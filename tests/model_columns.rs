@@ -1,6 +1,7 @@
 mod common;
 
 use common::{run_powerbi, stdout_json};
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -162,4 +163,33 @@ fn model_columns_set_sort_by_is_advertised() {
             .iter()
             .any(|command| command["path"] == "model columns set-sort-by")
     );
+}
+
+#[test]
+fn model_columns_expression_file_refuses_over_limit_before_mutation() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    let expression = temp.path().join("oversized-expression.dax");
+    fs::write(&expression, vec![b'x'; 2 * 1024 * 1024 + 1]).expect("oversized expression");
+    let output = run_powerbi(&[
+        "model",
+        "columns",
+        "add",
+        "--project",
+        project.to_str().expect("project path"),
+        "--table",
+        "FactSales",
+        "--name",
+        "OverLimit",
+        "--expression-file",
+        expression.to_str().expect("expression path"),
+        "--data-type",
+        "string",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(output.code, 10, "stderr: {}", output.stderr);
+    let error: Value = serde_json::from_str(output.stderr.trim()).expect("error JSON");
+    assert_eq!(error["error"]["code"], "input_safety_violation");
+    assert!(!output.stdout.contains("OverLimit"));
 }

@@ -1,0 +1,57 @@
+{
+  "connectionsOpened": false,
+  "counts": {
+    "errors": 0,
+    "findings": 0,
+    "materializedPartitions": 3,
+    "partitions": 3,
+    "placeholderPartitions": 0,
+    "templates": 0,
+    "unresolvedPartitions": 0,
+    "warnings": 0
+  },
+  "credentialsEmbedded": false,
+  "offline": true,
+  "ok": true,
+  "partitions": [
+    {
+      "findings": [],
+      "handle": "partition:DimCustomer:DimCustomer",
+      "materialized": true,
+      "partition": "DimCustomer",
+      "resolved": true,
+      "sourceKind": "sqlDatabase",
+      "state": "materialized",
+      "table": "DimCustomer"
+    },
+    {
+      "findings": [],
+      "handle": "partition:DimDate:DimDate",
+      "materialized": true,
+      "partition": "DimDate",
+      "resolved": true,
+      "sourceKind": "sqlDatabase",
+      "state": "materialized",
+      "table": "DimDate"
+    },
+    {
+      "findings": [],
+      "handle": "partition:FactSales:FactSales",
+      "materialized": true,
+      "partition": "FactSales",
+      "resolved": true,
+      "sourceKind": "sqlDatabase",
+      "state": "materialized",
+      "table": "FactSales"
+    }
+  ],
+  "refresh": {
+    "available": false,
+    "connectionOpened": false,
+    "performed": false,
+    "requested": false,
+    "status": "not-run"
+  },
+  "schema": "powerbi-cli.handoff.rebind-check.v1",
+  "status": "safe"
+}

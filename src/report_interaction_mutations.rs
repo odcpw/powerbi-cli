@@ -4,6 +4,7 @@ use crate::cli_support::{
     take_report_interaction_value as take_value, target_project,
 };
 use crate::feature_catalog::unsupported_feature_error;
+use crate::ops::{OpOutcome, SetInteraction};
 use crate::pbir::{PageRecord, PageSelector, VisualRecord, find_page, load_report_snapshot};
 use crate::pbir_interactions::{
     interaction_matches_handle, interaction_record_from_raw, interaction_record_json,
@@ -87,6 +88,118 @@ pub(crate) fn disable_interaction(args: &[String]) -> CliResult<Value> {
     options.interaction_type = Some("NoFilter".to_string());
     crate::cli_support::preflight_out_dir(args, disable_interaction)?;
     mutate_interaction("disable", &mut options)
+}
+
+/// Parse the endpoint form of `report interactions set` into the operation IR.
+///
+/// The operation intentionally carries selectors rather than a project path:
+/// a [`Transaction`](crate::ops::Transaction) supplies the staged project at
+/// apply time.  `--project` and `--out-dir` remain accepted here so the parser
+/// keeps the CLI's flag/error contract while callers decide where to commit.
+pub(crate) fn parse_set_interaction_operation(
+    args: &[String],
+) -> CliResult<(SetInteraction, MutationMode)> {
+    let options = parse_mutate_args(args, "report interactions set")?;
+    if options.interaction_type.is_none() {
+        return Err(CliError::invalid_args(
+            "report interactions set requires --type DataFilter|HighlightFilter|NoFilter",
+        )
+        .with_hint("Use `disable` as a shortcut for setting NoFilter.")
+        .with_suggested_command(
+            "powerbi-cli report interactions set --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --type NoFilter --dry-run --json",
+        ));
+    }
+    if options.interaction_type.as_deref() == Some("Default") {
+        return Err(unsupported_feature_error(
+            "report.interaction-default-reset",
+        ));
+    }
+    require_mutation_selector(&options, "set")?;
+    if options.handle.is_some() {
+        return Err(CliError::invalid_args(
+            "operation setInteraction requires --page plus --source and --target",
+        )
+        .with_hint("Use endpoint selectors when compiling report interactions into an operation plan.")
+        .with_suggested_command(
+            "powerbi-cli report interactions set --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --type DataFilter --dry-run --json",
+        ));
+    }
+    let mode = require_mode(options.mode, "report interactions set")?;
+    let operation = SetInteraction {
+        page: options.page.expect("selector validation requires page"),
+        source: options.source.expect("selector validation requires source"),
+        target: options.target.expect("selector validation requires target"),
+        interaction_type: options
+            .interaction_type
+            .expect("interaction type was checked above"),
+    };
+    Ok((operation, mode))
+}
+
+/// Apply a typed SetInteraction against a resolved staged project.
+///
+/// This is the single mutation implementation used by the concrete operation
+/// kernel. It deliberately writes the same `page.json` bytes as the existing
+/// path-based mutation and reports the same before/after payloads; transaction
+/// validation remains the caller's responsibility.
+pub(crate) fn apply_set_interaction_operation(
+    operation: &SetInteraction,
+    project: &ResolvedProject,
+) -> CliResult<OpOutcome> {
+    let interaction_type = parse_interaction_type(&operation.interaction_type)?;
+    if interaction_type == "Default" {
+        return Err(unsupported_feature_error(
+            "report.interaction-default-reset",
+        ));
+    }
+    let options = MutateOptions {
+        project: Some(project.project_dir.clone()),
+        page: Some(operation.page.clone()),
+        source: Some(operation.source.clone()),
+        target: Some(operation.target.clone()),
+        interaction_type: Some(interaction_type),
+        mode: Some(MutationMode::InPlace),
+        out_dir: None,
+        handle: None,
+    };
+    require_mutation_selector(&options, "set")?;
+    let resolved = resolve_mutation_target(project, &options, "set")?;
+    let mutation = upsert_page_interaction(
+        &resolved.page_path,
+        &resolved.source.name,
+        &resolved.target.name,
+        resolved.interaction_type.as_str(),
+    )?;
+    if mutation.changed {
+        write_json_atomic(&resolved.page_path, &mutation.page_json)?;
+    }
+    let after_record = interaction_record_from_raw(
+        &resolved.page,
+        &resolved.page_path,
+        mutation.ordinal,
+        &mutation.after,
+    );
+    let project_arg = command_arg(&project.project_dir);
+    Ok(OpOutcome {
+        changed: mutation.changed,
+        changes: vec![json!({
+            "kind": "pbir.page.visualInteractions",
+            "action": if mutation.existed { "update" } else { "insert" },
+            "path": canonical_display(&resolved.page_path),
+            "jsonPointer": format!("/visualInteractions/{}", mutation.ordinal),
+            "before": mutation.before,
+            "after": mutation.after
+        })],
+        readback: vec![format!(
+            "powerbi-cli report interactions show --project {} --page {} --source {} --target {} --json",
+            project_arg,
+            shell_arg(&resolved.page.handle),
+            shell_arg(&resolved.source.handle),
+            shell_arg(&resolved.target.handle)
+        )],
+        warnings: Vec::new(),
+        created_handles: vec![after_record.handle],
+    })
 }
 
 fn mutate_interaction(action: &'static str, options: &mut MutateOptions) -> CliResult<Value> {

@@ -131,6 +131,11 @@ fn dispatch(flags: &GlobalFlags, args: &[String]) -> CliResult<CliOutput> {
             rebind_args.extend_from_slice(&args[1..]);
             value_output(handoff_command(&rebind_args)?, flags.json)
         }
+        "handoff-rebind-check" => {
+            let mut rebind_args = vec!["rebind-check".to_string()];
+            rebind_args.extend_from_slice(&args[1..]);
+            value_output(handoff_command(&rebind_args)?, flags.json)
+        }
         "scaffold" => value_output(scaffold_command(&args[1..])?, flags.json),
         "schema" => value_output(schema_command(&args[1..])?, flags.json),
         "skill" | "skills" => value_output(skill_command(&args[1..])?, flags.json),
@@ -386,6 +391,21 @@ fn error_json(err: &CliError) -> Value {
             "didYouMean".to_string(),
             Value::String(did_you_mean.to_string()),
         );
+    }
+    if let Some(field) = err.field() {
+        error.insert("field".to_string(), Value::String(field.to_string()));
+    }
+    if let Some(reason) = err.reason() {
+        error.insert("reason".to_string(), Value::String(reason.to_string()));
+    }
+    if let Some(candidates_command) = err.candidates_command() {
+        error.insert(
+            "candidatesCommand".to_string(),
+            Value::String(candidates_command.to_string()),
+        );
+    }
+    if let Some(example) = err.example() {
+        error.insert("example".to_string(), example.clone());
     }
     json!({ "error": Value::Object(error) })
 }
