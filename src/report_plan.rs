@@ -1,5 +1,6 @@
 use crate::input_safety::{InputKind, read_utf8, validate_text};
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::profile_shape::classify;
 use crate::project_io::write_json_pretty;
 use crate::report_build::compile_dashboard_summary;
 use crate::schema::{load_schema_value, validate_schema_value};
@@ -136,11 +137,29 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
 
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let loaded_intent = load_intent(options.intent.as_deref(), options.objective.as_deref())?;
+    let shape = classify(&schema_value, profile_value.as_ref()).into_value();
+    let shape_for_profile_summary = shape.clone();
     let model = PlanModel::new(&schema_value, profile_value.as_ref());
     let (mut planned, intent) = build_dashboard_plan(&schema_value, &model, loaded_intent.intent)?;
+    planned.decisions.insert(
+        0,
+        json!({
+            "kind": "model-shape",
+            "selected": shape["kind"],
+            "shape": shape,
+            "reason": "deterministic classification from schema relationships, cardinalities, row ratios, and profile column signals"
+        }),
+    );
     planned.warnings.extend(loaded_intent.warnings);
     sort_intent_warnings(&mut planned.warnings);
     let compiled = compile_dashboard_summary(&schema_value, &planned.spec)?;
+    let mut profile_summary_value = profile_value.as_ref().map(profile_summary);
+    if let Some(summary) = profile_summary_value.as_mut() {
+        // The planner has the normalized schema and can therefore retain
+        // relationship evidence even when an older profile file predates the
+        // relationships sidecar field.
+        summary["shape"] = shape_for_profile_summary;
+    }
 
     if let Some(out) = options.out.as_ref() {
         if out.exists() && !options.force {
@@ -166,7 +185,8 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         "specPath": options.out.as_ref().map(|path| canonical_display(path)),
         "changed": options.out.is_some(),
         "intent": intent,
-        "profileSummary": profile_value.as_ref().map(profile_summary),
+        "profileSummary": profile_summary_value,
+        "shape": planned.decisions[0]["shape"],
         "spec": planned.spec,
         "compiled": compiled,
         "decisions": planned.decisions,

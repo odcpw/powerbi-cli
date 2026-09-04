@@ -151,6 +151,11 @@ object-specific writers and fixtures exist.
   measures; unresolved names return `spec.missing_input` with pointer and
   candidates. Uncompiled intent fields remain visible with an owning-bead
   warning.
+- Profile summaries and report plans classify model shape as flat, star,
+  snowflake, or multi-fact only when relationship/cardinality and profile
+  column evidence supports it. Ambiguous models remain explicitly ambiguous;
+  date-like columns without a date dimension produce a date-table proposal and
+  high-cardinality categorical noise is reported for planner review.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
