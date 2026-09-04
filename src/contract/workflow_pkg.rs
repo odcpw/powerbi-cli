@@ -188,7 +188,7 @@ pub(super) fn source_template_commands() -> Vec<Value> {
         json!({
             "path": "source-template list",
             "aliases": ["source-templates list", "sourceTemplate list", "sourceTemplates list", "source-template ls"],
-            "usage": "powerbi-cli source-template list --project <project-dir-or.pbip> [--table <table>] [--kind <sql|postgres|odbc|excel|csv|folder|sharepoint>] --json",
+            "usage": "powerbi-cli source-template list --project <project-dir-or.pbip> [--table <table>] [--kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m>] --json",
             "summary": "List credential-free sidecar source templates used by handoff rebind plans",
             "tags": ["source-template", "source", "handoff", "rebind", "partition", "agent"],
             "readOnly": true,
@@ -196,7 +196,7 @@ pub(super) fn source_template_commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.source-template.list.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--kind <sql|postgres|odbc|excel|csv|folder|sharepoint>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--table <table>", "--kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m>", "--json", "--format json"],
             "examples": ["powerbi-cli source-template list --project build/sales --json"],
             "followUpFields": ["templates[].handle", "templates[].partitionHandle", "templates[].mTemplate", "templates[].safety", "next"]
         }),
@@ -218,8 +218,8 @@ pub(super) fn source_template_commands() -> Vec<Value> {
         json!({
             "path": "source-template add",
             "aliases": ["source-templates add", "sourceTemplate add", "source-template create"],
-            "usage": "powerbi-cli source-template add --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> [--partition <partition-name>]) [--name <template-name>] --kind <sql|postgres|odbc|excel|csv|folder|sharepoint> [kind parameters] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Add or replace a credential-free database, file, folder, or SharePoint source template sidecar without changing executable partitions",
+            "usage": "powerbi-cli source-template add --project <project-dir-or.pbip> (--handle <partition-handle> | --table <table> [--partition <partition-name>]) [--name <template-name>] --kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m> [kind parameters] (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Add or replace a credential-free database, file, folder, SharePoint, or closed-grammar generic M source template sidecar without changing executable partitions",
             "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -228,7 +228,7 @@ pub(super) fn source_template_commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.source-template.mutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <partition-handle>", "--table <table>", "--partition <partition-name-or-handle>", "--name <template-name>", "--kind <sql|postgres|odbc|excel|csv|folder|sharepoint>", "--server <placeholder>", "--dsn <placeholder>", "--database <placeholder>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <file-or-placeholder>", "--path <path-or-placeholder>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--delimiter <character>", "--encoding <code-page>", "--has-header <true|false>", "--pattern <exact-name|*.suffix>", "--site-url <https-site-or-placeholder>", "--site <https-site-or-placeholder>", "--library <name-or-placeholder>", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--handle <partition-handle>", "--table <table>", "--partition <partition-name-or-handle>", "--name <template-name>", "--kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m>", "--server <placeholder>", "--dsn <placeholder>", "--database <placeholder>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <file-or-placeholder>", "--path <path-or-placeholder>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--delimiter <character>", "--encoding <code-page>", "--has-header <true|false>", "--pattern <exact-name|*.suffix>", "--site-url <https-site-or-placeholder>", "--site <https-site-or-placeholder>", "--library <name-or-placeholder>", "--m-template <M-expression>", "--m-file <path-or->", "--description <text>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": [
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind sql --server <server> --database <database> --schema dbo --object FactSales --dry-run --json",
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind postgres --server <server> --database <database> --schema public --object <object> --dry-run --json",
@@ -236,16 +236,17 @@ pub(super) fn source_template_commands() -> Vec<Value> {
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind excel --file <workbook.xlsx> --sheet FactSales --dry-run --json",
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind csv --file <file.csv> --delimiter , --encoding 65001 --has-header true --dry-run --json",
                 "powerbi-cli source-template add --project build/sales --table FactSales --kind folder --path <folder> --pattern *.csv --dry-run --json",
-                "powerbi-cli source-template add --project build/sales --table FactSales --kind sharepoint --site-url <siteUrl> --library <library> --path <path> --dry-run --json"
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind sharepoint --site-url <siteUrl> --library <library> --path <path> --dry-run --json",
+                "powerbi-cli source-template add --project build/sales --table FactSales --kind generic-m --m-template <M-expression> --dry-run --json"
             ],
-            "limitations": ["ODBC --dsn accepts only a bare DSN name; semicolon/equal connection attributes and embedded credentials are refused.", "Excel and CSV apply materialize file paths; folder apply materializes a folder path; move-safe packages should reapply those paths on the target machine.", "Folder patterns use a closed exact-name or leading-wildcard suffix grammar. SharePoint site URLs must be credential-free HTTPS *.sharepoint.com URLs when materialized."],
+            "limitations": ["ODBC --dsn accepts only a bare DSN name; semicolon/equal connection attributes and embedded credentials are refused.", "Excel and CSV apply materialize file paths; folder apply materializes a folder path; move-safe packages should reapply those paths on the target machine.", "Folder patterns use a closed exact-name or leading-wildcard suffix grammar. SharePoint site URLs must be credential-free HTTPS *.sharepoint.com URLs when materialized.", "generic-m accepts one direct allowlisted connector root, complete placeholder tokens, and the workflow/source-profile closed call grammar; credential text, hard-coded paths, unknown functions, and computed/postfix calls are refused with an M-text pointer."],
             "followUpFields": ["dryRun", "changes[].before", "changes[].after", "readbackCommand", "rebindPlanCommand", "handoffCheckCommand", "validateCommand"]
         }),
         json!({
             "path": "source-template apply",
             "aliases": ["source-template materialize", "source-templates apply", "sourceTemplate apply"],
             "usage": "powerbi-cli source-template apply --project <project-dir-or.pbip> (--handle <source-template-handle> | --name <template-name>) [kind parameters] [--replace-existing --confirm <partition-handle>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Materialize one credential-free source template into a generated dummy partition, or explicitly retarget a confirmed existing credential-free partition",
+            "summary": "Materialize one credential-free source template, including a validated generic M expression, into a generated dummy partition, or explicitly retarget a confirmed existing credential-free partition",
             "tags": ["source-template", "source", "handoff", "rebind", "partition", "mutation", "work-machine", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -254,7 +255,7 @@ pub(super) fn source_template_commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.source-template.apply.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--server <server>", "--dsn <dsn>", "--database <database>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <file>", "--path <path>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--delimiter <character>", "--encoding <code-page>", "--has-header <true|false>", "--pattern <exact-name|*.suffix>", "--site-url <https-site>", "--site <https-site>", "--library <name>", "--replace-existing", "--confirm <partition-handle>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "flags": ["--project <project-dir-or.pbip>", "--handle <source-template-handle>", "--name <template-name>", "--server <server>", "--dsn <dsn>", "--database <database>", "--schema <schema>", "--sql-schema <schema>", "--object <table-or-view>", "--file <file>", "--path <path>", "--item <sheet-or-table>", "--sheet <worksheet>", "--item-kind <Sheet|Table>", "--delimiter <character>", "--encoding <code-page>", "--has-header <true|false>", "--pattern <exact-name|*.suffix>", "--site-url <https-site>", "--site <https-site>", "--library <name>", "--m-template <M-expression>", "--m-file <path-or->", "--replace-existing", "--confirm <partition-handle>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": [
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --dry-run --json",
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --server pg.example.internal:5432 --database Sales --out-dir build/sales-live --json",
@@ -262,9 +263,10 @@ pub(super) fn source_template_commands() -> Vec<Value> {
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --file C:\\\\data\\\\sales.xlsx --sheet FactSales --replace-existing --confirm partition:FactSales:FactSales --dry-run --json",
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --file C:\\\\data\\\\sales.csv --delimiter , --encoding 65001 --has-header true --in-place --json",
                 "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --path C:\\\\data\\\\exports --pattern *.csv --out-dir build/sales-live --json",
-                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --site-url https://contoso.sharepoint.com/sites/Finance --library Documents --path Published/Exports --in-place --json"
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --site-url https://contoso.sharepoint.com/sites/Finance --library Documents --path Published/Exports --in-place --json",
+                "powerbi-cli source-template apply --project build/sales --handle source-template:FactSales:FactSales --m-template <M-expression> --dry-run --json"
             ],
-            "limitations": ["Applies one template per command.", "Existing source replacement requires --replace-existing plus the exact --confirm partition handle and is limited to recognized credential-free SQL, PostgreSQL, ODBC, external-file, and SharePoint sources.", "Unknown, web, and credential-bearing sources are refused.", "Credentials cannot be supplied or embedded; Power BI Desktop performs database and SharePoint authentication after the PBIP opens.", "CSV, folder, and SharePoint M is schema-derived and unit-tested; Desktop refresh remains a Windows proof step."],
+            "limitations": ["Applies one template per command.", "Existing source replacement requires --replace-existing plus the exact --confirm partition handle and is limited to recognized credential-free SQL, PostgreSQL, ODBC, external-file, and SharePoint sources.", "Unknown, web, and credential-bearing sources are refused.", "Credentials cannot be supplied or embedded; Power BI Desktop performs database and SharePoint authentication after the PBIP opens.", "CSV, folder, and SharePoint M is schema-derived and unit-tested; Desktop refresh remains a Windows proof step.", "generic-m overrides are complete expressions; placeholders remain visible until the work machine resolves them and every expression is rechecked against the closed grammar."],
             "followUpFields": ["projectModified", "credentialsEmbedded", "requiresDesktopAuthentication", "connection.parameters", "changes[].afterSource", "readbackCommand", "validateCommand", "instructions"]
         }),
     ]

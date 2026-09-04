@@ -149,7 +149,8 @@ advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
-PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive rebind metadata,
+PostgreSQL, ODBC, Excel, CSV, folder, SharePoint/OneDrive, and closed-grammar
+generic-M rebind metadata,
 handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
 one-shot desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
@@ -164,8 +165,7 @@ formatting list/show/extract/apply bundles, visual formatting set-text for
 title/alt-text patches, conditional-formatting readback list/show, handoff
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
-Treat planned generic-M source templates, filter sort and arbitrary expression
-updates, bookmark state capture/create/update/grouping,
+Treat filter sort and arbitrary expression updates, bookmark state capture/create/update/grouping,
 slicer selection/sync mutation, interaction Default/reset semantics, unsupported
 slicer modes, style
 drift lint, conditional formatting authoring,
@@ -637,6 +637,7 @@ pbi --json source-template add --project build/sales --table FactSales --kind ex
 pbi --json source-template add --project build/sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind generic-m --m-template 'let Source = Sql.Database("{{powerbi-cli.placeholder:server}}", "{{powerbi-cli.placeholder:database}}") in Source' --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --out-dir build/sales-rebind
 pbi --json source-template list --project build/sales-rebind
 pbi --json handoff rebind-plan build/sales-rebind --out build/sales-rebind/work-machine-rebind.md
@@ -661,6 +662,13 @@ named DSN there. The rebind runbook includes these prerequisites and post-refres
 checks. `--out` refuses to overwrite an existing runbook unless `--force` is
 passed, and credential detection redacts response content and suppresses the
 runbook write entirely.
+
+The `generic-m` kind accepts one complete expression through `--m-template` or
+`--m-file`. It reuses the workflow/source-profile closed grammar: a direct
+allowlisted connector root, complete placeholder tokens, and safe transformation
+namespaces only. Credential-like text, hard-coded file/URI paths, unknown
+functions, and computed/postfix calls are refused with a pointer into the M text;
+the expression is checked again when `source-template apply` materializes it.
 
 ### Copy Report Theme Bundles
 

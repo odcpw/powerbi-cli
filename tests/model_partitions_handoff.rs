@@ -1193,7 +1193,8 @@ fn capabilities_advertise_partitions_handoff_and_empty_filter_hints() {
             "excel",
             "csv",
             "folder",
-            "sharepoint"
+            "sharepoint",
+            "generic-m"
         ])
     );
 

@@ -291,6 +291,7 @@ cargo run --bin powerbi-cli -- source-template add --project .\build\sales --tab
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run --json
+cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind generic-m --m-template 'let Source = Sql.Database("{{powerbi-cli.placeholder:server}}", "{{powerbi-cli.placeholder:database}}") in Source' --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
@@ -632,7 +633,10 @@ three pages.
   templates to partitions and can write a self-contained Markdown runbook with
   `--out <file.md>` (existing files require `--force`). Credential detection
   redacts JSON/Markdown excerpts and suppresses runbook creation. CSV and
-  generic M template kinds remain planned and refused.
+  generic M templates are accepted only when their direct connector root and
+  transformation calls stay within the workflow/source-profile closed grammar;
+  credential-like text, hard-coded paths, unknown functions, and computed calls
+  are refused with a pointer into the M text.
 - Programmatic report layout authoring covers `report pages
   list/show/add/update/reorder/set-active/delete-empty`, `report visuals
   list/show/add/clone/delete`, guarded `report visuals set-position`, and guarded
