@@ -834,6 +834,24 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["target.handle", "interactionPlan.after.type", "changes[].jsonPointer", "readbackCommand", "validateCommand", "next"]
         }),
         json!({
+            "path": "report interactions reset",
+            "aliases": ["report interaction reset"],
+            "usage": "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle> (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Remove one explicit PBIR visualInteractions row so the target visual returns to its documented default interaction behavior",
+            "tags": ["pbir", "report", "interaction", "interactions", "visual", "page", "mutation", "reset", "default", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.interactions.resetMutation.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--page <page-name-or-handle>", "--source <visual-name-or-handle>", "--target <visual-name-or-handle>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "limitations": ["Reset accepts endpoint selectors rather than an interaction handle because the row is intentionally absent after the mutation.", "Desktop canvas/render confirmation remains pending; the local proof level is unit-smoke.", "The command removes only the matching page-local visualInteractions row and refuses duplicate matching rows."],
+            "examples": ["powerbi-cli report interactions reset --project build/sales --page page:ReportSectionOverview --source <visual-handle> --target <visual-handle> --dry-run --json", "powerbi-cli report interactions reset --project build/sales --page page:ReportSectionOverview --source <visual-handle> --target <visual-handle> --out-dir build/sales-reset --json"],
+            "followUpFields": ["dryRun", "mode", "target.page", "target.source", "target.target", "target.rowPresent", "target.defaulted", "interactionPlan.before", "interactionPlan.after", "interactionPlan.existed", "interactionPlan.changed", "interactionPlan.semantics", "resetSemantics", "changes[].action", "changes[].jsonPointer", "readbackCommand", "pageReadbackCommand", "validateCommand", "next"]
+        }),
+        json!({
             "path": "report themes show",
             "aliases": ["report theme show", "report styles show", "report style show", "report themes get"],
             "usage": "powerbi-cli report themes show --project <project-dir-or.pbip> --json",

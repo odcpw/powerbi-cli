@@ -185,8 +185,10 @@ policies can wait until the object-specific writers and fixtures exist.
   (`list/show` plus metadata-only display-name edits, flat reorder, and guarded
   delete are implemented; captured-state create/update and grouped reorder
   remain planned)
-- `report interactions list/show/set/disable` (`list/show` and first guarded
-  set/disable slice implemented; Default/reset semantics remain planned)
+- `report interactions list/show/set/disable/reset` (`list/show` and guarded
+  set/disable/reset slices implemented; reset removes one explicit
+  `visualInteractions` row and documents that absence restores the target
+  visual's default interaction behavior)
 - `report themes show/extract/apply/presets/apply-preset`
 - `report style inspect/extract/diff/apply`
 - `report visuals formatting conditional-formatting list/show/add/update/delete`
@@ -503,7 +505,10 @@ frozen until proven.
   set/disable` upserts explicit `visualInteractions` rows for live source/target
   visual pairs with `--dry-run`, `--out-dir`, or `--in-place`, refuses duplicate
   rows and stale endpoints, returns readback/wireframe/inspect/validate
-  commands, and leaves `Default`/reset behavior fixture-gated.
+  commands. `report interactions reset` removes one matching explicit row with
+  the same guarded output modes and returns a deterministic readback explaining
+  that the absent row restores the target visual's default behavior. The local
+  proof level is `unit-smoke`; Desktop canvas confirmation remains open.
 - Implemented typed formatting mutation slices: `report visuals formatting
   set-text` patches title text/visibility and clears rejected alt-text metadata,
   while `set-color` patches static literal
@@ -533,8 +538,9 @@ frozen until proven.
 - Add bookmark captured-state create/update and grouped reorder validation
   against pages and visuals on top of the implemented readback and metadata
   mutation handles.
-- Add visual interaction reset/default controls and Desktop-authored
-  round-trip fixtures on top of the implemented set/disable handles.
+- Keep the implemented visual interaction reset/default control aligned with
+  Desktop-authored round-trip fixtures and promote its proof level when a
+  Windows canvas check confirms that removing a row restores the default.
 - Build on the implemented same-report `report drillthrough set/show/clear`
   linked `pageBinding` + Drillthrough filter slice with Desktop re-verification,
   then add Desktop-authored goldens for visual drillthrough action links,
@@ -542,8 +548,8 @@ frozen until proven.
 - Build on the implemented `report drilldown set-hierarchy` slice with
   Desktop-authored goldens for chart-family coverage and transient UI
   expand/collapse state. Keep tooltip pages, bookmark captured-state mutation,
-  slicer authoring/sync, interaction reset/default semantics, non-catalog visual
-  generation, and conditional-formatting authoring behind
+  slicer authoring/sync, non-catalog visual generation, and conditional-formatting
+  authoring behind
   `unsupported_feature` until Desktop-authored goldens exist.
 
 ### Phase 8: Agent Batch Operations

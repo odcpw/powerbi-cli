@@ -293,6 +293,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report find --project <project-dir-or.pbip> [--kind <kind>] [--name-contains <text>] [--title-contains <text>] [--visual-type <type>] [--path-contains <text>] [--include-raw] --json` — Search report objects by stable metadata instead of guessing PBIR file paths _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions disable --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert an explicit NoFilter visualInteraction row so the target visual does not react to the source visual _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--source <visual-name-or-handle>] [--target <visual-name-or-handle>] [--type Default|DataFilter|HighlightFilter|NoFilter] [--include-raw] --json` — List explicit PBIR page visualInteraction overrides with stable handles, source/target visual resolution, and default-interaction semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle> (--dry-run | --in-place | --out-dir <dir>) --json` — Remove one explicit PBIR visualInteractions row so the target visual returns to its documented default interaction behavior _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions set --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) --type DataFilter|HighlightFilter|NoFilter (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert one explicit PBIR page visualInteraction override for a source/target visual pair; Default authoring remains Desktop-fixture gated _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions show --project <project-dir-or.pbip> --handle <interaction-handle> [--no-raw] --json` — Show one explicit PBIR page visualInteraction override by handle or page/source/target selector _(proof: `unit-smoke`)_
 - `powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json` — Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting _(proof: `unit-smoke`)_
@@ -510,7 +511,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `report.filters.relative-date` — **supported**, read-write-between-date-expressions, proof `schema-golden`: Relative-date report/page/visual filters. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`.
 - `report.filters.topn` — **supported**, read-write-visual-subquery, proof `schema-golden`: TopN visual filters ordered by a measure. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`, `report visuals set-topn-guard`.
 - `report.intent-parser` — **supported**, deterministic-json-markdown-normalization, proof `unit-smoke`: Structured report intent parsing. Commands: `report plan`.
-- `report.interaction-default-reset` — **planned**, unsupported, proof `unit-smoke`: Interaction Default/reset semantics.
+- `report.interaction-default-reset` — **supported**, read-write-reset-to-default, proof `unit-smoke`: Interaction Default/reset semantics. Commands: `report interactions reset`.
 - `report.interactions.overrides` — **supported**, read-write-explicit-overrides, proof `unit-smoke`: Explicit visual interaction overrides. Commands: `report build`, `report interactions list`, `report interactions show`, `report interactions set`, `report interactions disable`.
 - `report.pages` — **supported**, read-write, proof `unit-smoke`: Report pages and layout metadata. Commands: `report pages list`, `report pages show`, `report pages add`, `report pages update`, `report pages reorder`, `report pages set-active`, `report pages delete-empty`.
 - `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
@@ -725,6 +726,7 @@ cargo run --bin powerbi-cli -- report interactions list --project .\build\sales 
 cargo run --bin powerbi-cli -- report interactions show --project .\build\sales --handle <interaction-handle> --json
 cargo run --bin powerbi-cli -- report interactions disable --project .\build\sales --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json
 cargo run --bin powerbi-cli -- report interactions set --project .\build\sales --page <page-handle> --source <visual-handle> --target <visual-handle> --type HighlightFilter --out-dir .\build\sales-interactions --json
+cargo run --bin powerbi-cli -- report interactions reset --project .\build\sales-interactions --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json
 cargo run --bin powerbi-cli -- report themes show --project .\build\sales --json
 cargo run --bin powerbi-cli -- report themes extract --project .\corp\template --out .\build\corp-theme-bundle.json --json
 cargo run --bin powerbi-cli -- report themes apply --project .\build\sales --bundle .\build\corp-theme-bundle.json --out-dir .\build\sales-themed --json
@@ -921,17 +923,17 @@ three pages.
 
 ## Current Limits
 
-The 2026-09-04 build advertises 50 feature IDs (45 supported and 5 planned).
+The 2026-09-04 build advertises 52 feature IDs (46 supported and 6 planned).
 This generated snapshot keeps status and proof claims aligned with
 `features list --json`; planned rows remain explicit refusals.
 
 | status / proof | feature IDs |
 |---|---|
-| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
+| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interaction-default-reset`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
 | supported / `schema-golden` | `model.partition-grouped-rank`, `report.drillthrough`, `report.filters.numeric-range`, `report.filters.relative-date`, `report.filters.topn`, `report.visuals.generated`, `workflow.synthetic-source` |
 | supported / `desktop-golden-pending` | `desktop.reference-harvest`, `report.slicer-authoring`, `report.visuals.category-share`, `report.visuals.matrix` |
 | supported / `manual-desktop-canvas-refresh` | `report.visuals.combo-pareto` |
-| planned / `unit-smoke` | `report.bookmark-mutations`, `report.interaction-default-reset`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
+| planned / `unit-smoke` | `desktop.canvas-check`, `desktop.refresh-check`, `report.bookmark-mutations`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
 
 - Dashboard specs are strict at every supported object level. `report spec
   validate` and `report build` reject unknown keys with
@@ -968,8 +970,7 @@ This generated snapshot keeps status and proof claims aligned with
   unsupported sections, and proof commands without writing a project.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
-  state capture/create/update/grouping, slicer selection/sync authoring, interaction
-  reset/default semantics, non-catalog generated visual families, visual
+  state capture/create/update/grouping, slicer selection/sync authoring, non-catalog generated visual families, visual
   drillthrough action links, cross-report drillthrough, and conditional
   formatting authoring return `error.code = "unsupported_feature"` and do not
   write fallback PBIR.
@@ -1283,13 +1284,15 @@ This generated snapshot keeps status and proof claims aligned with
   `manual-desktop-canvas-refresh` proven by the checked-in 2026-07-10 canvas
   proof record.
 - Programmatic report interaction authoring covers `report interactions
-  list/show/set/disable` for explicit PBIR page `visualInteractions` overrides.
+  list/show/set/disable/reset` for explicit PBIR page `visualInteractions` overrides.
   `disable` upserts an explicit `NoFilter` row; `set` upserts DataFilter,
   HighlightFilter, or NoFilter with guarded output modes, stable source/target
   visual resolution, duplicate-row refusal, readback, wireframe, inspect, and
   validate commands. Missing rows still mean Power BI default interaction
-  behavior, not `NoFilter`; authoring `Default`/reset semantics remains
-  Desktop-fixture gated.
+  behavior, not `NoFilter`. `reset` removes one matching explicit row and
+  reports that the absent row restores the target visual's documented default;
+  the local proof level is `unit-smoke` and Desktop canvas confirmation remains
+  open.
 - Programmatic report bookmark handling covers `report bookmarks list/show` for
   raw PBIR `definition/bookmarks/*.bookmark.json` readback plus `bookmarks.json`
   order/group metadata. Metadata-only mutation is supported for display-name

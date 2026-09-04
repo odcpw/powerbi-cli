@@ -23,6 +23,7 @@ mod apply_theme_preset;
 mod handles;
 mod io;
 mod plan;
+mod reset_interaction;
 mod set_interaction;
 mod set_object;
 mod set_position;
@@ -46,6 +47,7 @@ pub(crate) use handles::*;
 #[allow(unused_imports)]
 pub(crate) use io::*;
 pub(crate) use plan::*;
+pub(crate) use reset_interaction::*;
 pub(crate) use set_interaction::*;
 #[allow(unused_imports)]
 pub(crate) use set_object::{
@@ -70,6 +72,7 @@ pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
 pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
     match operation {
         Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
+        Op::ResetInteraction(_) => Some(Box::new(ResetInteractionKernel)),
         Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
         Op::SetObject(_) => Some(Box::new(SetObjectKernel::default())),
         Op::SetPosition(_) => Some(Box::new(SetPositionKernel::default())),
@@ -92,6 +95,7 @@ pub(crate) enum Op {
     AddFilter(AddFilter),
     SetDrillthrough(SetDrillthrough),
     SetInteraction(SetInteraction),
+    ResetInteraction(ResetInteraction),
     ApplyThemePreset(ApplyThemePreset),
     SetObject(SetObject),
     SetPosition(SetPosition),
@@ -208,6 +212,16 @@ pub(crate) struct SetInteraction {
     pub(crate) interaction_type: String,
 }
 
+/// Remove one explicit page-local visual interaction override so Power BI can
+/// apply the target visual's default interaction behavior.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResetInteraction {
+    pub(crate) page: String,
+    pub(crate) source: String,
+    pub(crate) target: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ApplyThemePreset {
@@ -296,6 +310,7 @@ impl Op {
             Self::AddFilter(_) => "addFilter",
             Self::SetDrillthrough(_) => "setDrillthrough",
             Self::SetInteraction(_) => "setInteraction",
+            Self::ResetInteraction(_) => "resetInteraction",
             Self::ApplyThemePreset(_) => "applyThemePreset",
             Self::SetObject(_) => "setObject",
             Self::SetPosition(_) => "setPosition",
@@ -308,9 +323,10 @@ impl Op {
             // There is no AddPage in T1a. SetDrillthrough is deliberately in
             // the behavior stage so it follows every visual declaration.
             Self::AddVisual(_) | Self::SetPosition(_) => OpStage::Visual,
-            Self::AddFilter(_) | Self::SetInteraction(_) | Self::SetDrillthrough(_) => {
-                OpStage::Behavior
-            }
+            Self::AddFilter(_)
+            | Self::SetInteraction(_)
+            | Self::ResetInteraction(_)
+            | Self::SetDrillthrough(_) => OpStage::Behavior,
             Self::ApplyThemePreset(_) | Self::SetObject(_) => OpStage::Style,
         }
     }
@@ -323,6 +339,7 @@ impl Op {
             Self::AddFilter(value) => Some(&value.handle),
             Self::SetDrillthrough(_)
             | Self::SetInteraction(_)
+            | Self::ResetInteraction(_)
             | Self::ApplyThemePreset(_)
             | Self::SetObject(_)
             | Self::SetPosition(_) => None,
@@ -346,6 +363,20 @@ impl Op {
                 handle: &value.page,
             }],
             Self::SetInteraction(value) => vec![
+                HandleReference {
+                    field: "page",
+                    handle: &value.page,
+                },
+                HandleReference {
+                    field: "source",
+                    handle: &value.source,
+                },
+                HandleReference {
+                    field: "target",
+                    handle: &value.target,
+                },
+            ],
+            Self::ResetInteraction(value) => vec![
                 HandleReference {
                     field: "page",
                     handle: &value.page,
@@ -396,6 +427,7 @@ impl Serialize for Op {
             Self::AddFilter(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetDrillthrough(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetInteraction(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::ResetInteraction(value) => serialize_tagged(self.tag(), value, serializer),
             Self::ApplyThemePreset(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetObject(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetPosition(value) => serialize_tagged(self.tag(), value, serializer),
@@ -458,6 +490,9 @@ fn deserialize_tagged(tag: &str, payload: Value) -> Result<Op, String> {
         "setInteraction" => serde_json::from_value(payload)
             .map(Op::SetInteraction)
             .map_err(|error| format!("invalid setInteraction operation: {error}")),
+        "resetInteraction" => serde_json::from_value(payload)
+            .map(Op::ResetInteraction)
+            .map_err(|error| format!("invalid resetInteraction operation: {error}")),
         "applyThemePreset" => serde_json::from_value(payload)
             .map(Op::ApplyThemePreset)
             .map_err(|error| format!("invalid applyThemePreset operation: {error}")),
@@ -540,6 +575,10 @@ pub(crate) fn schema_json() -> Value {
                             "page": {"type": "string"}, "source": {"type": "string"},
                             "target": {"type": "string"}, "interactionType": {"type": "string"}
                         }), &["page", "source", "target", "interactionType"]),
+                        operation("resetInteraction", serde_json::json!({
+                            "page": {"type": "string"}, "source": {"type": "string"},
+                            "target": {"type": "string"}
+                        }), &["page", "source", "target"]),
                         operation("applyThemePreset", serde_json::json!({
                             "preset": {"type": "string"}
                         }), &["preset"]),
@@ -628,6 +667,11 @@ mod tests {
                 source: "visual:ReportSectionOverview:VisualContainerRevenue".into(),
                 target: "visual:ReportSectionOverview:VisualContainerTable".into(),
                 interaction_type: "DataFilter".into(),
+            }),
+            Op::ResetInteraction(ResetInteraction {
+                page: "page:ReportSectionOverview".into(),
+                source: "visual:ReportSectionOverview:VisualContainerRevenue".into(),
+                target: "visual:ReportSectionOverview:VisualContainerTable".into(),
             }),
             Op::ApplyThemePreset(ApplyThemePreset {
                 preset: "operations".into(),

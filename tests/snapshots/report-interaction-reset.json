@@ -1,0 +1,39 @@
+{
+  "action": "reset",
+  "change": {
+    "action": "remove",
+    "after": null,
+    "jsonPointer": "/visualInteractions/0",
+    "kind": "pbir.page.visualInteractions"
+  },
+  "dryRun": true,
+  "interactionPlan": {
+    "after": null,
+    "before": {
+      "source": "VisualContainerCustomerDetail6665af72a7",
+      "target": "VisualContainerRevenue83556a914d",
+      "type": "NoFilter"
+    },
+    "changed": true,
+    "defaulted": true,
+    "existed": true,
+    "semantics": {
+      "missingRowsMean": "When a source/target visual pair is absent from visualInteractions, Power BI uses the target visual's default interaction behavior.",
+      "mode": "explicit-overrides",
+      "supportedTypes": [
+        "Default",
+        "DataFilter",
+        "HighlightFilter",
+        "NoFilter"
+      ]
+    }
+  },
+  "mode": "dry-run",
+  "resetSemantics": "The explicit visualInteractions row is absent after reset; Power BI applies the target visual's default interaction behavior.",
+  "schema": "powerbi-cli.report.interactions.resetMutation.v1",
+  "target": {
+    "defaulted": true,
+    "interactionType": "Default",
+    "rowPresent": false
+  }
+}

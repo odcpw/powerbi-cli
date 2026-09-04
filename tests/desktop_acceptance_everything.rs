@@ -3008,6 +3008,31 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let reset = h.ok(
+        "report interactions reset",
+        &svec([
+            "report",
+            "interactions",
+            "reset",
+            "--project",
+            &project_arg,
+            "--page",
+            &overview,
+            "--source",
+            &line,
+            "--target",
+            &table,
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    assert_eq!(reset["action"], "reset");
+    assert!(reset["target"]["defaulted"].as_bool().unwrap_or(false));
+    assert!(
+        reset["interactionPlan"]["changed"]
+            .as_bool()
+            .unwrap_or(false)
+    );
 
     h.ok(
         "fixture normalize",

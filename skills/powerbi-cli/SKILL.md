@@ -198,6 +198,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report find --project <project-dir-or.pbip> [--kind <kind>] [--name-contains <text>] [--title-contains <text>] [--visual-type <type>] [--path-contains <text>] [--include-raw] --json` — Search report objects by stable metadata instead of guessing PBIR file paths _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions disable --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert an explicit NoFilter visualInteraction row so the target visual does not react to the source visual _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--source <visual-name-or-handle>] [--target <visual-name-or-handle>] [--type Default|DataFilter|HighlightFilter|NoFilter] [--include-raw] --json` — List explicit PBIR page visualInteraction overrides with stable handles, source/target visual resolution, and default-interaction semantics _(proof: `unit-smoke`)_
+- `powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle> (--dry-run | --in-place | --out-dir <dir>) --json` — Remove one explicit PBIR visualInteractions row so the target visual returns to its documented default interaction behavior _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions set --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) --type DataFilter|HighlightFilter|NoFilter (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert one explicit PBIR page visualInteraction override for a source/target visual pair; Default authoring remains Desktop-fixture gated _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions show --project <project-dir-or.pbip> --handle <interaction-handle> [--no-raw] --json` — Show one explicit PBIR page visualInteraction override by handle or page/source/target selector _(proof: `unit-smoke`)_
 - `powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json` — Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting _(proof: `unit-smoke`)_
@@ -415,7 +416,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `report.filters.relative-date` — **supported**, read-write-between-date-expressions, proof `schema-golden`: Relative-date report/page/visual filters. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`.
 - `report.filters.topn` — **supported**, read-write-visual-subquery, proof `schema-golden`: TopN visual filters ordered by a measure. Commands: `report filters list`, `report filters show`, `report filters add`, `report filters update`, `report filters delete`, `report visuals set-topn-guard`.
 - `report.intent-parser` — **supported**, deterministic-json-markdown-normalization, proof `unit-smoke`: Structured report intent parsing. Commands: `report plan`.
-- `report.interaction-default-reset` — **planned**, unsupported, proof `unit-smoke`: Interaction Default/reset semantics.
+- `report.interaction-default-reset` — **supported**, read-write-reset-to-default, proof `unit-smoke`: Interaction Default/reset semantics. Commands: `report interactions reset`.
 - `report.interactions.overrides` — **supported**, read-write-explicit-overrides, proof `unit-smoke`: Explicit visual interaction overrides. Commands: `report build`, `report interactions list`, `report interactions show`, `report interactions set`, `report interactions disable`.
 - `report.pages` — **supported**, read-write, proof `unit-smoke`: Report pages and layout metadata. Commands: `report pages list`, `report pages show`, `report pages add`, `report pages update`, `report pages reorder`, `report pages set-active`, `report pages delete-empty`.
 - `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
@@ -578,16 +579,16 @@ The final `desktop open` step is an opt-in Windows oracle operation. On Linux
 and macOS it returns `unsupported_feature`; local validation and schema/golden
 proof remain valid but do not claim Desktop canvas or refresh compatibility.
 
-The 2026-09-04 feature catalog has 50 IDs (45 supported, 5 planned). Keep the
+The 2026-09-04 feature catalog has 52 IDs (46 supported, 6 planned). Keep the
 proof level from `features list --json` with every claim:
 
 | status / proof | feature IDs |
 |---|---|
-| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
+| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interaction-default-reset`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
 | supported / `schema-golden` | `model.partition-grouped-rank`, `report.drillthrough`, `report.filters.numeric-range`, `report.filters.relative-date`, `report.filters.topn`, `report.visuals.generated`, `workflow.synthetic-source` |
 | supported / `desktop-golden-pending` | `desktop.reference-harvest`, `report.slicer-authoring`, `report.visuals.category-share`, `report.visuals.matrix` |
 | supported / `manual-desktop-canvas-refresh` | `report.visuals.combo-pareto` |
-| planned / `unit-smoke` | `report.bookmark-mutations`, `report.interaction-default-reset`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
+| planned / `unit-smoke` | `desktop.canvas-check`, `desktop.refresh-check`, `report.bookmark-mutations`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
 
 Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
 schema validate/normalize (including bounded `$include` composition), profile
@@ -612,7 +613,7 @@ report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
 fixture-backed visual role maps plus dry-run binding repair proposals,
-report slicer list/show/clear, report interaction list/show/set/disable, report bookmark
+report slicer list/show/clear, report interaction list/show/set/disable/reset, report bookmark
 list/show plus metadata-only display-name/reorder/delete, raw report theme
 show/extract/apply bundles, master report style inspect/extract/diff/apply,
 visual
@@ -621,7 +622,7 @@ title/legacy-alt-text cleanup, conditional-formatting readback list/show, handof
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
 Treat filter sort and arbitrary expression updates, bookmark state capture/create/update/grouping,
-slicer selection/sync mutation, interaction Default/reset semantics, unsupported
+slicer selection/sync mutation, unsupported
 slicer modes, style
 drift lint, conditional formatting authoring,
 unsupported visual families, and richer typed per-visual formatting commands as
@@ -782,7 +783,7 @@ required for manual canvas/refresh proof together with
 | Pie, donut, matrix, or Basic/Dropdown slicer binding/canvas baseline has prior manual proof | `testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json` plus exact current `visual.json` assertions, `validate --strict`, `handoff check`, and `fixture verify` against `catalog-proof.summary.json` | Re-open/refresh/save the current title-bearing bytes; Between slicers require that same Desktop proof before a compatibility claim |
 | Same-report one-column drillthrough matches the public schema-golden shape | `report drillthrough set/show/clear` shape/readback tests plus the public page schema and Desktop-authored reference shape | Reproducible Desktop well/context-menu/navigation/carried-filter proof; visual-action, multi-field, and cross-report fixtures before widening scope |
 | Visual formatting bundle was applied | `report visuals formatting extract/apply` dry-run/apply plus `report visuals formatting show` and `validate --strict` | Desktop-authored golden fixture match and Desktop open/save round-trip |
-| Visual interaction override was written/read locally | `report interactions set/disable` dry-run/apply plus `report interactions show` and `validate --strict` | Desktop open/save round-trip with interaction inspection |
+| Visual interaction override was written/read locally | `report interactions set/disable/reset` dry-run/apply plus `report interactions list/show` and `validate --strict` | Desktop open/save round-trip with interaction inspection |
 | Bookmark metadata was edited locally | `report bookmarks set-display-name/reorder/delete` dry-run/apply plus `report bookmarks list/show` and `validate --strict` | Desktop open/save round-trip with bookmark pane inspection |
 | Categorical filter was added or updated locally | `report filters add/update` dry-run/apply plus `report filters list/show` and `validate --strict` | Desktop canvas/open-save round-trip with filter pane inspection |
 | Numeric range filter matches the schema-golden contract | `report filters add --min/--max` dry-run/apply plus exact `show` shape and `validate --strict` | Desktop canvas/open-save round-trip for closed and open-ended ranges at every scope |
@@ -1351,6 +1352,7 @@ pbi --json report interactions list --project build/sales
 pbi --json report interactions show --project build/sales --handle "interaction:<page-name>:<ordinal>"
 pbi --json report interactions disable --project build/sales --page page:ReportSectionOverview --source "visual:ReportSectionOverview:<source-visual>" --target "visual:ReportSectionOverview:<target-visual>" --dry-run
 pbi --json report interactions set --project build/sales --page page:ReportSectionOverview --source "visual:ReportSectionOverview:<source-visual>" --target "visual:ReportSectionOverview:<target-visual>" --type HighlightFilter --out-dir build/sales-interactions
+pbi --json report interactions reset --project build/sales-interactions --page page:ReportSectionOverview --source "visual:ReportSectionOverview:<source-visual>" --target "visual:ReportSectionOverview:<target-visual>" --dry-run
 pbi --json report interactions show --project build/sales-interactions --page page:ReportSectionOverview --source "visual:ReportSectionOverview:<source-visual>" --target "visual:ReportSectionOverview:<target-visual>"
 pbi --json report visuals list --project build/sales --page page:ReportSectionOverview
 pbi --json report visuals catalog
@@ -1437,7 +1439,7 @@ proof and wider typed formatting remain open. Current title-bearing generated
 bytes are `desktop-golden-pending` until Desktop open/refresh/save
 re-verification. Do not infer support for
 arbitrary visual families, slicer selections/sync, filter shapes beyond the
-documented surface, or interaction Default/reset semantics.
+documented surface.
 
 Raw columns are refused with `unsupported_feature` in card Values, chart Y,
 matrix Values, and scatter X/Y/Size roles. Define a measure or wait for a
@@ -1527,15 +1529,16 @@ backed by `manual-desktop-canvas-refresh` binding/canvas evidence in the
 but still needs a committed Desktop canvas/refresh proof; automated proof and
 wider formatting coverage remain open.
 
-`report interactions list/show/set/disable` covers the first PBIR interaction
+`report interactions list/show/set/disable/reset` covers the PBIR interaction
 authoring slice. `list/show` scans page-level `visualInteractions`, resolves
 source/target visuals to stable handles, flags stale visual references, and
 states that missing rows mean Power BI default interaction behavior rather than
 `NoFilter`. `disable` upserts an explicit `NoFilter` row. `set` upserts
 DataFilter, HighlightFilter, or NoFilter for live source/target visual pairs
-with guarded output modes and readback/wireframe/inspect/validate commands. Do
-not author `Default` or reset/delete explicit interactions by memory; that
-semantics remains Desktop-fixture gated.
+with guarded output modes and readback/wireframe/inspect/validate commands.
+`reset` removes one matching explicit row and documents that its absence
+restores the target visual's default interaction behavior. This reset shape is
+locally proven at `unit-smoke`; Desktop canvas confirmation remains open.
 
 `report bookmarks list/show` provides PBIR bookmark inventory. It scans
 `definition/bookmarks/*.bookmark.json` plus `bookmarks.json` order/group
@@ -1558,8 +1561,8 @@ card/table values, standard category/value charts, category-share pie/donut,
 Rows/Columns/Values matrix, scatter/bubble, and single-column slicer bindings,
 with the measure-only value-role and single-use field gates described above.
 More visual families, slicer selection/sync authoring, filter sort or arbitrary
-expression mutation beyond the documented categorical update, interaction Default/reset behavior, conditional formatting, and rich
-formatting beyond title/alt-text/static color must still be driven by
+expression mutation beyond the documented categorical update, conditional
+formatting, and rich formatting beyond title/alt-text/static color must still be driven by
 Desktop-authored fixtures.
 Do not invent PBIR formatting JSON by memory.
 
