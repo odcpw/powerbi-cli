@@ -1,0 +1,58 @@
+{
+  "alerts": [
+    {
+      "measure": "Total Revenue",
+      "op": "<",
+      "semantic": "warning",
+      "threshold": 100000
+    }
+  ],
+  "audience": "Finance leaders",
+  "comparisons": [
+    "Segment"
+  ],
+  "drillPaths": [
+    "Segment -> Customer"
+  ],
+  "filterDimensions": [
+    "Region"
+  ],
+  "format": "json",
+  "handoff": {
+    "sourceKinds": [
+      "csv"
+    ],
+    "target": "work"
+  },
+  "kpis": [
+    {
+      "measure": "FactSales[Total Revenue]",
+      "name": "Total Revenue",
+      "target": 1000000
+    },
+    {
+      "measure": "FactSales[Total Units]",
+      "name": "Total Units",
+      "target": null
+    }
+  ],
+  "pageFlow": [
+    "Overview",
+    "Trend",
+    "Detail"
+  ],
+  "periods": [
+    "Last 12 months"
+  ],
+  "preferredArchetypes": [
+    "kpi-overview",
+    "time-series"
+  ],
+  "questions": [
+    "How is revenue trending?",
+    "Which segments need attention?"
+  ],
+  "schema": "intent.v1",
+  "source": "intent",
+  "text": "{\n  \"schema\": \"intent.v1\",\n  \"audience\": \"Finance leaders\",\n  \"questions\": [\n    \"How is revenue trending?\",\n    \"Which segments need attention?\"\n  ],\n  \"kpis\": [\n    {\n      \"name\": \"Total Revenue\",\n      \"target\": 1000000\n    },\n    {\n      \"name\": \"Total Units\"\n    }\n  ],\n  \"comparisons\": [\"Segment\"],\n  \"periods\": [\"Last 12 months\"],\n  \"drillPaths\": [\"Segment -> Customer\"],\n  \"alerts\": [\n    {\n      \"measure\": \"Total Revenue\",\n      \"op\": \"<\",\n      \"threshold\": 100000,\n      \"semantic\": \"warning\"\n    }\n  ],\n  \"filterDimensions\": [\"Region\"],\n  \"preferredArchetypes\": [\"kpi-overview\", \"time-series\"],\n  \"pageFlow\": [\"Overview\", \"Trend\", \"Detail\"],\n  \"handoff\": {\n    \"target\": \"work\",\n    \"sourceKinds\": [\"csv\"]\n  }\n}\n"
+}

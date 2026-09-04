@@ -1,0 +1,58 @@
+{
+  "alerts": [
+    {
+      "measure": "Total Revenue",
+      "op": "<",
+      "semantic": "warning",
+      "threshold": 100000
+    }
+  ],
+  "audience": "Finance leaders",
+  "comparisons": [
+    "Segment"
+  ],
+  "drillPaths": [
+    "Segment -> Customer"
+  ],
+  "filterDimensions": [
+    "Region"
+  ],
+  "format": "markdown",
+  "handoff": {
+    "sourceKinds": [
+      "csv"
+    ],
+    "target": "work"
+  },
+  "kpis": [
+    {
+      "measure": "FactSales[Total Revenue]",
+      "name": "Total Revenue",
+      "target": 1000000
+    },
+    {
+      "measure": "FactSales[Total Units]",
+      "name": "Total Units",
+      "target": null
+    }
+  ],
+  "pageFlow": [
+    "Overview",
+    "Trend",
+    "Detail"
+  ],
+  "periods": [
+    "Last 12 months"
+  ],
+  "preferredArchetypes": [
+    "kpi-overview",
+    "time-series"
+  ],
+  "questions": [
+    "How is revenue trending?",
+    "Which segments need attention?"
+  ],
+  "schema": "intent.v1",
+  "source": "intent",
+  "text": "## Audience\n\nFinance leaders\n\n## Questions\n\n- How is revenue trending?\n- Which segments need attention?\n\n## KPIs\n\n- Total Revenue (target: 1000000)\n- Total Units\n\n## Comparisons\n\n- Segment\n\n## Periods\n\n- Last 12 months\n\n## Drill Paths\n\n- Segment -> Customer\n\n## Alerts\n\n- measure: Total Revenue, op: <, threshold: 100000, semantic: warning\n\n## Filter Dimensions\n\n- Region\n\n## Preferred Archetypes\n\n- kpi-overview\n- time-series\n\n## Page Flow\n\n- Overview\n- Trend\n- Detail\n\n## Handoff\n\n- target: work\n- sourceKinds: csv\n"
+}

@@ -701,6 +701,26 @@ const FEATURE_CATALOG: &[Feature] = &[
         tags: &["report", "dashboard", "spec", "v2", "compiler", "agent"],
     },
     Feature {
+        id: "report.intent-parser",
+        title: "Structured report intent parsing",
+        category: "report",
+        status: "supported",
+        support: "deterministic-json-markdown-normalization",
+        proof_level: "unit-smoke",
+        emits_pbir: false,
+        commands: &["report plan"],
+        refusal_code: None,
+        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, normalizes audience/questions/KPIs and planning constraints, resolves KPI names to exact model measures, and returns pointer-rich diagnostics instead of guessing.",
+        next_proof: &[
+            "Compile comparisons, periods, drill paths, alerts, filters, archetypes, page flow, and handoff fields through their owning planner/compiler beads",
+        ],
+        reference_signals: &[
+            "examples/intents/sales.intent.json",
+            "examples/intents/sales.intent.md",
+        ],
+        tags: &["report", "intent", "planner", "markdown", "json", "agent"],
+    },
+    Feature {
         id: "workflow.synthetic-source",
         title: "Offline deterministic synthetic source swap",
         category: "workflow",

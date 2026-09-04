@@ -1,6 +1,6 @@
 mod common;
 
-use common::{load_archetype, run_powerbi, stdout_json};
+use common::{assert_json_snapshot, load_archetype, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
@@ -882,6 +882,117 @@ fn report_plan_builds_agent_dashboard_spec_from_schema_profile_and_objective() {
     assert_eq!(
         stdout_json(&handoff)["safeForOfflineHandoff"],
         Value::Bool(true)
+    );
+}
+
+#[test]
+fn report_plan_parses_json_and_markdown_intents_with_deterministic_output() {
+    for (fixture, snapshot) in [
+        (
+            "examples/intents/sales.intent.json",
+            "report-plan-intent-json",
+        ),
+        (
+            "examples/intents/sales.intent.md",
+            "report-plan-intent-markdown",
+        ),
+    ] {
+        let first = run_powerbi(&[
+            "report",
+            "plan",
+            "--schema",
+            "examples/sales.schema.json",
+            "--profile",
+            "examples/sales.profile.json",
+            "--intent",
+            fixture,
+            "--json",
+        ]);
+        assert_eq!(first.code, 0, "{fixture}: {}", first.stderr);
+        let second = run_powerbi(&[
+            "report",
+            "plan",
+            "--schema",
+            "examples/sales.schema.json",
+            "--profile",
+            "examples/sales.profile.json",
+            "--intent",
+            fixture,
+            "--json",
+        ]);
+        assert_eq!(second.code, 0, "{fixture}: {}", second.stderr);
+        assert_eq!(
+            first.stdout, second.stdout,
+            "planner output must be deterministic"
+        );
+
+        let value = stdout_json(&first);
+        assert_json_snapshot(snapshot, &value["intent"]);
+        assert_eq!(value["intent"]["schema"], "intent.v1");
+        assert!(value["intent"]["questions"].as_array().is_some());
+        assert_eq!(
+            value["intent"]["kpis"][0]["measure"],
+            "FactSales[Total Revenue]"
+        );
+        assert!(
+            value["decisions"]
+                .as_array()
+                .expect("decisions")
+                .iter()
+                .any(|decision| decision["kind"] == "kpi-measure")
+        );
+    }
+}
+
+#[test]
+fn report_plan_rejects_malformed_intent_with_pointer_and_missing_kpi_with_candidates() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let malformed = temp.path().join("malformed.intent.json");
+    fs::write(
+        &malformed,
+        r#"{"schema":"intent.v1","questions":"not-an-array"}"#,
+    )
+    .expect("malformed intent");
+    let malformed_arg = path_arg(&malformed);
+    let malformed_result = run_powerbi(&[
+        "report",
+        "plan",
+        "--schema",
+        "examples/sales.schema.json",
+        "--intent",
+        &malformed_arg,
+        "--json",
+    ]);
+    assert_eq!(malformed_result.code, 10);
+    let malformed_error = stderr_json(&malformed_result);
+    assert_eq!(malformed_error["error"]["code"], "spec.invalid_intent");
+    assert_eq!(malformed_error["error"]["pointer"], "/questions");
+
+    let missing = temp.path().join("missing.intent.json");
+    fs::write(
+        &missing,
+        r#"{"schema":"intent.v1","kpis":[{"name":"Not A Measure"}]}"#,
+    )
+    .expect("missing KPI intent");
+    let missing_arg = path_arg(&missing);
+    let missing_result = run_powerbi(&[
+        "report",
+        "plan",
+        "--schema",
+        "examples/sales.schema.json",
+        "--intent",
+        &missing_arg,
+        "--json",
+    ]);
+    assert_eq!(missing_result.code, 10);
+    let missing_error = stderr_json(&missing_result);
+    assert_eq!(missing_error["error"]["code"], "spec.missing_input");
+    assert_eq!(missing_error["error"]["pointer"], "/kpis/0/name");
+    assert!(
+        missing_error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("FactSales[Total Revenue]")
     );
 }
 

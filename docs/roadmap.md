@@ -132,11 +132,15 @@ object-specific writers and fixtures exist.
 - `report build --schema <schema> [--profile <profile>] [--spec <spec>]`:
   compile schema/profile/spec inputs into an offline-safe PBIP project through
   proven scaffold/report primitives.
-- `report plan --schema <schema> --profile <profile> --objective <goal>`:
-  deterministic starter dashboard planner that emits an explicit
-  `powerbi-cli.dashboard.v1` spec plus decisions, warnings, and compile
-  summary. Keep broader semantic inference shallow until additional unrelated
-  archetype and Desktop goldens prove it.
+- `report plan --schema <schema> --profile <profile> --intent <intent.md|intent.json>`
+  (or the backward-compatible `--objective <goal>`): deterministic starter
+  dashboard planner that normalizes audience, questions, KPIs, comparisons,
+  periods, drill paths, alerts, filter dimensions, preferred archetypes, page
+  flow, and handoff requirements into one `intent.v1` response before emitting
+  an explicit `powerbi-cli.dashboard.v1` spec. KPI names resolve to exact model
+  measures; unresolved names return `spec.missing_input` with pointer and
+  candidates. Uncompiled intent fields remain visible with an owning-bead
+  warning.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
