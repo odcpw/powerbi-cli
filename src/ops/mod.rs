@@ -16,16 +16,20 @@
 // consumers are registered without weakening clippy's correctness lints.
 #![allow(dead_code)]
 
+mod apply_theme_preset;
 mod handles;
 mod io;
 mod plan;
+mod set_interaction;
 mod transaction;
 
+pub(crate) use apply_theme_preset::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
 pub(crate) use io::*;
 pub(crate) use plan::*;
+pub(crate) use set_interaction::*;
 #[allow(unused_imports)]
 pub(crate) use transaction::*;
 
@@ -33,6 +37,18 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
+
+/// Return the concrete kernel registered for an operation variant.
+///
+/// The registry is intentionally additive: each converted mutation contributes
+/// one match arm while the public `ops apply` dispatcher remains a later bead.
+pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
+    match operation {
+        Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
+        Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
+        _ => None,
+    }
+}
 
 /// A typed operation accepted by the operation-plan compiler.
 ///
