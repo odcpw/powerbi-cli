@@ -20,6 +20,7 @@ mod handles;
 mod io;
 mod plan;
 mod set_object;
+mod set_position;
 mod transaction;
 
 #[allow(unused_imports)]
@@ -30,6 +31,10 @@ pub(crate) use plan::*;
 #[allow(unused_imports)]
 pub(crate) use set_object::{
     SetObjectKernel, apply as apply_set_object, execute as execute_set_object,
+};
+#[allow(unused_imports)]
+pub(crate) use set_position::{
+    SetPositionKernel, apply as apply_set_position, execute as execute_set_position,
 };
 #[allow(unused_imports)]
 pub(crate) use transaction::*;
@@ -56,6 +61,7 @@ pub(crate) enum Op {
     SetInteraction(SetInteraction),
     ApplyThemePreset(ApplyThemePreset),
     SetObject(SetObject),
+    SetPosition(SetPosition),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,6 +188,37 @@ pub(crate) struct SetObject {
     pub(crate) value: Value,
 }
 
+/// A typed patch for the PBIR visual `position` object. Geometry fields are
+/// optional so one operation can move, resize, or reorder a visual without
+/// replacing fields it did not request. Parsed command arguments reject
+/// non-finite values before they reach this payload; the kernel repeats that
+/// validation when callers construct operations directly.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SetPosition {
+    pub(crate) visual: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) x: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) y: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) width: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) height: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) z: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) tab_order: Option<u64>,
+    #[serde(default)]
+    pub(crate) allow_outside_page: bool,
+}
+
+// The parser and PBIR writer reject NaN/infinite geometry values, so the
+// operation's equality semantics are only used for valid JSON payloads. A
+// manual Eq implementation keeps OpPlan's duplicate-operation checks intact
+// while retaining the natural f64 representation in the ops.v1 contract.
+impl Eq for SetPosition {}
+
 /// A handle reference together with the payload field that supplied it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HandleReference<'a> {
@@ -226,6 +263,7 @@ impl Op {
             Self::SetInteraction(_) => "setInteraction",
             Self::ApplyThemePreset(_) => "applyThemePreset",
             Self::SetObject(_) => "setObject",
+            Self::SetPosition(_) => "setPosition",
         }
     }
 
@@ -234,7 +272,7 @@ impl Op {
             Self::AddMeasure(_) | Self::AddRelationship(_) => OpStage::Model,
             // There is no AddPage in T1a. SetDrillthrough is deliberately in
             // the behavior stage so it follows every visual declaration.
-            Self::AddVisual(_) => OpStage::Visual,
+            Self::AddVisual(_) | Self::SetPosition(_) => OpStage::Visual,
             Self::AddFilter(_) | Self::SetInteraction(_) | Self::SetDrillthrough(_) => {
                 OpStage::Behavior
             }
@@ -251,7 +289,8 @@ impl Op {
             Self::SetDrillthrough(_)
             | Self::SetInteraction(_)
             | Self::ApplyThemePreset(_)
-            | Self::SetObject(_) => None,
+            | Self::SetObject(_)
+            | Self::SetPosition(_) => None,
         }
     }
 
@@ -289,6 +328,10 @@ impl Op {
                 field: "visual",
                 handle: &value.visual,
             }],
+            Self::SetPosition(value) => vec![HandleReference {
+                field: "visual",
+                handle: &value.visual,
+            }],
             Self::AddMeasure(_)
             | Self::AddRelationship(_)
             | Self::AddFilter(_)
@@ -320,6 +363,7 @@ impl Serialize for Op {
             Self::SetInteraction(value) => serialize_tagged(self.tag(), value, serializer),
             Self::ApplyThemePreset(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetObject(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetPosition(value) => serialize_tagged(self.tag(), value, serializer),
         }
     }
 }
@@ -385,6 +429,9 @@ fn deserialize_tagged(tag: &str, payload: Value) -> Result<Op, String> {
         "setObject" => serde_json::from_value(payload)
             .map(Op::SetObject)
             .map_err(|error| format!("invalid setObject operation: {error}")),
+        "setPosition" => serde_json::from_value(payload)
+            .map(Op::SetPosition)
+            .map_err(|error| format!("invalid setPosition operation: {error}")),
         other => Err(format!("unsupported operation tag `{other}`")),
     }
 }
@@ -463,7 +510,15 @@ pub(crate) fn schema_json() -> Value {
                         operation("setObject", serde_json::json!({
                             "visual": {"type": "string"}, "object": {"type": "string"},
                             "property": {"type": "string"}, "value": {}
-                        }), &["visual", "object", "property", "value"])
+                        }), &["visual", "object", "property", "value"]),
+                        operation("setPosition", serde_json::json!({
+                            "visual": {"type": "string"},
+                            "x": {"type": "number"}, "y": {"type": "number"},
+                            "width": {"type": "number"}, "height": {"type": "number"},
+                            "z": {"type": "integer", "minimum": 0},
+                            "tabOrder": {"type": "integer", "minimum": 0},
+                            "allowOutsidePage": {"type": "boolean"}
+                        }), &["visual"])
                     ]
                 }
             }
@@ -546,11 +601,21 @@ mod tests {
                 property: "text".into(),
                 value: serde_json::json!("Revenue"),
             }),
+            Op::SetPosition(SetPosition {
+                visual: "visual:ReportSectionOverview:VisualContainerRevenue".into(),
+                x: Some(40.0),
+                y: Some(50.0),
+                width: Some(320.0),
+                height: Some(180.0),
+                z: Some(2),
+                tab_order: Some(1),
+                allow_outside_page: false,
+            }),
         ]
     }
 
     #[test]
-    fn every_t1a_operation_round_trips_as_flat_ops_v1_json() {
+    fn every_registered_operation_round_trips_as_flat_ops_v1_json() {
         for operation in variants() {
             let value = serde_json::to_value(&operation).expect("serialize operation");
             assert_eq!(value["op"].as_str(), Some(operation.tag()));
@@ -571,7 +636,7 @@ mod tests {
             schema["properties"]["ops"]["items"]["oneOf"]
                 .as_array()
                 .map(Vec::len),
-            Some(8)
+            Some(9)
         );
     }
 

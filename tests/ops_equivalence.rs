@@ -87,3 +87,54 @@ fn set_object_op_replays_are_deterministic_and_preserve_cli_contract() {
     }
     assert_eq!(project_files(&first_out), project_files(&second_out));
 }
+
+#[test]
+fn set_position_op_replays_are_deterministic_and_preserve_cli_contract() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let first = scaffold_sales(&temp.path().join("first"));
+    let second = scaffold_sales(&temp.path().join("second"));
+    let first_handle = visual_handle(&first);
+    let second_handle = visual_handle(&second);
+    assert_eq!(first_handle, second_handle);
+    let page = first_page_name(&first);
+
+    let first_out = temp.path().join("first-out");
+    let second_out = temp.path().join("second-out");
+    for (project, handle, out) in [
+        (&first, first_handle, &first_out),
+        (&second, second_handle, &second_out),
+    ] {
+        let output = run_powerbi(&[
+            "report",
+            "visuals",
+            "set-position",
+            "--project",
+            project.to_str().expect("project path"),
+            "--page",
+            &page,
+            "--visual",
+            handle.rsplit(':').next().expect("visual name"),
+            "--x",
+            "120",
+            "--y",
+            "140",
+            "--width",
+            "360",
+            "--height",
+            "220",
+            "--z",
+            "5",
+            "--tab-order",
+            "4",
+            "--out-dir",
+            out.to_str().expect("out path"),
+            "--json",
+        ]);
+        assert_eq!(output.exit, 0, "stderr: {}", output.stderr);
+        assert_eq!(
+            stdout_json(&output)["schema"],
+            "powerbi-cli.report.visuals.positionMutation.v1"
+        );
+    }
+    assert_eq!(project_files(&first_out), project_files(&second_out));
+}

@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, required_project,
     set_report_visual_mode as set_mode, shell_arg, take_report_value as take_value, target_project,
 };
+use crate::ops::SetPosition;
 use crate::pbir::{
     VisualSelector, find_visual, load_report_snapshot, visual_detail, visual_list_item,
     visuals_for_page,
@@ -24,8 +25,8 @@ use crate::report_visual_scaffold::{add_card, add_slicer, add_textbox};
 use crate::tmdl::load_table_documents;
 use crate::visual_catalog::visual_catalog_command;
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
-    read_json_value, resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
+    command_arg, read_json_value, resolve_project, validate_project,
 };
 use serde_json::{Number, Value, json};
 use std::path::PathBuf;
@@ -96,6 +97,31 @@ struct PositionOptions {
     mode: Option<MutationMode>,
     out_dir: Option<PathBuf>,
     allow_outside_page: bool,
+}
+
+/// Parsed arguments for the set-position operation. The typed operation keeps
+/// only the PBIR geometry payload; project and output-mode context remains at
+/// the command boundary so an ops.v1 plan can be replayed against another
+/// project.
+#[derive(Debug)]
+pub(crate) struct ParsedSetPosition {
+    pub(crate) operation: SetPosition,
+    pub(crate) project: PathBuf,
+    pub(crate) selector: VisualSelector,
+    pub(crate) mode: MutationMode,
+    pub(crate) out_dir: Option<PathBuf>,
+}
+
+/// Details captured while applying set-position to a staged transaction. The
+/// renderer reloads the caller-visible project after commit, keeping paths and
+/// visual metadata identical to the historical CLI response.
+#[derive(Debug, Clone)]
+pub(crate) struct AppliedPositionMutation {
+    pub(crate) visual_path: PathBuf,
+    pub(crate) fields: Vec<String>,
+    pub(crate) target: Value,
+    pub(crate) before: Value,
+    pub(crate) after: Value,
 }
 
 #[derive(Debug, Default)]
@@ -169,27 +195,61 @@ fn show_visual(args: &[String]) -> CliResult<Value> {
 }
 
 fn set_position(args: &[String]) -> CliResult<Value> {
+    crate::ops::execute_set_position(args)
+}
+
+pub(crate) fn parse_set_position_args(args: &[String]) -> CliResult<ParsedSetPosition> {
     let options = parse_position_args(args)?;
     let source_project = required_project(options.project.clone(), "report visuals set-position")?;
     require_visual_selector(&options.selector, "report visuals set-position")?;
     require_position_patch(&options.patch)?;
-    let source_resolved = resolve_project(&source_project)?;
     let mode = require_mode_with_contract(
         options.mode,
         "report visuals set-position",
         "Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.",
         "powerbi-cli report visuals set-position --project <project-dir-or.pbip> --handle <visual-handle> --x 40 --y 40 --dry-run --json",
     )?;
+    Ok(ParsedSetPosition {
+        operation: SetPosition {
+            visual: options.selector.handle.clone().unwrap_or_default(),
+            x: options.patch.x,
+            y: options.patch.y,
+            width: options.patch.width,
+            height: options.patch.height,
+            z: options.patch.z,
+            tab_order: options.patch.tab_order,
+            allow_outside_page: options.allow_outside_page,
+        },
+        project: source_project,
+        selector: options.selector,
+        mode,
+        out_dir: options.out_dir,
+    })
+}
 
-    crate::cli_support::preflight_out_dir(args, set_position)?;
-    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
-
-    let snapshot = load_report_snapshot(&target_resolved)?;
-    let visual = find_visual(
-        &snapshot.pages,
-        &options.selector,
-        "report visuals set-position",
-    )?;
+/// Apply one typed set-position operation to an already-resolved project. The
+/// caller owns the transaction; this helper performs the same PBIR read,
+/// bounds validation, and atomic write as the historical CLI path.
+pub(crate) fn apply_set_position_operation(
+    project: &ResolvedProject,
+    operation: &SetPosition,
+) -> CliResult<AppliedPositionMutation> {
+    let patch = PositionPatch {
+        x: operation.x,
+        y: operation.y,
+        width: operation.width,
+        height: operation.height,
+        z: operation.z,
+        tab_order: operation.tab_order,
+    };
+    require_position_patch(&patch)?;
+    let selector = VisualSelector {
+        handle: Some(operation.visual.clone()),
+        ..VisualSelector::default()
+    };
+    let snapshot = load_report_snapshot(project)?;
+    let visual = find_visual(&snapshot.pages, &selector, "report visuals set-position")?;
+    let target = visual_detail(visual);
     let visual_path = visual.path.as_ref().ok_or_else(|| {
         CliError::validation_failed(format!(
             "visual has no path in inspect output: {}",
@@ -200,25 +260,60 @@ fn set_position(args: &[String]) -> CliResult<Value> {
     let before = visual_json["position"].clone();
     let page_width = snapshot.pages[visual.page_ordinal].width.as_f64();
     let page_height = snapshot.pages[visual.page_ordinal].height.as_f64();
-    let after = patched_position(&before, &options.patch)?;
+    let after = patched_position(&before, &patch)?;
     validate_position_bounds(
         &after,
         page_width,
         page_height,
-        options.allow_outside_page,
+        operation.allow_outside_page,
         "report visuals set-position",
     )?;
-    visual_json["position"] = after.clone();
-
-    let dry_run = matches!(mode, MutationMode::DryRun);
-    if !dry_run {
+    if before != after {
+        visual_json["position"] = after.clone();
         write_json_atomic(visual_path, &visual_json)?;
     }
+    Ok(AppliedPositionMutation {
+        visual_path: visual_path.to_path_buf(),
+        fields: changed_fields(&patch)
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .collect(),
+        target,
+        before,
+        after,
+    })
+}
 
+/// Render the original position-mutation response after an operation has been
+/// committed (or while a dry-run keeps the source untouched).
+pub(crate) fn render_set_position_mutation(
+    target_resolved: &ResolvedProject,
+    mode: MutationMode,
+    operation: &SetPosition,
+    applied: &AppliedPositionMutation,
+) -> CliResult<Value> {
+    let snapshot = load_report_snapshot(target_resolved)?;
+    let selector = VisualSelector {
+        handle: Some(operation.visual.clone()),
+        ..VisualSelector::default()
+    };
+    let visual = find_visual(&snapshot.pages, &selector, "report visuals set-position")?;
+    let visual_path = visual.path.as_ref().ok_or_else(|| {
+        CliError::validation_failed(format!(
+            "visual has no path in inspect output: {}",
+            visual.handle
+        ))
+    })?;
+    // The historical command assembled `target` from the inspect snapshot
+    // taken before the patch. Keep that pre-mutation metadata while replacing
+    // only its temporary working-copy path with the caller-visible path.
+    let mut target_detail = applied.target.clone();
+    target_detail["path"] = Value::String(canonical_display(visual_path));
+    let dry_run = matches!(mode, MutationMode::DryRun);
     let validation = if dry_run {
         None
     } else {
-        Some(validate_project(&target_resolved)?)
+        Some(validate_project(target_resolved)?)
     };
     let validation_ok = validation
         .as_ref()
@@ -247,7 +342,6 @@ fn set_position(args: &[String]) -> CliResult<Value> {
         "powerbi-cli validate --strict {} --json",
         command_arg(&target_resolved.project_dir)
     );
-
     Ok(json!({
         "schema": "powerbi-cli.report.visuals.positionMutation.v1",
         "ok": validation_ok,
@@ -258,14 +352,14 @@ fn set_position(args: &[String]) -> CliResult<Value> {
         "projectDir": canonical_display(&target_resolved.project_dir),
         "pbip": canonical_display(&target_resolved.pbip_path),
         "reportDir": canonical_display(&target_resolved.report_dir),
-        "target": visual_detail(visual),
+        "target": target_detail,
         "changes": [{
             "kind": "pbir.visual.position",
             "action": "set-position",
             "path": canonical_display(visual_path),
-            "fields": changed_fields(&options.patch),
-            "before": before,
-            "after": after
+            "fields": applied.fields,
+            "before": applied.before,
+            "after": applied.after
         }],
         "validation": validation.map(|report| json!({
             "ok": report.errors.is_empty(),
