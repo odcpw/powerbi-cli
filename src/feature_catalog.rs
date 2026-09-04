@@ -906,13 +906,15 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. `report spec normalize` flattens model, page, and style fragments deterministically; `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. The compiled subset is artifact-identical to v1; proof is compiled into a side-effect-free proofPlan and exact next commands, while every other recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. `report spec normalize` flattens model, page, and style fragments deterministically; `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. Root, page, and visual `filters[]` compile through the typed AddFilter kernel with model/type validation for categorical, numeric-range, relative-date, and visual TopN shapes; page `drillthrough` blocks compile through SetDrillthrough with an existing-column target and hidden-by-default page, while backButton requests return a spec.feature_pending warning for pbi-t4-pbir-catalog-expansion-sn2.8 until the action-button kernel is proven. Build responses expose per-operation outcomes and readback. The compiled subset remains artifact-identical to v1 where features overlap; proof is compiled into a side-effect-free proofPlan and exact next commands, while every other recognized future section stops with unsupported_feature and its owning T3 bead id.",
         next_proof: &[
-            "Land the named T3 compiler bead for each currently refused v2 section",
+            "Land the named T3 compiler bead for each remaining refused v2 section",
             "Promote generated v2 archetypes through the existing Desktop proof ladder",
         ],
         reference_signals: &[
             "examples/sales.dashboard.v2.json: minimal compiled v2 parity fixture",
+            "examples/filter-kinds.dashboard.v2.json: root/page/visual filter compiler coverage",
+            "examples/archetypes/regional-sales.dashboard.json: declarative drillthrough compiler and pending back-button warning",
         ],
         tags: &["report", "dashboard", "spec", "v2", "compiler", "agent"],
     },

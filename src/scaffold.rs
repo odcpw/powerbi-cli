@@ -1390,7 +1390,7 @@ fn write_bytes(path: &Path, bytes: &[u8]) -> CliResult<()> {
     })
 }
 
-pub(super) fn object_name(prefix: &str, label: &str, index: usize) -> String {
+pub(crate) fn object_name(prefix: &str, label: &str, index: usize) -> String {
     let slug = slug(label);
     let hash = hash_hex(&format!("{prefix}:{label}:{index}"));
     let short_hash = &hash[..10];

@@ -135,8 +135,12 @@ policies can wait until the object-specific writers and fixtures exist.
   validation also checks the visual catalog before writing files. `report spec
   fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
-  its not-yet-compiled sections return `unsupported_feature` with their owning
-  T3 bead id.
+  root/page/visual `filters[]` compile through the typed AddFilter kernel with
+  model/type checks, and page `drillthrough` blocks compile through
+  SetDrillthrough with target-column validation and a hidden-by-default page;
+  `backButton:true` reports the pending action-button bead without emitting a
+  guessed visual. Remaining not-yet-compiled sections return
+  `unsupported_feature` with their owning T3 bead id.
 - `report spec schema` emits a draft 2020-12 JSON Schema for both strict
   dashboard-spec versions, while `report spec explain` previews the typed
   staged operation plan, handles, layout/defaults, unsupported sections, and
@@ -174,10 +178,10 @@ policies can wait until the object-specific writers and fixtures exist.
   Category/Y charts with two or more resolved model columns.
 - `report visuals format`: set title, labels, legend, colors, display units,
   sort, and interactions.
-- `report filters list/show/add/delete/clear` (`list/show/add/delete/clear`
-  implemented first as raw readback, categorical authoring, exact-handle
-  deletion, and owner-scoped clear with data-value safety warnings;
-  advanced/range/TopN filters, update, and sort remain planned)
+- `report filters list/show/add/update/delete/clear` (raw readback,
+  categorical/numeric-range/relative-date authoring, visual TopN, type-preserving
+  updates, exact-handle deletion, and owner-scoped clear with data-value safety
+  warnings)
 - `report slicers list/show/clear/add/update` (`list/show/clear` implemented
   first as slicer visual readback plus guarded persisted-selection clear with
   data-value safety warnings; add/update/richer state authoring remain planned)
@@ -473,17 +477,21 @@ frozen until proven.
   passes them to shared M generator functions, so the same seed is
   byte-deterministic while multiple scales reproduce Desktop refresh cost
   without live data or credentials.
-- Implemented first filter slice: `report filters list/show` inventories raw
-  report/page/visual PBIR filter containers, returns stable filter handles, and
-  warns when filter metadata may contain selected semantic-model values.
-- Implemented guarded filter add, deletion, and clear slices: `report filters
-  add` writes one categorical filter to report/page/visual
-  `/filterConfig/filters` after TMDL column validation; `report filters delete`
-  removes one explicit report/page/visual filter by stable handle; `report
-  filters clear` removes filters by exact filter handle, report scope, one page
-  owner, one visual owner, or explicit `--all`. Mutations require `--dry-run`,
-  `--out-dir`, or guarded `--in-place`; broader advanced/range/TopN filters,
-  update/sort, and expression-level edits remain fixture-gated.
+- Implemented filter authoring and compiler parity: `report filters
+  list/show/add/update/delete/clear` inventories raw report/page/visual PBIR
+  filter containers, writes categorical, numeric-range, relative-date, and
+  visual TopN shapes after TMDL validation, and returns stable handles with
+  data-value safety warnings. Dashboard v2 root/page/visual `filters[]` use
+  the same typed AddFilter kernel during `report build`; spec builds and the
+  equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
+  `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
+  type-changing updates remain fixture-gated.
+- Implemented dashboard-spec drillthrough compiler parity: v2
+  `pages[].drillthrough` uses the SetDrillthrough kernel, validates a model
+  column target, defaults pages to hidden, and matches the two regional-sales
+  CLI drillthrough mutations byte-for-byte. `backButton:true` emits a
+  `spec.feature_pending` warning for `pbi-t4-pbir-catalog-expansion-sn2.8`
+  until the proven action-button kernel lands.
 - Implemented first bookmark slice: `report bookmarks list/show` inventories
   raw PBIR bookmark files plus bookmark order/group metadata, returns stable
   bookmark handles, and warns when captured bookmark state may contain selected
@@ -543,7 +551,8 @@ frozen until proven.
   Desktop-authored round-trip fixtures and promote its proof level when a
   Windows canvas check confirms that removing a row restores the default.
 - Build on the implemented same-report `report drillthrough set/show/clear`
-  linked `pageBinding` + Drillthrough filter slice with Desktop re-verification,
+  linked `pageBinding` + Drillthrough filter slice and declarative v2 compiler
+  with Desktop re-verification,
   then add Desktop-authored goldens for visual drillthrough action links,
   multi-field drillthrough, and cross-report drillthrough.
 - Build on the implemented `report drilldown set-hierarchy` slice with

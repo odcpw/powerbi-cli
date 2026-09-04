@@ -567,7 +567,9 @@ profile output retain their documented family-specific fields.
 
 `report build` also returns `compiled.ops`, a flat operation-change aggregate,
 and `readback` command arrays keyed by stable report/page/visual/table/measure
-handles. Its shared `scorecard.v1` contains native validation, Microsoft
+handles. When a dashboard spec emits typed operations, `operationOutcomes[]`
+records each kernel's concrete changes, readback commands, warnings, and
+created handles. Its shared `scorecard.v1` contains native validation, Microsoft
 validator availability, lint grouped by severity, the fixed unavailable design
 lint shape, offline handoff status, and the honest proof level. Add `--trace`
 to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
@@ -644,6 +646,8 @@ cargo run --bin powerbi-cli -- report spec explain --schema .\examples\sales.sch
 cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
+# V2 spec filters compile through the same typed AddFilter kernels as the CLI.
+cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --spec .\examples\filter-kinds.dashboard.v2.json --out-dir .\build\filter-kinds --force --json
 cargo run --bin powerbi-cli -- validate --strict .\build\generic-sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\generic-sales --json
 cargo run --bin powerbi-cli -- fixture verify .\build\generic-sales --expected .\testdata\golden\generic-sales.summary.json --json
@@ -949,10 +953,20 @@ This generated snapshot keeps status and proof claims aligned with
   `proofPlan` plus exact `next[]` commands. Desktop levels are never claimed by
   the Linux compiler: `proofPlan.unavailable[]` records the platform, missing
   Desktop, or missing-reference reason and the Windows instruction. Sections
-  whose other compiler bead has not landed return `unsupported_feature` with
-  the owning bead id instead of being dropped. The checked-in
-  `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
-  subset and builds byte-identically to the v1 sales fixture. To migrate any
+  Root, page, and visual `filters[]` compile to the same typed `AddFilter`
+  operations used by `report filters add`; categorical, numeric range,
+  relative-date, and visual TopN filters are model/type checked and surfaced
+  in `operationOutcomes[]`. Sections whose other compiler bead has not landed
+  return `unsupported_feature` with the owning bead id instead of being dropped.
+  Page `drillthrough` blocks likewise compile to the typed `SetDrillthrough`
+  operation: `target` must resolve to an existing model column and `hidden`
+  defaults to `true`. A requested `backButton:true` keeps the page binding but
+  returns a `spec.feature_pending` warning naming
+  `pbi-t4-pbir-catalog-expansion-sn2.8` until the proven action-button kernel
+  lands; no guessed visual is emitted.
+  The checked-in `examples/sales.dashboard.v2.json` demonstrates the minimal
+  compiled-v2 subset, while `examples/filter-kinds.dashboard.v2.json` exercises
+  every supported filter kind. To migrate any
   validated v1 spec, run `report spec upgrade --spec <v1.json> --out <v2.json>`;
   the command rewrites only `/schema`, preserves array order, normalizes object
   keys, and returns every transformed pointer. Unknown v1 keys fail with
@@ -1234,6 +1248,12 @@ This generated snapshot keeps status and proof claims aligned with
   same-report slice is `schema-golden`, backed by the public page schema and
   Desktop-authored reference shape; reproducible Desktop drillthrough
   navigation proof remains open.
+  Declarative v2 `pages[].drillthrough` uses the same `SetDrillthrough` kernel
+  during `report build`, validates its target column, and defaults the page to
+  hidden. `backButton:true` currently produces a structured
+  `spec.feature_pending` warning for
+  `pbi-t4-pbir-catalog-expansion-sn2.8`; it does not author an unproven
+  action-button visual.
 - Programmatic report filter handling covers `report filters
   list/show/add/update/delete/clear` for raw report/page/visual PBIR
   `filterConfig.filters` readback; categorical, numeric range, visual TopN, and
@@ -1265,6 +1285,9 @@ This generated snapshot keeps status and proof claims aligned with
   PBIR schemas and reference shapes, but Desktop canvas/open-save verification
   remains pending. Filter sort, tuple filters, arbitrary Advanced expressions,
   and type-changing updates remain unsupported.
+  Declarative v2 root/page/visual `filters[]` use the same AddFilter validation
+  and PBIR emission path during `report build`, so a spec build and the
+  equivalent CLI filter commands produce byte-identical artifacts.
 - Programmatic visual formatting authoring covers raw formatting bundle
   extract/apply plus typed `report visuals formatting set-text` and
   `set-color`. `set-color` patches only static literal `title.fontColor` and

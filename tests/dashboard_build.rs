@@ -280,25 +280,15 @@ fn catalog_proof_archetype_build_validates_handoff_and_matches_golden() {
 }
 
 #[test]
-fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
+fn regional_sales_archetype_compiles_in_spec_and_matches_golden() {
     let temp = tempfile::tempdir().expect("tempdir");
     let built = temp.path().join("regional_sales_build");
-    let with_customer_drillthrough = temp.path().join("regional_sales_customer_drillthrough");
-    let with_drillthrough = temp.path().join("regional_sales_drillthrough");
-    let with_customer_top3 = temp.path().join("regional_sales_customer_top3");
-    let project = temp.path().join("regional_sales");
     let built_arg = path_arg(&built);
-    let with_customer_drillthrough_arg = path_arg(&with_customer_drillthrough);
-    let with_drillthrough_arg = path_arg(&with_drillthrough);
-    let with_customer_top3_arg = path_arg(&with_customer_top3);
-    let project_arg = path_arg(&project);
     let schema_path = "examples/archetypes/regional-sales.schema.json";
     let profile_path = "examples/archetypes/regional-sales.profile.json";
     let spec_path = "examples/archetypes/regional-sales.dashboard.json";
     let customer_page = "page:ReportSectionCustomerDetail";
     let segment_page = "page:ReportSectionSegmentDetail";
-    let customer_table = "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable";
-    let segment_table = "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable";
 
     let schema = run_powerbi(&["schema", "validate", schema_path, "--json"]);
     assert_eq!(schema.code, 0, "stderr: {}", schema.stderr);
@@ -374,7 +364,21 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
         "--json",
     ]);
     assert_eq!(build.code, 0, "stderr: {}", build.stderr);
-    assert_eq!(stdout_json(&build)["ok"], Value::Bool(true));
+    let build_json = stdout_json(&build);
+    assert_eq!(build_json["ok"], Value::Bool(true));
+    assert_eq!(
+        build_json["operationOutcomes"].as_array().map(Vec::len),
+        Some(4)
+    );
+    assert_eq!(
+        build_json["warnings"]
+            .as_array()
+            .expect("build warnings")
+            .iter()
+            .filter(|warning| warning["code"] == "spec.feature_pending")
+            .count(),
+        2
+    );
 
     // Non-ASCII measure and column names round-trip byte-for-byte into generated PBIR.
     let overview_card = fs::read_to_string(
@@ -402,223 +406,12 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
     .expect("read Größenklasse slicer visual.json");
     assert!(overview_slicer.contains("\"Größenklasse\""));
 
-    let drillthrough_dry = run_powerbi(&[
-        "report",
-        "drillthrough",
-        "set",
-        "--project",
-        &built_arg,
-        "--page",
-        customer_page,
-        "--target",
-        "DimCustomer[Customer]",
-        "--dry-run",
-        "--json",
-    ]);
-    assert_eq!(
-        drillthrough_dry.code, 0,
-        "stderr: {}",
-        drillthrough_dry.stderr
-    );
-    let drillthrough_dry_json = stdout_json(&drillthrough_dry);
-    assert_eq!(drillthrough_dry_json["dryRun"], Value::Bool(true));
-    assert_eq!(
-        drillthrough_dry_json["drillthroughPlan"]["after"]["enabled"],
-        Value::Bool(true)
-    );
-
-    let drillthrough_write = run_powerbi(&[
-        "report",
-        "drillthrough",
-        "set",
-        "--project",
-        &built_arg,
-        "--page",
-        customer_page,
-        "--target",
-        "DimCustomer[Customer]",
-        "--out-dir",
-        &with_customer_drillthrough_arg,
-        "--json",
-    ]);
-    assert_eq!(
-        drillthrough_write.code, 0,
-        "stderr: {}",
-        drillthrough_write.stderr
-    );
-    let drillthrough_write_json = stdout_json(&drillthrough_write);
-    assert_eq!(drillthrough_write_json["mode"], "out-dir");
-    assert_eq!(
-        drillthrough_write_json["validation"]["ok"],
-        Value::Bool(true)
-    );
-
-    let segment_drillthrough_dry = run_powerbi(&[
-        "report",
-        "drillthrough",
-        "set",
-        "--project",
-        &with_customer_drillthrough_arg,
-        "--page",
-        segment_page,
-        "--target",
-        "DimCustomer[Segment]",
-        "--dry-run",
-        "--json",
-    ]);
-    assert_eq!(
-        segment_drillthrough_dry.code, 0,
-        "stderr: {}",
-        segment_drillthrough_dry.stderr
-    );
-    let segment_drillthrough_dry_json = stdout_json(&segment_drillthrough_dry);
-    assert_eq!(segment_drillthrough_dry_json["dryRun"], Value::Bool(true));
-    assert_eq!(
-        segment_drillthrough_dry_json["drillthroughPlan"]["after"]["enabled"],
-        Value::Bool(true)
-    );
-
-    let segment_drillthrough_write = run_powerbi(&[
-        "report",
-        "drillthrough",
-        "set",
-        "--project",
-        &with_customer_drillthrough_arg,
-        "--page",
-        segment_page,
-        "--target",
-        "DimCustomer[Segment]",
-        "--out-dir",
-        &with_drillthrough_arg,
-        "--json",
-    ]);
-    assert_eq!(
-        segment_drillthrough_write.code, 0,
-        "stderr: {}",
-        segment_drillthrough_write.stderr
-    );
-    assert_eq!(
-        stdout_json(&segment_drillthrough_write)["validation"]["ok"],
-        Value::Bool(true)
-    );
-
-    let top3_dry = run_powerbi(&[
-        "report",
-        "filters",
-        "add",
-        "--project",
-        &with_drillthrough_arg,
-        "--scope",
-        "visual",
-        "--visual",
-        customer_table,
-        "--target",
-        "DimCustomer[Customer]",
-        "--top",
-        "3",
-        "--by",
-        "FactSales[Total Revenue]",
-        "--dry-run",
-        "--json",
-    ]);
-    assert_eq!(top3_dry.code, 0, "stderr: {}", top3_dry.stderr);
-    let top3_dry_json = stdout_json(&top3_dry);
-    assert_eq!(top3_dry_json["dryRun"], Value::Bool(true));
-    assert_eq!(top3_dry_json["changes"][0]["after"]["filterType"], "TopN");
-
-    let top3_write = run_powerbi(&[
-        "report",
-        "filters",
-        "add",
-        "--project",
-        &with_drillthrough_arg,
-        "--scope",
-        "visual",
-        "--visual",
-        customer_table,
-        "--target",
-        "DimCustomer[Customer]",
-        "--top",
-        "3",
-        "--by",
-        "FactSales[Total Revenue]",
-        "--out-dir",
-        &with_customer_top3_arg,
-        "--json",
-    ]);
-    assert_eq!(top3_write.code, 0, "stderr: {}", top3_write.stderr);
-    assert_eq!(
-        stdout_json(&top3_write)["validation"]["ok"],
-        Value::Bool(true)
-    );
-
-    let segment_top2_dry = run_powerbi(&[
-        "report",
-        "filters",
-        "add",
-        "--project",
-        &with_customer_top3_arg,
-        "--scope",
-        "visual",
-        "--visual",
-        segment_table,
-        "--target",
-        "DimCustomer[Segment]",
-        "--top",
-        "2",
-        "--by",
-        "FactSales[Total Revenue]",
-        "--dry-run",
-        "--json",
-    ]);
-    assert_eq!(
-        segment_top2_dry.code, 0,
-        "stderr: {}",
-        segment_top2_dry.stderr
-    );
-    let segment_top2_dry_json = stdout_json(&segment_top2_dry);
-    assert_eq!(segment_top2_dry_json["dryRun"], Value::Bool(true));
-    assert_eq!(
-        segment_top2_dry_json["changes"][0]["after"]["filterType"],
-        "TopN"
-    );
-
-    let segment_top2_write = run_powerbi(&[
-        "report",
-        "filters",
-        "add",
-        "--project",
-        &with_customer_top3_arg,
-        "--scope",
-        "visual",
-        "--visual",
-        segment_table,
-        "--target",
-        "DimCustomer[Segment]",
-        "--top",
-        "2",
-        "--by",
-        "FactSales[Total Revenue]",
-        "--out-dir",
-        &project_arg,
-        "--json",
-    ]);
-    assert_eq!(
-        segment_top2_write.code, 0,
-        "stderr: {}",
-        segment_top2_write.stderr
-    );
-    assert_eq!(
-        stdout_json(&segment_top2_write)["validation"]["ok"],
-        Value::Bool(true)
-    );
-
     let drillthrough_show = run_powerbi(&[
         "report",
         "drillthrough",
         "show",
         "--project",
-        &project_arg,
+        &built_arg,
         "--page",
         customer_page,
         "--json",
@@ -650,7 +443,7 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
         "drillthrough",
         "show",
         "--project",
-        &project_arg,
+        &built_arg,
         "--page",
         segment_page,
         "--json",
@@ -676,7 +469,7 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
         "filters",
         "list",
         "--project",
-        &project_arg,
+        &built_arg,
         "--json",
     ]);
     assert_eq!(filters.code, 0, "stderr: {}", filters.stderr);
@@ -690,7 +483,7 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
         "dax",
         "dependencies",
         "--project",
-        &project_arg,
+        &built_arg,
         "--json",
     ]);
     assert_eq!(dependencies.code, 0, "stderr: {}", dependencies.stderr);
@@ -700,7 +493,7 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
             .is_some_and(Vec::is_empty)
     );
 
-    let lint = run_powerbi(&["model", "dax", "lint", "--project", &project_arg, "--json"]);
+    let lint = run_powerbi(&["model", "dax", "lint", "--project", &built_arg, "--json"]);
     assert_eq!(lint.code, 0, "stderr: {}", lint.stderr);
     assert!(
         stdout_json(&lint)["findings"]
@@ -708,18 +501,18 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
             .is_some_and(Vec::is_empty)
     );
 
-    let validate = run_powerbi(&["validate", "--strict", &project_arg, "--json"]);
+    let validate = run_powerbi(&["validate", "--strict", &built_arg, "--json"]);
     assert_eq!(validate.code, 0, "stderr: {}", validate.stderr);
     assert_eq!(stdout_json(&validate)["ok"], Value::Bool(true));
 
-    let handoff = run_powerbi(&["handoff", "check", &project_arg, "--json"]);
+    let handoff = run_powerbi(&["handoff", "check", &built_arg, "--json"]);
     assert_eq!(handoff.code, 0, "stderr: {}", handoff.stderr);
     assert_eq!(
         stdout_json(&handoff)["safeForOfflineHandoff"],
         Value::Bool(true)
     );
 
-    let audit = run_powerbi(&["report", "audit", "--project", &project_arg, "--json"]);
+    let audit = run_powerbi(&["report", "audit", "--project", &built_arg, "--json"]);
     assert_eq!(audit.code, 0, "stderr: {}", audit.stderr);
     let audit_json = stdout_json(&audit);
     assert_eq!(audit_json["ok"], Value::Bool(true));
@@ -748,7 +541,7 @@ fn regional_sales_archetype_runs_post_build_chain_and_matches_golden() {
     let verify = run_powerbi(&[
         "fixture",
         "verify",
-        &project_arg,
+        &built_arg,
         "--expected",
         "testdata/golden/archetypes/regional-sales.summary.json",
         "--json",
