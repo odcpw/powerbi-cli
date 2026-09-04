@@ -85,6 +85,26 @@ private metadata, unregistered data, links, and credential-bearing source text.
 See [`docs/source-profile-workflow.md`](docs/source-profile-workflow.md) for the
 complete profile shape and command contract.
 
+For offline Desktop refresh and performance QA, `workflow synthesize` can call
+shared M generator functions with an exact row scale and seed while replacing
+the live database root in a fresh project copy:
+
+```bash
+powerbi-cli workflow synthesize \
+  --project Report.pbip \
+  --expressions qa/generators.tmdl \
+  --out-dir ../powerbi-build/Report-QA-100x \
+  --row-scale 100 \
+  --seed 42 \
+  --json
+```
+
+Each mapped expression in a scaled run is invoked positionally as
+`Expression(rowScale, seed)`. Supplying only one option uses `1` for row scale
+or `0` for seed. Both values must be exact non-negative M integers and row scale
+must be positive. Re-run with the same pair for byte-identical partition M; vary
+the scale to reproduce load behavior without moving real data or credentials.
+
 This project does not generate `.pbix` or `.pbit` binaries directly. It can
 inspect and safely extract metadata/source files from PBIX/PBIT archives when
 those entries are present, and it can import PBIP/PBIR/TMDL source folders from
@@ -123,6 +143,12 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   levels. The closed ladder is `unit-smoke < schema-golden <
   desktop-golden-pending < manual-desktop-canvas-refresh <
   desktop-canvas-refresh`.
+  Committed records under `testdata/desktop-proof/` use the strict
+  `powerbi-cli.desktop-proof.v1` shape. They name the linked feature IDs and
+  explicit evidence signals; the embedded loader rejects overclaims and
+  `features list` reports the maximum valid level per feature. Placeholder
+  records can remain `desktop-golden-pending`, while launch, title, or
+  screenshot evidence alone cannot claim canvas/refresh compatibility.
   `desktop screenshot` captures the primary display only after the foreground
   window PID is verified as the selected Desktop process or one of its process
   descendants. `desktop open` and idempotent `desktop close` provide one bounded,
@@ -191,6 +217,14 @@ Desktop open-proof is Windows-only, but PBIP/PBIR/TMDL scaffold and validation
 commands are normal filesystem operations and are covered by CI on all three
 platform families.
 
+## Testing
+
+Integration tests use one shared, structured CLI runner plus repository-backed
+archetype/spec helpers. Set `POWERBI_CLI_TEST_LOG=1` to emit each invocation as
+one JSON line containing argv, stdout, stderr, exit code, and elapsed time. See
+[`docs/testing.md`](docs/testing.md) for the focused e2e, snapshot, and nightly
+performance workflows.
+
 ## First Commands
 
 ```powershell
@@ -222,6 +256,8 @@ cargo run --bin powerbi-cli -- inspect --deep .\build\sales --json
 cargo run --bin powerbi-cli -- model measures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model dax dependencies --project .\build\sales --json
 cargo run --bin powerbi-cli -- model dax lint --project .\build\sales --json
+cargo run --bin powerbi-cli -- lint --rules --json
+cargo run --bin powerbi-cli -- lint --explain dax.reference_self --json
 $env:POWERBI_DESKTOP_ORACLE='1'
 cargo run --bin powerbi-cli -- model dax execute --project .\build\sales --query 'EVALUATE ROW("Revenue", [Total Revenue])' --allow-data-read --max-rows 10 --json
 cargo run --bin powerbi-cli -- desktop open .\SourceProfile.pbix --json
@@ -233,6 +269,7 @@ cargo run --bin powerbi-cli -- model roles list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model perspectives list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model cultures list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model expressions list --project .\build\sales --json
+cargo run --bin powerbi-cli -- workflow synthesize --project .\Report.pbip --expressions .\qa\generators.tmdl --out-dir .\build\Report-QA --row-scale 100 --seed 42 --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --dry-run --json
 cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Average Revenue" --expression "DIVIDE([Total Revenue], [Total Units])" --out-dir .\build\sales-v2 --json
 cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-v2 --json
@@ -245,6 +282,7 @@ cargo run --bin powerbi-cli -- diff .\build\sales .\build\sales-relationships --
 cargo run --bin powerbi-cli -- model partitions list --project .\build\sales --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --json
 cargo run --bin powerbi-cli -- model partitions show --project .\build\sales --handle <partition-handle> --include-source --json
+cargo run --bin powerbi-cli -- model partitions add-grouped-rank --project .\build\analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when "[IsEligible] = true" --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind excel --file "<workbook.xlsx>" --sheet FactSales --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
@@ -313,6 +351,7 @@ cargo run --bin powerbi-cli -- report visuals delete --project .\build\sales-lay
 cargo run --bin powerbi-cli -- report visuals delete --project .\build\sales-layout --handle <visual-handle> --out-dir .\build\sales-layout-minus-visual --json
 cargo run --bin powerbi-cli -- report visuals set-bindings --project .\build\sales --handle <visual-handle> --bindings-json "[{""role"":""Values"",""table"":""FactSales"",""measure"":""Total Revenue""}]" --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-bindings --project .\build\sales --handle <visual-handle> --bindings-json "[{""role"":""Values"",""table"":""FactSales"",""measure"":""Total Revenue""}]" --out-dir .\build\sales-bound --json
+cargo run --bin powerbi-cli -- report visuals repair-bindings --project .\build\sales --handle <visual-handle> --dry-run --json
 cargo run --bin powerbi-cli -- report drilldown set-hierarchy --project .\build\sales --handle <line-chart-handle> --field "DimDate[FiscalYear]" --field "DimDate[Month]" --dry-run --json
 cargo run --bin powerbi-cli -- lint .\build\sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\sales --json
@@ -368,6 +407,18 @@ three pages.
 
 ## Current Limits
 
+- Dashboard specs are strict at every supported object level. `report spec
+  validate` and `report build` reject unknown keys with
+  `spec.unknown_field`, an RFC 6901 `pointer`, and a `didYouMean` suggestion
+  when one is unambiguous; recognized sections that are not compiled still
+  return `unsupported_feature`. Run `report spec fields --json` for the key
+  catalog, adding `--schema` when exact model binding references are needed.
+  Both `powerbi-cli.dashboard.v1` and its v2 superset are accepted. V2 defines
+  model, style, layout, filter, slicer, visual-formatting, and proof sections;
+  sections whose compiler bead has not landed return `unsupported_feature`
+  with the owning bead id instead of being dropped. The checked-in
+  `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
+  subset and builds byte-identically to the v1 sales fixture.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction
@@ -446,6 +497,15 @@ three pages.
   `desktop-golden-pending` until Desktop open/refresh/save re-verification;
   automated `desktop-canvas-refresh` proof and broader typed formatting remain
   open.
+  `report visuals catalog` exposes one closed role-map row per generated visual
+  type: required and optional roles, measure-only roles, per-role projection
+  limits, mutually exclusive roles, runtime-parity rules, proof level, and
+  fixture provenance. Only the pie, donut, pivotTable, and slicer rows cite
+  independent Desktop-authored reference files; other rows identify their
+  repository-generated proof level. `report visuals repair-bindings --dry-run`
+  can propose a typed `setBindings` op for mechanical, proven repairs such as
+  scatter `Details` to `Category` and bare scatter value-axis columns to Sum
+  aggregations. It never writes, invents fields, or drops ambiguous bindings.
   `report visuals formatting list/show` inventories existing PBIR formatting
   object cards and property names with raw payloads omitted unless
   `--include-raw` is passed. `report visuals formatting extract/apply` copies
@@ -518,6 +578,15 @@ three pages.
   `annotation PowerBICli_SourceKind = ModelDerived` explicitly marks unknown M
   as model-derived: work handoff accepts it when no error finding remains, while
   offline handoff still requires review and rejects it.
+- Guarded refresh-time ranking covers `model partitions add-grouped-rank` for
+  a table with exactly one safe generated dummy partition. It resolves existing
+  group/order/rank columns to their Power Query source names, sorts the rows,
+  buffers each group, gives eligible rows a 1-based `Int64` index, gives
+  ineligible rows zero, recombines them, and finishes with an explicit
+  `Table.TransformColumnTypes`. The rank column must already be an `int64`
+  placeholder in the generated table. Live, unknown, unsafe, multi-partition,
+  and already transformed sources are refused; Desktop refresh is still the
+  semantic oracle.
 - Programmatic advanced semantic-model readback covers
   `model advanced inventory` plus `model roles|perspectives|cultures|expressions
   list/show` for TMDL metadata already present in a project. Mutating those
@@ -677,7 +746,12 @@ three pages.
 - `lint` now includes a small BPA-style report/model pass: DAX static findings,
   duplicate page/visual titles, and validator-rejected `general.altText`
   placements with an explicit `--clear-alt-text` remediation. Missing alt text
-  is valid until Microsoft exposes a supported PBIR location.
+  is valid until Microsoft exposes a supported PBIR location. `lint --rules`
+  lists the single versioned registry used by lint, DAX/M checks, and report
+  audit; `lint --explain <rule-id>` returns one rule's family, default severity,
+  summary, remediation, optional sanitize action, and example finding without
+  requiring a project. The registry includes a typed, currently empty design
+  family so future design lint cannot introduce ad-hoc ids.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.

@@ -12,6 +12,7 @@ use crate::report_filter_shapes::{
     generated_filter_name, parse_field_reference, parse_numeric_json, parse_values_json,
     resolve_filter_column, resolve_filter_measure, validate_filter_name,
 };
+use crate::rules;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
     command_arg, read_json_value, resolve_project, validate_project,
@@ -781,7 +782,7 @@ fn filter_summary(
             "literalCountInFilterDefinition": count_literals(&plan.filter["filter"]),
             "rawIncluded": include_raw,
             "findings": [{
-                "code": "filter.possible_persisted_values",
+                "code": rules::FILTER_POSSIBLE_PERSISTED_VALUES,
                 "severity": "warning",
                 "message": "Power BI filter metadata can persist selected values; use dummy/offline-safe values outside the work environment."
             }]

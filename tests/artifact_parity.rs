@@ -1,9 +1,11 @@
+mod common;
+
+use common::{run_powerbi_owned, stdout_json};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use walkdir::WalkDir;
 
 #[derive(Debug, Deserialize)]
@@ -96,18 +98,9 @@ fn build_case(case: &CorpusCase, out_dir: &Path) {
         path_arg(out_dir),
         "--json".to_string(),
     ]);
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(&args)
-        .output()
-        .expect("run powerbi-cli");
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "{} failed: {}",
-        case.name,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let response: Value = serde_json::from_slice(&output.stdout).expect("build response JSON");
+    let output = run_powerbi_owned(&args);
+    assert_eq!(output.exit, 0, "{} failed: {}", case.name, output.stderr);
+    let response: Value = stdout_json(&output);
     assert_eq!(response["ok"], Value::Bool(true));
     assert_eq!(
         response["proof"]["claimedDesktopCompatibility"],

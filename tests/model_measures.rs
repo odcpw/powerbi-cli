@@ -1,10 +1,9 @@
 mod common;
 
-use common::{assert_unsupported_feature, run_powerbi, stderr_json, stdout_json};
+use common::{assert_unsupported_feature, cli_command, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 fn scaffold_sales_project(root: &Path) -> PathBuf {
     let out_dir = root.join("sales_project");
@@ -159,21 +158,19 @@ fn model_dax_execute_requires_data_and_oracle_opt_ins_without_echoing_query() {
         "model dax execute requires --allow-data-read"
     );
 
-    let oracle_disabled = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args([
-            "model",
-            "dax",
-            "execute",
-            "--project",
-            out,
-            "--query",
-            query,
-            "--allow-data-read",
-            "--json",
-        ])
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .output()
-        .expect("run oracle-disabled DAX execute");
+    let oracle_disabled = cli_command([
+        "model",
+        "dax",
+        "execute",
+        "--project",
+        out,
+        "--query",
+        query,
+        "--allow-data-read",
+        "--json",
+    ])
+    .env_remove("POWERBI_DESKTOP_ORACLE")
+    .output();
     assert_eq!(oracle_disabled.status.code(), Some(30));
     let stdout = String::from_utf8_lossy(&oracle_disabled.stdout);
     let value: Value = serde_json::from_str(stdout.trim()).expect("stdout JSON");
@@ -242,21 +239,19 @@ fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
                 .contains("offline-unsafe"))
     );
 
-    let live = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args([
-            "model",
-            "dax",
-            "execute",
-            "--project",
-            project_arg,
-            "--query",
-            "EVALUATE ROW(\"Value\", 1)",
-            "--allow-data-read",
-            "--json",
-        ])
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .output()
-        .expect("run live Desktop preflight");
+    let live = cli_command([
+        "model",
+        "dax",
+        "execute",
+        "--project",
+        project_arg,
+        "--query",
+        "EVALUATE ROW(\"Value\", 1)",
+        "--allow-data-read",
+        "--json",
+    ])
+    .env_remove("POWERBI_DESKTOP_ORACLE")
+    .output();
     assert_eq!(live.status.code(), Some(30));
     let live_json: Value = serde_json::from_slice(&live.stdout).expect("live JSON");
     assert_eq!(live_json["validation"]["ok"], Value::Bool(true));
@@ -271,21 +266,19 @@ fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
 
     fs::write(report_dir.join("unsafe.pbit"), b"not a runtime artifact")
         .expect("write unsafe non-runtime file");
-    let rejected = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args([
-            "model",
-            "dax",
-            "execute",
-            "--project",
-            project_arg,
-            "--query",
-            "EVALUATE ROW(\"Value\", 1)",
-            "--allow-data-read",
-            "--json",
-        ])
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .output()
-        .expect("run unsafe live Desktop preflight");
+    let rejected = cli_command([
+        "model",
+        "dax",
+        "execute",
+        "--project",
+        project_arg,
+        "--query",
+        "EVALUATE ROW(\"Value\", 1)",
+        "--allow-data-read",
+        "--json",
+    ])
+    .env_remove("POWERBI_DESKTOP_ORACLE")
+    .output();
     assert_eq!(rejected.status.code(), Some(10));
     let rejected_json: Value = serde_json::from_slice(&rejected.stdout).expect("rejected JSON");
     assert_eq!(rejected_json["stage"], Value::from("document-validation"));
@@ -295,21 +288,19 @@ fn model_dax_execute_accepts_only_artifact_local_desktop_runtime_state() {
     fs::create_dir_all(&nested_runtime_lookalike).expect("create nested runtime lookalike");
     fs::write(nested_runtime_lookalike.join("broken.json"), "{")
         .expect("write malformed nested JSON");
-    let nested_rejected = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args([
-            "model",
-            "dax",
-            "execute",
-            "--project",
-            project_arg,
-            "--query",
-            "EVALUATE ROW(\"Value\", 1)",
-            "--allow-data-read",
-            "--json",
-        ])
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .output()
-        .expect("run nested runtime-lookalike preflight");
+    let nested_rejected = cli_command([
+        "model",
+        "dax",
+        "execute",
+        "--project",
+        project_arg,
+        "--query",
+        "EVALUATE ROW(\"Value\", 1)",
+        "--allow-data-read",
+        "--json",
+    ])
+    .env_remove("POWERBI_DESKTOP_ORACLE")
+    .output();
     assert_eq!(nested_rejected.status.code(), Some(10));
     let nested_json: Value =
         serde_json::from_slice(&nested_rejected.stdout).expect("nested rejection JSON");

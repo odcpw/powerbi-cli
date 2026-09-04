@@ -1,58 +1,59 @@
 {
   "schema": "powerbi-cli.desktop-proof.v1",
+  "fixture": "archetypes/catalog-proof/combo-pareto",
   "date": "2026-07-23",
-  "desktop": {
-    "product": "Power BI Desktop Store",
-    "packageVersion": "2.156.951.0",
-    "platform": "windows"
-  },
-  "fixture": {
-    "schema": "examples/archetypes/catalog-proof.schema.json",
-    "profile": "examples/archetypes/catalog-proof.profile.json",
-    "dashboard": "examples/archetypes/catalog-proof.dashboard.json",
-    "page": "Combo Proof",
-    "visual": "Pareto Combo",
-    "visualType": "lineClusteredColumnComboChart"
-  },
-  "managedSession": {
-    "singleOwnedSession": true,
-    "exactTitleMatched": "VisualCatalogProof",
-    "refreshRequested": true,
-    "refreshCompleted": true,
-    "saved": true,
-    "closedByCli": true
-  },
-  "manualScreenReview": {
-    "canvasRendered": true,
-    "issueDialogObserved": false,
-    "columnSeries": "Total Amount",
-    "lineSeries": "Cumulative Share",
-    "categoryOrder": [
-      {
-        "category": "Beta",
-        "value": 45
-      },
-      {
-        "category": "Alpha",
-        "value": 25
-      }
+  "desktopVersion": "2.156.951.0",
+  "commands": [
+    "powerbi-cli report build --schema examples/archetypes/catalog-proof.schema.json --profile examples/archetypes/catalog-proof.profile.json --spec examples/archetypes/catalog-proof.dashboard.json --out-dir build/catalog-proof --force --json",
+    "powerbi-cli validate --strict build/catalog-proof --json",
+    "POWERBI_DESKTOP_ORACLE=1 powerbi-cli desktop open build/catalog-proof --json",
+    "powerbi-cli desktop close --json"
+  ],
+  "signals": {
+    "featureIds": [
+      "report.visuals.combo-pareto"
     ],
-    "descendingSortObserved": true
+    "schemaGolden": true,
+    "desktopReferencePresent": true,
+    "currentArtifact": true,
+    "desktopOpened": true,
+    "canvasRendered": true,
+    "refreshCompleted": true,
+    "issueDialogsAbsent": true,
+    "expectedValuesMatched": true,
+    "saveReopenMatched": false,
+    "manualReview": true,
+    "automated": false,
+    "notes": [
+      "Manual screen review proved Category + Y + Y2 with one descending measure sort.",
+      "Ascending sort, multi-key sort, raw-column sort, and automated pixel assertions remain excluded."
+    ],
+    "evidence": {
+      "desktopProduct": "Power BI Desktop Store",
+      "desktopPlatform": "windows",
+      "exactTitleMatched": "VisualCatalogProof",
+      "singleOwnedSession": true,
+      "closedByCli": true,
+      "saved": true,
+      "columnSeries": "Total Amount",
+      "lineSeries": "Cumulative Share",
+      "categoryOrder": [
+        {
+          "category": "Beta",
+          "value": 45
+        },
+        {
+          "category": "Alpha",
+          "value": 25
+        }
+      ],
+      "desktopSaveCanonicalization": {
+        "explicitSortRetained": true,
+        "isDefaultSortFalseRemoved": true,
+        "referenceVisual": "docs/reference/desktop-authored-visuals/lineClusteredColumnComboChart.visual.json",
+        "schemaVersion": "2.11.0"
+      }
+    }
   },
-  "desktopSaveCanonicalization": {
-    "schemaVersion": "2.11.0",
-    "explicitSortRetained": true,
-    "isDefaultSortFalseRemoved": true,
-    "referenceVisual": "docs/reference/desktop-authored-visuals/lineClusteredColumnComboChart.visual.json"
-  },
-  "claim": {
-    "proofLevel": "manual-desktop-canvas-refresh",
-    "scope": "Category + Y + Y2 with one descending measure sort",
-    "excludes": [
-      "ascending sort",
-      "multi-key sort",
-      "raw-column sort",
-      "automated pixel assertions"
-    ]
-  }
+  "proofLevel": "manual-desktop-canvas-refresh"
 }

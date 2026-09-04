@@ -96,7 +96,7 @@ pub(super) fn workflow_commands() -> Vec<Value> {
     vec![
         json!({
             "path": "workflow synthesize",
-            "usage": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] --json",
+            "usage": "powerbi-cli workflow synthesize --project <project-dir-or.pbip> --expressions <expressions.tmdl> --out-dir <new-project-dir> [--map <schema.item>=<ExpressionName>] [--row-scale <positive-integer>] [--seed <non-negative-integer>] --json",
             "summary": "Copy a live PBIP into a fresh offline project, install synthetic shared M expressions, and replace shared Database connector steps with one complete navigation shim",
             "tags": ["workflow", "synthetic", "offline", "pbip", "tmdl", "partition", "agent"],
             "readOnly": false,
@@ -107,10 +107,10 @@ pub(super) fn workflow_commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "schema-golden",
             "outputSchema": "powerbi-cli.workflow-synthesize.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--expressions <expressions.tmdl>", "--out-dir <new-project-dir>", "--map <schema.item>=<ExpressionName>", "--json", "--format json"],
-            "examples": ["powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --json", "powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --map sales.orders=QaOrders --json"],
-            "limitations": ["The output directory must be fresh and outside the source project tree. Source links/reparse points are refused; cache.abf and localSettings.json files are always excluded.", "Recognizes literal Database{[Schema = \"s\", Item = \"t\"]}[Data] navigation and a single-line Database = <Connector>.Database(\"server\", ...) binding in each affected partition. It preserves downstream M lines unchanged and refuses variable/computed server arguments whose source text cannot be proven removed.", "The supplied expressions file must define every discovered default or overridden expression name. This command runs native project validation and a partition-focused connector/server-string scan; it does not contact a live source or require Microsoft sidecars."],
-            "followUpFields": ["projectDir", "pbip", "expressions", "mappings", "counts", "validation", "offlineSafety", "next"]
+            "flags": ["--project <project-dir-or.pbip>", "--expressions <expressions.tmdl>", "--out-dir <new-project-dir>", "--map <schema.item>=<ExpressionName>", "--row-scale <positive-integer>", "--seed <non-negative-integer>", "--json", "--format json"],
+            "examples": ["powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --json", "powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/generators.tmdl --out-dir ../powerbi-build/Sales-QA-100x --row-scale 100 --seed 42 --json", "powerbi-cli workflow synthesize --project Sales.pbip --expressions qa/expressions.tmdl --out-dir ../powerbi-build/Sales-QA --map sales.orders=QaOrders --json"],
+            "limitations": ["The output directory must be fresh and outside the source project tree. Source links/reparse points are refused; cache.abf and localSettings.json files are always excluded.", "Recognizes literal Database{[Schema = \"s\", Item = \"t\"]}[Data] navigation and a single-line Database = <Connector>.Database(\"server\", ...) binding in each affected partition. It preserves downstream M lines unchanged and refuses variable/computed server arguments whose source text cannot be proven removed.", "When --row-scale or --seed is supplied, every mapped expression must be an M function accepting positional (rowScale, seed) numeric arguments. The paired defaults are rowScale 1 and seed 0; integers are capped at 9007199254740991 so M can represent them exactly.", "The supplied expressions file must define every discovered default or overridden expression name. This command runs native project validation and a partition-focused connector/server-string scan; it does not contact a live source or require Microsoft sidecars."],
+            "followUpFields": ["projectDir", "pbip", "expressions", "generationParameters", "mappings", "counts", "validation", "offlineSafety", "next"]
         }),
         json!({
             "path": "workflow plan",

@@ -1,6 +1,7 @@
 use crate::input_safety::{INPUT_SAFETY_ERROR_CODE, InputKind, read_utf8};
 use crate::partitions::partition_summary_json;
 use crate::rebind_plan::rebind_plan;
+use crate::rules;
 use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect_text};
 use crate::source_templates::{
     load_source_template_store, source_template_findings, source_templates_path,
@@ -77,7 +78,7 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
     }
     for warning in &validation.warnings {
         findings.push(json!({
-            "code": "project.validation_warning",
+            "code": rules::PROJECT_VALIDATION_WARNING,
             "severity": "warning",
             "message": warning,
             "handle": Value::Null,
@@ -88,7 +89,7 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
     for doc in &docs {
         if doc.partitions.is_empty() {
             findings.push(json!({
-                "code": "handoff.table_without_partition",
+                "code": rules::HANDOFF_TABLE_WITHOUT_PARTITION,
                 "severity": "error",
                 "message": format!("table has no partition to rebind safely: {}", doc.table),
                 "handle": table_handle(&doc.table),
@@ -108,7 +109,7 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         }
         Err(err) => {
             findings.push(json!({
-                "code": "handoff.source_template_store_invalid",
+                "code": rules::HANDOFF_SOURCE_TEMPLATE_STORE_INVALID,
                 "severity": "error",
                 "message": err.message,
                 "handle": Value::Null,
@@ -116,6 +117,7 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
             }));
         }
     }
+    rules::ensure_finding_ids_registered(&findings, "code")?;
 
     let error_count = findings
         .iter()
@@ -284,7 +286,7 @@ fn add_partition_findings(
             target == HandoffTarget::Work && finding.code.starts_with("partition.real_connector.");
         let accepted_model_derived = target == HandoffTarget::Work
             && partition.source_kind == "modelDerived"
-            && finding.code == "partition.model_derived";
+            && finding.code == rules::PARTITION_MODEL_DERIVED;
         findings.push(json!({
             "code": finding.code,
             "severity": if accepted_live_source || accepted_model_derived { "info" } else { finding.severity.as_str() },
@@ -301,7 +303,7 @@ fn add_partition_findings(
     }
     if target == HandoffTarget::Offline && partition.source_kind != "dummyMTable" {
         findings.push(json!({
-            "code": "handoff.partition_not_dummy",
+            "code": rules::HANDOFF_PARTITION_NOT_DUMMY,
             "severity": "error",
             "message": format!("handoff requires dummy #table partitions; {} uses {}", partition.handle(), partition.source_kind),
             "handle": partition.handle(),
@@ -313,7 +315,7 @@ fn add_partition_findings(
         && !is_recognized_live_source(&partition.source_kind)
     {
         findings.push(json!({
-            "code": "handoff.partition_source_unrecognized",
+            "code": rules::HANDOFF_PARTITION_SOURCE_UNRECOGNIZED,
             "severity": "error",
             "message": format!("work handoff requires a dummy table or recognized connector; {} uses {}", partition.handle(), partition.source_kind),
             "handle": partition.handle(),
@@ -383,13 +385,13 @@ fn add_project_file_hazards(
             .replace('\\', "/");
         let normalized = relative.to_ascii_lowercase();
         let code = if normalized.contains("/.pbi/") || normalized.starts_with(".pbi/") {
-            Some("handoff.powerbi_cache_folder")
+            Some(rules::HANDOFF_POWERBI_CACHE_FOLDER)
         } else if normalized.ends_with(".abf") {
-            Some("handoff.analysis_services_cache")
+            Some(rules::HANDOFF_ANALYSIS_SERVICES_CACHE)
         } else if normalized.ends_with(".pbix") || normalized.ends_with(".pbit") {
-            Some("handoff.binary_powerbi_file")
+            Some(rules::HANDOFF_BINARY_POWERBI_FILE)
         } else if normalized.ends_with("localsettings.json") {
-            Some("handoff.local_settings_file")
+            Some(rules::HANDOFF_LOCAL_SETTINGS_FILE)
         } else if normalized.ends_with(".csv")
             || normalized.ends_with(".xlsx")
             || normalized.ends_with(".parquet")
@@ -397,7 +399,7 @@ fn add_project_file_hazards(
             || normalized.ends_with(".sqlite")
             || normalized.ends_with(".sqlite3")
         {
-            Some("handoff.embedded_data_file")
+            Some(rules::HANDOFF_EMBEDDED_DATA_FILE)
         } else {
             None
         };
@@ -415,7 +417,7 @@ fn add_project_file_hazards(
                 Ok(text) => {
                     if contains_credential_like_text_str(&text) {
                         findings.push(json!({
-                            "code": "handoff.credential_like_text",
+                            "code": rules::HANDOFF_CREDENTIAL_LIKE_TEXT,
                             "severity": "error",
                             "message": format!("offline handoff text file contains credential-like content: {relative}"),
                             "handle": Value::Null,
@@ -424,7 +426,7 @@ fn add_project_file_hazards(
                     }
                     if contains_pii_suspect_text(&text) {
                         findings.push(json!({
-                            "code": "handoff.pii_suspect_text",
+                            "code": rules::HANDOFF_PII_SUSPECT_TEXT,
                             "severity": "warning",
                             "message": format!("offline handoff text file contains PII-suspect row literals requiring review: {relative}"),
                             "handle": Value::Null,
@@ -434,7 +436,7 @@ fn add_project_file_hazards(
                 }
                 Err(err) if err.code == INPUT_SAFETY_ERROR_CODE => return Err(err),
                 Err(err) => findings.push(json!({
-                    "code": "handoff.text_scan_failed",
+                    "code": rules::HANDOFF_TEXT_SCAN_FAILED,
                     "severity": "error",
                     "message": format!("could not read handoff text file {relative}: {}", err.message),
                     "handle": Value::Null,
@@ -462,9 +464,9 @@ fn is_handoff_text_file(relative: &str) -> bool {
 
 fn project_finding(severity: &str, message: &str) -> Value {
     let code = if message.contains("offline-unsafe") {
-        "handoff.offline_unsafe_file"
+        rules::HANDOFF_OFFLINE_UNSAFE_FILE
     } else {
-        "project.validation_error"
+        rules::PROJECT_VALIDATION_ERROR
     };
     json!({
         "code": code,

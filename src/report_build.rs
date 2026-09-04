@@ -8,6 +8,7 @@ use crate::pbir_visual_factory::{
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_spec_fields::fields_command;
+use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
 use crate::{
@@ -64,6 +65,9 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
     })?;
     let schema_value = load_schema_value(&schema_path)?;
     let spec_value = load_optional_value(options.spec.as_deref(), "dashboard spec")?;
+    if let Some(spec) = spec_value.as_ref() {
+        validate_known_fields(spec)?;
+    }
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let compiled = compile_dashboard(&schema_value, spec_value.as_ref())?;
     let schema_validation = validate_schema_value(&compiled.schema);
@@ -152,18 +156,23 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
             )
     })?;
     let spec_value = load_json_value(&spec_path, "dashboard spec")?;
+    let known_fields = validate_known_fields(&spec_value);
     let profile_value = load_optional_profile(options.profile.as_deref())?;
     let (ok, validation_level, errors, warnings, compiled, schema_path) = if let Some(schema_path) =
         options.schema.as_deref()
     {
         let schema_value = load_schema_value(schema_path)?;
-        match compile_dashboard(&schema_value, Some(&spec_value)) {
+        match known_fields.and_then(|_| compile_dashboard(&schema_value, Some(&spec_value))) {
             Ok(compiled) => {
                 let schema_validation = validate_schema_value(&compiled.schema);
                 (
                     schema_validation.errors.is_empty(),
                     "compiled",
-                    schema_validation.errors,
+                    schema_validation
+                        .errors
+                        .into_iter()
+                        .map(Value::String)
+                        .collect(),
                     Vec::new(),
                     Some(compiled),
                     Some(schema_path.to_path_buf()),
@@ -172,14 +181,20 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
             Err(err) => (
                 false,
                 "compiled",
-                vec![err.message],
+                vec![spec_error_json(&err)],
                 Vec::new(),
                 None,
                 Some(schema_path.to_path_buf()),
             ),
         }
     } else {
-        let errors = validate_spec_shape(&spec_value);
+        let errors = match known_fields {
+            Ok(_) => validate_spec_shape(&spec_value)
+                .into_iter()
+                .map(Value::String)
+                .collect(),
+            Err(error) => vec![spec_error_json(&error)],
+        };
         let warnings = if errors.is_empty() {
             vec![
                 "schema was not provided; shape-only validation cannot prove field references, measures, visual roles, or build compatibility".to_string()
@@ -212,6 +227,33 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
     }))
 }
 
+fn spec_error_json(error: &CliError) -> Value {
+    let mut value = json!({
+        "code": error.code,
+        "message": error.message,
+    });
+    if let Some(pointer) = &error.pointer {
+        value["pointer"] = Value::String(pointer.clone());
+    }
+    if let Some(did_you_mean) = &error.did_you_mean {
+        value["didYouMean"] = Value::String(did_you_mean.clone());
+    }
+    if let Some(hint) = &error.hint {
+        value["hint"] = Value::String(hint.clone());
+    }
+    if !error.suggested_commands.is_empty() {
+        value["suggestedCommands"] = Value::Array(
+            error
+                .suggested_commands
+                .iter()
+                .cloned()
+                .map(Value::String)
+                .collect(),
+        );
+    }
+    value
+}
+
 #[derive(Debug)]
 struct CompiledDashboard {
     schema: Value,
@@ -233,6 +275,8 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
                 .collect(),
         });
     };
+    validate_known_fields(spec)?;
+    reject_uncompiled_v2_sections(spec)?;
     if spec.get("report").is_none() && spec.get("pages").is_some() {
         let (schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
         return Ok(CompiledDashboard {
@@ -862,6 +906,21 @@ fn validate_binding_contract(
                     visual_path()
                 )));
             }
+            if bindings.iter().any(|binding| {
+                matches!(
+                    binding.get("role").and_then(Value::as_str),
+                    Some("Y" | "Y2")
+                ) && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::unsupported_feature(format!(
+                    "{} {visual_type} Y and Y2 bindings require measures; bare columns are not fixture-proven",
+                    visual_path()
+                ))
+                .with_hint("Define measures for both value axes; the compiler refuses to invent an aggregation shape for combo charts.")
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
+                )));
+            }
         }
         VisualBindingFamily::CategoryShare => {
             let categories = count("Category");
@@ -879,6 +938,19 @@ fn validate_binding_contract(
                 return Err(CliError::invalid_args(format!(
                     "{} {visual_type} Category binding must be a column, not a measure",
                     visual_path()
+                )));
+            }
+            if bindings.iter().any(|binding| {
+                binding.get("role").and_then(Value::as_str) == Some("Y")
+                    && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::unsupported_feature(format!(
+                    "{} {visual_type} Y bindings require measures; bare columns are not proven by the Desktop-authored reference",
+                    visual_path()
+                ))
+                .with_hint("Define a measure for the value well; the reference fixture proves measure projections only.")
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
                 )));
             }
         }
@@ -900,6 +972,19 @@ fn validate_binding_contract(
                     "{} matrix (pivotTable) Rows and Columns bindings must be columns, not measures",
                     visual_path()
                 )));
+            }
+            if bindings.iter().any(|binding| {
+                binding.get("role").and_then(Value::as_str) == Some("Values")
+                    && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::unsupported_feature(format!(
+                    "{} matrix (pivotTable) Values bindings require measures; bare columns are not proven by the Desktop-authored reference",
+                    visual_path()
+                ))
+                .with_hint("Define a measure for matrix Values; the reference fixture does not prove an aggregation wrapper for raw columns.")
+                .with_suggested_command(
+                    "powerbi-cli report visuals catalog --visual-type matrix --json",
+                ));
             }
         }
         VisualBindingFamily::SlicerField => {

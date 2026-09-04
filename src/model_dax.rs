@@ -1,4 +1,5 @@
 use crate::cli_support::{required_project, take_value};
+use crate::rules;
 use crate::tmdl::{ColumnRecord, MeasureRecord, TableDocument, load_table_documents};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -139,6 +140,7 @@ fn dependencies(args: &[String]) -> CliResult<Value> {
     let validation = validate_project(&resolved)?;
     let docs = load_table_documents(&resolved)?;
     let analysis = analyze_dax(&docs);
+    rules::ensure_finding_ids_registered(&analysis.findings, "code")?;
     let project_arg = command_arg(&resolved.project_dir);
     let ok = validation.errors.is_empty();
     Ok(json!({
@@ -182,6 +184,7 @@ fn lint(args: &[String]) -> CliResult<Value> {
     let docs = load_table_documents(&resolved)?;
     let mut analysis = analyze_dax(&docs);
     add_cycle_findings(&mut analysis);
+    rules::ensure_finding_ids_registered(&analysis.findings, "code")?;
     let error_count = analysis
         .findings
         .iter()
@@ -341,7 +344,7 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
         for table_column in &expression.table_columns {
             if !table_column.resolved {
                 findings.push(dax_finding(
-                    "dax.reference_missing_column",
+                    rules::DAX_REFERENCE_MISSING_COLUMN,
                     "error",
                     format!(
                         "{} references missing column '{}'[{}]",
@@ -355,7 +358,7 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
         for measure_ref in &expression.measure_refs {
             match measure_ref.resolved_handles.len() {
                 0 => findings.push(dax_finding(
-                    "dax.reference_missing_measure",
+                    rules::DAX_REFERENCE_MISSING_MEASURE,
                     "error",
                     format!(
                         "{} references missing measure [{}]",
@@ -367,7 +370,7 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
                 1 => {
                     if measure_ref.resolved_handles[0] == expression.handle {
                         findings.push(dax_finding(
-                            "dax.reference_self",
+                            rules::DAX_REFERENCE_SELF,
                             "error",
                             format!("{} references itself", expression.handle),
                             &expression.handle,
@@ -376,7 +379,7 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
                     }
                 }
                 _ => findings.push(dax_finding(
-                    "dax.reference_ambiguous_measure",
+                    rules::DAX_REFERENCE_AMBIGUOUS_MEASURE,
                     "warning",
                     format!(
                         "{} references ambiguous measure [{}] resolved to {} handles",
@@ -393,7 +396,7 @@ pub(crate) fn analyze_dax(docs: &[TableDocument]) -> DaxAnalysis {
             scalar_if_variables_used_as_tables(&expression.expression)
         {
             findings.push(dax_finding(
-                "dax.table_variable_scalar_if",
+                rules::DAX_TABLE_VARIABLE_SCALAR_IF,
                 "error",
                 format!(
                     "{} assigns VAR {variable} with scalar IF() and later passes it as a table argument to {}; branch around the table-consuming calculation instead of choosing between table expressions with IF()",
@@ -978,7 +981,7 @@ pub(crate) fn add_cycle_findings(analysis: &mut DaxAnalysis) {
         let mut seen = BTreeSet::new();
         if dfs_cycle(&graph, &node, &node, &mut seen, &mut stack) {
             analysis.findings.push(json!({
-                "code": "dax.dependency_cycle",
+                "code": rules::DAX_DEPENDENCY_CYCLE,
                 "severity": "error",
                 "message": format!("DAX measure dependency cycle includes {node}"),
                 "handle": node,

@@ -16,6 +16,7 @@ use crate::pbir_slicers::{
 };
 use crate::project_io::write_json_atomic;
 use crate::report_filter_mutations::{ensure_filter_path_under_report, filter_array_pointer};
+use crate::rules;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
     command_arg, read_json_value, resolve_project, validate_project,
@@ -364,7 +365,7 @@ fn build_hygiene_plan(
         if record.may_contain_data_values || record.unsupported {
             findings.push(json!({
                 "id": format!("bookmark:{}", record.handle),
-                "ruleId": "bookmark.possible_persisted_state",
+                "ruleId": rules::BOOKMARK_POSSIBLE_PERSISTED_STATE,
                 "severity": "warning",
                 "risk": "possible-data-value-or-unsupported-state",
                 "surface": "bookmark",
@@ -386,7 +387,7 @@ fn build_hygiene_plan(
         if record.unsupported || record.source_visual.is_none() || record.target_visual.is_none() {
             findings.push(json!({
                 "id": format!("interaction:{}", record.handle),
-                "ruleId": "interaction.unsupported_or_stale",
+                "ruleId": rules::INTERACTION_UNSUPPORTED_OR_STALE,
                 "severity": "warning",
                 "risk": "stale-or-unsupported-report-behavior",
                 "surface": "interaction",
@@ -419,7 +420,7 @@ fn build_hygiene_plan(
             "beforeSummary": filter_record_json(record, false),
             "afterSummary": Value::Null,
             "blockedReason": Value::Null,
-            "sourceRuleIds": ["filter.possible_persisted_values"]
+            "sourceRuleIds": [rules::FILTER_POSSIBLE_PERSISTED_VALUES]
         }));
     }
     for record in slicers
@@ -437,17 +438,17 @@ fn build_hygiene_plan(
             "beforeSummary": slicer_record_json(record, false),
             "afterSummary": Value::Null,
             "blockedReason": Value::Null,
-            "sourceRuleIds": ["slicer.possible_persisted_values"]
+            "sourceRuleIds": [rules::SLICER_POSSIBLE_PERSISTED_VALUES]
         }));
     }
     for finding in &findings {
-        if finding["ruleId"] == "bookmark.possible_persisted_state" {
+        if finding["ruleId"] == rules::BOOKMARK_POSSIBLE_PERSISTED_STATE {
             unsupported_actions.push(plan_only_action(
                 "review-bookmark-state",
                 finding,
                 "bookmark state redaction requires Desktop-backed golden fixtures before mutation",
             ));
-        } else if finding["ruleId"] == "interaction.unsupported_or_stale" {
+        } else if finding["ruleId"] == rules::INTERACTION_UNSUPPORTED_OR_STALE {
             unsupported_actions.push(plan_only_action(
                 "review-interaction",
                 finding,
@@ -463,6 +464,7 @@ fn build_hygiene_plan(
         &actions,
         &unsupported_actions,
     )?;
+    rules::ensure_finding_ids_registered(&findings, "ruleId")?;
     Ok(HygienePlan {
         project_fingerprint,
         plan_fingerprint,
@@ -540,7 +542,7 @@ fn add_handoff_findings(
 fn filter_finding(record: &ReportFilterRecord, include_raw: bool) -> Value {
     json!({
         "id": format!("filter:{}", record.handle),
-        "ruleId": "filter.possible_persisted_values",
+        "ruleId": rules::FILTER_POSSIBLE_PERSISTED_VALUES,
         "severity": "warning",
         "risk": "possible-persisted-data-values",
         "surface": "filter",
@@ -560,7 +562,7 @@ fn filter_finding(record: &ReportFilterRecord, include_raw: bool) -> Value {
 fn slicer_finding(record: &ReportSlicerRecord, include_raw: bool) -> Value {
     json!({
         "id": format!("slicer:{}", record.handle),
-        "ruleId": "slicer.possible_persisted_values",
+        "ruleId": rules::SLICER_POSSIBLE_PERSISTED_VALUES,
         "severity": "warning",
         "risk": "possible-persisted-data-values",
         "surface": "slicer",

@@ -112,11 +112,21 @@ pub(crate) fn require_mode_with_allowed_modes(
 ) -> CliResult<MutationMode> {
     let hint = hint.into();
     let suggested_command = suggested_command.into();
-    mode.ok_or_else(|| {
-        CliError::invalid_args(format!("{command} requires {allowed_modes}"))
-            .with_hint(hint)
-            .with_suggested_command(suggested_command)
-    })
+    require_mode_with_message(
+        mode,
+        format!("{command} requires {allowed_modes}"),
+        Some(hint),
+        Some(suggested_command),
+    )
+}
+
+pub(crate) fn require_mode_with_message(
+    mode: Option<MutationMode>,
+    message: impl Into<String>,
+    hint: Option<String>,
+    suggested_command: Option<String>,
+) -> CliResult<MutationMode> {
+    mode.ok_or_else(|| output_mode_error(message, hint, suggested_command))
 }
 
 pub(crate) fn set_mode(
@@ -154,17 +164,42 @@ pub(crate) fn set_mode_with_allowed_modes(
     hint: impl Into<String>,
     suggested_command: impl Into<String>,
 ) -> CliResult<()> {
+    set_mode_with_message(
+        current,
+        next,
+        format!("choose exactly one output mode: {allowed_modes}"),
+        Some(hint.into()),
+        Some(suggested_command.into()),
+    )
+}
+
+pub(crate) fn set_mode_with_message(
+    current: &mut Option<MutationMode>,
+    next: MutationMode,
+    message: impl Into<String>,
+    hint: Option<String>,
+    suggested_command: Option<String>,
+) -> CliResult<()> {
     if current.is_some() {
-        let hint = hint.into();
-        let suggested_command = suggested_command.into();
-        return Err(CliError::invalid_args(format!(
-            "choose exactly one output mode: {allowed_modes}"
-        ))
-        .with_hint(hint)
-        .with_suggested_command(suggested_command));
+        return Err(output_mode_error(message, hint, suggested_command));
     }
     *current = Some(next);
     Ok(())
+}
+
+fn output_mode_error(
+    message: impl Into<String>,
+    hint: Option<String>,
+    suggested_command: Option<String>,
+) -> CliError {
+    let mut error = CliError::invalid_args(message);
+    if let Some(hint) = hint {
+        error = error.with_hint(hint);
+    }
+    if let Some(suggested_command) = suggested_command {
+        error = error.with_suggested_command(suggested_command);
+    }
+    error
 }
 
 pub(crate) fn require_report_page_mode(
@@ -340,7 +375,7 @@ pub(crate) fn command_arg(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{command_arg, shell_arg};
+    use super::{MutationMode, command_arg, require_mode_with_message, shell_arg};
     use std::path::Path;
 
     #[test]
@@ -383,6 +418,33 @@ mod tests {
         assert_eq!(
             command_arg(Path::new(r"\\?\UNC\server\share\Sales.pbip")),
             r"\\server\share\Sales.pbip"
+        );
+    }
+
+    #[test]
+    fn require_mode_with_message_preserves_custom_error_contract() {
+        let error = require_mode_with_message(
+            None,
+            "custom mutation requires an explicit output mode",
+            Some("custom hint".to_string()),
+            Some("powerbi-cli custom mutation --dry-run --json".to_string()),
+        )
+        .expect_err("missing mode must fail");
+
+        assert_eq!(error.code, "invalid_args");
+        assert_eq!(
+            error.message,
+            "custom mutation requires an explicit output mode"
+        );
+        assert_eq!(error.hint.as_deref(), Some("custom hint"));
+        assert_eq!(
+            error.suggested_commands,
+            ["powerbi-cli custom mutation --dry-run --json"]
+        );
+        assert_eq!(
+            require_mode_with_message(Some(MutationMode::DryRun), "unused", None, None,)
+                .expect("present mode"),
+            MutationMode::DryRun
         );
     }
 }

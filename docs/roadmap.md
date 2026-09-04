@@ -56,6 +56,9 @@ Required contract rules:
 - `features list --json` must advertise supported, read-only, planned, and
   explicitly refused Power BI feature surfaces, including proof level and
   refusal code.
+- Desktop proof records use the strict embedded `powerbi-cli.desktop-proof.v1`
+  contract. Feature levels are the maximum validated linked-record level and
+  catalog baseline; records that overclaim their explicit signals are rejected.
 - Current and future agent operating guidance lives in
   `skills/powerbi-cli/SKILL.md`.
 - `capabilities --json` should advertise architecture guardrails so subagents
@@ -117,7 +120,12 @@ object-specific writers and fixtures exist.
 ### Report Authoring
 
 - `report spec validate`: check a declarative dashboard spec against the schema
-  and visual catalog before writing files.
+  and visual catalog before writing files. The spec key walker is strict at
+  every supported node and reports `spec.unknown_field` with an RFC 6901
+  pointer; `report spec fields` publishes the same versioned allowed-key
+  tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
+  its not-yet-compiled sections return `unsupported_feature` with their owning
+  T3 bead id.
 - `report build --schema <schema> [--profile <profile>] [--spec <spec>]`:
   compile schema/profile/spec inputs into an offline-safe PBIP project through
   proven scaffold/report primitives.
@@ -129,7 +137,7 @@ object-specific writers and fixtures exist.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
-- `report visuals list/show/formatting list/formatting show/formatting extract/formatting apply/add/clone/update/delete/set-position`
+- `report visuals list/show/formatting list/formatting show/formatting extract/formatting apply/add/clone/update/delete/set-position/set-bindings/repair-bindings`
 - `report visuals bind`: bind a visual to fields or measures using PBIR queries.
 - `report drilldown set-hierarchy`: replace Category projections on existing
   Category/Y charts with two or more resolved model columns.
@@ -194,6 +202,8 @@ validation, proof, then mutation breadth.
 - Enforce the shared input-surface contract: fixed byte/row/column/depth/count
   budgets, strict decoding, traversal/symlink refusal, PNG sniffing, and one
   `input_safety_violation` diagnostic, exposed under `capabilities.limits`.
+- The mutation-mode contract spine is complete: mutating command modules share
+  the output-mode type and diagnostic helpers from `src/cli_support.rs`.
 
 ### Phase 0: Contract And Portability
 
@@ -231,6 +241,10 @@ validation, proof, then mutation breadth.
 - Implemented first BPA-lite lint slice: static DAX findings, duplicate
   page/visual titles, and validator-rejected `general.altText` placements with
   explicit cleanup guidance. Generated visuals omit the rejected property.
+- Implemented a single typed rule registry shared by lint, report audit, DAX
+  lint, and M lint. `lint --rules` inventories it and `lint --explain
+  <rule-id>` returns versioned remediation metadata; the empty design family is
+  reserved for the future design-lint implementation.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 
@@ -277,6 +291,10 @@ validation, proof, then mutation breadth.
 - Implemented static DAX dependencies/lint over stored measures/calculated
   columns. This catches missing/ambiguous references, self references, and
   simple measure cycles, but does not claim engine validation.
+- Implemented `model partitions add-grouped-rank` for the pilot's standard
+  refresh-time ranking pattern: guarded generated partitions only, sort and
+  buffered index per group, zero for ineligible rows, and a final explicit
+  `Int64.Type` conversion.
 - Implemented advanced semantic-model readback inventory for roles,
   perspectives, cultures, and expressions already present in TMDL. Mutation
   remains planned.
@@ -327,6 +345,13 @@ frozen until proven.
   by generated visual creation. It remains scoped to existing card/table and
   standard category/value chart visuals; slicer mutations, filters, and
   formatting remain fixture-gated.
+- Implemented fixture-backed role-map slice: `report visuals catalog` publishes
+  one complete rule row for each of the sixteen generated visual types, with
+  required/optional and measure-only roles, projection limits, runtime-parity
+  constraints, proof level, and evidence kind. `report visuals
+  repair-bindings --dry-run` proposes only deterministic role-name and proven
+  Sum-wrapper repairs as a typed set-bindings op; ambiguous or missing fields
+  remain `unsupported_feature` refusals.
 - Implemented first formatting readback slice: `report visuals formatting
   list/show` inventories existing PBIR formatting object containers and
   property names while omitting raw literal values unless `--include-raw` is
@@ -374,6 +399,10 @@ frozen until proven.
   formatting payloads, applies them by visual type and ordinal, and refuses
   copied literal text unless `--allow-literal-text` is explicit. Field bindings
   and data roles are never copied by style apply.
+- Offline QA synthesis accepts exact `--row-scale` and `--seed` values and
+  passes them to shared M generator functions, so the same seed is
+  byte-deterministic while multiple scales reproduce Desktop refresh cost
+  without live data or credentials.
 - Implemented first filter slice: `report filters list/show` inventories raw
   report/page/visual PBIR filter containers, returns stable filter handles, and
   warns when filter metadata may contain selected semantic-model values.
@@ -465,6 +494,10 @@ frozen until proven.
 - `cargo test --all-targets`
 - Scaffold/inspect/validate smoke tests on Windows, Linux, and macOS.
 - Golden summary tests for checked-in PBIP fixture folders.
+- The offline `tests/e2e.rs` loop covers every checked-in dashboard archetype;
+  `POWERBI_CLI_TEST_LOG=1` makes each step a self-contained JSON log record.
+- Ignored wall-time/resource targets live in `tests/perf.rs` and run in the
+  scheduled Linux performance workflow.
 
 ### Format Tests
 

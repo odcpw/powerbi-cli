@@ -157,7 +157,7 @@ pub(crate) fn visual_catalog_command(args: &[String]) -> CliResult<Value> {
         None => VISUAL_TYPES.to_vec(),
     };
     Ok(json!({
-        "schema": "powerbi-cli.report.visuals.catalog.v1",
+        "schema": "powerbi-cli.report.visuals.catalog.v2",
         "generatedVisualTypeCount": specs.len(),
         "supportedVisualTypes": specs.iter().map(|spec| spec.visual_type).collect::<Vec<_>>(),
         "visualTypes": specs.iter().map(visual_type_json).collect::<Vec<_>>(),
@@ -171,7 +171,8 @@ pub(crate) fn visual_catalog_command(args: &[String]) -> CliResult<Value> {
             "status": "planned",
             "note": note
         })).collect::<Vec<_>>(),
-        "rules": [
+        "rules": specs.iter().map(visual_type_rules_json).collect::<Vec<_>>(),
+        "catalogNotes": [
             "Generated visuals use a deliberately small PBIR visual.json pattern.",
             "Scatter X/Y/Size and 100% stacked-column Y accept columns by emitting the Desktop-proven explicit Sum aggregation shape; other value-axis columns require measures.",
             "The same model field cannot be projected more than once per visual until Desktop-authored duplicate queryRef numbering is available.",
@@ -180,6 +181,7 @@ pub(crate) fn visual_catalog_command(args: &[String]) -> CliResult<Value> {
         ],
         "next": [
             "powerbi-cli report visuals add --project <project-dir-or.pbip> --page <page-handle> --visual-type lineChart --title <title> --binding \"role=Category,table=<table>,column=<column>\" --binding \"role=Y,table=<table>,measure=<measure>\" --dry-run --json",
+            "powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json",
             "powerbi-cli report visuals clone --project <project-dir-or.pbip> --handle <template-visual-handle> --dry-run --json",
             "powerbi-cli --json capabilities --for \"report visuals add\""
         ]
@@ -204,6 +206,14 @@ pub(crate) fn schema_golden_visual_type_names() -> Vec<&'static str> {
 
 pub(crate) fn visual_type_contracts() -> Vec<Value> {
     VISUAL_TYPES.iter().map(visual_type_json).collect()
+}
+
+pub(crate) fn visual_type_role_rules() -> Vec<Value> {
+    VISUAL_TYPES.iter().map(visual_type_rules_json).collect()
+}
+
+pub(crate) fn visual_type_role_rule(visual_type: &str) -> CliResult<Value> {
+    lookup_visual_type(visual_type).map(|spec| visual_type_rules_json(&spec))
 }
 
 pub(crate) fn normalize_role(visual_type: &str, role: &str) -> CliResult<String> {
@@ -433,28 +443,198 @@ fn visual_type_json(spec: &VisualTypeSpec) -> Value {
     contract
 }
 
+fn visual_type_rules_json(spec: &VisualTypeSpec) -> Value {
+    let roles = role_specs_json(spec.family);
+    let role_items = roles.as_array().expect("role specs are always arrays");
+    let required = role_items
+        .iter()
+        .filter(|role| role["required"].as_bool() == Some(true))
+        .filter_map(|role| role["role"].as_str())
+        .collect::<Vec<_>>();
+    let optional = role_items
+        .iter()
+        .filter(|role| role["required"].as_bool() == Some(false))
+        .filter_map(|role| role["role"].as_str())
+        .collect::<Vec<_>>();
+    let measure_only = role_items
+        .iter()
+        .filter(|role| role["fieldKinds"] == json!(["measure"]))
+        .filter_map(|role| role["role"].as_str())
+        .collect::<Vec<_>>();
+    let max_projections = role_items
+        .iter()
+        .filter_map(|role| Some((role["role"].as_str()?.to_string(), role["max"].clone())))
+        .collect::<serde_json::Map<_, _>>();
+    let (proof_level, fixture_kind, evidence) = role_rule_provenance(spec);
+
+    json!({
+        "visualType": spec.visual_type,
+        "bindingFamily": binding_family_name(spec.family),
+        "required": required,
+        "optional": optional,
+        "measureOnly": measure_only,
+        "maxProjections": max_projections,
+        "mutuallyExclusive": mutually_exclusive_roles(spec.family),
+        "runtimeParity": runtime_parity_rules(spec),
+        "proofLevel": proof_level,
+        "fixtureKind": fixture_kind,
+        "evidence": evidence,
+        "refusalCode": "unsupported_feature"
+    })
+}
+
+fn mutually_exclusive_roles(_family: VisualBindingFamily) -> Vec<Vec<&'static str>> {
+    // None of the sixteen currently generated families has two *supported* roles
+    // that are mutually exclusive. Unsupported aliases such as scatter Details
+    // are represented as runtime-parity refusals instead of pretending they are
+    // members of the supported role set.
+    Vec::new()
+}
+
+fn runtime_parity_rules(spec: &VisualTypeSpec) -> Vec<Value> {
+    let mut rules = vec![json!({
+        "id": "binding.no-duplicate-field",
+        "requirement": "The same model field may be projected at most once per visual.",
+        "onViolation": "refuse",
+        "repair": "manual",
+        "evidence": "src/pbir_bindings.rs::reject_duplicate_fields"
+    })];
+    match spec.family {
+        VisualBindingFamily::SingleValue
+        | VisualBindingFamily::CategoryY
+        | VisualBindingFamily::ComboCategoryY
+        | VisualBindingFamily::CategoryShare
+        | VisualBindingFamily::RowsColumnsValues => rules.push(json!({
+            "id": "binding.measure-only-value-role",
+            "roles": role_specs_json(spec.family).as_array().expect("roles").iter()
+                .filter(|role| role["fieldKinds"] == json!(["measure"]))
+                .filter_map(|role| role["role"].as_str()).collect::<Vec<_>>(),
+            "requirement": "Bare Column expressions are refused in measure-only roles.",
+            "onViolation": "refuse",
+            "repair": "select-existing-measure",
+            "evidence": "src/pbir_bindings.rs::resolve_binding"
+        })),
+        _ => {}
+    }
+    match spec.family {
+        VisualBindingFamily::CategorySeriesYAggregatable => rules.push(json!({
+            "id": "binding.explicit-sum-column",
+            "roles": ["Y"],
+            "requirement": "Column inputs are emitted as PBIR Aggregation(Function=0), never as bare Column expressions.",
+            "onViolation": "repairable",
+            "repair": "wrap-sum-aggregation",
+            "evidence": "2026-08 repository-generated pilot fixture"
+        })),
+        VisualBindingFamily::ScatterBubble => {
+            rules.push(json!({
+                "id": "scatter.details-role-refused",
+                "roles": ["Details"],
+                "requirement": "Desktop runtime detail identity uses queryState.Category; queryState.Details is refused.",
+                "onViolation": "repairable",
+                "repair": "rename-role-to-Category",
+                "evidence": "docs/pilot-lessons.md lesson 3 and src/pbir_bindings.rs::visual_query_state_errors"
+            }));
+            rules.push(json!({
+                "id": "scatter.category-aggregated-value-axes",
+                "when": "Category has at least one projection",
+                "roles": ["X", "Y", "Size"],
+                "requirement": "Each value-axis field is a Measure or PBIR Aggregation(Function=0); a bare Column is refused.",
+                "onViolation": "repairable",
+                "repair": "wrap-sum-aggregation",
+                "evidence": "2026-08 repository-generated pilot fixture and PBIR_ROLE_KIND_MISMATCH validation"
+            }));
+            rules.push(json!({
+                "id": "scatter.series-pbir-role",
+                "roles": ["Series"],
+                "requirement": "Legend/color input aliases are serialized as the Desktop runtime PBIR role Series.",
+                "onViolation": "repairable",
+                "repair": "rename-role-to-Series",
+                "evidence": "docs/pbir-desktop-oracle.md scatter runtime finding"
+            }));
+        }
+        VisualBindingFamily::SlicerField => rules.push(json!({
+            "id": "slicer.no-persisted-selection",
+            "requirement": "Generated slicers omit objects.general.filter and other selected-value state.",
+            "onViolation": "refuse",
+            "repair": "report slicers clear",
+            "evidence": "docs/reference/desktop-authored-visuals/slicer.visual.json"
+        })),
+        _ => {}
+    }
+    rules
+}
+
+fn role_rule_provenance(spec: &VisualTypeSpec) -> (&'static str, &'static str, Vec<&'static str>) {
+    match spec.visual_type {
+        "pieChart" => (
+            "desktop-golden-pending",
+            "desktop-authored-reference",
+            vec!["docs/reference/desktop-authored-visuals/pieChart.visual.json"],
+        ),
+        "donutChart" => (
+            "desktop-golden-pending",
+            "desktop-authored-reference",
+            vec!["docs/reference/desktop-authored-visuals/donutChart.visual.json"],
+        ),
+        "pivotTable" => (
+            "desktop-golden-pending",
+            "desktop-authored-reference",
+            vec!["docs/reference/desktop-authored-visuals/matrix.visual.json"],
+        ),
+        "slicer" => (
+            "desktop-golden-pending",
+            "desktop-authored-reference",
+            vec!["docs/reference/desktop-authored-visuals/slicer.visual.json"],
+        ),
+        "lineClusteredColumnComboChart" => (
+            "manual-desktop-canvas-refresh",
+            "repository-generated-desktop-saved",
+            vec![
+                "docs/reference/desktop-authored-visuals/lineClusteredColumnComboChart.visual.json",
+                "testdata/desktop-proof/combo-pareto.2026-07-23.refresh-session.json",
+            ],
+        ),
+        visual_type if pilot_2026_08_schema_golden(visual_type) => (
+            "schema-golden",
+            "repository-generated-pilot",
+            vec![
+                "docs/pilot-lessons.md",
+                "src/report_visual_mutations.rs::validate_binding_cardinality",
+            ],
+        ),
+        _ => (
+            "unit-smoke",
+            "repository-generated",
+            vec![
+                "src/report_visual_mutations.rs::validate_binding_cardinality",
+                "src/pbir_visual_factory.rs::visual_container_json",
+            ],
+        ),
+    }
+}
+
 fn role_specs_json(family: VisualBindingFamily) -> Value {
     match family {
         VisualBindingFamily::SingleValue => json!([
             {
                 "role": "Values",
-                "required": false,
-                "min": 0,
+                "required": true,
+                "min": 1,
                 "max": 1,
                 "fieldKinds": ["measure"],
                 "aliases": ["values", "value", "field"],
-                "summary": "Optional for placeholders; exactly one measure binding when bound."
+                "summary": "Exactly one measure binding; consumed PBIR data visuals cannot be emitted as unbound placeholders."
             }
         ]),
         VisualBindingFamily::ValuesList => json!([
             {
                 "role": "Values",
-                "required": false,
-                "min": 0,
+                "required": true,
+                "min": 1,
                 "max": null,
                 "fieldKinds": ["column", "measure"],
                 "aliases": ["values", "value", "columns", "field"],
-                "summary": "Optional for placeholders; one or more bindings when bound."
+                "summary": "One or more column or measure bindings."
             }
         ]),
         VisualBindingFamily::CategoryY => json!([
@@ -787,4 +967,75 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<Strin
     })?;
     *index += 2;
     Ok(value.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn every_generated_visual_type_has_one_complete_role_rule_row() {
+        let rules = visual_type_role_rules();
+        assert_eq!(rules.len(), VISUAL_TYPES.len());
+        let visual_types = rules
+            .iter()
+            .map(|rule| rule["visualType"].as_str().expect("visualType"))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(visual_types.len(), VISUAL_TYPES.len());
+        for rule in rules {
+            assert!(rule["required"].is_array(), "{rule}");
+            assert!(rule["optional"].is_array(), "{rule}");
+            assert!(rule["measureOnly"].is_array(), "{rule}");
+            assert!(rule["maxProjections"].is_object(), "{rule}");
+            assert!(rule["mutuallyExclusive"].is_array(), "{rule}");
+            assert!(rule["runtimeParity"].is_array(), "{rule}");
+            assert!(rule["proofLevel"].is_string(), "{rule}");
+            assert!(rule["fixtureKind"].is_string(), "{rule}");
+            assert!(
+                rule["evidence"]
+                    .as_array()
+                    .is_some_and(|items| !items.is_empty())
+            );
+            assert_eq!(rule["refusalCode"], "unsupported_feature");
+        }
+    }
+
+    #[test]
+    fn only_independent_desktop_reference_rows_claim_that_fixture_kind() {
+        let reference_types = visual_type_role_rules()
+            .into_iter()
+            .filter(|rule| rule["fixtureKind"] == "desktop-authored-reference")
+            .map(|rule| rule["visualType"].as_str().expect("visualType").to_string())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            reference_types,
+            ["donutChart", "pieChart", "pivotTable", "slicer"]
+                .into_iter()
+                .map(ToOwned::to_owned)
+                .collect()
+        );
+    }
+
+    #[test]
+    fn scatter_rule_encodes_runtime_parity_refusals_and_repairs() {
+        let rule = visual_type_role_rule("scatterChart").expect("scatter rule");
+        assert_eq!(rule["required"], json!(["X", "Y"]));
+        assert_eq!(
+            rule["optional"],
+            json!(["Category", "Size", "Series", "Tooltips"])
+        );
+        assert_eq!(rule["maxProjections"]["X"], 1);
+        assert_eq!(rule["maxProjections"]["Y"], 1);
+        assert_eq!(rule["maxProjections"]["Size"], 1);
+        let ids = rule["runtimeParity"]
+            .as_array()
+            .expect("runtimeParity")
+            .iter()
+            .filter_map(|item| item["id"].as_str())
+            .collect::<BTreeSet<_>>();
+        assert!(ids.contains("scatter.details-role-refused"));
+        assert!(ids.contains("scatter.category-aggregated-value-axes"));
+        assert!(ids.contains("scatter.series-pbir-role"));
+    }
 }

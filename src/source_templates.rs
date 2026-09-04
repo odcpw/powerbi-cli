@@ -1,5 +1,6 @@
 use crate::input_safety::{InputKind, read_utf8};
 use crate::project_io::write_json_atomic;
+use crate::rules;
 use crate::safety_scan::{
     contains_credential_like_text_str, redact_credential_parameter, redact_credential_values,
 };
@@ -369,7 +370,7 @@ pub(crate) fn source_template_safety_json(record: &SourceTemplateRecord) -> Valu
     json!({
         "status": status,
         "safeForHome": status != "unsafe",
-        "credentialFree": !findings.iter().any(|finding| finding.code == "sourceTemplate.credential_like_text"),
+        "credentialFree": !findings.iter().any(|finding| finding.code == rules::SOURCE_TEMPLATE_CREDENTIAL_LIKE_TEXT),
         "containsPlaceholders": template_contains_placeholders(record),
         "findings": findings.iter().map(|finding| json!({
             "code": finding.code,
@@ -418,7 +419,7 @@ pub(crate) fn source_template_findings(
     }
     if contains_credential_like_text_str(&searchable) {
         findings.push(SourceTemplateFinding {
-            code: "sourceTemplate.credential_like_text".to_string(),
+            code: rules::SOURCE_TEMPLATE_CREDENTIAL_LIKE_TEXT.to_string(),
             severity: "error".to_string(),
             message: "source template contains credential-like text".to_string(),
         });
@@ -430,14 +431,14 @@ pub(crate) fn source_template_findings(
             .is_some_and(|dsn| dsn.contains(';') || dsn.contains('='))
     {
         findings.push(SourceTemplateFinding {
-            code: "sourceTemplate.odbc_dsn_attributes".to_string(),
+            code: rules::SOURCE_TEMPLATE_ODBC_DSN_ATTRIBUTES.to_string(),
             severity: "error".to_string(),
             message: "ODBC DSN must be a bare DSN name without ';' or '=' attributes; configure credentials in the ODBC manager or Power BI Desktop".to_string(),
         });
     }
     if !template_contains_placeholders(record) {
         findings.push(SourceTemplateFinding {
-            code: "sourceTemplate.specific_values".to_string(),
+            code: rules::SOURCE_TEMPLATE_SPECIFIC_VALUES.to_string(),
             severity: "warning".to_string(),
             message: "source template stores specific source identifiers; placeholders are safer for home handoff".to_string(),
         });

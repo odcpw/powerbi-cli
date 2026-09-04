@@ -1,4 +1,5 @@
 use crate::input_safety::{InputKind, read_utf8};
+use crate::rules;
 use crate::tmdl::{ColumnRecord, load_table_documents};
 use crate::{CliError, CliResult, ResolvedProject, canonical_display};
 use serde_json::{Value, json};
@@ -52,7 +53,7 @@ fn document_findings(source: &str, document_kind: &str, handle: &str, path: &Pat
         .into_iter()
         .map(|reuse| {
             json!({
-                "code": "m.unbuffered_reuse",
+                "code": rules::M_UNBUFFERED_REUSE,
                 "severity": "warning",
                 "message": format!(
                     "M step `{}` is referenced {} times by later steps without Table.Buffer",
@@ -81,7 +82,7 @@ fn untyped_expansion_document_findings(
         .into_iter()
         .map(|expansion| {
             json!({
-                "code": "m.untyped_expansion",
+                "code": rules::M_UNTYPED_EXPANSION,
                 "severity": "warning",
                 "message": format!(
                     "M step `{}` expands column `{}` without Table.TransformColumnTypes; expanded columns are untyped and can load as text despite a numeric TMDL declaration",

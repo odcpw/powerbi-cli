@@ -1,18 +1,14 @@
+use crate::cli_support::{
+    MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
+};
 use crate::pbir::{VisualRecord, VisualSelector, find_visual, load_report_snapshot, visual_detail};
-use crate::project_io::{copy_project_dir, write_json_atomic};
+use crate::project_io::write_json_atomic;
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
-    command_arg, read_json_value, resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
+    read_json_value, resolve_project, validate_project,
 };
 use serde_json::{Map, Value, json};
-use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MutationMode {
-    DryRun,
-    InPlace,
-    OutDir,
-}
+use std::path::PathBuf;
 
 #[derive(Debug, Default)]
 struct TextOptions {
@@ -35,7 +31,12 @@ pub(crate) fn set_text_formatting(args: &[String]) -> CliResult<Value> {
     )?;
     require_visual_selector(&options.selector, "report visuals formatting set-text")?;
     require_text_intent(&options)?;
-    let mode = require_mode(options.mode, "report visuals formatting set-text")?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "report visuals formatting set-text",
+        "Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.",
+        "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json",
+    )?;
     let source_resolved = resolve_project(&source_project)?;
     crate::cli_support::preflight_out_dir(args, set_text_formatting)?;
     let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
@@ -531,27 +532,30 @@ fn parse_text_args(args: &[String]) -> CliResult<TextOptions> {
                 i += 1;
             }
             "--dry-run" => {
-                set_mode(
+                set_mode_with_contract(
                     &mut options.mode,
                     MutationMode::DryRun,
-                    "report visuals formatting set-text",
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json",
                 )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(
+                set_mode_with_contract(
                     &mut options.mode,
                     MutationMode::InPlace,
-                    "report visuals formatting set-text",
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json",
                 )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(
+                set_mode_with_contract(
                     &mut options.mode,
                     MutationMode::OutDir,
-                    "report visuals formatting set-text",
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report visuals formatting set-text --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json",
                 )?;
                 options.out_dir = Some(out_dir);
             }
@@ -620,61 +624,6 @@ fn visual_path<'a>(visual: &'a VisualRecord, command: &str) -> CliResult<&'a Pat
             shell_arg(&visual.handle)
         ))
     })
-}
-
-fn target_project(
-    source_resolved: &ResolvedProject,
-    mode: MutationMode,
-    out_dir: Option<&Path>,
-) -> CliResult<ResolvedProject> {
-    match (mode, out_dir) {
-        (MutationMode::DryRun | MutationMode::InPlace, _) => Ok(source_resolved.clone()),
-        (MutationMode::OutDir, Some(out_dir)) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)
-        }
-        (MutationMode::OutDir, None) => {
-            Err(CliError::invalid_args("--out-dir requires a directory"))
-        }
-    }
-}
-
-fn require_mode(mode: Option<MutationMode>, command: &str) -> CliResult<MutationMode> {
-    mode.ok_or_else(|| {
-        CliError::invalid_args(format!(
-            "{command} requires --dry-run, --in-place, or --out-dir <dir>"
-        ))
-        .with_hint("Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.")
-        .with_suggested_command(format!(
-            "powerbi-cli {command} --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json"
-        ))
-    })
-}
-
-fn set_mode(
-    current: &mut Option<MutationMode>,
-    next: MutationMode,
-    command: &str,
-) -> CliResult<()> {
-    if current.is_some() {
-        return Err(CliError::invalid_args(
-            "choose exactly one output mode: --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.")
-        .with_suggested_command(format!(
-            "powerbi-cli {command} --project <project-dir-or.pbip> --handle <visual-handle> --title <text> --dry-run --json"
-        )));
-    }
-    *current = Some(next);
-    Ok(())
-}
-
-fn mode_name(mode: MutationMode) -> &'static str {
-    match mode {
-        MutationMode::DryRun => "dry-run",
-        MutationMode::InPlace => "in-place",
-        MutationMode::OutDir => "out-dir",
-    }
 }
 
 fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<String> {

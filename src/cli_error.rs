@@ -17,6 +17,8 @@ pub(crate) struct CliError {
     pub(crate) message: String,
     pub(crate) hint: Option<String>,
     pub(crate) suggested_commands: Vec<String>,
+    pub(crate) pointer: Option<String>,
+    pub(crate) did_you_mean: Option<String>,
 }
 
 impl CliError {
@@ -47,6 +49,8 @@ impl CliError {
             message: message.into(),
             hint: None,
             suggested_commands: Vec::new(),
+            pointer: None,
+            did_you_mean: None,
         }
     }
 
@@ -57,6 +61,16 @@ impl CliError {
 
     pub(crate) fn with_suggested_command(mut self, command: impl Into<String>) -> Self {
         self.suggested_commands.push(command.into());
+        self
+    }
+
+    pub(crate) fn with_pointer(mut self, pointer: impl Into<String>) -> Self {
+        self.pointer = Some(pointer.into());
+        self
+    }
+
+    pub(crate) fn with_did_you_mean(mut self, suggestion: impl Into<String>) -> Self {
+        self.did_you_mean = Some(suggestion.into());
         self
     }
 }

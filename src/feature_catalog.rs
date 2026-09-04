@@ -1,3 +1,4 @@
+use crate::desktop_proof::{LoadedDesktopProofRecord, ProofLevel, embedded_desktop_proof_records};
 use crate::{CliError, CliResult};
 use serde_json::{Value, json};
 
@@ -78,11 +79,14 @@ pub(crate) fn feature_catalog_schema_fields() -> Vec<&'static str> {
         "nextProof",
         "supportedKinds",
         "referenceSignals",
+        "proofRecords",
     ]
 }
 
 fn list_features(args: &[String]) -> CliResult<Value> {
     let filter = parse_filter(args)?;
+    let proof_records = embedded_desktop_proof_records()?;
+    validate_proof_record_feature_ids(&proof_records)?;
     let mut features = FEATURE_CATALOG
         .iter()
         .filter(|feature| {
@@ -90,7 +94,7 @@ fn list_features(args: &[String]) -> CliResult<Value> {
                 .as_deref()
                 .is_none_or(|filter| feature_matches(feature, filter))
         })
-        .map(feature_json)
+        .map(|feature| feature_json(feature, &proof_records))
         .collect::<Vec<_>>();
     features.sort_by_key(|feature| feature["id"].as_str().unwrap_or_default().to_string());
     let supported_count = features
@@ -158,14 +162,41 @@ fn feature_by_id(feature_id: &str) -> Option<Feature> {
         .find(|feature| feature.id == feature_id)
 }
 
-fn feature_json(feature: &Feature) -> Value {
+fn feature_json(feature: &Feature, proof_records: &[LoadedDesktopProofRecord]) -> Value {
+    let linked_records = proof_records
+        .iter()
+        .filter(|loaded| {
+            loaded
+                .record
+                .signals
+                .feature_ids
+                .iter()
+                .any(|feature_id| feature_id == feature.id)
+        })
+        .collect::<Vec<_>>();
+    let proof_level = linked_records.iter().fold(
+        ProofLevel::parse(feature.proof_level).expect("catalog proof levels are closed"),
+        |level, loaded| level.max(loaded.record.proof_level),
+    );
+    let proof_records_json = linked_records
+        .iter()
+        .map(|loaded| {
+            json!({
+                "path": loaded.source,
+                "fixture": loaded.record.fixture,
+                "date": loaded.record.date,
+                "desktopVersion": loaded.record.desktop_version,
+                "proofLevel": loaded.record.proof_level.as_str()
+            })
+        })
+        .collect::<Vec<_>>();
     json!({
         "id": feature.id,
         "title": feature.title,
         "category": feature.category,
         "status": feature.status,
         "support": feature.support,
-        "proofLevel": feature.proof_level,
+        "proofLevel": proof_level.as_str(),
         "runtimeFallback": false,
         "emitsPbir": feature.emits_pbir,
         "commands": feature.commands,
@@ -174,8 +205,27 @@ fn feature_json(feature: &Feature) -> Value {
         "nextProof": feature.next_proof,
         "supportedKinds": supported_kinds(feature),
         "referenceSignals": feature.reference_signals,
+        "proofRecords": proof_records_json,
         "tags": feature.tags
     })
+}
+
+fn validate_proof_record_feature_ids(proof_records: &[LoadedDesktopProofRecord]) -> CliResult<()> {
+    for loaded in proof_records {
+        for feature_id in &loaded.record.signals.feature_ids {
+            if feature_by_id(feature_id).is_none() {
+                return Err(CliError::validation_failed(format!(
+                    "invalid embedded Desktop proof record {}: signals.featureIds contains unknown feature `{feature_id}`",
+                    loaded.source
+                ))
+                .with_hint(
+                    "Use an exact features[].id from `powerbi-cli features list --json`; proof records never create feature catalog entries.",
+                )
+                .with_suggested_command("powerbi-cli features list --json"));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn supported_kinds(feature: &Feature) -> &'static [&'static str] {
@@ -203,6 +253,23 @@ struct Feature {
 }
 
 const FEATURE_CATALOG: &[Feature] = &[
+    Feature {
+        id: "quality.lint-rule-registry",
+        title: "Discoverable lint and audit rule registry",
+        category: "validation",
+        status: "supported",
+        support: "read-only-contract-catalog",
+        proof_level: "unit-smoke",
+        emits_pbir: false,
+        commands: &["lint", "model dax lint", "report audit"],
+        refusal_code: None,
+        reason: "Every lint and report-audit finding id is registered with family, severity, summary, remediation, optional sanitize action, and version metadata; agents can list or explain rules without opening a project.",
+        next_proof: &[
+            "Extend the typed design family when design lint ships without adding ad-hoc ids",
+        ],
+        reference_signals: &[],
+        tags: &["lint", "audit", "rules", "diagnostics", "agent"],
+    },
     Feature {
         id: "validation.microsoft-report",
         title: "Official Microsoft report validation backend",
@@ -569,6 +636,23 @@ const FEATURE_CATALOG: &[Feature] = &[
         ],
     },
     Feature {
+        id: "model.partition-grouped-rank",
+        title: "Refresh-time grouped rank partition generator",
+        category: "model",
+        status: "supported",
+        support: "safe-generated-partition-mutation",
+        proof_level: "schema-golden",
+        emits_pbir: false,
+        commands: &["model partitions add-grouped-rank"],
+        refusal_code: None,
+        reason: "A guarded generator appends sort, buffered per-group eligibility splitting, 1-based indexing, zero-ranked ineligible rows, recombination, and an explicit Int64 retype to one safe generated partition.",
+        next_proof: &[
+            "Refresh a grouped-rank analytics table in Power BI Desktop and verify ranks against bounded DAX queries",
+        ],
+        reference_signals: &[],
+        tags: &["semantic-model", "partition", "m", "rank", "performance"],
+    },
+    Feature {
         id: "workflow.source-profile",
         title: "Deterministic staged source-profile workflow",
         category: "workflow",
@@ -582,6 +666,43 @@ const FEATURE_CATALOG: &[Feature] = &[
         next_proof: &[],
         reference_signals: &[],
         tags: &["workflow", "source-profile", "mcp", "pbip", "validation"],
+    },
+    Feature {
+        id: "report.dashboard-spec-v2",
+        title: "Strict dashboard spec v2 shape and compilation boundary",
+        category: "report",
+        status: "supported",
+        support: "strict-shape-partial-compile",
+        proof_level: "unit-smoke",
+        emits_pbir: true,
+        commands: &["report spec fields", "report spec validate", "report build"],
+        refusal_code: None,
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables and deny-unknown-fields models. The currently compiled subset is artifact-identical to v1; every recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        next_proof: &[
+            "Land the named T3 compiler bead for each currently refused v2 section",
+            "Promote generated v2 archetypes through the existing Desktop proof ladder",
+        ],
+        reference_signals: &[
+            "examples/sales.dashboard.v2.json: minimal compiled v2 parity fixture",
+        ],
+        tags: &["report", "dashboard", "spec", "v2", "compiler", "agent"],
+    },
+    Feature {
+        id: "workflow.synthetic-source",
+        title: "Offline deterministic synthetic source swap",
+        category: "workflow",
+        status: "supported",
+        support: "shared-m-expressions-with-scale-and-seed",
+        proof_level: "schema-golden",
+        emits_pbir: false,
+        commands: &["workflow synthesize"],
+        refusal_code: None,
+        reason: "A fresh project copy replaces recognized Database connector roots with shared M expressions; optional exact integer row-scale and seed values invoke deterministic generator functions.",
+        next_proof: &[
+            "Refresh multiple row scales in Power BI Desktop and record wall-time/canvas evidence",
+        ],
+        reference_signals: &[],
+        tags: &["workflow", "synthetic", "m", "scale", "seed", "offline"],
     },
     Feature {
         id: "report.pages",
@@ -649,6 +770,36 @@ const FEATURE_CATALOG: &[Feature] = &[
             "https://github.com/data-goblin/power-bi-agentic-development @ 9704f1d: PBIR visual examples and visual catalog references",
         ],
         tags: &["pbir", "visuals", "bindings"],
+    },
+    Feature {
+        id: "report.visuals.role-maps",
+        title: "Fixture-backed visual role maps and runtime-parity repair",
+        category: "report",
+        status: "supported",
+        support: "validated-catalog-and-dry-run-repair",
+        proof_level: "unit-smoke",
+        emits_pbir: true,
+        commands: &[
+            "report visuals catalog",
+            "report visuals add",
+            "report visuals set-bindings",
+            "report visuals repair-bindings",
+            "report spec validate",
+        ],
+        refusal_code: None,
+        reason: "Every generated visual type publishes required and optional roles, measure-only roles, projection limits, mutually exclusive roles, runtime-parity rules, and per-row provenance. Spec validation, generated add, and set-bindings enforce the same closed role surface. The dry-run repair planner can canonicalize proven role aliases and wrap proven Sum aggregations, but never invents or drops fields. Pie, donut, pivotTable, and slicer rows cite real Desktop-authored references; all other rows identify their repository-generated proof honestly.",
+        next_proof: &[
+            "Harvest independent Desktop-authored references for repository-generated visual families",
+            "Run validate --strict --backend all and Desktop refresh/save proof before promoting each unit-smoke row",
+        ],
+        reference_signals: &[
+            "docs/reference/desktop-authored-visuals/pieChart.visual.json",
+            "docs/reference/desktop-authored-visuals/donutChart.visual.json",
+            "docs/reference/desktop-authored-visuals/matrix.visual.json",
+            "docs/reference/desktop-authored-visuals/slicer.visual.json",
+            "docs/pilot-lessons.md: scatter runtime-parity findings",
+        ],
+        tags: &["pbir", "visuals", "bindings", "catalog", "repair"],
     },
     Feature {
         id: "report.visuals.category-share",
@@ -1153,3 +1304,103 @@ const FEATURE_CATALOG: &[Feature] = &[
         tags: &["pbir", "formatting", "conditional-formatting"],
     },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_records_preserve_every_existing_feature_proof_level() {
+        let records = embedded_desktop_proof_records().expect("embedded proof records");
+        validate_proof_record_feature_ids(&records).expect("known feature ids");
+        for feature in FEATURE_CATALOG {
+            assert_eq!(
+                feature_json(feature, &records)["proofLevel"],
+                feature.proof_level,
+                "record unexpectedly changed {}",
+                feature.id
+            );
+        }
+    }
+
+    #[test]
+    fn feature_level_uses_maximum_linked_proven_record() {
+        let placeholder = crate::desktop_proof::parse_desktop_proof_record(
+            "placeholder.json",
+            r#"{
+                "schema":"powerbi-cli.desktop-proof.v1",
+                "fixture":"archetypes/placeholder",
+                "date":"2026-09-03",
+                "desktopVersion":null,
+                "commands":["powerbi-cli validate --strict build/placeholder --json"],
+                "signals":{"featureIds":["report.visuals.generated"],"placeholder":true},
+                "proofLevel":"desktop-golden-pending"
+            }"#,
+        )
+        .expect("placeholder record");
+        let proven = crate::desktop_proof::parse_desktop_proof_record(
+            "proven.json",
+            r#"{
+                "schema":"powerbi-cli.desktop-proof.v1",
+                "fixture":"archetypes/proven",
+                "date":"2026-09-04",
+                "desktopVersion":"2.200.1.0",
+                "commands":["powerbi-cli desktop open-check build/proven --json"],
+                "signals":{"featureIds":["report.visuals.generated"],"schemaGolden":true,"desktopReferencePresent":true,"currentArtifact":true,"desktopOpened":true,"canvasRendered":true,"refreshCompleted":true,"issueDialogsAbsent":true,"expectedValuesMatched":true,"automated":true},
+                "proofLevel":"desktop-canvas-refresh"
+            }"#,
+        )
+        .expect("proven record");
+        let feature = feature_by_id("report.visuals.generated").expect("feature");
+        let mut records = vec![LoadedDesktopProofRecord {
+            source: "placeholder.json",
+            record: placeholder,
+        }];
+        assert_eq!(
+            feature_json(&feature, &records)["proofLevel"],
+            "desktop-golden-pending"
+        );
+        records.push(LoadedDesktopProofRecord {
+            source: "proven.json",
+            record: proven,
+        });
+        let value = feature_json(&feature, &records);
+        assert_eq!(value["proofLevel"], "desktop-canvas-refresh");
+        assert_eq!(value["proofRecords"][0]["path"], "placeholder.json");
+        assert_eq!(value["proofRecords"][1]["path"], "proven.json");
+    }
+
+    #[test]
+    fn features_list_is_deterministic_with_embedded_records() {
+        let args = ["list".to_string()];
+        let first = serde_json::to_vec(&features_command(&args).expect("first feature list"))
+            .expect("serialize first feature list");
+        let second = serde_json::to_vec(&features_command(&args).expect("second feature list"))
+            .expect("serialize second feature list");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn record_with_unknown_feature_id_is_rejected() {
+        let record = crate::desktop_proof::parse_desktop_proof_record(
+            "unknown.json",
+            r#"{
+                "schema":"powerbi-cli.desktop-proof.v1",
+                "fixture":"archetypes/unknown",
+                "date":"2026-09-04",
+                "desktopVersion":null,
+                "commands":["powerbi-cli validate --strict build/unknown --json"],
+                "signals":{"featureIds":["report.does-not-exist"]},
+                "proofLevel":"unit-smoke"
+            }"#,
+        )
+        .expect("record shape");
+        let error = validate_proof_record_feature_ids(&[LoadedDesktopProofRecord {
+            source: "unknown.json",
+            record,
+        }])
+        .expect_err("unknown feature id");
+        assert_eq!(error.code, "validation_failed");
+        assert!(error.message.contains("report.does-not-exist"));
+    }
+}

@@ -1,8 +1,11 @@
+mod common;
+
+use common::cli_command;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 use walkdir::WalkDir;
 
 const CACHE_ENV: &str = "POWERBI_CLI_MICROSOFT_CACHE_DIR";
@@ -13,17 +16,16 @@ fn run_powerbi(
     fake_bin: Option<&Path>,
     timeout_ms: Option<u64>,
 ) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"));
-    command.args(args).env(CACHE_ENV, cache);
+    let mut command = cli_command(args).env(CACHE_ENV, cache);
     if let Some(fake_bin) = fake_bin {
-        command.env("PATH", fake_bin);
+        command = command.env("PATH", fake_bin);
     }
     if let Some(timeout_ms) = timeout_ms {
-        command.env("POWERBI_CLI_TEST_REPORT_TIMEOUT_MS", timeout_ms.to_string());
+        command = command.env("POWERBI_CLI_TEST_REPORT_TIMEOUT_MS", timeout_ms.to_string());
     } else {
-        command.env_remove("POWERBI_CLI_TEST_REPORT_TIMEOUT_MS");
+        command = command.env_remove("POWERBI_CLI_TEST_REPORT_TIMEOUT_MS");
     }
-    command.output().expect("run powerbi-cli")
+    command.output()
 }
 
 fn stdout_json(output: &Output) -> Value {

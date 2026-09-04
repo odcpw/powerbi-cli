@@ -1,4 +1,7 @@
-use crate::project_io::{copy_project_dir, write_text_atomic_validated};
+use crate::cli_support::{
+    MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
+};
+use crate::project_io::write_text_atomic_validated;
 use crate::source_templates::{
     ExcelSourceTemplateInput, OdbcSourceTemplateInput, PostgresSourceTemplateInput,
     SourceTemplateRecord, SqlSourceTemplateInput, excel_source_template, find_template,
@@ -58,13 +61,6 @@ struct ShowOptions {
     name: Option<String>,
 }
 
-#[derive(Debug)]
-enum MutationMode {
-    DryRun,
-    InPlace,
-    OutDir(PathBuf),
-}
-
 #[derive(Debug, Default)]
 struct AddOptions {
     project: Option<PathBuf>,
@@ -81,6 +77,7 @@ struct AddOptions {
     item_kind: Option<String>,
     description: Option<String>,
     mode: Option<MutationMode>,
+    out_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Default)]
@@ -99,6 +96,7 @@ struct ApplyOptions {
     replace_existing: bool,
     confirm: Option<String>,
     mode: Option<MutationMode>,
+    out_dir: Option<PathBuf>,
 }
 
 fn list_source_templates(args: &[String]) -> CliResult<Value> {
@@ -177,23 +175,18 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
     let options = parse_add_args(args)?;
     let source_project = required_project(options.project.clone(), "source-template add")?;
     let source_resolved = resolve_project(&source_project)?;
-    let mode = options.mode.as_ref().ok_or_else(|| {
-        CliError::invalid_args("source-template add requires --dry-run, --in-place, or --out-dir <dir>")
-            .with_hint("Start with `--dry-run`; source templates are sidecar metadata, not executable partition sources.")
-            .with_suggested_command("powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json")
-    })?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "source-template add",
+        "Start with `--dry-run`; source templates are sidecar metadata, not executable partition sources.",
+        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
+    )?;
     let kind = normalize_kind(options.kind.as_deref())?;
     if kind == "odbc" {
         validate_bare_odbc_dsn(options.dsn.as_deref().unwrap_or("<dsn>"))?;
     }
 
-    let target_resolved = match mode {
-        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
-        MutationMode::OutDir(out_dir) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)?
-        }
-    };
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
 
     let docs = load_table_documents(&target_resolved)?;
     let partition = find_partition(&docs, &options.selector)?;
@@ -393,13 +386,12 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
     let options = parse_apply_args(args)?;
     let source_project = required_project(options.project.clone(), "source-template apply")?;
     let source_resolved = resolve_project(&source_project)?;
-    let mode = options.mode.as_ref().ok_or_else(|| {
-        CliError::invalid_args(
-            "source-template apply requires --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with `--dry-run`; use `--out-dir` for a work-machine staging install.")
-        .with_suggested_command("powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json")
-    })?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "source-template apply",
+        "Start with `--dry-run`; use `--out-dir` for a work-machine staging install.",
+        "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
+    )?;
 
     let source_store = load_source_template_store(&source_resolved)?;
     let selector = ShowOptions {
@@ -490,13 +482,7 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
         "confirmed-existing"
     };
 
-    let target_resolved = match mode {
-        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
-        MutationMode::OutDir(out_dir) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)?
-        }
-    };
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
     let docs = load_table_documents(&target_resolved)?;
     let plan = replace_partition_source_plan(&docs, &partition_selector, &m_source)?;
     let dry_run = matches!(mode, MutationMode::DryRun);
@@ -704,16 +690,32 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                 options.description = Some(take_value(args, &mut i, "--description")?)
             }
             "--dry-run" => {
-                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::DryRun,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli --json capabilities --for source-template",
+                )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::InPlace,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli --json capabilities --for source-template",
+                )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::OutDir,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli --json capabilities --for source-template",
+                )?;
+                options.out_dir = Some(out_dir);
             }
             other => {
                 return Err(CliError::invalid_args(format!(
@@ -777,16 +779,32 @@ fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
             }
             "--confirm" => options.confirm = Some(take_value(args, &mut i, "--confirm")?),
             "--dry-run" => {
-                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::DryRun,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli --json capabilities --for source-template",
+                )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::InPlace,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli --json capabilities --for source-template",
+                )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::OutDir,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli --json capabilities --for source-template",
+                )?;
+                options.out_dir = Some(out_dir);
             }
             other => {
                 return Err(CliError::invalid_args(format!(
@@ -1226,26 +1244,6 @@ fn normalize_kind_arg(value: &str) -> String {
         "excel" | "xlsx" | "xls" => "excel".to_string(),
         "generic-m" | "genericm" | "m" => "generic-m".to_string(),
         other => other.to_string(),
-    }
-}
-
-fn set_mode(current: &mut Option<MutationMode>, next: MutationMode) -> CliResult<()> {
-    if current.is_some() {
-        return Err(CliError::invalid_args(
-            "choose exactly one output mode: --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.")
-        .with_suggested_command("powerbi-cli --json capabilities --for source-template"));
-    }
-    *current = Some(next);
-    Ok(())
-}
-
-fn mode_name(mode: &MutationMode) -> &'static str {
-    match mode {
-        MutationMode::DryRun => "dry-run",
-        MutationMode::InPlace => "in-place",
-        MutationMode::OutDir(_) => "out-dir",
     }
 }
 

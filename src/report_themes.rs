@@ -1,9 +1,12 @@
+use crate::cli_support::{
+    MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
+};
 use crate::input_safety::{InputKind, read_utf8};
 use crate::pbir_themes::{
     THEME_BUNDLE_SCHEMA, list_report_themes, theme_record_json, theme_safety, theme_safety_json,
     write_theme_bundle, write_theme_json,
 };
-use crate::project_io::{copy_project_dir, write_json_atomic};
+use crate::project_io::write_json_atomic;
 use crate::safety_scan::contains_external_uri as value_contains_external_uri;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -48,18 +51,12 @@ struct ExtractOptions {
     out: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone)]
-enum MutationMode {
-    DryRun,
-    InPlace,
-    OutDir(PathBuf),
-}
-
 #[derive(Debug, Default)]
 struct ApplyOptions {
     project: Option<PathBuf>,
     bundle: Option<PathBuf>,
     mode: Option<MutationMode>,
+    out_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Default)]
@@ -73,6 +70,7 @@ struct ApplyPresetOptions {
     project: Option<PathBuf>,
     preset: Option<String>,
     mode: Option<MutationMode>,
+    out_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -157,21 +155,14 @@ fn apply_theme(args: &[String]) -> CliResult<Value> {
     })?;
     let bundle = read_bundle(bundle_path)?;
     let source_resolved = resolve_project(&source_project)?;
-    let mode = options.mode.as_ref().ok_or_else(|| {
-        CliError::invalid_args("report themes apply requires --dry-run, --in-place, or --out-dir <dir>")
-            .with_hint("Start with `--dry-run`; use `--out-dir` or `--in-place` only after reviewing the raw theme bundle.")
-            .with_suggested_command(
-                "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
-            )
-    })?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "report themes apply",
+        "Start with `--dry-run`; use `--out-dir` or `--in-place` only after reviewing the raw theme bundle.",
+        "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+    )?;
     crate::cli_support::preflight_out_dir(args, apply_theme)?;
-    let target_resolved = match mode {
-        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
-        MutationMode::OutDir(out_dir) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)?
-        }
-    };
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
 
     let report_json_path = report_json_path(&target_resolved);
     let mut report_json = read_json_value(&report_json_path)?;
@@ -337,21 +328,14 @@ fn apply_theme_preset(args: &[String]) -> CliResult<Value> {
     let preset = builtin_theme_preset(preset_id)?;
     let bundle = builtin_theme_bundle(preset);
     let source_resolved = resolve_project(&source_project)?;
-    let mode = options.mode.as_ref().ok_or_else(|| {
-        CliError::invalid_args("report themes apply-preset requires --dry-run, --in-place, or --out-dir <dir>")
-            .with_hint("Start with `--dry-run`; use `--out-dir` or `--in-place` only after reviewing the theme changes.")
-            .with_suggested_command(
-                "powerbi-cli report themes apply-preset --project <project-dir-or.pbip> --preset risk-dashboard --dry-run --json",
-            )
-    })?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "report themes apply-preset",
+        "Start with `--dry-run`; use `--out-dir` or `--in-place` only after reviewing the theme changes.",
+        "powerbi-cli report themes apply-preset --project <project-dir-or.pbip> --preset risk-dashboard --dry-run --json",
+    )?;
     crate::cli_support::preflight_out_dir(args, apply_theme_preset)?;
-    let target_resolved = match mode {
-        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
-        MutationMode::OutDir(out_dir) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)?
-        }
-    };
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
 
     let report_json_path = report_json_path(&target_resolved);
     let mut report_json = read_json_value(&report_json_path)?;
@@ -698,16 +682,32 @@ fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
                 options.bundle = Some(PathBuf::from(take_value(args, &mut i, "--bundle")?));
             }
             "--dry-run" => {
-                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::DryRun,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+                )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::InPlace,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+                )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::OutDir,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+                )?;
+                options.out_dir = Some(out_dir);
             }
             "--theme" => {
                 return Err(CliError::invalid_args(
@@ -774,16 +774,32 @@ fn parse_apply_preset_args(args: &[String]) -> CliResult<ApplyPresetOptions> {
                 options.preset = Some(take_value(args, &mut i, "--preset")?);
             }
             "--dry-run" => {
-                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::DryRun,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+                )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::InPlace,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+                )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::OutDir,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
+                )?;
+                options.out_dir = Some(out_dir);
             }
             other => {
                 return Err(CliError::invalid_args(format!(
@@ -1074,20 +1090,6 @@ fn required_project(project: Option<PathBuf>, command: &str) -> CliResult<PathBu
     })
 }
 
-fn set_mode(current: &mut Option<MutationMode>, next: MutationMode) -> CliResult<()> {
-    if current.is_some() {
-        return Err(CliError::invalid_args(
-            "choose exactly one output mode: --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.")
-        .with_suggested_command(
-            "powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json",
-        ));
-    }
-    *current = Some(next);
-    Ok(())
-}
-
 fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<String> {
     let value = args.get(*index + 1).ok_or_else(|| {
         CliError::invalid_args(format!("{flag} requires a value"))
@@ -1110,12 +1112,4 @@ fn normalize_action(value: &str) -> String {
         other => other,
     }
     .to_string()
-}
-
-fn mode_name(mode: &MutationMode) -> &'static str {
-    match mode {
-        MutationMode::DryRun => "dry-run",
-        MutationMode::InPlace => "in-place",
-        MutationMode::OutDir(_) => "out-dir",
-    }
 }

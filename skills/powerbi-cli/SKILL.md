@@ -103,6 +103,8 @@ pbi --json capabilities --for "report spec"
 pbi --json capabilities --for inspect
 pbi --json capabilities --for validate
 pbi --json capabilities --for lint
+pbi lint --rules --json
+pbi lint --explain dax.reference_self --json
 pbi --json capabilities --for diff
 pbi --json capabilities --for package
 pbi --json capabilities --for dax
@@ -111,6 +113,7 @@ pbi --json capabilities --for "model live export-tmdl"
 pbi --json capabilities --for calculated-columns
 pbi --json capabilities --for advanced
 pbi --json capabilities --for partitions
+pbi --json capabilities --for "workflow synthesize"
 pbi --json capabilities --for source-template
 pbi --json capabilities --for rebind
 pbi --json capabilities --for theme
@@ -147,13 +150,14 @@ one-shot desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
+fixture-backed visual role maps plus dry-run binding repair proposals,
 report slicer list/show/clear, report interaction list/show/set/disable, report bookmark
 list/show plus metadata-only display-name/reorder/delete, raw report theme
 show/extract/apply bundles, master report style inspect/extract/diff/apply,
 visual
 formatting list/show/extract/apply bundles, visual formatting set-text for
 title/alt-text patches, conditional-formatting readback list/show, handoff
-check, lint, strict validate, doctor, version, robot docs, robot triage,
+check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
 Treat planned CSV/generic-M source templates, filter sort and arbitrary expression
 updates, bookmark state capture/create/update/grouping,
@@ -270,6 +274,16 @@ stages, not proof levels. The capabilities catalog exposes them as
 names in `proof.level`, so interpret that field as an observation stage until the
 Desktop hardening work migrates it.
 
+Desktop evidence committed under `testdata/desktop-proof/` uses
+`powerbi-cli.desktop-proof.v1`. Each record links exact `features[].id` values
+through `signals.featureIds`; `features list` takes the maximum validated record
+level and catalog baseline. The loader rejects records whose `proofLevel`
+exceeds their signals. In particular, a current artifact, rendered canvas,
+completed refresh, absent issue dialogs, and matched expected values are all
+required for manual canvas/refresh proof together with
+`signals.manualReview=true`; automated proof instead requires
+`signals.automated=true`.
+
 | Claim | Minimum proof | Stronger proof |
 |---|---|---|
 | Project is structurally present | `pbi --json validate <project>` | `validate --strict` once available |
@@ -278,6 +292,7 @@ Desktop hardening work migrates it.
 | PBIX/PBIT contains usable source metadata | `package inspect` plus `package extract` into a temporary folder | `package import` succeeds and `validate --strict` passes on the imported project |
 | Model object exists | `inspect --deep` or list/show command | Desktop open-check |
 | DAX references are locally plausible | `model dax dependencies` and `model dax lint` | Desktop/XMLA/Fabric engine validation |
+| A lint or audit finding is understood | `lint --explain <rule-id>` | Inspect the affected artifact and run the rule's remediation command |
 | One bounded DAX query executes in the open model | `model dax execute` with both opt-ins, exact-project match, `ok=true`, and no truncation relevant to the assertion | Repeat the targeted query after refresh; canvas/render proof remains separate |
 | One live PBIP/PBIX semantic model was exported to guarded TMDL | `model live export-tmdl` with both opt-ins, exact-document match, validated output hash/counts, and `integration.cleanup.childrenReaped=true` plus `pumpsJoined=true` | Wrap the reviewed TMDL in a PBIP semantic-model artifact and run strict local/official/Desktop proof; report pages remain separate |
 | Advanced semantic metadata exists | `model advanced inventory` or the relevant roles/perspectives/cultures/expressions list/show command | Desktop open/save round-trip |
@@ -360,6 +375,18 @@ materialization.
 Use this as the default data-agnostic dashboard loop. It keeps report intent in
 an explicit dashboard spec instead of relying on hidden inference:
 
+Dashboard spec keys are strict. Before authoring one, run `report spec fields`
+without a schema for the allowed-key catalog or with `--schema` for both the
+catalog and exact binding references. An unknown key returns
+`spec.unknown_field` with an RFC 6901 pointer and, when available, a
+`didYouMean` correction; do not bypass that diagnostic with raw PBIR edits.
+The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. A v2
+section is safe to retain before its compiler lands: compiled validation/build
+will return `unsupported_feature` with the owning T3 bead id, never silently
+discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
+reference; `report spec upgrade` remains assigned to
+`pbi-t2-dashboard-spec-v2-dsd.6`.
+
 ```bash
 pbi --json schema validate examples/sales.schema.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
@@ -419,6 +446,8 @@ Use the exact command paths below instead of guessing shortened families:
 pbi --json validate --strict build/sales
 pbi --json model dax dependencies --project build/sales
 pbi --json model dax lint --project build/sales
+pbi --json lint --rules
+pbi --json lint --explain dax.reference_self
 pbi --json report wireframe export build/sales
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales
@@ -524,6 +553,7 @@ pbi --json capabilities --for partition
 pbi --json model partitions list --project build/sales
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales"
 pbi --json model partitions show --project build/sales --handle "partition:FactSales:FactSales" --include-source
+pbi --json model partitions add-grouped-rank --project build/analytics --table Signals --group-by Segment --order-by Score --desc --rank-column GroupRank --eligible-when '[IsEligible] = true' --dry-run
 pbi --json handoff check build/sales
 pbi --json handoff check report/live.pbip --target work
 ```
@@ -544,6 +574,16 @@ contract, remains non-home-safe, and never overrides credential or other error
 findings. Credentials, caches, embedded data, and unannotated unknown partition
 sources still fail. Check `safeForWorkHandoff`, not
 `safeForOfflineHandoff`, in that workflow.
+
+For a disconnected refresh-time analytics table whose generated dummy source
+already includes an `int64` rank placeholder, generate the standard per-group
+rank chain with `model partitions add-grouped-rank`. The command accepts one or
+more existing source-backed group columns, one order column, optional `--desc`,
+and a bounded M row predicate. It buffers each group, assigns eligible rows
+1-based ranks and ineligible rows zero, and explicitly retypes the result. It
+refuses live/unknown/unsafe or multi-partition tables. Review `changes[].after`,
+then run the returned lint and strict-validation commands; Desktop refresh and a
+bounded DAX assertion remain required for semantic proof.
 
 ### Prepare Source Templates And Rebind Plans
 
@@ -674,6 +714,7 @@ pbi --json report visuals delete --project build/sales --handle "visual:ReportSe
 pbi --json report visuals set-position --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --x 120 --y 140 --width 360 --height 220 --dry-run
 pbi --json report visuals set-bindings --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --bindings-json '[{"role":"Values","table":"FactSales","measure":"Total Revenue"}]' --dry-run
 pbi --json report visuals set-bindings --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --bindings-json '[{"role":"Values","table":"FactSales","measure":"Total Revenue"}]' --out-dir build/sales-bound
+pbi --json report visuals repair-bindings --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --dry-run
 pbi --json report visuals formatting set-color --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --slot title.fontColor --color "#123456" --dry-run
 pbi --json report visuals show --project build/sales-bound --handle "visual:ReportSectionOverview:<visual-name>"
 ```
@@ -684,6 +725,16 @@ returned readback, wireframe, inspect, and validate commands before chaining
 more work.
 
 `report visuals catalog` returns the generated visual type and role contract.
+Its `rules[]` table has one row per generated type with required/optional roles,
+measure-only roles, projection limits, mutually exclusive roles,
+runtime-parity rules, and honest fixture provenance. Only pie, donut,
+pivotTable, and slicer currently cite independent Desktop-authored reference
+files; do not promote repository-generated rows beyond their reported proof
+level. When strict validation finds a mechanical binding parity defect, run
+`report visuals repair-bindings --dry-run`: it may propose only proven role
+canonicalization or Sum aggregation wrappers as a typed `setBindings` op.
+Review the returned preview before applying it. Missing roles, duplicate fields,
+and unproven substitutions remain explicit refusals.
 `report visuals add` creates only cataloged generated visual containers: card,
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
 lineClusteredColumnComboChart, matrix (PBIR `pivotTable`), and slicer.
@@ -856,6 +907,21 @@ branch. `model dax lint` and `validate --strict` catch common direct uses, but
 they are not a complete DAX engine.
 
 ### Handoff Between Home And Work
+
+For deterministic offline refresh/performance fixtures, supply shared M
+generator functions that accept positional `(rowScale, seed)` numeric
+arguments, then synthesize a fresh project outside the source tree:
+
+```bash
+pbi --json workflow synthesize --project Report.pbip --expressions qa/generators.tmdl --out-dir ../powerbi-build/Report-QA-100x --row-scale 100 --seed 42
+pbi --json lint ../powerbi-build/Report-QA-100x
+pbi --json validate --strict ../powerbi-build/Report-QA-100x
+```
+
+The same scale/seed pair emits byte-identical partition M. Supplying only one
+option uses row scale `1` or seed `0`; row scale must remain positive. Use this
+copy for Desktop refresh timing and canvas QA without carrying live connector
+text, credentials, or real rows.
 
 For a deterministic resource/source reorientation, prefer the fingerprinted workflow:
 
@@ -1048,6 +1114,21 @@ cargo fmt --check
 cargo check --all-targets
 cargo test --test cli_smoke '<focused-filter>' -- --nocapture
 ```
+
+For an invocation-by-invocation failure record, enable the shared integration
+test logger. Each CLI run is emitted as one JSON line with exact argv, stdout,
+stderr, exit code, and elapsed milliseconds:
+
+```bash
+POWERBI_CLI_TEST_LOG=1 cargo test --test e2e -- --nocapture
+```
+
+The offline e2e target runs the schema/profile/plan/spec/build/validate/handoff/
+lint/triage/fixture loop for every checked-in archetype. JSON contract snapshots
+use `tests/common::assert_json_snapshot`; update them only with
+`UPDATE_SNAPSHOTS=1` and review the resulting diff. Ignored performance budgets
+run through `cargo test --test perf -- --ignored`. The complete harness contract
+is documented in `docs/testing.md`.
 
 Broader loop:
 

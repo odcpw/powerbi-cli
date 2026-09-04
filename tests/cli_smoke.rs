@@ -1,28 +1,27 @@
+mod common;
+
+use common::cli_command;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 fn run_powerbi(args: &[&str]) -> (i32, Value, String) {
     run_powerbi_in(args, None)
 }
 
 fn run_powerbi_in(args: &[&str], current_dir: Option<&Path>) -> (i32, Value, String) {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"));
-    command.args(args);
-    if let Some(current_dir) = current_dir {
-        command.current_dir(current_dir);
-    }
-    let output = command.output().expect("run powerbi-cli binary");
-    let code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let value = if stdout.trim().is_empty() {
+    let command = cli_command(args);
+    let output = if let Some(current_dir) = current_dir {
+        command.current_dir(current_dir).run()
+    } else {
+        command.run()
+    };
+    let value = if output.stdout.trim().is_empty() {
         Value::Null
     } else {
-        serde_json::from_str(stdout.trim()).expect("stdout JSON")
+        serde_json::from_str(output.stdout.trim()).expect("stdout JSON")
     };
-    (code, value, stderr)
+    (output.exit, value, output.stderr)
 }
 
 #[test]
