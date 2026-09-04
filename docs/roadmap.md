@@ -478,6 +478,10 @@ frozen until proven.
 - `cargo test --all-targets`
 - Scaffold/inspect/validate smoke tests on Windows, Linux, and macOS.
 - Golden summary tests for checked-in PBIP fixture folders.
+- The offline `tests/e2e.rs` loop covers every checked-in dashboard archetype;
+  `POWERBI_CLI_TEST_LOG=1` makes each step a self-contained JSON log record.
+- Ignored wall-time/resource targets live in `tests/perf.rs` and run in the
+  scheduled Linux performance workflow.
 
 ### Format Tests
 

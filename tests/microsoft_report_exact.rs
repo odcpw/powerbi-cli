@@ -1,14 +1,14 @@
+mod common;
+
+use common::cli_command;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 use walkdir::WalkDir;
 
 fn run_powerbi(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli")
+    cli_command(args).output()
 }
 
 fn stdout_json(output: &Output) -> Value {

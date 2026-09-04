@@ -1070,6 +1070,21 @@ cargo check --all-targets
 cargo test --test cli_smoke '<focused-filter>' -- --nocapture
 ```
 
+For an invocation-by-invocation failure record, enable the shared integration
+test logger. Each CLI run is emitted as one JSON line with exact argv, stdout,
+stderr, exit code, and elapsed milliseconds:
+
+```bash
+POWERBI_CLI_TEST_LOG=1 cargo test --test e2e -- --nocapture
+```
+
+The offline e2e target runs the schema/profile/plan/spec/build/validate/handoff/
+lint/triage/fixture loop for every checked-in archetype. JSON contract snapshots
+use `tests/common::assert_json_snapshot`; update them only with
+`UPDATE_SNAPSHOTS=1` and review the resulting diff. Ignored performance budgets
+run through `cargo test --test perf -- --ignored`. The complete harness contract
+is documented in `docs/testing.md`.
+
 Broader loop:
 
 ```bash

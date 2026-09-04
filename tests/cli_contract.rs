@@ -1,46 +1,13 @@
+mod common;
+
+use common::{RunOutput, cli_command, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::fs;
-use std::process::Command;
-
-struct RunOutput {
-    code: i32,
-    stdout: String,
-    stderr: String,
-}
-
-fn run_powerbi(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
-}
 
 #[cfg(windows)]
 fn run_powerbi_without_oracle(args: &[&str]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .args(args)
-        .output()
-        .expect("run powerbi-cli binary without Desktop oracle");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
-}
-
-fn stdout_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stdout.trim()).expect("stdout JSON")
-}
-
-fn stderr_json(output: &RunOutput) -> Value {
-    serde_json::from_str(output.stderr.trim()).expect("stderr JSON")
+    cli_command(args).env_remove("POWERBI_DESKTOP_ORACLE").run()
 }
 
 fn command_paths(value: &Value) -> Vec<String> {
@@ -717,11 +684,9 @@ fn first_class_dispatch_roots_and_agent_commands_are_cataloged() {
 #[test]
 fn desktop_close_is_idempotent_without_an_owned_session() {
     let state = tempfile::tempdir().expect("Desktop session state");
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("run desktop close");
+        .output();
 
     if cfg!(windows) {
         assert!(output.status.success());
@@ -762,11 +727,9 @@ fn desktop_close_discards_a_stale_receipt_without_targeting_any_process() {
     )
     .expect("write stale receipt");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("close stale Desktop session");
+        .output();
 
     assert!(output.status.success());
     let value: Value = serde_json::from_slice(&output.stdout).expect("close JSON");
@@ -785,11 +748,9 @@ fn desktop_close_retains_an_invalid_receipt_for_explicit_recovery() {
     let receipt = state.path().join("desktop-session.json");
     fs::write(&receipt, b"not-json").expect("write invalid receipt");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("close invalid Desktop session");
+        .output();
 
     assert!(!output.status.success());
     let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
@@ -810,11 +771,9 @@ fn desktop_lifecycle_lock_refuses_concurrent_mutation() {
     let lock = state.path().join("desktop-session.lock");
     fs::write(&lock, b"other-operation").expect("write lifecycle lock");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(["desktop", "close", "--json"])
+    let output = cli_command(["desktop", "close", "--json"])
         .env("POWERBI_CLI_STATE_DIR", state.path())
-        .output()
-        .expect("run concurrent Desktop close");
+        .output();
 
     assert_eq!(output.status.code(), Some(10));
     let value: Value = serde_json::from_slice(&output.stderr).expect("error JSON");

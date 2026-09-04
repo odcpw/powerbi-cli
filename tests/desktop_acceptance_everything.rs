@@ -1,18 +1,14 @@
+mod common;
+
+use common::{RunOutput, cli_command};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const ACCEPTANCE_SENTINEL: &str = ".powerbi-acceptance-out";
 const ACCEPTANCE_SENTINEL_CONTENT: &str = "powerbi-cli acceptance harness output\n";
-
-struct RunOutput {
-    code: i32,
-    stdout: String,
-    stderr: String,
-}
 
 struct Harness {
     root: PathBuf,
@@ -2341,16 +2337,7 @@ fn assert_capability_coverage(coverage: &BTreeSet<String>) {
 }
 
 fn run_powerbi(args: &[String]) -> RunOutput {
-    let output = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .env_remove("POWERBI_DESKTOP_ORACLE")
-        .output()
-        .expect("run powerbi-cli binary");
-    RunOutput {
-        code: output.status.code().unwrap_or(-1),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    }
+    cli_command(args).env_remove("POWERBI_DESKTOP_ORACLE").run()
 }
 
 fn stdout_json(output: &RunOutput) -> Value {
