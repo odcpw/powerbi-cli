@@ -945,6 +945,27 @@ pub(crate) fn table_handle(name: &str) -> String {
     format!("table:{}", encode_handle_component(name))
 }
 
+pub(crate) fn expression_handle(name: &str) -> String {
+    format!("expression:{}", encode_handle_component(name))
+}
+
+pub(crate) fn parse_expression_handle(handle: &str) -> CliResult<String> {
+    let invalid = || {
+        CliError::invalid_args(format!("invalid expression handle: {handle}"))
+            .with_hint("Expression handles look like `expression:<name>`; literal `%` and `:` are encoded as `%25` and `%3A`.")
+            .with_suggested_command(
+                "powerbi-cli model expressions list --project <project-dir-or.pbip> --json",
+            )
+    };
+    let Some(encoded) = handle.strip_prefix("expression:") else {
+        return Err(invalid());
+    };
+    if encoded.is_empty() || encoded.contains(':') {
+        return Err(invalid());
+    }
+    decode_handle_component(encoded).map_err(|_| invalid())
+}
+
 pub(crate) fn column_handle(table: &str, name: &str) -> String {
     format!(
         "column:{}:{}",
@@ -1685,6 +1706,19 @@ fn unsupported_expression_object_line(
     None
 }
 
+/// Return the first line that a named-expression writer cannot preserve.
+/// Named expressions have no modeled TMDL child properties; the shared
+/// expression-object classifier still understands multiline M bodies while
+/// refusing comments, annotations, and unknown property-shaped metadata.
+pub(crate) fn unsupported_named_expression_line(block: &str) -> Option<String> {
+    let declaration = block.lines().find(|line| !line.trim().is_empty())?;
+    let lower_declaration = declaration.to_ascii_lowercase();
+    if lower_declaration.contains(" meta ") || lower_declaration.contains(" meta[") {
+        return Some(declaration.trim().to_string());
+    }
+    unsupported_expression_object_line(block, &[], &[], &[])
+}
+
 fn looks_like_tmdl_property_key(key: &str) -> bool {
     !key.is_empty()
         && key
@@ -1973,12 +2007,31 @@ fn column_insertion_index(doc: &TableDocument) -> usize {
         .unwrap_or(doc.lines.len())
 }
 
-fn render_lines(lines: &[String], newline: &str, final_newline: bool) -> String {
+pub(crate) fn load_tmdl_lines(path: &Path) -> CliResult<(Vec<String>, String, bool)> {
+    let text = read_utf8(path, InputKind::ProjectText)?;
+    let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let had_final_newline = text.ends_with('\n') || text.ends_with('\r');
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    let mut lines = normalized
+        .split('\n')
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if had_final_newline {
+        lines.pop();
+    }
+    Ok((lines, newline.to_string(), had_final_newline))
+}
+
+pub(crate) fn render_tmdl_lines(lines: &[String], newline: &str, final_newline: bool) -> String {
     let mut text = lines.join(newline);
     if final_newline {
         text.push_str(newline);
     }
     text
+}
+
+fn render_lines(lines: &[String], newline: &str, final_newline: bool) -> String {
+    render_tmdl_lines(lines, newline, final_newline)
 }
 
 pub(crate) fn parse_measure_handle(handle: &str) -> CliResult<(String, String)> {

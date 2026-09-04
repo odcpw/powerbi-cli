@@ -1,0 +1,222 @@
+{
+  "assignments": [
+    {
+      "position": {
+        "height": 96.0,
+        "tabOrder": 0,
+        "width": 296.0,
+        "x": 24.0,
+        "y": 96.0,
+        "z": 0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "slot": "kpi.1",
+      "visual": "visual:ReportSectionOverview:VisualContainerRevenue83556a914d",
+      "visualType": "card"
+    },
+    {
+      "position": {
+        "height": 264.0,
+        "tabOrder": 1,
+        "width": 712.0,
+        "x": 24.0,
+        "y": 208.0,
+        "z": 1
+      },
+      "preferredFamilies": [
+        "lineChart",
+        "areaChart",
+        "columnChart"
+      ],
+      "slot": "primary",
+      "visual": "visual:ReportSectionOverview:VisualContainerRevenueTrendf33e67f559",
+      "visualType": "lineChart"
+    },
+    {
+      "position": {
+        "height": 192.0,
+        "tabOrder": 2,
+        "width": 1232.0,
+        "x": 24.0,
+        "y": 488.0,
+        "z": 2
+      },
+      "preferredFamilies": [
+        "tableEx",
+        "matrix"
+      ],
+      "slot": "detail",
+      "visual": "visual:ReportSectionOverview:VisualContainerCustomerDetail6665af72a7",
+      "visualType": "tableEx"
+    }
+  ],
+  "grid": {
+    "columns": 12,
+    "gutter": 16.0,
+    "margin": 24.0,
+    "rowUnit": 8.0
+  },
+  "invariants": {
+    "minimumSizes": true,
+    "overlapFree": true,
+    "withinPage": true
+  },
+  "pageSize": {
+    "height": 720.0,
+    "width": 1280.0
+  },
+  "slots": [
+    {
+      "col": 0,
+      "colSpan": 12,
+      "minFamily": "textbox",
+      "name": "heading",
+      "position": {
+        "height": 56.0,
+        "width": 1232.0,
+        "x": 24.0,
+        "y": 24.0
+      },
+      "preferredFamilies": [
+        "textbox"
+      ],
+      "row": 0,
+      "rowSpan": 7
+    },
+    {
+      "col": 0,
+      "colSpan": 3,
+      "minFamily": "card",
+      "name": "kpi.1",
+      "position": {
+        "height": 96.0,
+        "width": 296.0,
+        "x": 24.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 3,
+      "colSpan": 3,
+      "minFamily": "card",
+      "name": "kpi.2",
+      "position": {
+        "height": 96.0,
+        "width": 296.0,
+        "x": 336.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 6,
+      "colSpan": 3,
+      "minFamily": "card",
+      "name": "kpi.3",
+      "position": {
+        "height": 96.0,
+        "width": 296.0,
+        "x": 648.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 9,
+      "colSpan": 3,
+      "minFamily": "card",
+      "name": "kpi.4",
+      "position": {
+        "height": 96.0,
+        "width": 296.0,
+        "x": 960.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 0,
+      "colSpan": 7,
+      "minFamily": "chart",
+      "name": "primary",
+      "position": {
+        "height": 264.0,
+        "width": 712.0,
+        "x": 24.0,
+        "y": 208.0
+      },
+      "preferredFamilies": [
+        "lineChart",
+        "areaChart",
+        "columnChart"
+      ],
+      "row": 23,
+      "rowSpan": 33
+    },
+    {
+      "col": 7,
+      "colSpan": 5,
+      "minFamily": "chart",
+      "name": "secondary",
+      "position": {
+        "height": 264.0,
+        "width": 504.0,
+        "x": 752.0,
+        "y": 208.0
+      },
+      "preferredFamilies": [
+        "barChart",
+        "lineChart",
+        "chart"
+      ],
+      "row": 23,
+      "rowSpan": 33
+    },
+    {
+      "col": 0,
+      "colSpan": 12,
+      "minFamily": "table",
+      "name": "detail",
+      "position": {
+        "height": 192.0,
+        "width": 1232.0,
+        "x": 24.0,
+        "y": 488.0
+      },
+      "preferredFamilies": [
+        "tableEx",
+        "matrix"
+      ],
+      "row": 58,
+      "rowSpan": 24
+    }
+  ],
+  "template": {
+    "budget": 8,
+    "headingBand": {
+      "row": 0,
+      "rowSpan": 7
+    },
+    "name": "kpi-strip-trend-breakdown",
+    "rail": null
+  }
+}

@@ -1,10 +1,12 @@
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=testdata/desktop-proof");
+    println!("cargo:rerun-if-changed=testdata/formatting-catalog.v1.json");
     println!("cargo:rerun-if-changed=testdata/planner-rules/planner-rules.v1.json");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
 
     generate_desktop_proof_records();
+    generate_formatting_catalog();
     generate_planner_rule_catalog();
 
     println!("cargo:rustc-env=POWERBI_CLI_GIT_SHA={}", git_sha());
@@ -27,6 +29,18 @@ fn generate_planner_rule_catalog() {
     );
     std::fs::write(out_dir.join("planner_rule_catalog.rs"), generated)
         .expect("write generated planner rule catalog index");
+}
+
+fn generate_formatting_catalog() {
+    let relative = "testdata/formatting-catalog.v1.json";
+    let include_suffix = format!("/{relative}");
+    let generated = format!(
+        "const EMBEDDED_FORMATTING_CATALOG_TEXT: &str = include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), {include_suffix:?}));\n"
+    );
+    let out_dir =
+        std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR is set by Cargo"));
+    std::fs::write(out_dir.join("formatting_catalog.rs"), generated)
+        .expect("write generated formatting catalog embedding");
 }
 
 fn generate_desktop_proof_records() {
