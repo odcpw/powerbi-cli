@@ -69,6 +69,11 @@
       "id": "customer_detail",
       "displayName": "Customer Detail",
       "size": { "width": 1280, "height": 720 },
+      "drillthrough": {
+        "target": "DimCustomer[Customer]",
+        "hidden": true,
+        "backButton": true
+      },
       "visuals": [
         {
           "id": "customer_detail_table",
@@ -105,6 +110,11 @@
       "id": "segment_detail",
       "displayName": "Segment Detail",
       "size": { "width": 1280, "height": 720 },
+      "drillthrough": {
+        "target": "DimCustomer[Segment]",
+        "hidden": true,
+        "backButton": true
+      },
       "visuals": [
         {
           "id": "segment_detail_table",

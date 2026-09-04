@@ -1193,7 +1193,6 @@ fn first_uncompiled_v2_section(
     root: &Map<String, Value>,
 ) -> Option<(String, &'static str, &'static str)> {
     const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
-    const DRILLTHROUGH_BEAD: &str = "pbi-t3-compiler-completeness-1qi.3";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
@@ -1273,10 +1272,10 @@ fn first_uncompiled_v2_section(
                 "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
             ));
         }
-        if page.contains_key("drillthrough") || page.contains_key("tooltipFor") {
+        if page.contains_key("tooltipFor") {
             return Some((
-                format!("pages[{page_index}].drillthrough|tooltipFor"),
-                DRILLTHROUGH_BEAD,
+                format!("pages[{page_index}].tooltipFor"),
+                "pbi-t3-compiler-completeness-1qi.3",
                 "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
             ));
         }
@@ -1357,7 +1356,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
     }
 
     const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
-    const DRILLTHROUGH_BEAD: &str = "pbi-t3-compiler-completeness-1qi.3";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
@@ -1454,19 +1452,11 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                     "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
                 );
             }
-            if page.contains_key("drillthrough") {
-                push(
-                    format!("pages[{page_index}].drillthrough"),
-                    format!("{page_pointer}/drillthrough"),
-                    DRILLTHROUGH_BEAD,
-                    "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
-                );
-            }
             if page.contains_key("tooltipFor") {
                 push(
                     format!("pages[{page_index}].tooltipFor"),
                     format!("{page_pointer}/tooltipFor"),
-                    DRILLTHROUGH_BEAD,
+                    "pbi-t3-compiler-completeness-1qi.3",
                     "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
                 );
             }

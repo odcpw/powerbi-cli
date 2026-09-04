@@ -504,7 +504,12 @@ catalog and exact binding references. An unknown key returns
 The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. Root,
 page, and visual `filters[]` in v2 compile through the same typed `AddFilter`
 kernel as the CLI filter command, with model/type validation and per-operation
-readback. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
+readback. Page `drillthrough` blocks compile through the typed
+`SetDrillthrough` kernel after validating an existing model column; `hidden`
+defaults to true. `backButton:true` emits a `spec.feature_pending` warning
+naming `pbi-t4-pbir-catalog-expansion-sn2.8` until the action-button kernel is
+proven, and never emits guessed PBIR. `examples/sales.dashboard.v2.json` is
+the minimal compiled-v2
 reference; `examples/filter-kinds.dashboard.v2.json` covers every supported
 filter kind. Other v2 sections remain safe to retain before their compiler
 lands: compiled validation/build returns `unsupported_feature` with the owning
@@ -1107,6 +1112,13 @@ Dashboard-spec v2 root/page/visual `filters[]` compile through this same
 validation and PBIR emission path. A spec build therefore produces the same
 filter artifacts as the corresponding `report filters add` operations, while
 the build response records typed `operationOutcomes[]` and stable readback.
+
+Declarative v2 `pages[].drillthrough` compiles through the same
+`report drillthrough set` kernel. The target must be an existing model column,
+and omitted `hidden` is treated as true. `backButton:true` preserves the
+page-binding operation but returns a structured `spec.feature_pending` warning
+for `pbi-t4-pbir-catalog-expansion-sn2.8` until a proven action-button kernel
+exists.
 
 Handles are identity-based: a named record uses
 `filter:<scope>:<owner>:<name>`, a nameless record uses `@<fnv-prefix>`, and an

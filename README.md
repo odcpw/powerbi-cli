@@ -595,6 +595,12 @@ This generated snapshot keeps status and proof claims aligned with
   relative-date, and visual TopN filters are model/type checked and surfaced
   in `operationOutcomes[]`. Sections whose other compiler bead has not landed
   return `unsupported_feature` with the owning bead id instead of being dropped.
+  Page `drillthrough` blocks likewise compile to the typed `SetDrillthrough`
+  operation: `target` must resolve to an existing model column and `hidden`
+  defaults to `true`. A requested `backButton:true` keeps the page binding but
+  returns a `spec.feature_pending` warning naming
+  `pbi-t4-pbir-catalog-expansion-sn2.8` until the proven action-button kernel
+  lands; no guessed visual is emitted.
   The checked-in `examples/sales.dashboard.v2.json` demonstrates the minimal
   compiled-v2 subset, while `examples/filter-kinds.dashboard.v2.json` exercises
   every supported filter kind. To migrate any
@@ -870,6 +876,12 @@ This generated snapshot keeps status and proof claims aligned with
   same-report slice is `schema-golden`, backed by the public page schema and
   Desktop-authored reference shape; reproducible Desktop drillthrough
   navigation proof remains open.
+  Declarative v2 `pages[].drillthrough` uses the same `SetDrillthrough` kernel
+  during `report build`, validates its target column, and defaults the page to
+  hidden. `backButton:true` currently produces a structured
+  `spec.feature_pending` warning for
+  `pbi-t4-pbir-catalog-expansion-sn2.8`; it does not author an unproven
+  action-button visual.
 - Programmatic report filter handling covers `report filters
   list/show/add/update/delete/clear` for raw report/page/visual PBIR
   `filterConfig.filters` readback; categorical, numeric range, visual TopN, and

@@ -820,10 +820,6 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
             "pbi-t3-compiler-completeness-1qi.2",
         ),
         (
-            json!({"pages": [{"drillthrough": {"target": "DimDate[Date]"}}]}),
-            "pbi-t3-compiler-completeness-1qi.3",
-        ),
-        (
             json!({"pages": [{"visuals": [{"sort": {"field": "FactSales[Total Revenue]", "direction": "Descending"}}]}]}),
             "pbi-t3-compiler-completeness-1qi.4",
         ),

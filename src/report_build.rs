@@ -916,7 +916,12 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         "kind": "compileDashboardSpec",
         "summary": "compiled powerbi-cli.dashboard.v1 report/pages/visuals into scaffold-compatible manifest"
     })];
-    let (typed_operations, operation_pointers) = compile_filter_operations(spec_object, &model)?;
+    let (mut typed_operations, mut operation_pointers) =
+        compile_filter_operations(spec_object, &model)?;
+    let (drillthrough_operations, drillthrough_pointers, drillthrough_warnings) =
+        compile_drillthrough_operations(spec_object, &model)?;
+    typed_operations.extend(drillthrough_operations);
+    operation_pointers.extend(drillthrough_pointers);
     operations.extend(
         typed_operations
             .iter()
@@ -942,7 +947,7 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         typed_operations,
         operation_pointers,
         operation_outcomes: Vec::new(),
-        warnings: Vec::new(),
+        warnings: drillthrough_warnings,
         defaults_applied,
     })
 }
@@ -1295,6 +1300,91 @@ fn compile_filter_operations(
     }
 
     Ok((operations, pointers))
+}
+
+fn compile_drillthrough_operations(
+    spec: &Map<String, Value>,
+    model: &ModelIndex,
+) -> CliResult<(Vec<Op>, Vec<String>, Vec<Value>)> {
+    const BACK_BUTTON_BEAD: &str = "pbi-t4-pbir-catalog-expansion-sn2.8";
+    let mut operations = Vec::new();
+    let mut pointers = Vec::new();
+    let mut warnings = Vec::new();
+
+    for (page_index, page) in spec
+        .get("pages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        let page = page.as_object().ok_or_else(|| {
+            CliError::invalid_args(format!("pages[{page_index}] must be an object"))
+        })?;
+        let Some(value) = page.get("drillthrough") else {
+            continue;
+        };
+        let pointer = format!("/pages/{page_index}/drillthrough");
+        let drillthrough = value.as_object().ok_or_else(|| {
+            CliError::invalid_args("pages[].drillthrough must be an object")
+                .with_pointer(pointer.clone())
+        })?;
+        let target = drillthrough
+            .get("target")
+            .and_then(Value::as_str)
+            .filter(|target| !target.trim().is_empty())
+            .ok_or_else(|| {
+                CliError::invalid_args(
+                    "pages[].drillthrough.target must be a non-empty Table[Column] reference",
+                )
+                .with_pointer(format!("{pointer}/target"))
+            })?;
+        let (table, column) = parse_field_reference(target)
+            .map_err(|error| error.with_pointer(format!("{pointer}/target")))?;
+        let resolved = model
+            .resolve_filter_column(&table, &column)
+            .map_err(|error| error.with_pointer(format!("{pointer}/target")))?;
+        let hidden = match drillthrough.get("hidden") {
+            Some(value) => value.as_bool().ok_or_else(|| {
+                CliError::invalid_args("pages[].drillthrough.hidden must be a boolean")
+                    .with_pointer(format!("{pointer}/hidden"))
+            })?,
+            None => true,
+        };
+        let back_button = match drillthrough.get("backButton") {
+            Some(value) => value.as_bool().ok_or_else(|| {
+                CliError::invalid_args("pages[].drillthrough.backButton must be a boolean")
+                    .with_pointer(format!("{pointer}/backButton"))
+            })?,
+            None => false,
+        };
+        let page_name = compiled_page_name(page, page_index)?;
+        let target = format!("{}[{}]", resolved.table, resolved.column);
+        operations.push(Op::SetDrillthrough(crate::ops::SetDrillthrough {
+            page: format!("page:{page_name}"),
+            target: target.clone(),
+            fields: vec![target.clone()],
+            table: Some(resolved.table),
+            column: Some(resolved.column),
+            keep_all_filters: None,
+            keep_visible: Some(!hidden),
+            hidden: Some(hidden),
+            // The first proven slice is pageBinding plus its paired filter.
+            // Do not pass an unsupported action-button request to the kernel.
+            back_button: None,
+        }));
+        pointers.push(pointer.clone());
+        if back_button {
+            warnings.push(json!({
+                "code": "spec.feature_pending",
+                "message": "dashboard spec drillthrough backButton is pending the proven action-button kernel; the page drillthrough binding was compiled",
+                "pointer": format!("{pointer}/backButton"),
+                "owningBead": BACK_BUTTON_BEAD
+            }));
+        }
+    }
+
+    Ok((operations, pointers, warnings))
 }
 
 fn compile_filter_operation(

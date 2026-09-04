@@ -135,7 +135,10 @@ object-specific writers and fixtures exist.
   fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   root/page/visual `filters[]` compile through the typed AddFilter kernel with
-  model/type checks, while its remaining not-yet-compiled sections return
+  model/type checks, and page `drillthrough` blocks compile through
+  SetDrillthrough with target-column validation and a hidden-by-default page;
+  `backButton:true` reports the pending action-button bead without emitting a
+  guessed visual. Remaining not-yet-compiled sections return
   `unsupported_feature` with their owning T3 bead id.
 - `report spec schema` emits a draft 2020-12 JSON Schema for both strict
   dashboard-spec versions, while `report spec explain` previews the typed
@@ -476,6 +479,12 @@ frozen until proven.
   equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
   `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
   type-changing updates remain fixture-gated.
+- Implemented dashboard-spec drillthrough compiler parity: v2
+  `pages[].drillthrough` uses the SetDrillthrough kernel, validates a model
+  column target, defaults pages to hidden, and matches the two regional-sales
+  CLI drillthrough mutations byte-for-byte. `backButton:true` emits a
+  `spec.feature_pending` warning for `pbi-t4-pbir-catalog-expansion-sn2.8`
+  until the proven action-button kernel lands.
 - Implemented first bookmark slice: `report bookmarks list/show` inventories
   raw PBIR bookmark files plus bookmark order/group metadata, returns stable
   bookmark handles, and warns when captured bookmark state may contain selected
@@ -524,7 +533,8 @@ frozen until proven.
 - Add visual interaction reset/default controls and Desktop-authored
   round-trip fixtures on top of the implemented set/disable handles.
 - Build on the implemented same-report `report drillthrough set/show/clear`
-  linked `pageBinding` + Drillthrough filter slice with Desktop re-verification,
+  linked `pageBinding` + Drillthrough filter slice and declarative v2 compiler
+  with Desktop re-verification,
   then add Desktop-authored goldens for visual drillthrough action links,
   multi-field drillthrough, and cross-report drillthrough.
 - Build on the implemented `report drilldown set-hierarchy` slice with
