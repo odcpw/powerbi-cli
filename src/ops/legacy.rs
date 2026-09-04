@@ -350,6 +350,12 @@ mod tests {
             Op::SetDisplayName(MutationPayload {
                 fields: BTreeMap::new(),
             }),
+            Op::SetTopNGuard(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::SetDrilldownHierarchy(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
         ];
         for operation in operations {
             let value = serde_json::to_value(&operation).expect("serialize operation");

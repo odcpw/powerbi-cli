@@ -88,10 +88,11 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         | Op::SetActivePage(_)
         | Op::DeleteEmptyPage(_)
         | Op::ClonePage(_) => Some(Box::new(PageKernel)),
-        Op::SetBindings(_) | Op::SetDisplayName(_) => Some(Box::new(VisualKernel)),
-        Op::SetTopNGuard(_)
-        | Op::SetDrilldownHierarchy(_)
-        | Op::CloneVisual(_)
+        Op::SetBindings(_)
+        | Op::SetDisplayName(_)
+        | Op::SetTopNGuard(_)
+        | Op::SetDrilldownHierarchy(_) => Some(Box::new(VisualKernel)),
+        Op::CloneVisual(_)
         | Op::DeleteVisual(_)
         | Op::UpdateFilter(_)
         | Op::DeleteFilter(_)

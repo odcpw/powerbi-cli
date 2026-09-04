@@ -11,6 +11,10 @@ impl OpKernel for VisualKernel {
         let (payload, command): (&MutationPayload, &[&str]) = match operation {
             Op::SetBindings(payload) => (payload, &["report", "visuals", "set-bindings"]),
             Op::SetDisplayName(payload) => (payload, &["report", "visuals", "set-display-name"]),
+            Op::SetTopNGuard(payload) => (payload, &["report", "visuals", "set-topn-guard"]),
+            Op::SetDrilldownHierarchy(payload) => {
+                (payload, &["report", "drilldown", "set-hierarchy"])
+            }
             _ => {
                 return Err(CliError::invalid_args(format!(
                     "VisualKernel cannot apply operation `{}`",
