@@ -2,6 +2,7 @@ use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, required_project,
     set_report_visual_mode as set_mode, shell_arg, take_report_value as take_value, target_project,
 };
+use crate::ops::SetObject;
 use crate::pbir::{VisualRecord, VisualSelector, find_visual, load_report_snapshot, visual_detail};
 use crate::project_io::write_json_atomic;
 use crate::{
@@ -118,6 +119,32 @@ struct ObjectOptions {
     out_dir: Option<PathBuf>,
 }
 
+/// Parsed arguments for the set-object operation. The typed operation carries
+/// only the mutation payload; project and output-mode context stays at the
+/// command boundary so it never leaks into the ops.v1 JSON contract.
+#[derive(Debug)]
+pub(crate) struct ParsedSetObject {
+    pub(crate) operation: SetObject,
+    pub(crate) project: PathBuf,
+    pub(crate) selector: VisualSelector,
+    pub(crate) mode: MutationMode,
+    pub(crate) out_dir: Option<PathBuf>,
+}
+
+/// Details captured while a set-object operation is applied to a staged
+/// working copy. The renderer reloads the target project after commit so all
+/// paths and visual metadata point at the caller-visible project, not the
+/// transaction's temporary directory.
+#[derive(Debug, Clone)]
+pub(crate) struct AppliedObjectMutation {
+    pub(crate) visual_path: PathBuf,
+    pub(crate) object: String,
+    pub(crate) property: String,
+    pub(crate) json_pointer: String,
+    pub(crate) before: Value,
+    pub(crate) after: Value,
+}
+
 #[derive(Debug, Default)]
 struct DisplayNameOptions {
     project: Option<PathBuf>,
@@ -131,6 +158,10 @@ struct DisplayNameOptions {
 }
 
 pub(crate) fn set_object(args: &[String]) -> CliResult<Value> {
+    crate::ops::execute_set_object(args)
+}
+
+pub(crate) fn parse_set_object_args(args: &[String]) -> CliResult<ParsedSetObject> {
     let options = parse_object_args(args)?;
     let source_project = required_project(options.project.clone(), SET_OBJECT)?;
     require_visual_selector(&options.selector, SET_OBJECT)?;
@@ -147,26 +178,76 @@ pub(crate) fn set_object(args: &[String]) -> CliResult<Value> {
         "Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.",
         set_object_usage(),
     )?;
+    Ok(ParsedSetObject {
+        operation: SetObject {
+            visual: options.selector.handle.clone().unwrap_or_default(),
+            object: spec.object.to_string(),
+            property: spec.property.to_string(),
+            value: encoded,
+        },
+        project: source_project,
+        selector: options.selector,
+        mode,
+        out_dir: options.out_dir,
+    })
+}
 
-    crate::cli_support::preflight_out_dir(args, set_object)?;
-    let source_resolved = resolve_project(&source_project)?;
-    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
-    let snapshot = load_report_snapshot(&target_resolved)?;
-    let visual = find_visual(&snapshot.pages, &options.selector, SET_OBJECT)?;
+/// Apply one typed set-object operation to an already-resolved project. The
+/// caller is responsible for staging/transaction semantics; this function
+/// performs the same PBIR read/patch/write that the historical CLI path used.
+pub(crate) fn apply_set_object_operation(
+    project: &ResolvedProject,
+    operation: &SetObject,
+) -> CliResult<AppliedObjectMutation> {
+    let spec = resolve_object_property(Some(&operation.object), Some(&operation.property))?;
+    let selector = VisualSelector {
+        handle: Some(operation.visual.clone()),
+        ..VisualSelector::default()
+    };
+    let snapshot = load_report_snapshot(project)?;
+    let visual = find_visual(&snapshot.pages, &selector, SET_OBJECT)?;
     let visual_path = visual_json_path(visual, SET_OBJECT)?;
     let mut visual_json = read_json_value(visual_path)?;
     let json_pointer = object_property_pointer(spec);
     let before = property_at(&visual_json, spec)
         .cloned()
         .unwrap_or(Value::Null);
-    upsert_object_property(&mut visual_json, spec, encoded.clone())?;
+    upsert_object_property(&mut visual_json, spec, operation.value.clone())?;
     let after = property_at(&visual_json, spec)
         .cloned()
-        .unwrap_or_else(|| encoded.clone());
+        .unwrap_or_else(|| operation.value.clone());
+    write_json_atomic(visual_path, &visual_json)?;
+    Ok(AppliedObjectMutation {
+        visual_path: visual_path.to_path_buf(),
+        object: spec.object.to_string(),
+        property: spec.property.to_string(),
+        json_pointer,
+        before,
+        after,
+    })
+}
 
+/// Render the original set-object response envelope after a transaction has
+/// applied the mutation. Reloading the target keeps output byte-for-byte
+/// compatible with the pre-ops CLI, including canonical paths and readback
+/// handles for out-dir commits.
+pub(crate) fn render_set_object_mutation(
+    target_resolved: &ResolvedProject,
+    mode: MutationMode,
+    operation: &SetObject,
+    applied: &AppliedObjectMutation,
+) -> CliResult<Value> {
+    let snapshot = load_report_snapshot(target_resolved)?;
+    let selector = VisualSelector {
+        handle: Some(operation.visual.clone()),
+        ..VisualSelector::default()
+    };
+    let visual = find_visual(&snapshot.pages, &selector, SET_OBJECT)?;
+    let visual_path = visual_json_path(visual, SET_OBJECT)?;
+    let visual_json = read_json_value(visual_path)?;
     finish_visual_mutation(MutationResult {
         mode,
-        target_resolved: &target_resolved,
+        target_resolved,
         visual,
         visual_path,
         visual_json: &visual_json,
@@ -176,19 +257,20 @@ pub(crate) fn set_object(args: &[String]) -> CliResult<Value> {
             "kind": "pbir.visual.objectProperty",
             "action": "set-object",
             "path": canonical_display(visual_path),
-            "object": spec.object,
-            "property": spec.property,
-            "jsonPointer": json_pointer,
-            "before": before,
-            "after": after
+            "object": applied.object,
+            "property": applied.property,
+            "jsonPointer": applied.json_pointer,
+            "before": applied.before,
+            "after": applied.after
         }]),
         plan: json!({
-            "object": spec.object,
-            "property": spec.property,
-            "jsonPointer": json_pointer,
-            "before": before,
-            "after": after
+            "object": applied.object,
+            "property": applied.property,
+            "jsonPointer": applied.json_pointer,
+            "before": applied.before,
+            "after": applied.after
         }),
+        write: false,
     })
 }
 
@@ -259,6 +341,7 @@ pub(crate) fn set_display_name(args: &[String]) -> CliResult<Value> {
             "before": before,
             "after": after
         }),
+        write: true,
     })
 }
 
@@ -272,11 +355,12 @@ struct MutationResult<'a> {
     action: &'a str,
     changes: Value,
     plan: Value,
+    write: bool,
 }
 
 fn finish_visual_mutation(result: MutationResult<'_>) -> CliResult<Value> {
     let dry_run = matches!(result.mode, MutationMode::DryRun);
-    if !dry_run {
+    if !dry_run && result.write {
         write_json_atomic(result.visual_path, result.visual_json)?;
     }
     let validation = if dry_run {

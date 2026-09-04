@@ -1139,10 +1139,11 @@ fn snapshot_path(
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or("project");
-        source_root
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join(format!("{name}-snapshot-{}", path_timestamp(created_at)))
+        let parent = source_root.parent().unwrap_or_else(|| Path::new("."));
+        unique_path(
+            parent,
+            &format!("{name}-snapshot-{}", path_timestamp(created_at)),
+        )
     });
     // Keep the snapshot boundary in the shared input-safety contract. It
     // canonicalizes the sibling/outside destination, rejects links/reparse

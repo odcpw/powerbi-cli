@@ -19,6 +19,7 @@
 mod handles;
 mod io;
 mod plan;
+mod set_object;
 mod transaction;
 
 #[allow(unused_imports)]
@@ -26,6 +27,10 @@ pub(crate) use handles::*;
 #[allow(unused_imports)]
 pub(crate) use io::*;
 pub(crate) use plan::*;
+#[allow(unused_imports)]
+pub(crate) use set_object::{
+    SetObjectKernel, apply as apply_set_object, execute as execute_set_object,
+};
 #[allow(unused_imports)]
 pub(crate) use transaction::*;
 
