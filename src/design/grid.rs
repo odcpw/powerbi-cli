@@ -308,6 +308,47 @@ pub(crate) fn resolve_with_grid(
     Ok(resolved)
 }
 
+/// Resolve the structural slicer rail from the same twelve-column geometry
+/// used by named layout templates.  The rail width is expressed in grid
+/// columns (three by default for dashboard-spec v2) and its top aligns with
+/// the content area below the seven-row heading band used by the catalog.
+pub(crate) fn resolve_rail_position(
+    page_size: PageSize,
+    grid: Grid,
+    side: RailSide,
+    width_columns: u32,
+) -> CliResult<SlotPosition> {
+    let page_size = page_size.validate()?;
+    let grid = grid.validate()?;
+    if width_columns == 0 || width_columns > grid.columns {
+        return Err(CliError::invalid_args(format!(
+            "layout rail width must be between 1 and {} grid columns; got {width_columns}",
+            grid.columns
+        ))
+        .with_pointer("/layout/rail/width"));
+    }
+    let scale_x = page_size.width / REFERENCE_WIDTH;
+    let scale_y = page_size.height / REFERENCE_HEIGHT;
+    let margin_x = grid.margin * scale_x;
+    let margin_y = grid.margin * scale_y;
+    let gutter_x = grid.gutter * scale_x;
+    let row_unit = grid.row_unit * scale_y;
+    let columns = grid.columns as f64;
+    let column_width = (page_size.width - margin_x * 2.0 - gutter_x * (columns - 1.0)) / columns;
+    let width =
+        width_columns as f64 * column_width + width_columns.saturating_sub(1) as f64 * gutter_x;
+    let x = match side {
+        RailSide::Left => margin_x,
+        RailSide::Right => page_size.width - margin_x - width,
+    };
+    Ok(SlotPosition {
+        x: round(x),
+        y: round(margin_y + 7.0 * row_unit),
+        width: round(width),
+        height: round(75.0 * row_unit),
+    })
+}
+
 pub(crate) fn content_slots(template: &Template) -> impl Iterator<Item = &Slot> {
     template.slots.iter().filter(|slot| {
         !matches!(slot.name.as_str(), "heading" | "rail")

@@ -10,7 +10,7 @@ use crate::ops::{
     visual_handle,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
-use crate::report_build::compiled_schema_for_explain;
+use crate::report_build::compile_dashboard_for_explain_with_profile;
 use crate::report_spec_schema::{
     DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, uncompiled_v2_sections,
     validate_known_fields,
@@ -69,7 +69,8 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
     let profile = load_optional_profile(options.profile.as_deref())?;
     let unsupported = collect_unsupported_sections(&spec, version)?;
     let sanitized = sanitize_for_compile(&spec, version);
-    let compiled_schema = compiled_schema_for_explain(&schema, &sanitized)?;
+    let (compiled_schema, compiled_warnings) =
+        compile_dashboard_for_explain_with_profile(&schema, &sanitized, profile.as_ref())?;
     let compiled_validation = validate_schema_value(&compiled_schema);
     if !compiled_validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
@@ -98,7 +99,7 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
             })
         })
         .collect::<Vec<_>>();
-    let warnings = unsupported
+    let mut warnings = unsupported
         .iter()
         .map(|item| {
             json!({
@@ -109,6 +110,7 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
             })
         })
         .collect::<Vec<_>>();
+    warnings.extend(compiled_warnings);
     let proof_plan = proof_plan(&schema_path, options.profile.as_deref(), &spec_path);
     let next = proof_plan["commands"]
         .as_array()
@@ -298,8 +300,24 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
             sanitize_pages(&mut sanitized, &["filters"], &["drilldown"]);
         }
         SpecVersion::V2 => {
-            for field in ["style", "layout", "filters", "proof"] {
+            for field in ["style", "filters", "proof"] {
                 sanitized.remove(field);
+            }
+            // The rail is a compiled layout primitive; retain only that
+            // subtree while leaving the still-planned grid/page-size fields
+            // behind the layout compiler boundary.
+            let rail = sanitized
+                .get_mut("layout")
+                .and_then(Value::as_object_mut)
+                .and_then(|layout| {
+                    let rail = layout.remove("rail");
+                    layout.clear();
+                    rail
+                });
+            if let Some(rail) = rail {
+                sanitized.insert("layout".to_string(), json!({"rail": rail}));
+            } else {
+                sanitized.remove("layout");
             }
             if let Some(model) = sanitized.get_mut("model").and_then(Value::as_object_mut) {
                 for field in [
@@ -326,7 +344,6 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
                 &mut sanitized,
                 &[
                     "filters",
-                    "slicers",
                     "drillthrough",
                     "tooltipFor",
                     "template",
@@ -500,6 +517,59 @@ fn compile_operations(
                         }),
                         pointer: format!("/pages/{page_index}/visuals/{visual_index}"),
                         summary: "declare compiled report visual".to_string(),
+                    });
+                }
+                // `report_build` appends compiler-owned slicer visuals after
+                // the explicitly declared page visuals. Surface those values
+                // as the same typed AddVisual operations used by replay so an
+                // agent can inspect the exact rail/page placement before a
+                // project is written.
+                for compiled_visual in compiled_visuals.iter().skip(raw_visuals.len()) {
+                    let Some(compiled_visual) = compiled_visual.as_object() else {
+                        continue;
+                    };
+                    let Some(visual_name) = compiled_visual.get("name").and_then(Value::as_str)
+                    else {
+                        continue;
+                    };
+                    let visual_type = compiled_visual
+                        .get("visualType")
+                        .and_then(Value::as_str)
+                        .unwrap_or("slicer")
+                        .to_string();
+                    let pointer = if visual_name.starts_with("VisualContainerRail") {
+                        "/layout/rail/slicers".to_string()
+                    } else {
+                        format!("/pages/{page_index}/slicers")
+                    };
+                    entries.push(OpEntry {
+                        operation: Op::AddVisual(AddVisual {
+                            handle: visual_handle(page, visual_name),
+                            page: page_handle_value.clone(),
+                            visual_type,
+                            name: Some(visual_name.to_string()),
+                            title: compiled_visual
+                                .get("title")
+                                .and_then(Value::as_str)
+                                .map(ToOwned::to_owned),
+                            mode: compiled_visual
+                                .get("mode")
+                                .and_then(Value::as_str)
+                                .map(ToOwned::to_owned),
+                            single_select: compiled_visual
+                                .get("singleSelect")
+                                .and_then(Value::as_bool),
+                            position: position_value(compiled_visual),
+                            bindings: compiled_visual
+                                .get("bindings")
+                                .and_then(Value::as_array)
+                                .cloned()
+                                .unwrap_or_default(),
+                        }),
+                        pointer,
+                        summary: format!(
+                            "compile v2 slicer visual {visual_name} as AddVisual(slicer)"
+                        ),
                     });
                 }
             }
@@ -683,7 +753,7 @@ fn layout_json(spec: &Value, compiled_schema: &Value) -> Value {
                 .and_then(Value::as_str)
                 .or_else(|| raw_page.get("id").and_then(Value::as_str))
                 .unwrap_or("page");
-            let slots = raw_page
+            let mut slots = raw_page
                 .get("visuals")
                 .and_then(Value::as_array)
                 .into_iter()
@@ -713,6 +783,37 @@ fn layout_json(spec: &Value, compiled_schema: &Value) -> Value {
                     }))
                 })
                 .collect::<Vec<_>>();
+            let raw_visual_count = raw_page
+                .get("visuals")
+                .and_then(Value::as_array)
+                .map_or(0, Vec::len);
+            if let Some(compiled_visuals) = compiled_page.get("visuals").and_then(Value::as_array) {
+                for compiled_visual in compiled_visuals.iter().skip(raw_visual_count) {
+                    let Some(compiled_visual) = compiled_visual.as_object() else {
+                        continue;
+                    };
+                    let Some(name) = compiled_visual.get("name").and_then(Value::as_str) else {
+                        continue;
+                    };
+                    let Some(position) = position_value(compiled_visual) else {
+                        continue;
+                    };
+                    let pointer = if name.starts_with("VisualContainerRail") {
+                        "/layout/rail/slicers".to_string()
+                    } else {
+                        format!("/pages/{page_index}/slicers")
+                    };
+                    slots.push(json!({
+                        "visual": visual_handle(page, name),
+                        "pointer": pointer,
+                        "coordinates": position,
+                        "x": position["x"],
+                        "y": position["y"],
+                        "width": position["width"],
+                        "height": position["height"]
+                    }));
+                }
+            }
             pages.push(json!({
                 "page": page_handle(page),
                 "pointer": format!("/pages/{page_index}"),

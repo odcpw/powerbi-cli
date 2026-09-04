@@ -1443,7 +1443,7 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "report.slicer-authoring",
-        title: "Generated basic, dropdown, and between slicers",
+        title: "Generated basic, dropdown, and between slicers with v2 page and rail compilation",
         category: "report",
         status: "supported",
         support: "generated-clean-state-desktop-golden-pending",
@@ -1459,7 +1459,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report slicers clear",
         ],
         refusal_code: None,
-        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between also writes /visual/objects/slider.show=true so the numeric/date range is an explicit draggable band. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
+        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Dashboard-spec v2 pages[].slicers[] and layout.rail.slicers[] compile to deterministic AddVisual(slicer) visuals, with a three-column rail replicated on every opted-in page. Profile distinctCount above twelve selects Dropdown; absent cardinality evidence defaults to Basic with a spec.feature_pending warning naming pbi-t6-planner-v2-szr.1. Between also writes /visual/objects/slider.show=true so the numeric/date range is an explicit draggable band. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
         next_proof: &[
             "Automate the manual slicer canvas, refresh, and interaction assertions as the desktop-canvas-refresh proof level",
             "Widen typed slicer formatting and mode coverage with Desktop-authored fixtures and PBIR readback",

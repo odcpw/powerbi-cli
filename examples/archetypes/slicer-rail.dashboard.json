@@ -1,0 +1,58 @@
+{
+  "schema": "powerbi-cli.dashboard.v2",
+  "report": {
+    "name": "SlicerRail",
+    "displayName": "Slicer Rail"
+  },
+  "layout": {
+    "rail": {
+      "side": "right",
+      "width": 3,
+      "slicers": [
+        {"field": "DimCustomer[Segment]", "title": "Segment"},
+        {"field": "DimCustomer[CustomerName]", "title": "Customer", "singleSelect": true}
+      ]
+    }
+  },
+  "pages": [
+    {
+      "id": "overview",
+      "displayName": "Overview",
+      "rail": true,
+      "size": {"width": 1280, "height": 720},
+      "visuals": [
+        {
+          "id": "revenue",
+          "type": "card",
+          "title": "Revenue",
+          "bindings": [
+            {"role": "Values", "field": "FactSales[Total Revenue]"}
+          ]
+        }
+      ],
+      "slicers": [
+        {
+          "field": "DimDate[Date]",
+          "mode": "Between",
+          "title": "Date",
+          "slot": "rail"
+        }
+      ]
+    },
+    {
+      "id": "detail",
+      "displayName": "Detail",
+      "size": {"width": 1280, "height": 720},
+      "visuals": [
+        {
+          "id": "units",
+          "type": "card",
+          "title": "Units",
+          "bindings": [
+            {"role": "Values", "field": "FactSales[Total Units]"}
+          ]
+        }
+      ]
+    }
+  ]
+}

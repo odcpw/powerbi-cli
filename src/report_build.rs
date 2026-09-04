@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes, shell_arg,
 };
+use crate::design::grid::{Grid, PageSize, RailSide, resolve_rail_position};
 use crate::input_safety::{InputKind, read_utf8};
 use crate::json_composition::normalize_spec_file;
 use crate::ops::OpOutcome;
@@ -83,7 +84,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         validate_known_fields(spec)?;
     }
     let profile_value = load_optional_profile(options.profile.as_deref())?;
-    let compiled = compile_dashboard(&schema_value, spec_value.as_ref())?;
+    let compiled = compile_dashboard(&schema_value, spec_value.as_ref(), profile_value.as_ref())?;
     let dry_run_proof_plan = if mode == MutationMode::DryRun {
         compile_proof_plan(spec_value.as_ref(), None)?
     } else {
@@ -175,17 +176,22 @@ pub(crate) fn spec_command(args: &[String]) -> CliResult<Value> {
     }
 }
 
-pub(crate) fn compile_dashboard_summary(schema: &Value, spec: &Value) -> CliResult<Value> {
-    let compiled = compile_dashboard(schema, Some(spec))?;
+pub(crate) fn compile_dashboard_summary_with_profile(
+    schema: &Value,
+    spec: &Value,
+    profile: Option<&Value>,
+) -> CliResult<Value> {
+    let compiled = compile_dashboard(schema, Some(spec), profile)?;
     Ok(compiled_summary(&compiled))
 }
 
-/// Compile a sanitized dashboard spec for the read-only `report spec explain`
-/// surface. The explain command removes recognized-but-uncompiled sections
-/// before calling this helper, while the normal build path retains its strict
-/// refusal behavior.
-pub(crate) fn compiled_schema_for_explain(schema: &Value, spec: &Value) -> CliResult<Value> {
-    Ok(compile_dashboard(schema, Some(spec))?.schema)
+pub(crate) fn compile_dashboard_for_explain_with_profile(
+    schema: &Value,
+    spec: &Value,
+    profile: Option<&Value>,
+) -> CliResult<(Value, Vec<Value>)> {
+    let compiled = compile_dashboard(schema, Some(spec), profile)?;
+    Ok((compiled.schema, compiled.warnings))
 }
 
 fn spec_validate(args: &[String]) -> CliResult<Value> {
@@ -212,7 +218,9 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         options.schema.as_deref()
     {
         let schema_value = load_schema_value(schema_path)?;
-        match known_fields.and_then(|_| compile_dashboard(&schema_value, Some(&spec_value))) {
+        match known_fields.and_then(|_| {
+            compile_dashboard(&schema_value, Some(&spec_value), profile_value.as_ref())
+        }) {
             Ok(compiled) => {
                 let schema_validation = validate_schema_value(&compiled.schema);
                 (
@@ -223,7 +231,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
                         .into_iter()
                         .map(Value::String)
                         .collect(),
-                    Vec::new(),
+                    compiled.warnings.clone(),
                     Some(compiled),
                     Some(schema_path.to_path_buf()),
                 )
@@ -247,11 +255,11 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
             (Err(error), Ok(_)) => vec![spec_error_json(&error)],
         };
         let warnings = if errors.is_empty() {
-            vec![
-            "schema was not provided; shape-only validation cannot prove field references, measures, visual roles, or build compatibility".to_string()
-            ]
+            vec![Value::String(
+                "schema was not provided; shape-only validation cannot prove field references, measures, visual roles, or build compatibility".to_string(),
+            )]
         } else {
-            Vec::new()
+            Vec::<Value>::new()
         };
         (
             errors.is_empty(),
@@ -466,6 +474,8 @@ fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> 
     if let Some(layout) = root.get("layout").and_then(Value::as_object)
         && let Some(rail) = layout.get("rail").and_then(Value::as_object)
     {
+        rail_side(Some(rail))?;
+        rail_width(Some(rail))?;
         validate_slicer_fields(rail.get("slicers"), "/layout/rail/slicers", &model)?;
     }
 
@@ -623,6 +633,37 @@ fn validate_slicer_fields(
                 format!("`{field}` is not a resolvable model column"),
                 json!({"field": "DimCustomer[Segment]"}),
             ));
+        }
+        if let Some(mode) = slicer.get("mode") {
+            let mode = mode.as_str().ok_or_else(|| {
+                CliError::invalid_args(format!("{pointer}/{index}/mode must be a string"))
+                    .with_pointer(format!("{pointer}/{index}/mode"))
+            })?;
+            resolve_slicer_mode("slicer", Some(mode))?;
+        }
+        if let Some(single_select) = slicer.get("singleSelect")
+            && single_select.as_bool().is_none()
+        {
+            return Err(CliError::invalid_args(format!(
+                "{pointer}/{index}/singleSelect must be a boolean"
+            ))
+            .with_pointer(format!("{pointer}/{index}/singleSelect")));
+        }
+        if let Some(title) = slicer.get("title")
+            && title.as_str().is_none()
+        {
+            return Err(CliError::invalid_args(format!(
+                "{pointer}/{index}/title must be a string"
+            ))
+            .with_pointer(format!("{pointer}/{index}/title")));
+        }
+        if let Some(slot) = slicer.get("slot")
+            && slot.as_str().is_none()
+        {
+            return Err(
+                CliError::invalid_args(format!("{pointer}/{index}/slot must be a string"))
+                    .with_pointer(format!("{pointer}/{index}/slot")),
+            );
         }
     }
     Ok(())
@@ -815,7 +856,11 @@ struct CompiledDashboard {
     defaults_applied: Vec<Value>,
 }
 
-fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<CompiledDashboard> {
+fn compile_dashboard(
+    schema: &Value,
+    spec: Option<&Value>,
+    profile: Option<&Value>,
+) -> CliResult<CompiledDashboard> {
     let Some(spec) = spec else {
         let (schema, notes) = merge_schema_and_spec(schema.clone(), None)?;
         return Ok(CompiledDashboard {
@@ -887,7 +932,14 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
     }
     let model = ModelIndex::from_schema(&merged);
     let mut defaults_applied = Vec::new();
-    let pages = compile_pages(spec_object, &model, &mut defaults_applied)?;
+    let mut warnings = Vec::new();
+    let pages = compile_pages(
+        spec_object,
+        &model,
+        profile,
+        &mut defaults_applied,
+        &mut warnings,
+    )?;
     if !pages.is_empty() {
         merged
             .as_object_mut()
@@ -898,6 +950,7 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         "kind": "compileDashboardSpec",
         "summary": "compiled powerbi-cli.dashboard.v1 report/pages/visuals into scaffold-compatible manifest"
     })];
+    append_generated_slicer_operations(&merged, &mut operations);
     if spec_object.get("style").is_some() {
         return Err(CliError::unsupported_feature(
             "report build style application from dashboard spec is not implemented yet"
@@ -915,7 +968,7 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
     Ok(CompiledDashboard {
         schema: merged,
         operations,
-        warnings: Vec::new(),
+        warnings,
         defaults_applied,
     })
 }
@@ -1001,8 +1054,15 @@ fn add_measure_to_schema(schema: &mut Map<String, Value>, measure: &Value) -> Cl
 fn compile_pages(
     spec: &Map<String, Value>,
     model: &ModelIndex,
+    profile: Option<&Value>,
     defaults_applied: &mut Vec<Value>,
+    warnings: &mut Vec<Value>,
 ) -> CliResult<Vec<Value>> {
+    let root_rail = spec
+        .get("layout")
+        .and_then(Value::as_object)
+        .and_then(|layout| layout.get("rail"))
+        .and_then(Value::as_object);
     let mut pages = Vec::new();
     for (page_index, page) in spec
         .get("pages")
@@ -1044,7 +1104,18 @@ fn compile_pages(
                 "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json",
             ));
         }
-        let visuals = compile_visuals(page_index, page, model, defaults_applied)?;
+        let page_size = page_size_for_spec(spec, page)?;
+        let rail_slicers =
+            rail_slicers_for_page(page_index, page, root_rail, page_size, profile, warnings)?;
+        let mut visual_values = page
+            .get("visuals")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        visual_values.extend(rail_slicers);
+        let mut visual_page = page.clone();
+        visual_page.insert("visuals".to_string(), Value::Array(visual_values));
+        let visuals = compile_visuals(page_index, &visual_page, model, defaults_applied)?;
         out.insert("visuals".to_string(), Value::Array(visuals));
         let interactions = compile_interactions(page_index, page)?;
         if !interactions.is_empty() {
@@ -1053,6 +1124,385 @@ fn compile_pages(
         pages.push(Value::Object(out));
     }
     Ok(pages)
+}
+
+fn page_size_for_spec(spec: &Map<String, Value>, page: &Map<String, Value>) -> CliResult<PageSize> {
+    let page_size = page.get("size").and_then(Value::as_object).or_else(|| {
+        spec.get("layout")
+            .and_then(Value::as_object)
+            .and_then(|layout| layout.get("pageSize"))
+            .and_then(Value::as_object)
+    });
+    let width = page_size
+        .and_then(|size| size.get("width"))
+        .and_then(Value::as_f64)
+        .unwrap_or(PageSize::STANDARD.width);
+    let height = page_size
+        .and_then(|size| size.get("height"))
+        .and_then(Value::as_f64)
+        .unwrap_or(PageSize::STANDARD.height);
+    if !width.is_finite() || width <= 0.0 {
+        return Err(
+            CliError::invalid_args("page width must be a positive finite number")
+                .with_pointer("/pages/size/width"),
+        );
+    }
+    if !height.is_finite() || height <= 0.0 {
+        return Err(
+            CliError::invalid_args("page height must be a positive finite number")
+                .with_pointer("/pages/size/height"),
+        );
+    }
+    Ok(PageSize { width, height })
+}
+
+fn rail_side(rail: Option<&Map<String, Value>>) -> CliResult<RailSide> {
+    let Some(value) = rail.and_then(|rail| rail.get("side")) else {
+        return Ok(RailSide::Left);
+    };
+    let side = value.as_str().ok_or_else(|| {
+        CliError::invalid_args("layout.rail.side must be a string")
+            .with_pointer("/layout/rail/side")
+    })?;
+    match side.trim().to_ascii_lowercase().as_str() {
+        "left" | "rail-left" => Ok(RailSide::Left),
+        "right" | "rail-right" => Ok(RailSide::Right),
+        _ => Err(
+            CliError::invalid_args(format!("unsupported layout rail side: {side}"))
+                .with_pointer("/layout/rail/side")
+                .with_hint("Use left or right."),
+        ),
+    }
+}
+
+fn rail_width(rail: Option<&Map<String, Value>>) -> CliResult<u32> {
+    let Some(value) = rail.and_then(|rail| rail.get("width")) else {
+        return Ok(3);
+    };
+    let width = value
+        .as_u64()
+        .or_else(|| {
+            value
+                .as_f64()
+                .filter(|number| number.fract() == 0.0)
+                .map(|number| number as u64)
+        })
+        .and_then(|number| u32::try_from(number).ok())
+        .ok_or_else(|| {
+            CliError::invalid_args(
+                "layout.rail.width must be a positive integer number of grid columns",
+            )
+            .with_pointer("/layout/rail/width")
+        })?;
+    if !(1..=12).contains(&width) {
+        return Err(CliError::invalid_args(format!(
+            "layout.rail.width must be between 1 and 12 grid columns; got {width}"
+        ))
+        .with_pointer("/layout/rail/width"));
+    }
+    Ok(width)
+}
+
+fn page_rail_enabled(
+    page_index: usize,
+    page: &Map<String, Value>,
+    root_rail: bool,
+) -> CliResult<bool> {
+    let Some(value) = page.get("rail") else {
+        return Ok(root_rail);
+    };
+    value.as_bool().ok_or_else(|| {
+        CliError::invalid_args(format!("pages[{page_index}].rail must be a boolean"))
+            .with_pointer(format!("/pages/{page_index}/rail"))
+    })
+}
+
+fn rail_slicers_for_page(
+    page_index: usize,
+    page: &Map<String, Value>,
+    root_rail: Option<&Map<String, Value>>,
+    page_size: PageSize,
+    profile: Option<&Value>,
+    warnings: &mut Vec<Value>,
+) -> CliResult<Vec<Value>> {
+    let root_rail_declared = root_rail.is_some();
+    let page_rail = page_rail_enabled(page_index, page, root_rail_declared)?;
+    let mut generated = Vec::new();
+    let mut used_names = page
+        .get("visuals")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_object)
+        .filter_map(|visual| {
+            visual
+                .get("id")
+                .or_else(|| visual.get("name"))
+                .and_then(Value::as_str)
+                .map(|name| visual_name(name).to_ascii_lowercase())
+        })
+        .collect::<BTreeSet<_>>();
+
+    let mut rail_entries: Vec<(Value, String)> = Vec::new();
+    if page_rail
+        && let Some(slicers) = root_rail
+            .and_then(|rail| rail.get("slicers"))
+            .and_then(Value::as_array)
+    {
+        for (index, slicer) in slicers.iter().enumerate() {
+            rail_entries.push((slicer.clone(), format!("/layout/rail/slicers/{index}")));
+        }
+    }
+
+    let page_slicers = page
+        .get("slicers")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for (index, slicer) in page_slicers.iter().enumerate() {
+        let slot = slicer
+            .get("slot")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if slot.eq_ignore_ascii_case("rail") {
+            rail_entries.push((
+                slicer.clone(),
+                format!("/pages/{page_index}/slicers/{index}"),
+            ));
+        }
+    }
+
+    let rail_geometry = if rail_entries.is_empty() {
+        None
+    } else {
+        let side = rail_side(root_rail)?;
+        let width = rail_width(root_rail)?;
+        Some(resolve_rail_position(
+            page_size,
+            Grid::default(),
+            side,
+            width,
+        )?)
+    };
+    let mut next_rail_y = rail_geometry.map(|position| position.y);
+    for (index, (slicer, pointer)) in rail_entries.into_iter().enumerate() {
+        let slicer = slicer.as_object().ok_or_else(|| {
+            CliError::invalid_args(format!("{pointer} must be an object"))
+                .with_pointer(pointer.clone())
+        })?;
+        let field = required_slicer_field(slicer, &pointer)?;
+        let mode = resolve_spec_slicer_mode(slicer, field, profile, &pointer, warnings)?;
+        let position = rail_geometry.expect("rail geometry for rail entry");
+        let height = if mode == SlicerMode::Between {
+            BETWEEN_SLICER_MIN_HEIGHT
+        } else {
+            SLICER_MIN_HEIGHT
+        };
+        let y = next_rail_y.expect("rail y for rail entry");
+        if y + height > position.y + position.height {
+            return Err(CliError::invalid_args(format!(
+                "rail slicer {field} at index {index} does not fit in the available rail height"
+            ))
+            .with_pointer(pointer));
+        }
+        next_rail_y = Some(y + height + Grid::default().gutter);
+        let name = unique_generated_name(
+            &format!("VisualContainerRail{}", slug(slicer_title(slicer, field))),
+            &mut used_names,
+        );
+        generated.push(generated_slicer_visual(
+            &name,
+            slicer,
+            field,
+            mode,
+            json!({
+                "x": position.x,
+                "y": y,
+                "width": position.width,
+                "height": height
+            }),
+        ));
+    }
+
+    for (index, slicer) in page_slicers.into_iter().enumerate() {
+        let slicer = slicer.as_object().ok_or_else(|| {
+            let pointer = format!("/pages/{page_index}/slicers/{index}");
+            CliError::invalid_args(format!("{pointer} must be an object")).with_pointer(pointer)
+        })?;
+        let slot = slicer
+            .get("slot")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if slot.eq_ignore_ascii_case("rail") {
+            continue;
+        }
+        let pointer = format!("/pages/{page_index}/slicers/{index}");
+        let field = required_slicer_field(slicer, &pointer)?;
+        let mode = resolve_spec_slicer_mode(slicer, field, profile, &pointer, warnings)?;
+        let name = unique_generated_name(
+            &format!("VisualContainerSlicer{}", slug(slicer_title(slicer, field))),
+            &mut used_names,
+        );
+        generated.push(generated_slicer_visual(
+            &name,
+            slicer,
+            field,
+            mode,
+            Value::Object(Map::new()),
+        ));
+    }
+    Ok(generated)
+}
+
+fn required_slicer_field<'a>(slicer: &'a Map<String, Value>, pointer: &str) -> CliResult<&'a str> {
+    slicer
+        .get("field")
+        .and_then(Value::as_str)
+        .filter(|field| !field.trim().is_empty())
+        .ok_or_else(|| {
+            CliError::invalid_args(format!("{pointer}/field requires a non-empty model column"))
+                .with_pointer(format!("{pointer}/field"))
+        })
+}
+
+fn slicer_title<'a>(slicer: &'a Map<String, Value>, field: &'a str) -> &'a str {
+    slicer
+        .get("title")
+        .and_then(Value::as_str)
+        .filter(|title| !title.trim().is_empty())
+        .unwrap_or_else(|| {
+            field
+                .rsplit_once('[')
+                .map_or(field, |(_, name)| name.trim_end_matches(']'))
+        })
+}
+
+fn unique_generated_name(base: &str, used_names: &mut BTreeSet<String>) -> String {
+    let mut candidate = base.to_string();
+    let mut suffix = 2;
+    while !used_names.insert(candidate.to_ascii_lowercase()) {
+        candidate = format!("{base}{suffix}");
+        suffix += 1;
+    }
+    candidate
+}
+
+fn generated_slicer_visual(
+    name: &str,
+    slicer: &Map<String, Value>,
+    field: &str,
+    mode: SlicerMode,
+    layout: Value,
+) -> Value {
+    let title = slicer_title(slicer, field).to_string();
+    json!({
+        "id": name,
+        "name": name,
+        "type": "slicer",
+        "visualType": "slicer",
+        "title": title,
+        "mode": mode.as_str(),
+        "singleSelect": slicer.get("singleSelect").and_then(Value::as_bool).unwrap_or(false),
+        "bindings": [{"role": "Values", "field": field}],
+        "layout": layout
+    })
+}
+
+fn append_generated_slicer_operations(schema: &Value, operations: &mut Vec<Value>) {
+    for page in schema["pages"].as_array().into_iter().flatten() {
+        let Some(page_name) = page["name"].as_str() else {
+            continue;
+        };
+        for visual in page["visuals"].as_array().into_iter().flatten() {
+            let Some(name) = visual["name"].as_str() else {
+                continue;
+            };
+            if !(name.starts_with("VisualContainerRail")
+                || name.starts_with("VisualContainerSlicer"))
+            {
+                continue;
+            }
+            operations.push(json!({
+                "kind": "addVisual",
+                "summary": "compiled dashboard-spec slicer into AddVisual(slicer)",
+                "handle": format!("visual:{page_name}:{name}"),
+                "visualType": "slicer",
+                "mode": visual["mode"],
+                "singleSelect": visual["singleSelect"],
+                "position": {
+                    "x": visual["x"],
+                    "y": visual["y"],
+                    "width": visual["width"],
+                    "height": visual["height"]
+                }
+            }));
+        }
+    }
+}
+
+fn resolve_spec_slicer_mode(
+    slicer: &Map<String, Value>,
+    field: &str,
+    profile: Option<&Value>,
+    pointer: &str,
+    warnings: &mut Vec<Value>,
+) -> CliResult<SlicerMode> {
+    if let Some(requested) = slicer.get("mode") {
+        let requested = requested.as_str().ok_or_else(|| {
+            CliError::invalid_args(format!("{pointer}/mode must be a string"))
+                .with_pointer(format!("{pointer}/mode"))
+        })?;
+        return resolve_slicer_mode("slicer", Some(requested))
+            .map(|mode| mode.expect("slicer mode resolves for slicer visual"));
+    }
+    let Some(distinct_count) = profile_distinct_count(profile, field) else {
+        if !warnings
+            .iter()
+            .any(|warning| warning["code"] == "spec.feature_pending" && warning["field"] == field)
+        {
+            warnings.push(json!({
+                "code": "spec.feature_pending",
+                "feature": "slicer.mode-default",
+                "field": field,
+                "pointer": pointer,
+                "owningBead": "pbi-t6-planner-v2-szr.1",
+                "message": format!("profile has no distinctCount for {field}; defaulted slicer mode to Basic; planner cardinality inference remains pending (pbi-t6-planner-v2-szr.1)")
+            }));
+        }
+        return Ok(SlicerMode::Basic);
+    };
+    Ok(if distinct_count > 12 {
+        SlicerMode::Dropdown
+    } else {
+        SlicerMode::Basic
+    })
+}
+
+fn profile_distinct_count(profile: Option<&Value>, field: &str) -> Option<u64> {
+    let (table, column) = parse_field(field).ok()?;
+    profile?
+        .get("tables")
+        .and_then(Value::as_array)?
+        .iter()
+        .filter_map(Value::as_object)
+        .find(|candidate| {
+            candidate
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.eq_ignore_ascii_case(&table))
+        })?
+        .get("columns")
+        .and_then(Value::as_array)?
+        .iter()
+        .filter_map(Value::as_object)
+        .find(|candidate| {
+            candidate
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.eq_ignore_ascii_case(&column))
+        })?
+        .get("distinctCount")
+        .and_then(Value::as_u64)
 }
 
 fn compile_interactions(page_index: usize, page: &Map<String, Value>) -> CliResult<Vec<Value>> {
