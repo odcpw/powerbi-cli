@@ -140,6 +140,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let planned_spec = h.root.join("everything.planned.dashboard.json");
     let project = h.root.join("EverythingAcceptance");
     let scaffold_project = h.root.join("ScaffoldSmoke");
+    let generic_model_project = h.root.join("GenericModelAcceptance");
     let package = h.root.join("source-bearing-template.pbit");
     let work_schema = h.root.join("work-pack.schema.json");
     let work_project = h.root.join("WorkPackAcceptance");
@@ -694,6 +695,252 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+
+    // Exercise every generic table/column CRUD path on an isolated copy so
+    // the acceptance project remains available to the later report and
+    // relationship commands.  Keep these calls through Harness::ok so the
+    // catalog coverage set records the exact command paths, and assert each
+    // response schema to catch drift in the public contract.
+    let generic_add = h.ok(
+        "model tables add",
+        &svec([
+            "model",
+            "tables",
+            "add",
+            "--project",
+            &project_arg,
+            "--table",
+            "CrudProbe",
+            "--column",
+            "Code",
+            "--data-type",
+            "string",
+            "--out-dir",
+            &p(&generic_model_project),
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_add["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(generic_add["action"], Value::from("add"));
+    assert_eq!(generic_add["projectModified"], Value::Bool(true));
+
+    let generic_project_arg = p(&generic_model_project);
+    let generic_tables = h.ok(
+        "model tables list",
+        &svec([
+            "model",
+            "tables",
+            "list",
+            "--project",
+            &generic_project_arg,
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_tables["schema"],
+        Value::from("powerbi-cli.model.tables.list.v1")
+    );
+    assert!(generic_tables["tables"].as_array().is_some_and(|tables| {
+        tables
+            .iter()
+            .any(|table| table["handle"] == "table:CrudProbe")
+    }));
+
+    let generic_table_show = h.ok(
+        "model tables show",
+        &svec([
+            "model",
+            "tables",
+            "show",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CrudProbe",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_table_show["schema"],
+        Value::from("powerbi-cli.model.tables.show.v1")
+    );
+    assert!(
+        generic_table_show["block"]
+            .as_str()
+            .is_some_and(|block| block.contains("table CrudProbe"))
+    );
+
+    let generic_columns = h.ok(
+        "model columns list",
+        &svec([
+            "model",
+            "columns",
+            "list",
+            "--project",
+            &generic_project_arg,
+            "--table",
+            "CrudProbe",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_columns["schema"],
+        Value::from("powerbi-cli.model.columns.list.v1")
+    );
+    assert!(
+        generic_columns["columns"]
+            .as_array()
+            .is_some_and(|columns| {
+                columns
+                    .iter()
+                    .any(|column| column["handle"] == "column:CrudProbe:Code")
+            })
+    );
+
+    let generic_column_show = h.ok(
+        "model columns show",
+        &svec([
+            "model",
+            "columns",
+            "show",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "column:CrudProbe:Code",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_show["schema"],
+        Value::from("powerbi-cli.model.columns.show.v1")
+    );
+    assert!(
+        generic_column_show["block"]
+            .as_str()
+            .is_some_and(|block| block.contains("column Code"))
+    );
+
+    let generic_column_add = h.ok(
+        "model columns add",
+        &svec([
+            "model",
+            "columns",
+            "add",
+            "--project",
+            &generic_project_arg,
+            "--table",
+            "CrudProbe",
+            "--name",
+            "Amount",
+            "--data-type",
+            "decimal",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_add["schema"],
+        Value::from("powerbi-cli.model.columns.mutation.v1")
+    );
+    assert_eq!(generic_column_add["action"], Value::from("add"));
+    assert_eq!(
+        generic_column_add["target"]["handle"],
+        Value::from("column:CrudProbe:Amount")
+    );
+
+    let generic_column_update = h.ok(
+        "model columns update",
+        &svec([
+            "model",
+            "columns",
+            "update",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "column:CrudProbe:Amount",
+            "--format-string",
+            "#,##0.00",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_update["schema"],
+        Value::from("powerbi-cli.model.columns.mutation.v1")
+    );
+    assert_eq!(generic_column_update["action"], Value::from("update"));
+
+    let generic_column_delete = h.ok(
+        "model columns delete",
+        &svec([
+            "model",
+            "columns",
+            "delete",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "column:CrudProbe:Amount",
+            "--in-place",
+            "--confirm",
+            "column:CrudProbe:Amount",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_column_delete["schema"],
+        Value::from("powerbi-cli.model.columns.mutation.v1")
+    );
+    assert_eq!(generic_column_delete["action"], Value::from("delete"));
+
+    let generic_table_rename = h.ok(
+        "model tables rename",
+        &svec([
+            "model",
+            "tables",
+            "rename",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CrudProbe",
+            "--new-name",
+            "CrudRenamed",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_table_rename["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(generic_table_rename["action"], Value::from("rename"));
+    assert_eq!(
+        generic_table_rename["target"]["handle"],
+        Value::from("table:CrudRenamed")
+    );
+
+    let generic_table_delete = h.ok(
+        "model tables delete",
+        &svec([
+            "model",
+            "tables",
+            "delete",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CrudRenamed",
+            "--in-place",
+            "--confirm",
+            "table:CrudRenamed",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        generic_table_delete["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(generic_table_delete["action"], Value::from("delete"));
 
     h.ok(
         "model tables add-static",
