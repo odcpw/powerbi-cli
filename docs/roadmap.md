@@ -78,7 +78,9 @@ Required contract rules:
   manifest before building a report.
 - `profile infer|validate|summarize`: derive or check schema/profile metadata
   from schema manifests and embedded dummy/profile rows without connecting to
-  live sources.
+  live sources. `profile infer --rows <rows.csv|rows.json>` now emits profile
+  v2 statistics under bounded input-safety limits; top literals stay redacted
+  unless explicitly opted in with `--include-data-values`.
 - `inspect <project|pbip>`: summarize PBIP, report, semantic model, pages,
   visuals, tables, columns, measures, relationships, and offline hazards.
 - `validate <project|pbip>`: parse required files, validate known schemas, check

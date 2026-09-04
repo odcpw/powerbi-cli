@@ -262,6 +262,24 @@ struct Feature {
 
 const FEATURE_CATALOG: &[Feature] = &[
     Feature {
+        id: "profile.data-profile-v2",
+        title: "Bounded CSV/JSON data profile inference",
+        category: "profile",
+        status: "supported",
+        support: "schema-matched-statistics-with-redacted-values",
+        proof_level: "unit-smoke",
+        emits_pbir: false,
+        commands: &["profile infer", "profile validate", "profile summarize"],
+        refusal_code: None,
+        reason: "Profile v2 reads rows only through the bounded input-safety contract and emits null rates, cardinality, numeric/time ranges, bounded top-value counts, coercion diagnostics, and duplicate-key grain conflicts. Literal values remain redacted unless --include-data-values is explicitly requested and every selected column passes credential/PII scanning.",
+        next_proof: &[
+            "Review profiles generated from representative synthetic row fixtures",
+            "Keep Desktop planner fixtures consuming v2 candidate and grain signals",
+        ],
+        reference_signals: &["docs/input-safety-contract.md"],
+        tags: &["profile", "rows", "csv", "json", "privacy", "inference"],
+    },
+    Feature {
         id: "quality.lint-rule-registry",
         title: "Discoverable lint and audit rule registry",
         category: "validation",

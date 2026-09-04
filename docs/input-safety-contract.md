@@ -44,7 +44,9 @@ does not weaken or replace those boundaries.
   `include.path_escape`/`include.cycle` codes and includes the active chain for
   cycles.
 - Profile v2 calls `read_rows`; its returned `BoundedRows` contains exact CSV
-  strings or the parsed JSON value plus observed row/column counts.
+  strings or the parsed JSON value plus observed row/column counts. Inference
+  keeps literal top values redacted by default and performs credential/PII
+  scanning before any `--include-data-values` opt-in.
 - Registered-resource image authoring calls `read_png` before it registers or
   writes any resource.
 - Batch apply calls `read_ops` with its complete typed op-kind catalog before
@@ -53,5 +55,6 @@ does not weaken or replace those boundaries.
 - The Desktop reference harvester calls `read_harvested_fragment`; persisted
   data is a refusal and must be removed explicitly in the source workflow.
 
-None of these APIs advertises an unimplemented command. The command-owning
-bead wires its surface to this contract when that command becomes real.
+None of these APIs bypasses the safety contract or silently strips rejected
+content. Profile v2 is the first rows consumer; future rows surfaces must use
+the same reader and privacy rules.
