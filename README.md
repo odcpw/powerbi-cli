@@ -327,6 +327,7 @@ cargo run --bin powerbi-cli -- source-template add --project .\build\sales --tab
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
+cargo run --bin powerbi-cli -- handoff rebind-check .\build\sales-live --partition partition:FactSales:FactSales --json
 cargo run --bin powerbi-cli -- fixture normalize .\build\sales --out .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- fixture verify .\build\sales --expected .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- desktop open .\build\sales --json
@@ -369,7 +370,7 @@ cargo run --bin powerbi-cli -- report themes presets list --json
 cargo run --bin powerbi-cli -- report themes apply-preset --project .\build\sales --preset risk-dashboard --dry-run --json
 cargo run --bin powerbi-cli -- report style inspect --project .\build\sales --json
 cargo run --bin powerbi-cli -- report style extract --project .\corp\template --out .\build\corp-style-bundle.json --json
-cargo run --bin powerbi-cli -- report style diff --project .\build\sales --bundle .\build\corp-style-bundle.json --json
+cargo run --bin powerbi-cli -- report style diff .\build\style-before.json .\build\style-after.json --json
 cargo run --bin powerbi-cli -- report style apply --project .\build\sales --bundle .\build\corp-style-bundle.json --out-dir .\build\sales-styled --allow-literal-text --json
 cargo run --bin powerbi-cli -- report visuals list --project .\build\sales --json
 cargo run --bin powerbi-cli -- report visuals catalog --json
@@ -391,7 +392,60 @@ cargo run --bin powerbi-cli -- report visuals delete --project .\build\sales-lay
 cargo run --bin powerbi-cli -- report visuals set-bindings --project .\build\sales --handle <visual-handle> --bindings-json "[{""role"":""Values"",""table"":""FactSales"",""measure"":""Total Revenue""}]" --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-bindings --project .\build\sales --handle <visual-handle> --bindings-json "[{""role"":""Values"",""table"":""FactSales"",""measure"":""Total Revenue""}]" --out-dir .\build\sales-bound --json
 cargo run --bin powerbi-cli -- report visuals repair-bindings --project .\build\sales --handle <visual-handle> --dry-run --json
+cargo run --bin powerbi-cli -- report visuals formatting set-color --project .\build\sales --handle <visual-handle> --slot title.fontColor --color '#123456' --dry-run --json
+cargo run --bin powerbi-cli -- report visuals add-card --project .\build\sales --page page:ReportSectionOverview --measure "FactSales.Total Revenue" --title "Revenue Card" --x 40 --y 40 --width 200 --height 120 --value-font-size 20 --category-font-size 9 --word-wrap --dry-run --json
+cargo run --bin powerbi-cli -- report visuals add-slicer --project .\build\sales --page page:ReportSectionOverview --field "DimCustomer.Segment" --title "Segment" --x 40 --y 40 --width 240 --height 80 --mode Dropdown --single-select --dry-run --json
+cargo run --bin powerbi-cli -- report visuals add-textbox --project .\build\sales --page page:ReportSectionOverview --title "Reading guide" --paragraphs-file guide.txt --x 40 --y 520 --width 400 --height 120 --dry-run --json
+cargo run --bin powerbi-cli -- report visuals set-topn-guard --project .\build\sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by "FactSales[Total Revenue]" --top 28 --dry-run --json
+cargo run --bin powerbi-cli -- report visuals set-object --project .\build\sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
+cargo run --bin powerbi-cli -- report visuals set-display-name --project .\build\sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 cargo run --bin powerbi-cli -- report drilldown set-hierarchy --project .\build\sales --handle <line-chart-handle> --field "DimDate[FiscalYear]" --field "DimDate[Month]" --dry-run --json
+cargo run --bin powerbi-cli -- desktop bridge status --json
+cargo run --bin powerbi-cli -- desktop bridge reload --project .\build\sales --pid 1234 --json
+cargo run --bin powerbi-cli -- desktop bridge screenshot-page --project .\build\sales --pid 1234 --page ReportSection --out proof/page.png --json
+cargo run --bin powerbi-cli -- desktop bridge screenshot-all --project .\build\sales --pid 1234 --out-dir proof/pages --json
+cargo run --bin powerbi-cli -- profile validate .\build\sales.profile.json --json
+cargo run --bin powerbi-cli -- profile summarize .\build\sales.profile.json --json
+cargo run --bin powerbi-cli -- model tables show --project .\build\sales --handle table:FactSales --json
+cargo run --bin powerbi-cli -- model tables rename --project .\build\sales --handle table:DimDate --new-name Calendar --rename-references --dry-run --json
+cargo run --bin powerbi-cli -- model tables delete --project .\build\sales --handle table:DimSegment --dry-run --json
+cargo run --bin powerbi-cli -- model columns show --project .\build\sales --handle column:FactSales:Revenue --json
+cargo run --bin powerbi-cli -- model columns add --project .\build\sales --table FactSales --name Margin --expression '[Revenue] - [Cost]' --data-type decimal --dry-run --json
+cargo run --bin powerbi-cli -- model columns update --project .\build\sales --handle column:FactSales:Revenue --format-string '$#,##0' --dry-run --json
+cargo run --bin powerbi-cli -- model columns delete --project .\build\sales --handle column:DimSegment:Label --dry-run --json
+cargo run --bin powerbi-cli -- model columns set-sort-by --project .\build\sales --table DimDate --column Month --by MonthNumber --dry-run --json
+cargo run --bin powerbi-cli -- model calculated-columns list --project .\build\sales --json
+cargo run --bin powerbi-cli -- model calculated-columns show --project .\build\sales --handle 'column:FactSales:Revenue Band' --json
+cargo run --bin powerbi-cli -- model calculated-columns update --project .\build\sales --handle 'column:FactSales:Revenue Band' --expression 'IF(''FactSales''[Revenue] >= 5000, ""High"", ""Standard"")' --dry-run --json
+cargo run --bin powerbi-cli -- model calculated-columns delete --project .\build\sales --handle 'column:FactSales:Revenue Band' --dry-run --json
+cargo run --bin powerbi-cli -- model measures show --project .\build\sales --handle 'measure:FactSales:Total Revenue' --json
+cargo run --bin powerbi-cli -- model measures update --project .\build\sales --handle 'measure:FactSales:Total Revenue' --expression 'SUM(''FactSales''[Revenue])' --dry-run --json
+cargo run --bin powerbi-cli -- model measures delete --project .\build\sales --handle 'measure:FactSales:Average Revenue' --dry-run --json
+cargo run --bin powerbi-cli -- model relationships show --project .\build\sales --handle <relationship-handle> --json
+cargo run --bin powerbi-cli -- model relationships delete --project .\build\sales --handle <relationship-handle> --dry-run --json
+cargo run --bin powerbi-cli -- model dax bridge-plan --project .\build\sales --json
+cargo run --bin powerbi-cli -- model roles show --project .\build\sales --handle role:Safety --json
+cargo run --bin powerbi-cli -- model perspectives show --project .\build\sales --handle perspective:Executive --json
+cargo run --bin powerbi-cli -- model cultures show --project .\build\sales --handle culture:de-CH --json
+cargo run --bin powerbi-cli -- model expressions show --project .\build\sales --handle expression:RefreshDate --json
+cargo run --bin powerbi-cli -- source-template show --project .\build\sales --handle source-template:FactSales:FactSales --json
+cargo run --bin powerbi-cli -- report tree --project .\build\sales --json
+cargo run --bin powerbi-cli -- report find --project .\build\sales --kind visual --json
+cargo run --bin powerbi-cli -- report cat --project .\build\sales --handle visual:ReportSectionOverview:VisualContainerSalesKpi --json
+cargo run --bin powerbi-cli -- report query --project .\build\sales --selector kind:visual --json
+cargo run --bin powerbi-cli -- report audit --project .\build\sales --json
+cargo run --bin powerbi-cli -- report sanitize plan --project .\build\sales --json
+cargo run --bin powerbi-cli -- report sanitize apply --project .\build\sales --dry-run --json
+cargo run --bin powerbi-cli -- report pages show --project .\build\sales --handle page:ReportSectionOverview --json
+cargo run --bin powerbi-cli -- report pages clone --project .\build\sales --from page:ReportSectionOverview --new-name ReportSectionOverviewCopy --visual-prefix Copy --dry-run --json
+cargo run --bin powerbi-cli -- report drillthrough set --project .\build\sales --page page:ReportSectionOverview --target 'DimCustomer[Segment]' --dry-run --json
+cargo run --bin powerbi-cli -- report drillthrough show --project .\build\sales --page page:ReportSectionOverview --json
+cargo run --bin powerbi-cli -- report drillthrough clear --project .\build\sales --page page:ReportSectionOverview --dry-run --json
+cargo run --bin powerbi-cli -- report filters delete --project .\build\sales --handle filter:report:main:ReportSegmentFilter --dry-run --json
+cargo run --bin powerbi-cli -- desktop open .\build\sales --preflight normal --json
+cargo run --bin powerbi-cli -- model dax execute --project .\build\sales --query-file checks/total-revenue.dax --allow-data-read --json
+cargo run --bin powerbi-cli -- model measures add --project .\build\sales --table FactSales --name "Dynamic Revenue" --expression "SUM(FactSales[Revenue])" --format-string-definition "IF([Mode] = \"raw\", \"$#,##0\", \"$#,##0.00\")" --dry-run --json
+cargo run --bin powerbi-cli -- validate .\build\sales --strict --backend all --json
 cargo run --bin powerbi-cli -- lint .\build\sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\sales --json
 cargo run --bin powerbi-cli -- validate --strict .\build\sales --json
@@ -479,6 +533,18 @@ three pages.
 
 ## Current Limits
 
+The 2026-09-04 build advertises 50 feature IDs (45 supported and 5 planned).
+This generated snapshot keeps status and proof claims aligned with
+`features list --json`; planned rows remain explicit refusals.
+
+| status / proof | feature IDs |
+|---|---|
+| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
+| supported / `schema-golden` | `model.partition-grouped-rank`, `report.drillthrough`, `report.filters.numeric-range`, `report.filters.relative-date`, `report.filters.topn`, `report.visuals.generated`, `workflow.synthetic-source` |
+| supported / `desktop-golden-pending` | `desktop.reference-harvest`, `report.slicer-authoring`, `report.visuals.category-share`, `report.visuals.matrix` |
+| supported / `manual-desktop-canvas-refresh` | `report.visuals.combo-pareto` |
+| planned / `unit-smoke` | `report.bookmark-mutations`, `report.interaction-default-reset`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
+
 - Dashboard specs are strict at every supported object level. `report spec
   validate` and `report build` reject unknown keys with
   `spec.unknown_field`, an RFC 6901 `pointer`, and a `didYouMean` suggestion
@@ -521,8 +587,8 @@ three pages.
   accepted by `handoff check --target work`; it writes source metadata only,
   never imported rows, caches, PBIX files, or local settings. Its default output
   is the sibling `<project>-work.pbit`. Finally,
-  `package export-plan` emits the Desktop handoff. `package export/compile/pack`
-  is intentionally refused.
+  `package export-plan` emits the Desktop handoff. Opaque binary
+  export/compile/pack requests are intentionally refused.
 - Package extraction streams through four default budgets: 10,000 archive
   entries, 256 MiB per entry, 2 GiB total uncompressed, and a 200:1 maximum
   compression ratio. `--max-entries`, `--max-entry-bytes`,
@@ -542,7 +608,8 @@ three pages.
   discovery with `report visuals catalog` and generated PBIR visual creation
   with `report visuals add` for card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
-  columnChart, lineClusteredColumnComboChart, scatterChart, pieChart,
+  columnChart, hundredPercentStackedColumnChart,
+  lineClusteredColumnComboChart, scatterChart, pieChart,
   donutChart, matrix (emitted as PBIR `pivotTable`), and slicer generated
   patterns, plus PBIR
   `queryState` generation, `report visuals set-bindings` replacement/clear
@@ -613,6 +680,9 @@ three pages.
 - Programmatic DAX measure authoring covers `model measures
   list/show/add/update/delete` over generated TMDL table files. Local validation
   proves file structure and readback, not DAX engine semantics.
+  Add/update accepts either inline `--expression` or bounded
+  `--expression-file`, plus static `--format-string` or a DAX
+  `--format-string-definition` persisted as `formatStringDefinition`.
   `model dax dependencies` and `model dax lint` add offline static reference
   checks for measures and calculated columns: missing fields, ambiguous
   references, self references, simple measure cycles, and scalar `IF()`
@@ -662,7 +732,9 @@ three pages.
 - Programmatic relationship authoring covers `model relationships
   list/show/add/update/delete` with endpoint validation, guarded output modes,
   readback commands, and `diff --scope model.relationships`. Endpoint rewiring
-  is currently modeled as delete+add for clearer audit trails.
+  is currently modeled as delete+add for clearer audit trails. Add/update can
+  author `one|many` endpoint cardinalities, `active`/`inactive` state, and
+  `oneDirection`/`bothDirections`/`automatic` cross-filtering behavior.
   Measure, calculated-column, and relationship writes retain the original TMDL
   file through post-write validation. A failed validation restores that file and
   returns `projectModified: false` plus rollback details.
@@ -712,6 +784,13 @@ three pages.
   transformation calls stay within the workflow/source-profile closed grammar;
   credential-like text, hard-coded paths, unknown functions, and computed calls
   are refused with a pointer into the M text.
+- `handoff rebind-check` is the offline, credential-free gate after a work-machine
+  rebind. It checks every selected partition for a concrete supported connector,
+  validates SQL/PostgreSQL/ODBC/SharePoint syntax, probes only local file/folder
+  paths for existence and readability, and reports per-partition findings plus
+  strict native validation. It never opens a database, SharePoint, or Desktop
+  connection; use the returned `desktop open` command for separate refresh and
+  canvas proof.
 - Programmatic report layout authoring covers `report pages
   list/show/add/update/reorder/set-active/delete-empty`, `report visuals
   list/show/add/clone/delete`, guarded `report visuals set-position`, and guarded
@@ -837,6 +916,10 @@ three pages.
   files, and unknown partition sources. The result reports `target`,
   `sourceMode`, `safeForOfflineHandoff`, and `safeForWorkHandoff` explicitly.
   Structurally valid literal tables with PII-suspect rows remain `review`.
+- `handoff rebind-check` verifies that a rebinding is materialized and
+  credential-free without evaluating Power Query. It returns `safe`, `review`,
+  or `unsafe`, stable partition handles, registered finding codes, and a
+  `refresh.status` of `not-run` to make the Desktop boundary explicit.
 - Dashboard specs and strict PBIR validation reject slicers shorter than Power
   BI's 76-pixel minimum, preventing a common source of clipped controls before
   the report reaches Desktop.
@@ -857,8 +940,10 @@ three pages.
   `m.duplicate_step_name` rule when a partition or named expression defines a
   let-step name more than once (including quoted names and the final step before
   `in`); findings include both source positions and ignore comments/string
-  literals. The registry includes a typed, currently empty design family so
-  future design lint cannot introduce ad-hoc ids.
+  literals. M lint also reports `m.untyped_expansion` and `m.unbuffered_reuse`
+  warnings for unsafe expansion and reused table values without buffering. The
+  registry includes a typed, currently empty design family so future design
+  lint cannot introduce ad-hoc ids.
 - Model completeness lint adds warning-only checks for measures without an
   explicit static or dynamic format, malformed custom format strings, visible
   relationship keys, both-direction fact-to-dimension relationships, and
@@ -892,8 +977,9 @@ three pages.
   descendants. A missing, exited, or PID-reused session receipt never triggers a
   title-wide or executable-wide kill. Opening a new managed session first closes
   the prior owned session. Never use raw `Start-Process` for CLI-managed testing.
-  `desktop open-check` and `desktop screenshot` are one-shot opt-in Windows oracle
-  commands. They always attempt bounded identity-checked cleanup and expose any
+  `desktop open --preflight strict|normal|skip`, `desktop open-check`, and
+  `desktop screenshot` are one-shot opt-in Windows oracle commands. They always
+  attempt bounded identity-checked cleanup and expose any
   unresolved ownership in the response. `--timeout-ms` is one watchdog budget for the bounded version probe,
   pre-launch process baseline, file-association launch, and window/title polling.
   `proof.level` uses the canonical `unit-smoke` level; launch and exact normalized
@@ -925,6 +1011,14 @@ three pages.
   Desktop open proof.
 - `.pbix`, `.pbit`, `.abf`, `.pbi/`, embedded data files, and
   `localSettings.json` are treated as unsafe for the home/offline workflow.
+
+### Pilot results
+
+The August 2026 production pilot is the field-evidence source for the current
+boundaries and priorities. Read the captured hand-patched idioms, proof notes,
+and follow-up beads in [`docs/pilot-lessons.md`](docs/pilot-lessons.md); the
+September sequencing and compiler work are tracked in
+[`docs/bridge-plan-2026-09.md`](docs/bridge-plan-2026-09.md).
 
 ## Format References
 

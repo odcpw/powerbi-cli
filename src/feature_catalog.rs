@@ -746,6 +746,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "source-template add",
             "source-template apply",
             "handoff rebind-plan",
+            "handoff rebind-check",
         ],
         refusal_code: None,
         reason: "Credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, SharePoint/OneDrive, and generic M templates are stored in sidecar metadata and can replace safe generated dummy partitions. Generic M is checked by the workflow/source-profile closed connector grammar (including placeholder and computed-call guards); file-family templates emit explicit TMDL-derived type conversions. An exact-handle confirmation gate also permits intentional retargeting of recognized credential-free existing sources without embedding credentials.",
