@@ -1,12 +1,12 @@
 use serde_json::Value;
+mod common;
+
+use common::cli_command;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 fn run_powerbi(args: &[String]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args(args)
-        .output()
-        .expect("run powerbi-cli")
+    cli_command(args).output()
 }
 
 fn scaffold_sales(root: &Path) -> PathBuf {

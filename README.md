@@ -178,6 +178,14 @@ Desktop open-proof is Windows-only, but PBIP/PBIR/TMDL scaffold and validation
 commands are normal filesystem operations and are covered by CI on all three
 platform families.
 
+## Testing
+
+Integration tests use one shared, structured CLI runner plus repository-backed
+archetype/spec helpers. Set `POWERBI_CLI_TEST_LOG=1` to emit each invocation as
+one JSON line containing argv, stdout, stderr, exit code, and elapsed time. See
+[`docs/testing.md`](docs/testing.md) for the focused e2e, snapshot, and nightly
+performance workflows.
+
 ## First Commands
 
 ```powershell

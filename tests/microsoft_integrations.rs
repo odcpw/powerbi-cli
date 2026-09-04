@@ -1,18 +1,20 @@
+mod common;
+
+use common::cli_command;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 const CACHE_ENV: &str = "POWERBI_CLI_MICROSOFT_CACHE_DIR";
 
 fn run_powerbi(args: &[&str], cache: &Path, path: Option<&Path>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"));
-    command.args(args).env(CACHE_ENV, cache);
-    if let Some(path) = path {
-        command.env("PATH", path);
+    let command = cli_command(args).env(CACHE_ENV, cache);
+    match path {
+        Some(path) => command.env("PATH", path).output(),
+        None => command.output(),
     }
-    command.output().expect("run powerbi-cli")
 }
 
 fn stdout_json(output: &Output) -> Value {
@@ -233,17 +235,15 @@ fn explicitly_selected_unsupported_desktop_bridge_is_not_ready() {
 #[test]
 #[ignore = "requires integrations install --allow-network for the exact Microsoft graph"]
 fn exact_install_has_supported_ready_components_and_final_receipt_identity() {
-    let report = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args([
-            "integrations",
-            "status",
-            "--component",
-            "report-authoring",
-            "--deep",
-            "--json",
-        ])
-        .output()
-        .expect("report status");
+    let report = cli_command([
+        "integrations",
+        "status",
+        "--component",
+        "report-authoring",
+        "--deep",
+        "--json",
+    ])
+    .output();
     assert!(
         report.status.success(),
         "{}",
@@ -254,17 +254,15 @@ fn exact_install_has_supported_ready_components_and_final_receipt_identity() {
     assert_eq!(report["components"][0]["ready"], true);
     assert_eq!(report["ready"], true);
 
-    let modeling = Command::new(env!("CARGO_BIN_EXE_powerbi-cli"))
-        .args([
-            "integrations",
-            "status",
-            "--component",
-            "modeling-mcp",
-            "--deep",
-            "--json",
-        ])
-        .output()
-        .expect("modeling status");
+    let modeling = cli_command([
+        "integrations",
+        "status",
+        "--component",
+        "modeling-mcp",
+        "--deep",
+        "--json",
+    ])
+    .output();
     assert!(
         modeling.status.success(),
         "{}",
