@@ -17,6 +17,7 @@ const OP_KIND_CATALOG: &[&str] = &[
     "addFilter",
     "setDrillthrough",
     "setInteraction",
+    "resetInteraction",
     "applyThemePreset",
     "setObject",
     // Compatibility spellings accepted by the safety harness while older
@@ -27,6 +28,7 @@ const OP_KIND_CATALOG: &[&str] = &[
     "AddFilter",
     "SetDrillthrough",
     "SetInteraction",
+    "ResetInteraction",
     "ApplyThemePreset",
     "SetObject",
 ];
@@ -73,6 +75,7 @@ fn normalize_tag(value: Value) -> Value {
         "AddFilter" => "addFilter",
         "SetDrillthrough" => "setDrillthrough",
         "SetInteraction" => "setInteraction",
+        "ResetInteraction" => "resetInteraction",
         "ApplyThemePreset" => "applyThemePreset",
         "SetObject" => "setObject",
         _ => tag,

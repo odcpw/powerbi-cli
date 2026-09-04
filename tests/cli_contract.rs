@@ -1251,7 +1251,7 @@ fn robot_docs_and_triage_are_first_class_agent_surfaces() {
     assert!(
         guide
             .stdout
-            .contains("report interactions list/show/set/disable")
+            .contains("report interactions list/show/set/disable/reset")
     );
 
     let guide_json = run_powerbi(&["robot-docs", "guide", "--json"]);
@@ -1282,6 +1282,7 @@ fn robot_docs_and_triage_are_first_class_agent_surfaces() {
     assert!(value["quickRef"]["reportInteractionsList"].is_string());
     assert!(value["quickRef"]["reportInteractionSetDryRun"].is_string());
     assert!(value["quickRef"]["reportInteractionDisableDryRun"].is_string());
+    assert!(value["quickRef"]["reportInteractionResetDryRun"].is_string());
     assert!(value["quickRef"]["reportVisualsCatalog"].is_string());
     assert!(value["quickRef"]["reportVisualFormattingSetColorDryRun"].is_string());
     assert!(value["recommendedNext"].as_array().is_some());
