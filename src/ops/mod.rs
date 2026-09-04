@@ -22,6 +22,8 @@ mod add_visual;
 mod apply_theme_preset;
 mod handles;
 mod io;
+mod legacy;
+mod model_kernels;
 mod plan;
 mod set_interaction;
 mod transaction;
@@ -43,6 +45,8 @@ pub(crate) use apply_theme_preset::*;
 pub(crate) use handles::*;
 #[allow(unused_imports)]
 pub(crate) use io::*;
+pub(crate) use legacy::*;
+pub(crate) use model_kernels::*;
 pub(crate) use plan::*;
 pub(crate) use set_interaction::*;
 #[allow(unused_imports)]
@@ -57,11 +61,46 @@ pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
 ///
 /// The registry is intentionally additive: each converted mutation contributes
 /// one match arm while the public `ops apply` dispatcher remains a later bead.
+/// Every T1b mutation registered by this bead has a kernel; the `Option`
+/// return type keeps the seam compatible with pending sibling registrations and
+/// future read-only IR variants.
 pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
     match operation {
+        Op::AddMeasure(_) => Some(Box::new(AddMeasureKernel)),
+        Op::AddRelationship(_) => Some(Box::new(AddRelationshipKernel)),
+        Op::AddVisual(_) => Some(Box::new(AddVisualKernel)),
+        Op::AddFilter(_) => Some(Box::new(AddFilterKernel)),
+        Op::SetDrillthrough(_) => Some(Box::new(SetDrillthroughKernel)),
         Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
         Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
-        _ => None,
+        Op::SetObject(_) => None,
+        Op::AddCalculatedColumn(_)
+        | Op::AddStaticTable(_)
+        | Op::SetSortBy(_)
+        | Op::SourceTemplateApply(_) => Some(Box::new(ModelKernel)),
+        Op::AddPage(_)
+        | Op::UpdatePage(_)
+        | Op::ReorderPages(_)
+        | Op::SetActivePage(_)
+        | Op::DeleteEmptyPage(_)
+        | Op::ClonePage(_)
+        | Op::SetBindings(_)
+        | Op::SetDisplayName(_)
+        | Op::SetTopNGuard(_)
+        | Op::SetDrilldownHierarchy(_)
+        | Op::CloneVisual(_)
+        | Op::DeleteVisual(_)
+        | Op::UpdateFilter(_)
+        | Op::DeleteFilter(_)
+        | Op::ClearFilter(_)
+        | Op::SlicerClear(_)
+        | Op::SetText(_)
+        | Op::SetColor(_)
+        | Op::FormattingApply(_)
+        | Op::ApplyThemeBundle(_)
+        | Op::ApplyStyleBundle(_)
+        | Op::BookmarkMetadata(_)
+        | Op::SanitizeAction(_) => None,
     }
 }
 
@@ -82,7 +121,74 @@ pub(crate) enum Op {
     SetInteraction(SetInteraction),
     ApplyThemePreset(ApplyThemePreset),
     SetObject(SetObject),
+    AddCalculatedColumn(AddCalculatedColumn),
+    AddStaticTable(AddStaticTable),
+    SetSortBy(SetSortBy),
+    SourceTemplateApply(SourceTemplateApply),
+    AddPage(AddPage),
+    UpdatePage(UpdatePage),
+    ReorderPages(ReorderPages),
+    SetActivePage(SetActivePage),
+    DeleteEmptyPage(DeleteEmptyPage),
+    ClonePage(ClonePage),
+    SetBindings(SetBindings),
+    SetDisplayName(SetDisplayName),
+    SetTopNGuard(SetTopNGuard),
+    SetDrilldownHierarchy(SetDrilldownHierarchy),
+    CloneVisual(CloneVisual),
+    DeleteVisual(DeleteVisual),
+    UpdateFilter(UpdateFilter),
+    DeleteFilter(DeleteFilter),
+    ClearFilter(ClearFilter),
+    SlicerClear(SlicerClear),
+    SetText(SetText),
+    SetColor(SetColor),
+    FormattingApply(FormattingApply),
+    ApplyThemeBundle(ApplyThemeBundle),
+    ApplyStyleBundle(ApplyStyleBundle),
+    BookmarkMetadata(BookmarkMetadata),
+    SanitizeAction(SanitizeAction),
 }
+
+/// Flattened, JSON-native payload used by mutation kernels whose command
+/// options are already validated by a focused legacy parser. Keys are
+/// canonical camelCase flags; repeated flags are represented as arrays.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct MutationPayload {
+    #[serde(flatten)]
+    pub(crate) fields: std::collections::BTreeMap<String, Value>,
+}
+
+// These aliases keep each operation's Rust surface named and discoverable
+// while allowing the canonical command parsers to evolve without duplicating
+// dozens of option fields in the IR.
+pub(crate) type AddCalculatedColumn = MutationPayload;
+pub(crate) type AddStaticTable = MutationPayload;
+pub(crate) type SetSortBy = MutationPayload;
+pub(crate) type SourceTemplateApply = MutationPayload;
+pub(crate) type AddPage = MutationPayload;
+pub(crate) type UpdatePage = MutationPayload;
+pub(crate) type ReorderPages = MutationPayload;
+pub(crate) type SetActivePage = MutationPayload;
+pub(crate) type DeleteEmptyPage = MutationPayload;
+pub(crate) type ClonePage = MutationPayload;
+pub(crate) type SetBindings = MutationPayload;
+pub(crate) type SetDisplayName = MutationPayload;
+pub(crate) type SetTopNGuard = MutationPayload;
+pub(crate) type SetDrilldownHierarchy = MutationPayload;
+pub(crate) type CloneVisual = MutationPayload;
+pub(crate) type DeleteVisual = MutationPayload;
+pub(crate) type UpdateFilter = MutationPayload;
+pub(crate) type DeleteFilter = MutationPayload;
+pub(crate) type ClearFilter = MutationPayload;
+pub(crate) type SlicerClear = MutationPayload;
+pub(crate) type SetText = MutationPayload;
+pub(crate) type SetColor = MutationPayload;
+pub(crate) type FormattingApply = MutationPayload;
+pub(crate) type ApplyThemeBundle = MutationPayload;
+pub(crate) type ApplyStyleBundle = MutationPayload;
+pub(crate) type BookmarkMetadata = MutationPayload;
+pub(crate) type SanitizeAction = MutationPayload;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -254,6 +360,33 @@ impl Op {
             Self::SetInteraction(_) => "setInteraction",
             Self::ApplyThemePreset(_) => "applyThemePreset",
             Self::SetObject(_) => "setObject",
+            Self::AddCalculatedColumn(_) => "addCalculatedColumn",
+            Self::AddStaticTable(_) => "addStaticTable",
+            Self::SetSortBy(_) => "setSortBy",
+            Self::SourceTemplateApply(_) => "sourceTemplateApply",
+            Self::AddPage(_) => "addPage",
+            Self::UpdatePage(_) => "updatePage",
+            Self::ReorderPages(_) => "reorderPages",
+            Self::SetActivePage(_) => "setActivePage",
+            Self::DeleteEmptyPage(_) => "deleteEmptyPage",
+            Self::ClonePage(_) => "clonePage",
+            Self::SetBindings(_) => "setBindings",
+            Self::SetDisplayName(_) => "setDisplayName",
+            Self::SetTopNGuard(_) => "setTopNGuard",
+            Self::SetDrilldownHierarchy(_) => "setDrilldownHierarchy",
+            Self::CloneVisual(_) => "cloneVisual",
+            Self::DeleteVisual(_) => "deleteVisual",
+            Self::UpdateFilter(_) => "updateFilter",
+            Self::DeleteFilter(_) => "deleteFilter",
+            Self::ClearFilter(_) => "clearFilter",
+            Self::SlicerClear(_) => "slicerClear",
+            Self::SetText(_) => "setText",
+            Self::SetColor(_) => "setColor",
+            Self::FormattingApply(_) => "formattingApply",
+            Self::ApplyThemeBundle(_) => "applyThemeBundle",
+            Self::ApplyStyleBundle(_) => "applyStyleBundle",
+            Self::BookmarkMetadata(_) => "bookmarkMetadata",
+            Self::SanitizeAction(_) => "sanitizeAction",
         }
     }
 
@@ -267,6 +400,33 @@ impl Op {
                 OpStage::Behavior
             }
             Self::ApplyThemePreset(_) | Self::SetObject(_) => OpStage::Style,
+            Self::AddCalculatedColumn(_)
+            | Self::AddStaticTable(_)
+            | Self::SetSortBy(_)
+            | Self::SourceTemplateApply(_) => OpStage::Model,
+            Self::AddPage(_)
+            | Self::UpdatePage(_)
+            | Self::ReorderPages(_)
+            | Self::SetActivePage(_)
+            | Self::DeleteEmptyPage(_)
+            | Self::ClonePage(_) => OpStage::Page,
+            Self::SetBindings(_)
+            | Self::SetDisplayName(_)
+            | Self::SetTopNGuard(_)
+            | Self::SetDrilldownHierarchy(_)
+            | Self::CloneVisual(_)
+            | Self::DeleteVisual(_) => OpStage::Visual,
+            Self::UpdateFilter(_)
+            | Self::DeleteFilter(_)
+            | Self::ClearFilter(_)
+            | Self::SlicerClear(_) => OpStage::Behavior,
+            Self::SetText(_)
+            | Self::SetColor(_)
+            | Self::FormattingApply(_)
+            | Self::ApplyThemeBundle(_)
+            | Self::ApplyStyleBundle(_)
+            | Self::BookmarkMetadata(_) => OpStage::Style,
+            Self::SanitizeAction(_) => OpStage::Behavior,
         }
     }
 
@@ -280,6 +440,102 @@ impl Op {
             | Self::SetInteraction(_)
             | Self::ApplyThemePreset(_)
             | Self::SetObject(_) => None,
+            Self::AddCalculatedColumn(value)
+            | Self::AddStaticTable(value)
+            | Self::SetSortBy(value)
+            | Self::SourceTemplateApply(value)
+            | Self::AddPage(value)
+            | Self::UpdatePage(value)
+            | Self::ReorderPages(value)
+            | Self::SetActivePage(value)
+            | Self::DeleteEmptyPage(value)
+            | Self::ClonePage(value)
+            | Self::SetBindings(value)
+            | Self::SetDisplayName(value)
+            | Self::SetTopNGuard(value)
+            | Self::SetDrilldownHierarchy(value)
+            | Self::CloneVisual(value)
+            | Self::DeleteVisual(value)
+            | Self::UpdateFilter(value)
+            | Self::DeleteFilter(value)
+            | Self::ClearFilter(value)
+            | Self::SlicerClear(value)
+            | Self::SetText(value)
+            | Self::SetColor(value)
+            | Self::FormattingApply(value)
+            | Self::ApplyThemeBundle(value)
+            | Self::ApplyStyleBundle(value)
+            | Self::BookmarkMetadata(value)
+            | Self::SanitizeAction(value) => {
+                let _ = value;
+                None
+            }
+        }
+    }
+
+    /// Return the stable handle produced by an operation, deriving it from a
+    /// flattened payload when the legacy command did not accept an explicit
+    /// handle flag. The owned form lets plan validation retain the same
+    /// collision checks as the original typed kernels without leaking a
+    /// temporary string reference.
+    pub(crate) fn declared_handle_owned(&self) -> Option<String> {
+        if let Some(handle) = self.declared_handle() {
+            return Some(handle.to_string());
+        }
+        match self {
+            Self::AddCalculatedColumn(payload) => Some(crate::tmdl::column_handle(
+                payload_text(payload, "table")?,
+                payload_text(payload, "name")?,
+            )),
+            Self::AddStaticTable(payload) => {
+                Some(crate::tmdl::table_handle(payload_text(payload, "table")?))
+            }
+            Self::AddPage(payload) => Some(crate::ops::handles::page_handle(payload_text(
+                payload, "name",
+            )?)),
+            Self::ClonePage(payload) => Some(crate::ops::handles::page_handle(payload_text(
+                payload, "newName",
+            )?)),
+            Self::CloneVisual(payload) => {
+                let page = payload_text(payload, "targetPage")
+                    .or_else(|| payload_text(payload, "page"))?;
+                let name = payload_text(payload, "name")?;
+                Some(format!(
+                    "visual:{}:{}",
+                    page.trim_start_matches("page:"),
+                    name
+                ))
+            }
+            Self::AddMeasure(_)
+            | Self::AddRelationship(_)
+            | Self::AddVisual(_)
+            | Self::AddFilter(_)
+            | Self::SetDrillthrough(_)
+            | Self::SetInteraction(_)
+            | Self::ApplyThemePreset(_)
+            | Self::SetObject(_)
+            | Self::SetSortBy(_)
+            | Self::SourceTemplateApply(_)
+            | Self::UpdatePage(_)
+            | Self::ReorderPages(_)
+            | Self::SetActivePage(_)
+            | Self::DeleteEmptyPage(_)
+            | Self::SetBindings(_)
+            | Self::SetDisplayName(_)
+            | Self::SetTopNGuard(_)
+            | Self::SetDrilldownHierarchy(_)
+            | Self::DeleteVisual(_)
+            | Self::UpdateFilter(_)
+            | Self::DeleteFilter(_)
+            | Self::ClearFilter(_)
+            | Self::SlicerClear(_)
+            | Self::SetText(_)
+            | Self::SetColor(_)
+            | Self::FormattingApply(_)
+            | Self::ApplyThemeBundle(_)
+            | Self::ApplyStyleBundle(_)
+            | Self::BookmarkMetadata(_)
+            | Self::SanitizeAction(_) => None,
         }
     }
 
@@ -320,7 +576,34 @@ impl Op {
             Self::AddMeasure(_)
             | Self::AddRelationship(_)
             | Self::AddFilter(_)
-            | Self::ApplyThemePreset(_) => Vec::new(),
+            | Self::ApplyThemePreset(_)
+            | Self::AddCalculatedColumn(_)
+            | Self::AddStaticTable(_)
+            | Self::SetSortBy(_)
+            | Self::SourceTemplateApply(_)
+            | Self::AddPage(_)
+            | Self::UpdatePage(_)
+            | Self::ReorderPages(_)
+            | Self::SetActivePage(_)
+            | Self::DeleteEmptyPage(_)
+            | Self::ClonePage(_)
+            | Self::SetBindings(_)
+            | Self::SetDisplayName(_)
+            | Self::SetTopNGuard(_)
+            | Self::SetDrilldownHierarchy(_)
+            | Self::CloneVisual(_)
+            | Self::DeleteVisual(_)
+            | Self::UpdateFilter(_)
+            | Self::DeleteFilter(_)
+            | Self::ClearFilter(_)
+            | Self::SlicerClear(_)
+            | Self::SetText(_)
+            | Self::SetColor(_)
+            | Self::FormattingApply(_)
+            | Self::ApplyThemeBundle(_)
+            | Self::ApplyStyleBundle(_)
+            | Self::BookmarkMetadata(_)
+            | Self::SanitizeAction(_) => Vec::new(),
         }
     }
 
@@ -328,6 +611,10 @@ impl Op {
     pub(crate) fn idempotent_key(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| self.tag().to_string())
     }
+}
+
+fn payload_text<'a>(payload: &'a MutationPayload, key: &str) -> Option<&'a str> {
+    payload.fields.get(key).and_then(Value::as_str)
 }
 
 fn is_handle_reference(value: &str) -> bool {
@@ -348,6 +635,33 @@ impl Serialize for Op {
             Self::SetInteraction(value) => serialize_tagged(self.tag(), value, serializer),
             Self::ApplyThemePreset(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetObject(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::AddCalculatedColumn(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::AddStaticTable(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetSortBy(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SourceTemplateApply(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::AddPage(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::UpdatePage(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::ReorderPages(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetActivePage(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::DeleteEmptyPage(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::ClonePage(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetBindings(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetDisplayName(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetTopNGuard(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetDrilldownHierarchy(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::CloneVisual(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::DeleteVisual(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::UpdateFilter(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::DeleteFilter(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::ClearFilter(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SlicerClear(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetText(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SetColor(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::FormattingApply(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::ApplyThemeBundle(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::ApplyStyleBundle(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::BookmarkMetadata(value) => serialize_tagged(self.tag(), value, serializer),
+            Self::SanitizeAction(value) => serialize_tagged(self.tag(), value, serializer),
         }
     }
 }
@@ -413,12 +727,93 @@ fn deserialize_tagged(tag: &str, payload: Value) -> Result<Op, String> {
         "setObject" => serde_json::from_value(payload)
             .map(Op::SetObject)
             .map_err(|error| format!("invalid setObject operation: {error}")),
+        "addCalculatedColumn" => serde_json::from_value(payload)
+            .map(Op::AddCalculatedColumn)
+            .map_err(|error| format!("invalid addCalculatedColumn operation: {error}")),
+        "addStaticTable" => serde_json::from_value(payload)
+            .map(Op::AddStaticTable)
+            .map_err(|error| format!("invalid addStaticTable operation: {error}")),
+        "setSortBy" => serde_json::from_value(payload)
+            .map(Op::SetSortBy)
+            .map_err(|error| format!("invalid setSortBy operation: {error}")),
+        "sourceTemplateApply" => serde_json::from_value(payload)
+            .map(Op::SourceTemplateApply)
+            .map_err(|error| format!("invalid sourceTemplateApply operation: {error}")),
+        "addPage" => serde_json::from_value(payload)
+            .map(Op::AddPage)
+            .map_err(|error| format!("invalid addPage operation: {error}")),
+        "updatePage" => serde_json::from_value(payload)
+            .map(Op::UpdatePage)
+            .map_err(|error| format!("invalid updatePage operation: {error}")),
+        "reorderPages" => serde_json::from_value(payload)
+            .map(Op::ReorderPages)
+            .map_err(|error| format!("invalid reorderPages operation: {error}")),
+        "setActivePage" => serde_json::from_value(payload)
+            .map(Op::SetActivePage)
+            .map_err(|error| format!("invalid setActivePage operation: {error}")),
+        "deleteEmptyPage" => serde_json::from_value(payload)
+            .map(Op::DeleteEmptyPage)
+            .map_err(|error| format!("invalid deleteEmptyPage operation: {error}")),
+        "clonePage" => serde_json::from_value(payload)
+            .map(Op::ClonePage)
+            .map_err(|error| format!("invalid clonePage operation: {error}")),
+        "setBindings" => serde_json::from_value(payload)
+            .map(Op::SetBindings)
+            .map_err(|error| format!("invalid setBindings operation: {error}")),
+        "setDisplayName" => serde_json::from_value(payload)
+            .map(Op::SetDisplayName)
+            .map_err(|error| format!("invalid setDisplayName operation: {error}")),
+        "setTopNGuard" => serde_json::from_value(payload)
+            .map(Op::SetTopNGuard)
+            .map_err(|error| format!("invalid setTopNGuard operation: {error}")),
+        "setDrilldownHierarchy" => serde_json::from_value(payload)
+            .map(Op::SetDrilldownHierarchy)
+            .map_err(|error| format!("invalid setDrilldownHierarchy operation: {error}")),
+        "cloneVisual" => serde_json::from_value(payload)
+            .map(Op::CloneVisual)
+            .map_err(|error| format!("invalid cloneVisual operation: {error}")),
+        "deleteVisual" => serde_json::from_value(payload)
+            .map(Op::DeleteVisual)
+            .map_err(|error| format!("invalid deleteVisual operation: {error}")),
+        "updateFilter" => serde_json::from_value(payload)
+            .map(Op::UpdateFilter)
+            .map_err(|error| format!("invalid updateFilter operation: {error}")),
+        "deleteFilter" => serde_json::from_value(payload)
+            .map(Op::DeleteFilter)
+            .map_err(|error| format!("invalid deleteFilter operation: {error}")),
+        "clearFilter" => serde_json::from_value(payload)
+            .map(Op::ClearFilter)
+            .map_err(|error| format!("invalid clearFilter operation: {error}")),
+        "slicerClear" => serde_json::from_value(payload)
+            .map(Op::SlicerClear)
+            .map_err(|error| format!("invalid slicerClear operation: {error}")),
+        "setText" => serde_json::from_value(payload)
+            .map(Op::SetText)
+            .map_err(|error| format!("invalid setText operation: {error}")),
+        "setColor" => serde_json::from_value(payload)
+            .map(Op::SetColor)
+            .map_err(|error| format!("invalid setColor operation: {error}")),
+        "formattingApply" => serde_json::from_value(payload)
+            .map(Op::FormattingApply)
+            .map_err(|error| format!("invalid formattingApply operation: {error}")),
+        "applyThemeBundle" => serde_json::from_value(payload)
+            .map(Op::ApplyThemeBundle)
+            .map_err(|error| format!("invalid applyThemeBundle operation: {error}")),
+        "applyStyleBundle" => serde_json::from_value(payload)
+            .map(Op::ApplyStyleBundle)
+            .map_err(|error| format!("invalid applyStyleBundle operation: {error}")),
+        "bookmarkMetadata" => serde_json::from_value(payload)
+            .map(Op::BookmarkMetadata)
+            .map_err(|error| format!("invalid bookmarkMetadata operation: {error}")),
+        "sanitizeAction" => serde_json::from_value(payload)
+            .map(Op::SanitizeAction)
+            .map_err(|error| format!("invalid sanitizeAction operation: {error}")),
         other => Err(format!("unsupported operation tag `{other}`")),
     }
 }
 
-/// JSON Schema for an operation plan. It intentionally describes the T1a
-/// closed set; T1b kernels extend the `oneOf` list additively.
+/// JSON Schema for an operation plan. The oneOf list covers the original T1a
+/// kernels and the T1b mutation families; read-only commands stay outside it.
 pub(crate) fn schema_json() -> Value {
     let operation = |tag: &str, properties: Value, required: &[&str]| {
         let mut value = serde_json::json!({
@@ -492,7 +887,37 @@ pub(crate) fn schema_json() -> Value {
                         operation("setObject", serde_json::json!({
                             "visual": {"type": "string"}, "object": {"type": "string"},
                             "property": {"type": "string"}, "value": {}
-                        }), &["visual", "object", "property", "value"])
+                        }), &["visual", "object", "property", "value"]),
+                        // T1b mutation payloads intentionally allow the
+                        // focused command catalog to add fields without
+                        // changing the operation envelope.
+                        operation("addCalculatedColumn", serde_json::json!({}), &[]),
+                        operation("addStaticTable", serde_json::json!({}), &[]),
+                        operation("setSortBy", serde_json::json!({}), &[]),
+                        operation("sourceTemplateApply", serde_json::json!({}), &[]),
+                        operation("addPage", serde_json::json!({}), &[]),
+                        operation("updatePage", serde_json::json!({}), &[]),
+                        operation("reorderPages", serde_json::json!({}), &[]),
+                        operation("setActivePage", serde_json::json!({}), &[]),
+                        operation("deleteEmptyPage", serde_json::json!({}), &[]),
+                        operation("clonePage", serde_json::json!({}), &[]),
+                        operation("setBindings", serde_json::json!({}), &[]),
+                        operation("setDisplayName", serde_json::json!({}), &[]),
+                        operation("setTopNGuard", serde_json::json!({}), &[]),
+                        operation("setDrilldownHierarchy", serde_json::json!({}), &[]),
+                        operation("cloneVisual", serde_json::json!({}), &[]),
+                        operation("deleteVisual", serde_json::json!({}), &[]),
+                        operation("updateFilter", serde_json::json!({}), &[]),
+                        operation("deleteFilter", serde_json::json!({}), &[]),
+                        operation("clearFilter", serde_json::json!({}), &[]),
+                        operation("slicerClear", serde_json::json!({}), &[]),
+                        operation("setText", serde_json::json!({}), &[]),
+                        operation("setColor", serde_json::json!({}), &[]),
+                        operation("formattingApply", serde_json::json!({}), &[]),
+                        operation("applyThemeBundle", serde_json::json!({}), &[]),
+                        operation("applyStyleBundle", serde_json::json!({}), &[]),
+                        operation("bookmarkMetadata", serde_json::json!({}), &[]),
+                        operation("sanitizeAction", serde_json::json!({}), &[]),
                     ]
                 }
             }
@@ -601,7 +1026,7 @@ mod tests {
             schema["properties"]["ops"]["items"]["oneOf"]
                 .as_array()
                 .map(Vec::len),
-            Some(8)
+            Some(35)
         );
     }
 

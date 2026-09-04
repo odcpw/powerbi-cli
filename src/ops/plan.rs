@@ -107,7 +107,7 @@ impl OpPlan {
                 validate_reference(index, reference, &available)?;
             }
 
-            if let Some(handle) = operation.declared_handle() {
+            if let Some(handle) = operation.declared_handle_owned() {
                 if handle.trim().is_empty() {
                     return Err(PlanError::new(
                         "ops.empty_handle",
@@ -115,14 +115,14 @@ impl OpPlan {
                         format!("/ops/{index}/handle"),
                     ));
                 }
-                if project.contains(handle) {
+                if project.contains(&handle) {
                     return Err(PlanError::new(
                         "ops.handle_collision",
                         format!("declared handle already exists in the project: {handle}"),
                         format!("/ops/{index}/handle"),
                     ));
                 }
-                if let Some(previous_index) = declarations.get(handle) {
+                if let Some(previous_index) = declarations.get(&handle) {
                     return Err(PlanError::new(
                         "ops.duplicate_handle",
                         format!("declared handle is already produced by operation {previous_index}: {handle}"),
@@ -130,8 +130,8 @@ impl OpPlan {
                     )
                     .with_related_pointer(format!("/ops/{previous_index}/handle")));
                 }
-                declarations.insert(handle.to_string(), index);
-                available.insert(handle.to_string());
+                declarations.insert(handle.clone(), index);
+                available.insert(handle);
             }
 
             stages.entry(stage).or_default().push(index);

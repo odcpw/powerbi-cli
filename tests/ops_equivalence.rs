@@ -177,3 +177,50 @@ fn set_drillthrough_ops_equivalence_fixture_is_byte_deterministic() {
     }
     assert_eq!(tree(&first), tree(&second));
 }
+
+#[test]
+fn remaining_mutation_commands_expose_replayable_operation_kinds() {
+    let run = run_powerbi(&["--json", "capabilities"]);
+    assert_eq!(run.code, 0, "capabilities: {}", run.stderr);
+    let document: serde_json::Value = serde_json::from_str(&run.stdout).expect("capabilities JSON");
+    let commands = document["commands"].as_array().expect("command catalog");
+    let expected = [
+        ("model calculated-columns add", "addCalculatedColumn"),
+        ("model tables add-static", "addStaticTable"),
+        ("model columns set-sort-by", "setSortBy"),
+        ("source-template apply", "sourceTemplateApply"),
+        ("report pages add", "addPage"),
+        ("report pages update", "updatePage"),
+        ("report pages reorder", "reorderPages"),
+        ("report pages set-active", "setActivePage"),
+        ("report pages delete-empty", "deleteEmptyPage"),
+        ("report pages clone", "clonePage"),
+        ("report visuals set-bindings", "setBindings"),
+        ("report visuals set-display-name", "setDisplayName"),
+        ("report visuals set-topn-guard", "setTopNGuard"),
+        ("report drilldown set-hierarchy", "setDrilldownHierarchy"),
+        ("report visuals clone", "cloneVisual"),
+        ("report visuals delete", "deleteVisual"),
+        ("report filters update", "updateFilter"),
+        ("report filters delete", "deleteFilter"),
+        ("report filters clear", "clearFilter"),
+        ("report slicers clear", "slicerClear"),
+        ("report visuals formatting set-text", "setText"),
+        ("report visuals formatting set-color", "setColor"),
+        ("report visuals formatting apply", "formattingApply"),
+        ("report themes apply", "applyThemeBundle"),
+        ("report style apply", "applyStyleBundle"),
+        ("report bookmarks set-display-name", "bookmarkMetadata"),
+        ("report bookmarks reorder", "bookmarkMetadata"),
+        ("report bookmarks delete", "bookmarkMetadata"),
+        ("report sanitize apply", "sanitizeAction"),
+    ];
+    for (path, op_kind) in expected {
+        let command = commands
+            .iter()
+            .find(|command| command["path"] == path)
+            .unwrap_or_else(|| panic!("missing catalog path {path}"));
+        assert_eq!(command["mutates"], true, "{path} must remain a mutation");
+        assert_eq!(command["opKind"], op_kind, "wrong opKind for {path}");
+    }
+}
