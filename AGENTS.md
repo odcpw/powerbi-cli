@@ -34,6 +34,11 @@ dashboard from schema + profile + intent, data-domain agnostic, agent-first.
   command end to end (clap definition, dispatcher, module, contract catalog in
   `src/contract/*.rs`, `src/feature_catalog.rs`, tests) before adding one.
   Reuse `src/cli_support.rs`.
+- Every new or renamed command path MUST be invoked in
+  `tests/desktop_acceptance_everything.rs` (the everything-acceptance harness
+  asserts that every advertised capability is exercised); run
+  `cargo test --test desktop_acceptance_everything` before committing a
+  command change.
 - Docs change in the same commit as behavior: README.md,
   skills/powerbi-cli/SKILL.md, the capabilities catalog, the feature catalog,
   docs/roadmap.md as applicable. Keep doc edits localized (insert small blocks
