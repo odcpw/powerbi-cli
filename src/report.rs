@@ -1,6 +1,5 @@
 use crate::contract::suggested_command_path;
 use crate::feature_catalog::unsupported_feature_error;
-use crate::inspect::deep_inspect;
 use crate::report_bookmarks::bookmarks_command;
 use crate::report_build::{build_command, spec_command};
 use crate::report_design::design_plan_command;
@@ -17,12 +16,9 @@ use crate::report_slicers::slicers_command;
 use crate::report_style::style_command;
 use crate::report_themes::themes_command;
 use crate::report_visuals::visuals_command;
-use crate::{
-    CliError, CliResult, canonical_display, command_arg, resolve_project, validate_project,
-};
+use crate::report_wireframe::wireframe_export;
+use crate::{CliError, CliResult};
 use serde_json::Value;
-use serde_json::json;
-use std::path::PathBuf;
 
 pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
     match args {
@@ -119,83 +115,4 @@ fn unknown_report_command(args: &[String]) -> CliError {
             "Run `powerbi-cli --json capabilities --for report` for supported report commands.",
         )
         .with_suggested_command("powerbi-cli --json capabilities --for report")
-}
-
-fn wireframe_export(args: &[String]) -> CliResult<Value> {
-    let path = parse_wireframe_args(args)?;
-    let resolved = resolve_project(&path)?;
-    let validation = validate_project(&resolved)?;
-    let deep = deep_inspect(&resolved, &validation)?;
-    let report = deep["report"].clone();
-    let handles = deep["handles"]
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter(|item| matches!(item["kind"].as_str(), Some("project" | "page" | "visual")))
-                .cloned()
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    Ok(json!({
-        "schema": "powerbi-cli.report.wireframe.v1",
-        "projectDir": canonical_display(&resolved.project_dir),
-        "pbip": canonical_display(&resolved.pbip_path),
-        "reportDir": canonical_display(&resolved.report_dir),
-        "valid": validation.errors.is_empty(),
-        "counts": {
-            "pages": validation.pages,
-            "visuals": validation.visuals,
-            "boundVisuals": validation.bound_visuals
-        },
-        "handles": handles,
-        "pages": report["pages"].clone(),
-        "next": [
-            format!("powerbi-cli inspect --deep {} --json", command_arg(&resolved.project_dir)),
-            format!("powerbi-cli validate {} --json", command_arg(&resolved.project_dir))
-        ],
-        "warnings": validation.warnings,
-        "errors": validation.errors
-    }))
-}
-
-fn parse_wireframe_args(args: &[String]) -> CliResult<PathBuf> {
-    let mut path = None;
-    for arg in args {
-        match arg.as_str() {
-            other if other.starts_with('-') => {
-                return Err(CliError::invalid_args(format!(
-                    "unknown report wireframe export flag: {other}"
-                ))
-                .with_hint(
-                    "Only JSON wireframe export is supported now. Use global `--json` or `--format json`.",
-                )
-                .with_suggested_command(
-                    "powerbi-cli report wireframe export <project-dir-or.pbip> --json",
-                ));
-            }
-            other => {
-                if path.is_some() {
-                    return Err(CliError::invalid_args(
-                        "report wireframe export accepts exactly one path",
-                    )
-                    .with_hint(
-                        "Run `powerbi-cli report wireframe export <project-dir-or.pbip> --json`.",
-                    )
-                    .with_suggested_command(
-                        "powerbi-cli report wireframe export <project-dir-or.pbip> --json",
-                    ));
-                }
-                path = Some(PathBuf::from(other));
-            }
-        }
-    }
-    path.ok_or_else(|| {
-        CliError::invalid_args("report wireframe export requires a path")
-            .with_hint("Run `powerbi-cli report wireframe export <project-dir-or.pbip> --json`.")
-            .with_suggested_command(
-                "powerbi-cli report wireframe export <project-dir-or.pbip> --json",
-            )
-    })
 }

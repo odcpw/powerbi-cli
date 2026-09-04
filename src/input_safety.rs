@@ -517,6 +517,160 @@ pub(crate) fn snapshot_destination(
     Ok(candidate)
 }
 
+/// Resolve an externally written artifact path without allowing it to alias
+/// the selected project.  This boundary intentionally permits replacing an
+/// existing ordinary file (wireframe exports are reproducible artifacts), but
+/// refuses symlinks/reparse points at every existing path component.  Missing
+/// parent components are returned in canonical form so callers can create
+/// them immediately before publication.
+pub(crate) fn artifact_destination(project_root: &Path, requested: &Path) -> CliResult<PathBuf> {
+    let source_metadata = fs::symlink_metadata(project_root).map_err(|error| {
+        CliError::file_not_found(format!(
+            "inspect artifact source {}: {error}",
+            project_root.display()
+        ))
+    })?;
+    if !source_metadata.is_dir() || metadata_is_link_or_reparse(&source_metadata) {
+        return Err(refusal(
+            InputKind::Snapshot,
+            "artifact source must be an ordinary non-symlink directory",
+        ));
+    }
+    let project_root = fs::canonicalize(project_root).map_err(|error| {
+        CliError::file_not_found(format!(
+            "resolve artifact source {}: {error}",
+            project_root.display()
+        ))
+    })?;
+
+    let requested = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| {
+                CliError::unexpected(format!("resolve artifact working directory: {error}"))
+            })?
+            .join(requested)
+    };
+    let requested = normalize_artifact_path(&requested)?;
+    let parent = requested.parent().unwrap_or_else(|| Path::new("."));
+    let (canonical_parent, missing_components) = canonical_output_parent(parent)?;
+    let mut candidate = canonical_parent.clone();
+    for component in missing_components.iter().rev() {
+        candidate.push(component);
+    }
+    let file_name = requested.file_name().ok_or_else(|| {
+        refusal(
+            InputKind::Snapshot,
+            format!(
+                "artifact destination needs a file name: {}",
+                requested.display()
+            ),
+        )
+    })?;
+    candidate.push(file_name);
+    if let Ok(metadata) = fs::symlink_metadata(&candidate)
+        && metadata_is_link_or_reparse(&metadata)
+    {
+        return Err(refusal(
+            InputKind::Snapshot,
+            format!(
+                "artifact destination must not be a symlink or reparse point: {}",
+                requested.display()
+            ),
+        ));
+    }
+    if candidate.starts_with(&project_root) {
+        return Err(refusal(
+            InputKind::Snapshot,
+            format!(
+                "artifact destination must be outside the selected project: {}",
+                requested.display()
+            ),
+        ));
+    }
+    probe_writable(&canonical_parent)?;
+    Ok(candidate)
+}
+
+fn normalize_artifact_path(path: &Path) -> CliResult<PathBuf> {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    return Err(refusal(
+                        InputKind::Snapshot,
+                        format!(
+                            "artifact destination escapes its working directory: {}",
+                            path.display()
+                        ),
+                    ));
+                }
+            }
+            Component::RootDir | Component::Prefix(_) | Component::Normal(_) => {
+                normalized.push(component.as_os_str());
+            }
+        }
+    }
+    Ok(normalized)
+}
+
+fn canonical_output_parent(parent: &Path) -> CliResult<(PathBuf, Vec<PathBuf>)> {
+    let mut missing = Vec::new();
+    let mut existing = parent;
+    while !existing.exists() {
+        let name = existing.file_name().ok_or_else(|| {
+            refusal(
+                InputKind::Snapshot,
+                format!(
+                    "artifact destination parent is unavailable: {}",
+                    parent.display()
+                ),
+            )
+        })?;
+        missing.push(PathBuf::from(name));
+        existing = existing.parent().ok_or_else(|| {
+            refusal(
+                InputKind::Snapshot,
+                format!(
+                    "artifact destination parent is unavailable: {}",
+                    parent.display()
+                ),
+            )
+        })?;
+    }
+    let metadata = fs::symlink_metadata(existing).map_err(|error| {
+        refusal(
+            InputKind::Snapshot,
+            format!(
+                "inspect artifact destination parent {}: {error}",
+                existing.display()
+            ),
+        )
+    })?;
+    if !metadata.is_dir() || metadata_is_link_or_reparse(&metadata) {
+        return Err(refusal(
+            InputKind::Snapshot,
+            format!(
+                "artifact destination parent must be an ordinary directory: {}",
+                existing.display()
+            ),
+        ));
+    }
+    let existing = fs::canonicalize(existing).map_err(|error| {
+        refusal(
+            InputKind::Snapshot,
+            format!(
+                "resolve artifact destination parent {}: {error}",
+                existing.display()
+            ),
+        )
+    })?;
+    Ok((existing, missing))
+}
+
 pub(crate) fn read_harvested_fragment(path: &Path) -> CliResult<Value> {
     let text = read_utf8(path, InputKind::HarvestedFragment)?;
     let value: Value = serde_json::from_str(&text).map_err(|error| {

@@ -207,6 +207,14 @@ mutations support `--dry-run`, `--out-dir`, and guarded `--in-place`. Legacy
 `--preset overview|analysis|detail|grid` values remain aliases for the named
 templates.
 
+`report wireframe export` keeps the JSON wireframe baseline and can render the
+same resolved grid and deep-inspection visual geometry as deterministic SVG or
+HTML. SVG output is one file per page (use an output directory for a
+multi-page report); HTML embeds every page with a stable index. Use
+`--dry-run` to review artifact bytes without writing, or `--out` to publish
+outside the PBIP project. CSS is embedded and no network or external assets
+are used.
+
 A focused `--for` response returns the matching commands and small shared
 contract fields. It deliberately leaves the large unrelated schema/visual
 catalogs null and names them in `omittedCatalogs`; run the returned
@@ -246,7 +254,7 @@ schema validate/normalize (including bounded `$include` composition), profile
 infer/validate/summarize, deterministic report planning, declarative report spec
 validation/normalization, report build from schema/profile/spec inputs, scaffold, shallow/deep
 inspect, semantic measure,
-calculated-column, and relationship diff, report wireframe JSON export,
+calculated-column, and relationship diff, report wireframe JSON/SVG/HTML export,
 measure list/show/add/update/delete, static DAX dependencies/lint, explicitly
 opted-in bounded DAX query execution against an exact already-open Desktop
 PBIP/PBIX, guarded TMDL-only semantic-model export from that same exact live
@@ -678,6 +686,8 @@ pbi --json lint --rules
 pbi --json lint --explain dax.reference_self
 pbi --json lint --explain m.duplicate_step_name
 pbi --json report wireframe export build/sales
+pbi report wireframe export build/sales --format svg --out proof/sales-wireframe --json
+pbi report wireframe export build/sales --format html --dry-run --json
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales
 ```

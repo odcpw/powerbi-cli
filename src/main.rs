@@ -101,6 +101,7 @@ mod report_visual_mutations;
 mod report_visual_objects;
 mod report_visual_scaffold;
 mod report_visuals;
+mod report_wireframe;
 mod rules;
 mod safety_scan;
 mod scaffold;

@@ -144,7 +144,7 @@ Usage:
   powerbi-cli report audit --project <project-dir-or.pbip> --json
   powerbi-cli report sanitize plan --project <project-dir-or.pbip> --json
   powerbi-cli report sanitize apply --project <project-dir-or.pbip> --dry-run --json
-  powerbi-cli report wireframe export <project-dir-or.pbip> --json
+  powerbi-cli report wireframe export <project-dir-or.pbip> --format svg --out <preview-dir> --json
   powerbi-cli report layout auto --project <project-dir-or.pbip> --page <page-handle> --template overview --dry-run --json
   powerbi-cli report pages list --project <project-dir-or.pbip> --json
   powerbi-cli report pages show --project <project-dir-or.pbip> --handle <page-handle> --json
@@ -1248,6 +1248,7 @@ fn schema_manifest() -> Value {
         "reportAuditFields": ["ok", "profile", "counts.findings", "counts.bySeverity", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].message", "recommendedActions", "unsupportedActions", "next"],
         "reportSanitizePlanFields": ["ok", "profile", "planFingerprint", "confirmToken", "actions[].kind", "actions[].handles", "actions[].applySupported", "actions[].blockedReason", "actions[].jsonPointers", "next"],
         "reportSanitizeApplyFields": ["ok", "dryRun", "mode", "planFingerprint", "actions[].kind", "actions[].handles", "changes[].path", "changes[].jsonPointer", "postAudit", "validateCommand", "readbackCommand", "next"],
+        "reportWireframeFields": ["ok", "format", "dryRun", "mode", "projectDir", "template", "grid", "geometrySource", "gridSource", "counts", "handles", "pages[].slots[]", "pages[].visuals[]", "pages[].lintMarkers[]", "artifacts[]", "warnings", "errors", "next"],
         "reportLayoutAutoMutationFields": ["dryRun", "mode", "layoutPlan.template", "layoutPlan.grid", "layoutPlan.pages", "layoutPlan.changedVisuals", "preview.pages[].template", "preview.pages[].slots[]", "preview.pages[].assignments[]", "preview.pages[].invariants", "warnings[].code", "changes[].path", "changes[].visual", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportDrilldownHierarchyMutationFields": ["dryRun", "mode", "target.handle", "hierarchyPlan.fields", "hierarchyPlan.before", "hierarchyPlan.after", "changes[].jsonPointer", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportThemeFields": ["handle", "state", "name", "fingerprint", "reportJsonPath", "themeCollection", "registeredThemes", "safety"],

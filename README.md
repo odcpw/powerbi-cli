@@ -349,6 +349,8 @@ cargo run --bin powerbi-cli -- desktop open-check .\build\sales --json
 cargo run --bin powerbi-cli -- desktop screenshot .\build\sales --out .\proof\sales.png --json
 cargo run --bin powerbi-cli -- report design-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- report wireframe export .\build\sales --json
+cargo run --bin powerbi-cli -- report wireframe export .\build\sales --format svg --out .\proof\sales-wireframe --json
+cargo run --bin powerbi-cli -- report wireframe export .\build\sales --format html --out .\proof\sales-wireframe.html --json
 cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --template overview --dry-run --json
 cargo run --bin powerbi-cli -- report layout auto --project .\build\sales --page page:ReportSectionOverview --template kpi-strip-trend-breakdown --grid columns=12,gutter=16,margin=24,rowUnit=8 --out-dir .\build\sales-layout --json
 cargo run --bin powerbi-cli -- report pages list --project .\build\sales --json
@@ -931,7 +933,8 @@ This generated snapshot keeps status and proof claims aligned with
   List output hides raw bookmark JSON by default and marks bookmark state that
   may persist filter, slicer, highlight, or selected semantic-model values.
 - Programmatic report design/layout authoring covers `report design-plan`,
-  `report layout auto`, and `report drilldown set-hierarchy`. Design-plan is a
+  `report layout auto`, deterministic `report wireframe export` JSON/SVG/HTML,
+  and `report drilldown set-hierarchy`. Design-plan is a
   read-only profile with exact next commands; auto-layout uses the deterministic
   twelve-column design grid and eleven named templates (`overview`,
   `time-series`, `ranking`, `distribution`, `comparison`, `detail-table`,
@@ -939,7 +942,9 @@ This generated snapshot keeps status and proof claims aligned with
   `kpi-strip-trend-breakdown`). Templates expose named slots with preferred
   visual families, emit SVG-free JSON previews and overlap/minimum-size
   invariants, and support standard (1280x720), wide (1920x1080), or explicit
-  page-size/grid overrides. Mutations support `--dry-run`, `--out-dir`, and
+  page-size/grid overrides. Wireframe SVG/HTML previews are written outside
+  the project with `--out` or can be reviewed inline with `--dry-run`; they
+  embed their CSS and never fetch external assets. Layout mutations support `--dry-run`, `--out-dir`, and
   guarded `--in-place`; legacy `--preset overview|analysis|detail|grid`
   remains an alias for the corresponding templates; auto-layout rewrites only
   visual `position` blocks;
