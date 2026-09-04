@@ -29,7 +29,7 @@ focused `capabilities --for ...` response.
 | Image | PNG only in v1; 16 MiB; the eight-byte PNG signature is sniffed, so an extension cannot authorize content; URL inputs are not accepted |
 | Ops file | 8 MiB; exact `powerbi-cli.ops.v1` schema marker and typed op-kind allowlist must pass before apply; unknown op kinds are refused |
 | Snapshot | Sibling path by default or explicit `--snapshot-dir`; source at most 10,000 files and 512 MiB; links, an inside-project destination, an existing destination, and an unwritable destination are refused |
-| Harvested PBIR fragment | 4 MiB; known persisted selection/filter value containers are refused with a JSON pointer; the guard never silently strips content |
+| Harvested PBIR fragment | 4 MiB; known persisted selection/filter value containers (including Desktop slicer `filter/.../Value` comparisons) are refused with a JSON pointer; the guard never silently strips content |
 
 Package archives and deterministic staged-workflow resources retain their
 stricter specialized streaming limits and file-identity checks. This contract

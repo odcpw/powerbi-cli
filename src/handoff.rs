@@ -10,8 +10,8 @@ use crate::tmdl::{
     PartitionRecord, load_table_documents, partition_source_kind_is_external, table_handle,
 };
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
-    resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, Finding, canonical_display,
+    command_arg, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -75,17 +75,11 @@ fn check_handoff(args: &[String]) -> CliResult<Value> {
         .flat_map(|doc| doc.partitions.iter())
         .collect::<Vec<_>>();
     let mut findings = Vec::new();
-    for error in &validation.errors {
-        findings.push(project_finding("error", error));
+    for diagnostic in &validation.errors {
+        findings.push(project_finding(diagnostic));
     }
-    for warning in &validation.warnings {
-        findings.push(json!({
-            "code": rules::PROJECT_VALIDATION_WARNING,
-            "severity": "warning",
-            "message": warning,
-            "handle": Value::Null,
-            "path": Value::Null
-        }));
+    for diagnostic in &validation.warnings {
+        findings.push(project_finding(diagnostic));
     }
     add_project_file_hazards(&resolved.project_dir, &mut findings)?;
     for doc in &docs {
@@ -466,18 +460,14 @@ fn is_handoff_text_file(relative: &str) -> bool {
         .is_some_and(|name| name.eq_ignore_ascii_case(".platform"))
 }
 
-fn project_finding(severity: &str, message: &str) -> Value {
-    let code = if message.contains("offline-unsafe") {
-        rules::HANDOFF_OFFLINE_UNSAFE_FILE
-    } else {
-        rules::PROJECT_VALIDATION_ERROR
-    };
+fn project_finding(diagnostic: &Finding) -> Value {
     json!({
-        "code": code,
-        "severity": severity,
-        "message": message,
+        "code": diagnostic.code,
+        "severity": diagnostic.severity,
+        "message": diagnostic.message,
         "handle": Value::Null,
-        "path": Value::Null
+        "path": diagnostic.path,
+        "pointer": diagnostic.pointer
     })
 }
 

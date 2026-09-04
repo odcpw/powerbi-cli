@@ -183,7 +183,7 @@ fn scatter_with_category_rejects_bare_columns_in_all_numeric_roles() {
         .as_array()
         .expect("validation errors")
         .iter()
-        .filter_map(Value::as_str)
+        .filter_map(|error| error["message"].as_str())
         .collect::<Vec<_>>();
     for role in ["X", "Y", "Size"] {
         assert!(errors.iter().any(|error| {

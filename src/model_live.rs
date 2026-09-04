@@ -97,7 +97,14 @@ fn export_tmdl(args: &[String]) -> CliResult<Value> {
                 return Err(CliError::validation_failed(
                     "PBIP runtime validation failed before live TMDL export",
                 )
-                .with_hint(report.errors.join("; ")));
+                .with_hint(
+                    report
+                        .errors
+                        .iter()
+                        .map(|finding| finding.message.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; "),
+                ));
             }
             json!({
                 "kind": "pbip-runtime",

@@ -1,6 +1,6 @@
 use crate::input_safety::{InputKind, read_utf8};
 use crate::inspect::deep_inspect;
-use crate::model_dax::{add_cycle_findings, analyze_dax};
+use crate::model_dax::{add_cycle_findings, add_model_completeness_findings, analyze_dax};
 use crate::rules;
 use crate::tmdl::load_table_documents;
 use crate::{
@@ -62,7 +62,7 @@ pub(crate) fn lint_project(
     add_pbir_metadata_findings(resolved, &mut findings)?;
     add_report_findings(&deep, &mut findings);
     add_model_findings(&deep, &mut findings);
-    add_dax_findings(resolved, &mut findings)?;
+    add_dax_findings(resolved, &deep, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
     add_desktop_compat_findings(resolved, &mut findings)?;
     rules::ensure_finding_ids_registered(&findings, "code")?;
@@ -181,23 +181,25 @@ fn lint_mode_conflict() -> CliError {
 }
 
 fn add_validation_findings(validation: &ValidationReport, findings: &mut Vec<Value>) {
-    for message in &validation.errors {
-        findings.push(finding(
-            rules::VALIDATION_STRUCTURE,
-            "error",
-            message,
-            None,
-            None,
-        ));
+    for diagnostic in &validation.errors {
+        findings.push(json!({
+            "code": diagnostic.code,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "handle": Value::Null,
+            "path": diagnostic.path,
+            "pointer": diagnostic.pointer
+        }));
     }
-    for message in &validation.warnings {
-        findings.push(finding(
-            rules::VALIDATION_WARNING,
-            "warning",
-            message,
-            None,
-            None,
-        ));
+    for diagnostic in &validation.warnings {
+        findings.push(json!({
+            "code": diagnostic.code,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "handle": Value::Null,
+            "path": diagnostic.path,
+            "pointer": diagnostic.pointer
+        }));
     }
 }
 
@@ -374,7 +376,11 @@ fn add_model_findings(deep: &Value, findings: &mut Vec<Value>) {
     }
 }
 
-fn add_dax_findings(resolved: &ResolvedProject, findings: &mut Vec<Value>) -> CliResult<()> {
+fn add_dax_findings(
+    resolved: &ResolvedProject,
+    deep: &Value,
+    findings: &mut Vec<Value>,
+) -> CliResult<()> {
     let docs = match load_table_documents(resolved) {
         Ok(docs) => docs,
         Err(err) if err.code == "file_not_found" => return Ok(()),
@@ -382,6 +388,10 @@ fn add_dax_findings(resolved: &ResolvedProject, findings: &mut Vec<Value>) -> Cl
     };
     let mut analysis = analyze_dax(&docs);
     add_cycle_findings(&mut analysis);
+    // Model completeness uses the same static DAX graph so columns referenced
+    // by a measure are not reported as unused. DAX-only lint remains scoped to
+    // the analysis findings returned by `model dax lint`.
+    add_model_completeness_findings(deep, &analysis, findings);
     for finding in analysis.findings {
         findings.push(finding);
     }

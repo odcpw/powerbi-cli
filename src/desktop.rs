@@ -2,6 +2,7 @@
 
 mod cleanup;
 mod evidence;
+mod harvest_reference;
 mod launch;
 mod observe;
 

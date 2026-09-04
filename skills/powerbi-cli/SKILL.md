@@ -105,6 +105,7 @@ pbi --json capabilities --for validate --compact
 pbi --json capabilities --for lint --compact
 pbi lint --rules --json
 pbi lint --explain dax.reference_self --json
+pbi lint --explain dax.format_missing --json
 pbi lint --explain m.duplicate_step_name --json
 pbi --json capabilities --for diff --compact
 pbi --json capabilities --for package
@@ -150,7 +151,8 @@ list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
 PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive rebind metadata,
 handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
-one-shot desktop open-check/screenshot,
+one-shot desktop open-check/screenshot and Linux-capable desktop
+harvest-reference,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
@@ -401,8 +403,12 @@ The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. A v2
 section is safe to retain before its compiler lands: compiled validation/build
 will return `unsupported_feature` with the owning T3 bead id, never silently
 discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
-  reference; `report spec upgrade` remains assigned to
-  `pbi-t2-dashboard-spec-v2-dsd.6`.
+  reference. Migrate a validated v1 spec with
+  `report spec upgrade --spec <v1.json> --out <v2.json>`; it rewrites only
+  `/schema`, preserves array order, recursively normalizes object keys, and
+  reports every transformed pointer. Use `--dry-run` to inspect the v2
+  document without writing; unknown v1 keys fail with
+  `spec.unknown_field` before output.
   `report spec validate` writes validation failures to stdout as structured
   `errors[]` objects (`code` and `message` are required; `pointer`,
   `didYouMean`, `hint`, and `suggestedCommands` are optional). Consumers should
@@ -422,8 +428,10 @@ pbi --json schema validate examples/sales.schema.json
 pbi --json schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
 pbi --json profile validate examples/sales.profile.json
+pbi --json report plan --schema examples/sales.schema.json --profile examples/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.planned.dashboard.json
 pbi --json report spec validate --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json
 pbi --json report spec normalize examples/sales.dashboard.json --out build/sales.dashboard.normalized.json
+pbi --json report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json
 pbi --json report build --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/generic-sales --force
 pbi --json validate --strict build/generic-sales
 pbi --json handoff check build/generic-sales
@@ -431,9 +439,15 @@ pbi --json fixture verify build/generic-sales --expected testdata/golden/generic
 ```
 
 `report plan` is implemented as a deterministic starter-spec planner. Give it a
-schema, optional profile, objective, and `--out <dashboard.json>`, then validate
-the emitted spec before `report build`. It is not a substitute for reviewing the
-generated report intent or for Desktop compatibility proof.
+schema, optional profile, and either `--intent <intent.md|intent.json>` or the
+backward-compatible objective text, then validate the emitted spec before
+`report build`. Intent v1 normalizes audience, questions, KPIs, comparisons,
+periods, drill paths, alerts, filter dimensions, preferred archetypes, page
+flow, and handoff requirements. KPI names resolve to exact model measures;
+unresolved names return `spec.missing_input` with a pointer and candidates.
+Fields not compiled by this starter planner remain in the response with an
+owning-bead warning. It is not a substitute for reviewing generated report
+intent or for Desktop compatibility proof.
 
 ### Scaffold From A Schema
 
@@ -493,6 +507,13 @@ pbi --json report wireframe export build/sales
 pbi --json report interactions list --project build/sales
 pbi --json handoff check build/sales
 ```
+
+The combined lint and triage scorecards also report model completeness
+warnings: measures without an explicit format, malformed custom format
+strings, visible relationship keys, suspicious both-direction
+fact-to-dimension relationships, and columns unused by visuals, measures, or
+relationships. Each finding has a stable handle and a remediation hint; use
+model dax lint when only DAX and measure-format diagnostics are needed.
 
 Use `report visuals list/show` handles for every visual mutation. Delete a
 visual only with `report visuals delete --dry-run`, then an output copy or a
@@ -558,6 +579,36 @@ refresh when opened at work. Input type `date` is normalized to TMDL `dateTime`
 and receives `formatString: "Short Date"` unless an explicit format string is
 provided. Colon-bearing table and column names round-trip through percent-encoded
 handles returned by the CLI.
+
+### Author Tables And Columns
+
+Use the generic semantic-model commands for typed table and column inventory
+and guarded CRUD:
+
+```bash
+pbi --json capabilities --for "model tables"
+pbi --json model tables list --project build/sales
+pbi --json model tables show --project build/sales --handle table:FactSales
+pbi --json model tables add --project build/sales --table DimSegment --column Code --data-type string --dry-run
+pbi --json model tables rename --project build/sales --handle table:DimDate --new-name Calendar --rename-references --dry-run
+pbi --json model tables delete --project build/sales --handle table:DimSegment --dry-run
+pbi --json capabilities --for "model columns"
+pbi --json model columns list --project build/sales
+pbi --json model columns add --project build/sales --table FactSales --name Margin --data-type decimal --dry-run
+pbi --json model columns update --project build/sales --handle column:FactSales:Revenue --format-string '$#,##0' --dry-run
+pbi --json model columns delete --project build/sales --handle column:FactSales:Margin --dry-run
+pbi --json diff build/sales build/sales-v2 --scope model.tables
+pbi --json diff build/sales build/sales-v2 --scope model.columns
+```
+
+Table handles are `table:<name>` and column handles are
+`column:<table>:<name>`; literal `%` and `:` in every component are encoded as
+`%25` and `%3A`. Table rename refuses and lists relationship/DAX/variation
+references unless `--rename-references` is explicit. Column updates refuse a
+targeted block containing unknown Desktop-authored properties (including
+annotations or extended properties) rather than dropping them. Every mutation
+supports `--dry-run`, guarded `--in-place`, and isolated `--out-dir`; run the
+returned inspect and validate commands after applying a plan.
 
 ### Add A Small Selector Or Lookup Table
 
@@ -1079,6 +1130,25 @@ follows only the exact observed PID and verified descendants, never sweeps by
 title or executable path, and verifies targeted PIDs are dead. `--leave-open` is
 rejected; use the managed `desktop open`/`desktop close` pair.
 
+Use `desktop harvest-reference` to archive a Desktop-saved `visual.json`,
+`page.json`, or `report.json` fragment by stable handle:
+
+```bash
+pbi --json desktop harvest-reference \
+  --project build/sales \
+  --visual visual:ReportSectionOverview:VisualContainer1 \
+  --out docs/reference/desktop-authored-visuals/sales-card.json
+```
+
+The archive wraps the fragment under `fragment` and records `provenance` with
+the source path, source-project SHA-256 fingerprint, date, license note, and
+Desktop version (`unknown` when none is supplied). The command calls the
+shared harvested-fragment input guard and refuses persisted selection/filter
+values, malformed or oversized files, links, and invalid UTF-8; it never
+silently strips rejected state. Already-saved Linux projects remain
+`desktop-golden-pending` because this path does not prove a Desktop canvas or
+refresh.
+
 When duplicate Desktop windows share the project title, selection prefers the
 association-launch PID and then a new post-baseline Desktop PID. If only
 pre-existing duplicates remain, the command reports `desktop_title_ambiguous`
@@ -1144,7 +1214,8 @@ High-value improvement targets:
 - stable object handles;
 - `inspect --deep`;
 - generated proof/follow-up commands on every mutation;
-- strict validation diagnostics with machine-readable codes;
+- strict validation diagnostics with machine-readable codes, source paths, and
+  RFC 6901 JSON pointers;
 - `handoff check` and source rebind planning;
 - Desktop rebind/refresh proof for SQL Server, PostgreSQL/Npgsql, ODBC/DSN,
   Excel, CSV, folder, and SharePoint/OneDrive source templates;

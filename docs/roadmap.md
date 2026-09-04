@@ -101,8 +101,10 @@ Required contract rules:
 
 ### Semantic Model
 
-- `model tables list/show/add/update/delete`
-- `model columns list/show/add/update/delete`
+- `model tables list/show/add/rename/delete` (shipped guarded TMDL CRUD;
+  rename can rewrite references explicitly)
+- `model columns list/show/add/update/delete` (shipped guarded base and
+  calculated-column CRUD with unknown-metadata refusal)
 - `model measures list/show/add/update/delete`
 - `model dax dependencies|lint`
 - `model relationships list/show/add/update/delete`
@@ -132,14 +134,21 @@ object-specific writers and fixtures exist.
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
+- `report spec upgrade --spec <v1.json> --out <v2.json>`: losslessly migrate
+  a strict v1 spec to normalized v2 by rewriting only `/schema`, preserving
+  array order, and refusing unknown keys before output.
 - `report build --schema <schema> [--profile <profile>] [--spec <spec>]`:
   compile schema/profile/spec inputs into an offline-safe PBIP project through
   proven scaffold/report primitives.
-- `report plan --schema <schema> --profile <profile> --objective <goal>`:
-  deterministic starter dashboard planner that emits an explicit
-  `powerbi-cli.dashboard.v1` spec plus decisions, warnings, and compile
-  summary. Keep broader semantic inference shallow until additional unrelated
-  archetype and Desktop goldens prove it.
+- `report plan --schema <schema> --profile <profile> --intent <intent.md|intent.json>`
+  (or the backward-compatible `--objective <goal>`): deterministic starter
+  dashboard planner that normalizes audience, questions, KPIs, comparisons,
+  periods, drill paths, alerts, filter dimensions, preferred archetypes, page
+  flow, and handoff requirements into one `intent.v1` response before emitting
+  an explicit `powerbi-cli.dashboard.v1` spec. KPI names resolve to exact model
+  measures; unresolved names return `spec.missing_input` with pointer and
+  candidates. Uncompiled intent fields remain visible with an owning-bead
+  warning.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
@@ -185,6 +194,11 @@ visual binding is too strict to invent by memory.
   save the project without corrupting it.
 - `desktop export-snapshot <project|pbip> --out-dir <dir>`: capture a
   Desktop-saved version for golden comparison.
+- `desktop harvest-reference --project <saved.pbip> --visual <handle> --out
+  docs/reference/desktop-authored-visuals/<name>.json`: archive one safe
+  Desktop-saved visual, page, or report fragment with source fingerprint and
+  provenance. Linux runs remain `desktop-golden-pending`; persisted selection
+  and filter values are refused by the shared input-safety guard.
 
 These commands should be optional. CI should run them only on Windows machines
 that explicitly opt in with Power BI Desktop installed.
@@ -251,11 +265,19 @@ validation, proof, then mutation breadth.
   lint, and M lint. `lint --rules` inventories it and `lint --explain
   <rule-id>` returns versioned remediation metadata; the empty design family is
   reserved for the future design-lint implementation.
+- Implemented structured native validation diagnostics: every finding now
+  carries a registered code, unchanged message, source path, severity, and RFC
+  6901 pointer (with the empty pointer reserved for whole-file/TMDL findings).
 - Implemented the error-level `m.duplicate_step_name` M lint rule. It catches
   duplicate `let` identifiers in partition and named-expression sources,
   including quoted names and the final step before `in`, reports both source
   positions, and ignores comments and string literals; triage carries the same
   finding and remediation path.
+- Implemented warning-only model completeness checks for missing or malformed
+  measure formats, visible relationship keys, suspicious both-direction
+  fact-to-dimension relationships, and columns unused by report, DAX, or
+  relationship references. Findings flow through lint, triage, fixture
+  scorecards, and the canonical rule explanations.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 

@@ -87,7 +87,7 @@ macro_rules! define_rules {
     ($(
         $name:ident => ($id:literal, $family:ident, $severity:literal, $summary:literal, $remediation:literal, $sanitize:expr)
     ),+ $(,)?) => {
-        $(pub(crate) const $name: &str = $id;)+
+        $(#[allow(dead_code)] pub(crate) const $name: &str = $id;)+
 
         pub(crate) const RULES: &[RuleDefinition] = &[
             $(RuleDefinition {
@@ -106,6 +106,26 @@ macro_rules! define_rules {
 define_rules! {
     VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
     VALIDATION_WARNING => ("validation.warning", Validation, "warning", "Native project validation reported a non-fatal compatibility warning.", "Review the corresponding validation warning and use Power BI Desktop when compatibility proof is required.", None),
+    VALIDATION_MISSING_FILE => ("validation.missing_file", Validation, "error", "A required PBIP/PBIR/TMDL project file is missing.", "Restore the generated project file or regenerate the project before opening it in Desktop.", None),
+    VALIDATION_FILE_READ => ("validation.file_read", Validation, "error", "A native validation input could not be read.", "Restore a readable project input and run native validation again.", None),
+    VALIDATION_INVALID_JSON => ("validation.invalid_json", Validation, "error", "A PBIP/PBIR/TMDL JSON input is not valid JSON.", "Repair or regenerate the JSON file at the reported pointer.", None),
+    VALIDATION_UTF8_BOM => ("validation.utf8_bom", Validation, "error", "A JSON-like project input contains a UTF-8 BOM rejected by the native contract.", "Rewrite the file as UTF-8 without a byte-order mark.", None),
+    VALIDATION_THEME_SHAPE => ("validation.theme_shape", Validation, "error", "Report theme metadata does not match the PBIR schema.", "Repair themeCollection metadata using the report theme command or a Desktop round trip.", None),
+    VALIDATION_THEME_RESOURCE => ("validation.theme_resource", Validation, "error", "A registered report theme resource is missing or inconsistent.", "Keep the customTheme metadata, resource package item, and JSON resource filename in sync.", None),
+    VALIDATION_PAGE_ORDER => ("validation.page_order", Validation, "error", "Report page order metadata is missing, malformed, or inconsistent.", "Repair pages.json pageOrder and activePageName entries.", None),
+    VALIDATION_PAGE_ORDER_EMPTY => ("validation.page_order_empty", Validation, "warning", "The report has no entries in pageOrder.", "Add an intentional report page or remove the empty report metadata.", None),
+    VALIDATION_PAGE_SHAPE => ("validation.page_shape", Validation, "error", "A report page metadata file does not match its folder or geometry contract.", "Repair page.json name and positive width/height values.", None),
+    VALIDATION_PAGE_UNREFERENCED => ("validation.page_unreferenced", Validation, "warning", "A page directory is not referenced by pages.json pageOrder.", "Add the page to pageOrder or remove the stale page directory.", None),
+    VALIDATION_VISUAL_SHAPE => ("validation.visual_shape", Validation, "error", "A report visual metadata file is missing or has invalid geometry.", "Restore visual.json or repair the visual position metadata.", None),
+    VALIDATION_QUERY_STATE => ("validation.query_state", Validation, "error", "A visual query state uses an unsupported or Desktop-incompatible role.", "Reapply the visual bindings with the report visuals command and validate again.", None),
+    VALIDATION_FILTER_SHAPE => ("validation.filter_shape", Validation, "error", "Report filter metadata does not match the PBIR filter contract.", "Repair the filterConfig entry using the report filter commands.", None),
+    VALIDATION_FILTER_SOURCE_REF => ("validation.filter_source_ref", Validation, "warning", "A filter source reference may not resolve to its declared alias.", "Review filter.From aliases and use Source references that exist in the same filter.", None),
+    VALIDATION_MODEL_TABLE => ("validation.model_table", Validation, "error", "The semantic model has no usable table definitions.", "Restore the TMDL tables directory and at least one table file.", None),
+    VALIDATION_MODEL_PARTITION => ("validation.model_partition", Validation, "warning", "A semantic-model table has no partition block.", "Add a credential-free dummy or model-derived partition before handoff.", None),
+    VALIDATION_MODEL_CONNECTOR => ("validation.model_connector", Validation, "warning", "A semantic-model partition appears to contain a real connector.", "Review the connector before taking the project to a locked-down machine.", None),
+    VALIDATION_RELATIONSHIP => ("validation.relationship", Validation, "error", "A semantic-model relationship references a missing endpoint.", "Repair relationship table/column names against the generated TMDL tables.", None),
+    VALIDATION_VARIATION => ("validation.variation", Validation, "error", "A TMDL variation references missing model metadata.", "Repair the variation relationship, table, or hierarchy reference.", None),
+    VALIDATION_OFFLINE_UNSAFE_FILE => ("validation.offline_unsafe_file", Validation, "error", "An offline-unsafe cache, local, or binary file is present in the project.", "Remove runtime data and cache artifacts before sharing the source project.", None),
     PBIR_REPORT_DEFINITION_VERSION => ("pbir.report_definition_version", Report, "error", "The PBIR report definition version is not the Desktop round-trip-proven version.", "Regenerate the report with the current CLI or migrate it to the version named in the finding before opening it in Desktop.", None),
     BPA_REPORT_DUPLICATE_PAGE_TITLE => ("bpa.report.duplicate_page_title", Report, "warning", "Multiple report pages have the same normalized display title.", "Give each page a distinct display name with `report pages update`.", None),
     REPORT_PAGE_EMPTY => ("report.page_empty", Report, "warning", "A report page contains no visuals.", "Add an intentional visual or delete the empty page with the guarded page command.", None),
@@ -143,6 +163,7 @@ define_rules! {
     PARTITION_REAL_CONNECTOR_ODBC => ("partition.real_connector.odbc", Handoff, "error", "A partition uses Odbc.DataSource and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
     PARTITION_REAL_CONNECTOR_WEB => ("partition.real_connector.web", Handoff, "error", "A partition uses Web.Contents and is unsafe for offline handoff.", "Replace it with a dummy partition for offline use, or audit explicitly for the work target.", None),
     PARTITION_REAL_CONNECTOR_FILE => ("partition.real_connector.file", Handoff, "error", "A partition reads an external file and is unsafe for offline handoff.", "Replace it with a generated dummy table before offline handoff.", None),
+    PARTITION_REAL_CONNECTOR_SHAREPOINT => ("partition.real_connector.sharepoint", Handoff, "error", "A partition uses SharePoint.Files and is unsafe for offline handoff.", "Replace it with a generated dummy table for offline use, or audit explicitly for the work target and authenticate only in Power BI Desktop.", None),
     PARTITION_DUMMY_TABLE_SHAPE_UNVERIFIED => ("partition.dummy_table_shape_unverified", Handoff, "warning", "A #table partition does not match the proven generated shape.", "Regenerate the dummy partition from the schema or correct its columns and row arity.", None),
     PARTITION_PII_SUSPECT_LITERAL => ("partition.pii_suspect_literal", Handoff, "warning", "Dummy partition literals may contain personal or long free-text values.", "Replace suspect values with synthetic placeholders before offline handoff.", None),
     PARTITION_SOURCE_UNKNOWN => ("partition.source_unknown", Handoff, "warning", "A partition source is not a recognized safe dummy or supported connector.", "Classify or replace the source explicitly; do not rely on an unknown M expression.", None),
@@ -161,6 +182,11 @@ define_rules! {
     HANDOFF_CREDENTIAL_LIKE_TEXT => ("handoff.credential_like_text", Handoff, "error", "A handoff text file contains credential-like content.", "Remove or redact credentials and configure authentication only on the locked-down machine.", None),
     HANDOFF_PII_SUSPECT_TEXT => ("handoff.pii_suspect_text", Handoff, "warning", "A handoff text file contains PII-suspect row literals.", "Review and replace possible real rows with synthetic values.", None),
     HANDOFF_TEXT_SCAN_FAILED => ("handoff.text_scan_failed", Handoff, "error", "A handoff text file could not be read for safety scanning.", "Restore readable source text or remove the unreadable file before handoff.", None),
+    DAX_FORMAT_MISSING => ("dax.format_missing", Dax, "warning", "A measure has no static or dynamic format string, so its display unit is implicit.", "Set a deliberate --format-string or --format-string-definition on the measure, then re-run DAX lint.", None),
+    DAX_FORMAT_INVALID => ("dax.format_invalid", Dax, "warning", "A measure format string is not a balanced, supported custom format pattern.", "Replace the formatString with a balanced Power BI custom format such as #,##0.00, 0.0%, or Short Date.", None),
+    MODEL_KEY_NOT_HIDDEN => ("model.key_not_hidden", Model, "warning", "A relationship endpoint marked as a model key remains visible to report authors.", "Hide relationship key columns with the model column visibility control while leaving the relationship endpoint intact.", None),
+    MODEL_RELATIONSHIP_DIRECTION_SUSPECT => ("model.relationship_direction_suspect", Model, "warning", "A many-to-one fact-to-dimension relationship uses both-direction filtering.", "Prefer oneDirection from the fact table to the dimension; use bothDirections only with an explicit, reviewed ambiguity requirement.", None),
+    MODEL_COLUMN_UNUSED => ("model.column_unused", Model, "warning", "A model column is not referenced by a visual, measure, or relationship.", "Remove the column or document its intended use; otherwise hide or omit it before handoff to keep the model focused.", None),
     M_DUPLICATE_STEP_NAME => ("m.duplicate_step_name", M, "error", "An M let expression defines the same step name more than once, which can surface as a cyclic-reference refresh error in Power BI Desktop.", "Rename or remove the duplicate M step; lint reports the first and duplicate source positions, including quoted identifiers, before Desktop handoff.", None),
 }
 
@@ -229,14 +255,17 @@ pub(crate) fn validate_registry() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        RULES, RuleFamily, ensure_finding_ids_registered, rules_for_family, validate_registry,
+        RULES, RuleFamily, ensure_finding_ids_registered, find_rule, rules_for_family,
+        validate_registry,
     };
     use serde_json::json;
+    use std::collections::BTreeSet;
 
     #[test]
     fn every_registered_rule_has_unique_complete_documentation() {
         validate_registry().expect("valid documented registry");
-        assert_eq!(RULES.len(), 58);
+        let unique_ids = RULES.iter().map(|rule| rule.id).collect::<BTreeSet<_>>();
+        assert_eq!(RULES.len(), unique_ids.len());
     }
 
     #[test]
@@ -254,5 +283,36 @@ mod tests {
             .expect_err("ad-hoc finding must be rejected");
         assert_eq!(error.code, "unexpected");
         assert!(error.message.contains("future.ad_hoc_rule"));
+    }
+
+    #[test]
+    fn native_validation_codes_are_registered_for_explanation() {
+        for id in [
+            "validation.missing_file",
+            "validation.file_read",
+            "validation.invalid_json",
+            "validation.utf8_bom",
+            "validation.theme_shape",
+            "validation.theme_resource",
+            "validation.page_order",
+            "validation.page_order_empty",
+            "validation.page_shape",
+            "validation.page_unreferenced",
+            "validation.visual_shape",
+            "validation.query_state",
+            "validation.filter_shape",
+            "validation.filter_source_ref",
+            "validation.model_table",
+            "validation.model_partition",
+            "validation.model_connector",
+            "validation.relationship",
+            "validation.variation",
+            "validation.offline_unsafe_file",
+        ] {
+            assert!(
+                find_rule(id).is_some(),
+                "missing native validation rule {id}"
+            );
+        }
     }
 }

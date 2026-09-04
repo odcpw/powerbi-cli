@@ -490,7 +490,12 @@ fn project_pack(args: &[String], kind: ProjectPackKind) -> CliResult<Value> {
         return Err(CliError::validation_failed(format!(
             "project is not valid for {}: {}",
             kind.validation_label(),
-            validation.errors.join("; ")
+            validation
+                .errors
+                .iter()
+                .map(|finding| finding.message.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
         ))
         .with_suggested_command(format!(
             "powerbi-cli validate --strict {} --json",

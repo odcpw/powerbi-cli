@@ -1,8 +1,8 @@
 use crate::cli_support::shell_arg;
 use crate::lint::lint_project;
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, ValidationReport,
-    canonical_display, command_arg, resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, Finding, ResolvedProject,
+    ValidationReport, canonical_display, command_arg, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -15,7 +15,12 @@ pub(crate) fn triage_command(args: &[String]) -> CliResult<Value> {
         // A project too broken to parse still deserves a triage document: fold the
         // hard failure into the validation errors instead of aborting the readback.
         Err(error) if error.exit_code == EXIT_VALIDATION_FAILED => ValidationReport {
-            errors: vec![error.message],
+            errors: vec![Finding::error(
+                crate::rules::VALIDATION_STRUCTURE,
+                error.message,
+                &resolved.pbip_path,
+                "",
+            )],
             warnings: Vec::new(),
             json_files_checked: 0,
             pages: 0,
@@ -167,7 +172,7 @@ fn next_commands(
 ) -> Vec<String> {
     let project = command_arg(&resolved.project_dir);
     if let Some(error) = validation.errors.first() {
-        return validation_next(&project, error);
+        return validation_next(&project, &error.message);
     }
     if findings.iter().any(|finding| {
         matches!(

@@ -32,6 +32,10 @@ unbound data visuals on the consumed PBIR surface (`PBIR_QUERY_STATE_MISSING`).
 The normalized fixture was refreshed after that exact-package conformance
 finding.
 
+The summary intentionally records the model-completeness warnings for the
+visible relationship keys and unreferenced dimension columns emitted by the
+offline lint heuristics.
+
 Generated with:
 
 ```powershell
@@ -45,6 +49,10 @@ cargo run -- fixture verify build/golden-sales --expected testdata/golden/sales.
 Purpose: generic dashboard-build baseline from separate schema/profile/spec
 inputs. This proves the data-agnostic macro path compiles a dashboard spec into
 the same offline-safe PBIP/PBIR/TMDL project shape as lower-level primitives.
+
+The summary includes the two visible relationship-key warnings and the two
+dimension columns that are not referenced by this report's visuals, measures,
+or relationships.
 
 Generated with:
 
@@ -132,9 +140,10 @@ local validation and offline-handoff proof only; it has not been opened or
 saved in Power BI Desktop.
 
 Every post-build mutation is previewed and then written to a fresh output
-directory. `report audit` returns `ok: true` with exactly two expected warning
-findings (`filter.possible_persisted_values`) for the two deliberately
-authored TopN filters.
+directory. `report audit` returns `ok: true` with three warning findings:
+two `filter.possible_persisted_values` entries for the deliberately authored
+TopN filters, plus the visible relationship-key warning surfaced by the
+combined model lint scorecard.
 
 Generated with:
 

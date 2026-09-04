@@ -137,6 +137,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let profile = h.root.join("everything.profile.json");
     let spec = h.root.join("everything.dashboard.json");
     let normalized_spec = h.root.join("everything.dashboard.normalized.json");
+    let upgraded_spec = h.root.join("everything.dashboard.v2.json");
     let planned_spec = h.root.join("everything.planned.dashboard.json");
     let project = h.root.join("EverythingAcceptance");
     let scaffold_project = h.root.join("ScaffoldSmoke");
@@ -154,6 +155,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let wireframe = h.root.join("wireframe.json");
     let dax_file = h.root.join("average-cost.dax");
     let desktop_screenshot = h.root.join("everything-desktop.png");
+    let desktop_reference = h.root.join("everything-reference.json");
     let live_model_export = h.root.join("live-model-export");
 
     write_json(&schema, &acceptance_schema());
@@ -280,6 +282,22 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let upgraded = h.ok(
+        "report spec upgrade",
+        &svec([
+            "report",
+            "spec",
+            "upgrade",
+            "--spec",
+            &p(&spec),
+            "--out",
+            &p(&upgraded_spec),
+            "--json",
+        ]),
+    );
+    assert_eq!(upgraded["targetVersion"], "powerbi-cli.dashboard.v2");
+    assert_eq!(upgraded["transformedPointers"], json!(["/schema"]));
+    assert!(upgraded_spec.is_file());
     h.ok(
         "report spec normalize",
         &svec([
@@ -591,6 +609,157 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "rebind-plan",
             &project_arg,
             "--allow-unmapped",
+            "--json",
+        ]),
+    );
+
+    h.ok(
+        "model tables list",
+        &svec([
+            "model",
+            "tables",
+            "list",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables show",
+        &svec([
+            "model",
+            "tables",
+            "show",
+            "--project",
+            &project_arg,
+            "--handle",
+            "table:DimDate",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables add",
+        &svec([
+            "model",
+            "tables",
+            "add",
+            "--project",
+            &project_arg,
+            "--table",
+            "TransientTable",
+            "--column",
+            "Value",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables rename",
+        &svec([
+            "model",
+            "tables",
+            "rename",
+            "--project",
+            &project_arg,
+            "--handle",
+            "table:DimDate",
+            "--new-name",
+            "Calendar",
+            "--rename-references",
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model tables delete",
+        &svec([
+            "model",
+            "tables",
+            "delete",
+            "--project",
+            &project_arg,
+            "--handle",
+            "table:TransientTable",
+            "--in-place",
+            "--confirm",
+            "table:TransientTable",
+            "--json",
+        ]),
+    );
+
+    h.ok(
+        "model columns list",
+        &svec([
+            "model",
+            "columns",
+            "list",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns show",
+        &svec([
+            "model",
+            "columns",
+            "show",
+            "--project",
+            &project_arg,
+            "--handle",
+            "column:FactIncidents:Cost",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns add",
+        &svec([
+            "model",
+            "columns",
+            "add",
+            "--project",
+            &project_arg,
+            "--table",
+            "FactIncidents",
+            "--name",
+            "Transient Generic Column",
+            "--expression",
+            "1",
+            "--data-type",
+            "int64",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns update",
+        &svec([
+            "model",
+            "columns",
+            "update",
+            "--project",
+            &project_arg,
+            "--handle",
+            "column:FactIncidents:Transient Generic Column",
+            "--description",
+            "Temporary generic column",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model columns delete",
+        &svec([
+            "model",
+            "columns",
+            "delete",
+            "--project",
+            &project_arg,
+            "--handle",
+            "column:FactIncidents:Transient Generic Column",
+            "--in-place",
+            "--confirm",
+            "column:FactIncidents:Transient Generic Column",
             "--json",
         ]),
     );
@@ -1425,6 +1594,32 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let table = handles["Company Detail"].clone();
     let scatter = handles["Branch Injury Cost Bubble"].clone();
     let catalog_column = handles["Stacked Column by Year"].clone();
+    let harvested_reference = h.ok(
+        "desktop harvest-reference",
+        &svec([
+            "desktop",
+            "harvest-reference",
+            "--project",
+            &project_arg,
+            "--visual",
+            &line,
+            "--out",
+            &p(&desktop_reference),
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        harvested_reference["proofLevel"],
+        Value::from("desktop-golden-pending")
+    );
+    assert_eq!(
+        harvested_reference["provenance"]["desktopVersion"],
+        Value::from("unknown")
+    );
+    assert!(
+        desktop_reference.is_file(),
+        "harvested reference was not written"
+    );
     let slicer = slicer_handle(&h.ok(
         "report slicers list",
         &svec([

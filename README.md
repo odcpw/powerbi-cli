@@ -157,6 +157,15 @@ end-to-end Desktop interaction proof remains open. Current generated visuals
   automates canvas or refresh proof; the `desktop-canvas-refresh` level remains
   open.
 
+  `desktop harvest-reference` archives a visual, page, or report JSON fragment
+  from an already-saved PBIP into a provenance-stamped wrapper. It records the
+  source path, source-project SHA-256 fingerprint, harvest date, license note,
+  and Desktop version when supplied. The selected fragment is read through the
+  bounded harvested-fragment safety contract; persisted selection/filter values
+  are refused rather than silently stripped. Linux archives record
+  `desktopVersion: "unknown"` and remain `desktop-golden-pending` until explicit
+  Desktop canvas/refresh evidence exists.
+
 Two additional Desktop-discovered guardrails are enforced locally. Scatter
 color grouping is stored under PBIR `queryState.Series`, even though Desktop's
 field well is labelled Legend; CLI inputs `legend`, `series`, `color`, and
@@ -247,9 +256,11 @@ cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --js
 cargo run --bin powerbi-cli -- schema normalize .\examples\sales.schema.json --out .\build\sales.schema.normalized.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
+cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
+cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
 cargo run --bin powerbi-cli -- validate --strict .\build\generic-sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\generic-sales --json
@@ -366,6 +377,16 @@ cargo run --bin powerbi-cli -- validate --strict .\build\sales --json
 cargo run --bin powerbi-cli -- --json validate .\build\sales
 ```
 
+`report plan` accepts a bounded `--intent <intent.md|intent.json>` document in
+the `intent.v1` shape. JSON fields and Markdown H2 sections cover audience,
+questions, KPIs, comparisons, periods, drill paths, alert rules, filter
+dimensions, preferred visual archetypes, page flow, and handoff requirements.
+The response preserves the normalized document under `intent`; each KPI must
+resolve to an exact model measure or the command returns `spec.missing_input`
+with its pointer and measure candidates. Fields that the starter planner does
+not compile remain visible in `warnings[]` with their owning bead. The
+free-form `--objective` form remains available for quick question-only plans.
+
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
 artifacts named by that prior manifest (including removed table/page/visual
@@ -419,6 +440,16 @@ separately with `model relationships add`. The command refuses replacement,
 credentials, multiline cells, duplicate rows/keys, and arbitrary fact-table
 ingestion, and validates the project after every write.
 
+The generic semantic-model surface covers `model tables list/show/add/rename/delete`
+and `model columns list/show/add/update/delete`. Table handles use the form
+`table:<name>`; column handles use `column:<table>:<name>`. Literal `%` and `:`
+inside each component are encoded as `%25` and `%3A`. Table rename refuses when
+relationships, DAX, or variation metadata still reference the old name unless
+`--rename-references` is supplied. Column updates refuse unknown
+Desktop-authored properties in the targeted block, so annotations and
+extended properties are never silently dropped. All mutating commands support
+`--dry-run`, guarded `--in-place`, and isolated `--out-dir` output.
+
 The `regional-sales` archetype is deliberately dummy data, but keeps the
 column names and shape close enough to exercise a non-ASCII column
 (`Größenklasse`) and measure (`Umsatz Übersicht`), a model relationship, DAX
@@ -438,7 +469,11 @@ three pages.
   sections whose compiler bead has not landed return `unsupported_feature`
   with the owning bead id instead of being dropped. The checked-in
   `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
-  subset and builds byte-identically to the v1 sales fixture.
+  subset and builds byte-identically to the v1 sales fixture. To migrate any
+  validated v1 spec, run `report spec upgrade --spec <v1.json> --out <v2.json>`;
+  the command rewrites only `/schema`, preserves array order, normalizes object
+  keys, and returns every transformed pointer. Unknown v1 keys fail with
+  `spec.unknown_field` before the output is created.
   Validation failures are returned on stdout as `errors[]` objects with required
   `code` and `message` fields plus optional `pointer`, `didYouMean`, `hint`, and
   `suggestedCommands`; they are not legacy error strings. The exact response
@@ -581,12 +616,20 @@ three pages.
   only after the MCP process tree is reaped. The output contains only a
   `definition/` TMDL tree; it is not a report export or full PBIX-to-PBIP
   conversion.
+- Programmatic semantic-model authoring covers `model tables list/show/add/rename/delete`
+  and `model columns list/show/add/update/delete` with stable percent-encoded
+  table/column handles, guarded output modes, and readback/validate commands.
+  Rename rewrites relationship, DAX, and variation references only when
+  `--rename-references` is explicit; otherwise it refuses with the reference
+  list. Column updates refuse unknown Desktop-authored properties instead of
+  dropping annotations or extended properties. `diff --scope model.tables` and
+  `diff --scope model.columns` provide semantic table/column changes.
 - Programmatic static-table authoring covers `model tables add-static` for a
   new disconnected single-string-column selector or a small 1-10-column string
   lookup dimension backed by a generated inline `#table` partition. Cells are
   bounded, short, and screened for credential-like text; the first column is a
-  unique key. Broader table/column CRUD, automatic relationships, and arbitrary
-  fact-table ingestion remain outside this guarded surface.
+  unique key. Automatic relationships and arbitrary fact-table ingestion remain
+  outside this guarded surface.
 - Programmatic DAX calculated column authoring covers `model calculated-columns
   list/show/add/update/delete` with explicit data types, guarded output modes,
   readback commands, and `diff --scope model.calculatedColumns`. Updates refuse
@@ -790,9 +833,20 @@ three pages.
   `in`); findings include both source positions and ignore comments/string
   literals. The registry includes a typed, currently empty design family so
   future design lint cannot introduce ad-hoc ids.
+- Model completeness lint adds warning-only checks for measures without an
+  explicit static or dynamic format, malformed custom format strings, visible
+  relationship keys, both-direction fact-to-dimension relationships, and
+  columns unused by visuals, measures, or relationships. Run lint or triage
+  for the combined scorecard, or model dax lint for the DAX format checks;
+  every finding carries a stable handle and a fix hint.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.
+- Native validation errors and warnings are structured findings with a stable
+  registry code, unchanged human message, source `path`, severity, and an RFC
+  6901 `pointer` (the empty pointer denotes a whole-file/TMDL finding). Every
+  emitted code is explainable with `lint --explain <code> --json` and listed by
+  the validation capability contract.
 - `diff` compares normalized semantic summaries with stable handles, so agents
   can verify measure, calculated-column, and relationship changes after CLI
   mutations or Desktop round-trips without reading raw TMDL.
