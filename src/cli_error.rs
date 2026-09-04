@@ -17,8 +17,11 @@ pub(crate) struct CliError {
     pub(crate) message: String,
     pub(crate) hint: Option<String>,
     pub(crate) suggested_commands: Vec<String>,
-    pub(crate) pointer: Option<String>,
-    pub(crate) did_you_mean: Option<String>,
+    // Keep the frequently-carried error type below clippy's `result_large_err`
+    // threshold. These diagnostics are optional and therefore pay for their
+    // allocation only when a caller needs to attach one.
+    pub(crate) pointer: Option<Box<str>>,
+    pub(crate) did_you_mean: Option<Box<str>>,
 }
 
 impl CliError {
@@ -65,12 +68,12 @@ impl CliError {
     }
 
     pub(crate) fn with_pointer(mut self, pointer: impl Into<String>) -> Self {
-        self.pointer = Some(pointer.into());
+        self.pointer = Some(pointer.into().into_boxed_str());
         self
     }
 
     pub(crate) fn with_did_you_mean(mut self, suggestion: impl Into<String>) -> Self {
-        self.did_you_mean = Some(suggestion.into());
+        self.did_you_mean = Some(suggestion.into().into_boxed_str());
         self
     }
 }

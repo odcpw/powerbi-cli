@@ -1165,7 +1165,7 @@ where
         nested(object).map_err(|mut error| {
             if let Some(relative) = error.pointer.as_deref() {
                 if !relative.starts_with('/') {
-                    error.pointer = Some(format!("{item_pointer}/{relative}"));
+                    error.pointer = Some(format!("{item_pointer}/{relative}").into_boxed_str());
                 }
             }
             error

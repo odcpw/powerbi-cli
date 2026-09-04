@@ -379,12 +379,12 @@ fn error_json(err: &CliError) -> Value {
         );
     }
     if let Some(pointer) = &err.pointer {
-        error.insert("pointer".to_string(), Value::String(pointer.clone()));
+        error.insert("pointer".to_string(), Value::String(pointer.to_string()));
     }
     if let Some(did_you_mean) = &err.did_you_mean {
         error.insert(
             "didYouMean".to_string(),
-            Value::String(did_you_mean.clone()),
+            Value::String(did_you_mean.to_string()),
         );
     }
     json!({ "error": Value::Object(error) })
