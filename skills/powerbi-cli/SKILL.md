@@ -1141,7 +1141,8 @@ High-value improvement targets:
 - stable object handles;
 - `inspect --deep`;
 - generated proof/follow-up commands on every mutation;
-- strict validation diagnostics with machine-readable codes;
+- strict validation diagnostics with machine-readable codes, source paths, and
+  RFC 6901 JSON pointers;
 - `handoff check` and source rebind planning;
 - Desktop rebind/refresh proof for SQL Server, PostgreSQL/Npgsql, ODBC/DSN,
   Excel, CSV, folder, and SharePoint/OneDrive source templates;

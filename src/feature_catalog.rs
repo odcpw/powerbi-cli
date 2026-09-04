@@ -269,9 +269,9 @@ const FEATURE_CATALOG: &[Feature] = &[
         support: "read-only-contract-catalog",
         proof_level: "unit-smoke",
         emits_pbir: false,
-        commands: &["lint", "model dax lint", "report audit"],
+        commands: &["validate", "lint", "model dax lint", "report audit"],
         refusal_code: None,
-        reason: "Every lint and report-audit finding id is registered with family, severity, summary, remediation, optional sanitize action, and version metadata; agents can list or explain rules without opening a project. M lint includes the error-level m.duplicate_step_name check for duplicate let identifiers.",
+        reason: "Every native validation, lint, and report-audit finding id is registered with family, severity, summary, remediation, optional sanitize action, and version metadata; validation findings also carry their source file and RFC 6901 pointer, while agents can list or explain rules without opening a project. M lint includes the error-level m.duplicate_step_name check for duplicate let identifiers.",
         next_proof: &[
             "Extend the typed design family when design lint ships without adding ad-hoc ids",
         ],

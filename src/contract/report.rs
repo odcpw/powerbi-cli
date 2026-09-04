@@ -35,9 +35,10 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.spec.validate.v1",
+            "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Validation).map(|rule| rule.id).collect::<Vec<_>>(),
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec validate --schema examples/sales.schema.json --spec examples/sales.dashboard.json --json", "powerbi-cli report spec validate --spec examples/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "warnings", "errors", "next"],
+            "followUpFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "next"],
             "validationLevels": [
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
