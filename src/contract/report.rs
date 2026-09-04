@@ -7,8 +7,8 @@ pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
             "path": "report build",
-            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including side-effect-free proofPlan commands",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -17,12 +17,12 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.build.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
-            "followUpFields": ["projectDir", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args"]
         }),
         json!({

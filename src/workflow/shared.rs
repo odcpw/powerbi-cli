@@ -1868,24 +1868,23 @@ pub(crate) fn validate_generic_m_template(text: &str) -> CliResult<()> {
             None,
         ));
     }
-    let roots =
-        tokens
-            .windows(4)
-            .enumerate()
-            .filter_map(|(index, items)| {
-                if let [
-                    MToken::Ident(binding),
-                    MToken::Equals,
-                    MToken::Ident(connector),
-                    MToken::LParen,
-                ] = items
-                    && binding == "Source"
-                {
-                    return Some((index, connector.as_str()));
-                }
-                None
-            })
-            .collect::<Vec<_>>();
+    let roots = tokens
+        .windows(4)
+        .enumerate()
+        .filter_map(|(index, items)| {
+            if let [
+                MToken::Ident(binding),
+                MToken::Equals,
+                MToken::Ident(connector),
+                MToken::LParen,
+            ] = items
+                && binding == "Source"
+            {
+                return Some((index, connector.as_str()));
+            }
+            None
+        })
+        .collect::<Vec<_>>();
     if roots.len() != 1 {
         return Err(generic_m_template_error(
             text,

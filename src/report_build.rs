@@ -1,8 +1,9 @@
 use crate::cli_support::{
-    MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes,
+    MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes, shell_arg,
 };
 use crate::input_safety::{InputKind, read_utf8};
 use crate::json_composition::normalize_spec_file;
+use crate::ops::OpOutcome;
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
     slicer_between_data_type_is_supported,
@@ -14,6 +15,8 @@ use crate::report_spec_normalize::normalize_command;
 use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
+use crate::scorecard::{dry_run_scorecard, project_scorecard};
+use crate::tmdl::{measure_handle, table_handle};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -30,6 +33,7 @@ struct BuildOptions {
     spec: Option<PathBuf>,
     out_dir: Option<PathBuf>,
     force: bool,
+    trace: bool,
     mode: Option<MutationMode>,
 }
 
@@ -51,6 +55,7 @@ struct BuildResponse<'a> {
     profile: Option<&'a Value>,
     scaffold: Option<Value>,
     proof_plan: Option<&'a ProofPlan>,
+    trace: bool,
 }
 
 pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
@@ -112,6 +117,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
             profile: profile_value.as_ref(),
             scaffold: None,
             proof_plan: dry_run_proof_plan.as_ref(),
+            trace: options.trace,
         }));
     }
 
@@ -139,6 +145,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         profile: profile_value.as_ref(),
         scaffold: Some(scaffold),
         proof_plan: proof_plan.as_ref(),
+        trace: options.trace,
     }))
 }
 
@@ -1912,21 +1919,28 @@ fn validate_spec_shape(spec: &Value) -> Vec<String> {
 fn build_response(response: BuildResponse<'_>) -> Value {
     let project_dir = response.out_dir.map(canonical_display);
     let compiled = compiled_summary(response.compiled);
-    let changes = vec![json!({
-        "kind": "pbip.project",
-        "action": "create",
-        "path": project_dir.clone(),
-        "before": Value::Null,
-        "after": {
-            "projectDir": project_dir.clone(),
-            "counts": compiled["counts"].clone()
-        }
-    })];
+    let execution = legacy_execution_trace(response.compiled, response.out_dir, response.dry_run);
     let validation = response
         .out_dir
         .and_then(|path| crate::resolve_project(path).ok())
         .and_then(|project| validate_project(&project).ok());
-    json!({
+    let scorecard = response
+        .out_dir
+        .and_then(|path| crate::resolve_project(path).ok())
+        .map(|project| project_scorecard(&project, "unit-smoke"))
+        .unwrap_or_else(|| {
+            dry_run_scorecard(
+                "unit-smoke",
+                next_for_build(
+                    response.out_dir,
+                    response.dry_run,
+                    response.schema_path,
+                    response.spec_path,
+                    response.proof_plan,
+                ),
+            )
+        });
+    let mut output = json!({
         "schema": "powerbi-cli.report.build.v1",
         "ok": validation.as_ref().is_none_or(|validation| validation.errors.is_empty()),
         "changed": response.changed,
@@ -1939,7 +1953,9 @@ fn build_response(response: BuildResponse<'_>) -> Value {
         },
         "compiled": compiled,
         "defaultsApplied": response.compiled.defaults_applied,
-        "changes": changes,
+        "changes": execution.changes,
+        "readback": execution.readback,
+        "scope": execution.scope,
         "profileSummary": response.profile.map(profile_summary),
         "executedPrimitives": if response.changed { vec![json!({"command": "scaffold", "reason": "report build compiled schema/spec into scaffold-compatible manifest"})] } else { Vec::new() },
         "operations": response.compiled.operations,
@@ -1967,8 +1983,13 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             response.schema_path,
             response.spec_path,
             response.proof_plan,
-        )
-    })
+        ),
+        "scorecard": scorecard
+    });
+    if response.trace {
+        output["trace"] = Value::Array(execution.trace);
+    }
+    output
 }
 
 fn compiled_summary(compiled: &CompiledDashboard) -> Value {
@@ -1984,9 +2005,189 @@ fn compiled_summary(compiled: &CompiledDashboard) -> Value {
             "bindings": validation.counts.bindings,
             "rows": validation.counts.rows
         },
+        "ops": compiled.operations.len(),
         "tables": validation.tables,
         "defaultsApplied": compiled.defaults_applied
     })
+}
+
+/// The report compiler still emits a compact legacy operation summary.  Keep
+/// that implementation detail behind one adapter that has the same aggregate
+/// fields as an OpPlan transaction receipt: flattened changes, stable-handle
+/// readbacks, and an opt-in deterministic timing trace.  The adapter materializes
+/// `OpOutcome`s here so switching the compiler to a real OpPlan later changes
+/// only this boundary, not the public build response.
+struct BuildExecutionTrace {
+    changes: Vec<Value>,
+    readback: Value,
+    trace: Vec<Value>,
+    scope: Value,
+}
+
+fn legacy_execution_trace(
+    compiled: &CompiledDashboard,
+    out_dir: Option<&Path>,
+    dry_run: bool,
+) -> BuildExecutionTrace {
+    let project_dir = out_dir.map(canonical_display);
+    let project_arg = out_dir
+        .map(command_arg)
+        .unwrap_or_else(|| "<project-dir>".to_string());
+    let generated = generated_handles(&compiled.schema);
+    let mut outcomes = Vec::with_capacity(compiled.operations.len());
+    let mut trace = Vec::with_capacity(compiled.operations.len());
+    for (index, operation) in compiled.operations.iter().enumerate() {
+        let kind = operation["kind"].as_str().unwrap_or("operation");
+        let change = if index == 0 {
+            json!({
+                "kind": "pbip.project",
+                "action": "create",
+                "op": kind,
+                "path": project_dir.clone(),
+                "before": Value::Null,
+                "after": {
+                    "projectDir": project_dir.clone(),
+                    "counts": compiled_summary(compiled)["counts"].clone()
+                }
+            })
+        } else {
+            json!({
+                "kind": "operation",
+                "action": if dry_run { "plan" } else { "apply" },
+                "op": kind,
+                "path": project_dir.clone(),
+                "before": Value::Null,
+                "after": {
+                    "index": index,
+                    "summary": operation["summary"].clone()
+                }
+            })
+        };
+        let created_handles = if index == 0 {
+            let mut handles = Vec::with_capacity(generated.len() + 1);
+            handles.push("report:main".to_string());
+            handles.extend(generated.iter().cloned());
+            handles
+        } else {
+            Vec::new()
+        };
+        // Legacy compilation has one aggregate operation for the generated
+        // project. Keep its readback commands in the same order as
+        // `created_handles`, allowing the response adapter below to expose
+        // per-handle command arrays while still consuming the OpOutcome shape.
+        let readback = created_handles
+            .iter()
+            .filter_map(|handle| readback_command_for_handle(handle, &project_arg))
+            .collect();
+        outcomes.push(OpOutcome {
+            changed: !dry_run,
+            changes: vec![change],
+            readback,
+            warnings: Vec::new(),
+            created_handles,
+        });
+        // Wall-clock durations would make an otherwise deterministic JSON
+        // response impossible to snapshot.  The legacy adapter reports the
+        // deterministic planning bucket (zero milliseconds); a future
+        // transaction adapter can supply rounded buckets from its trace.
+        trace.push(json!({"op": kind, "ms": 0}));
+    }
+
+    let mut readback = BTreeMap::<String, Vec<String>>::new();
+    for outcome in &outcomes {
+        for (handle, command) in outcome.created_handles.iter().zip(&outcome.readback) {
+            readback
+                .entry(handle.clone())
+                .or_default()
+                .push(command.clone());
+        }
+    }
+    let changes = outcomes
+        .into_iter()
+        .flat_map(|outcome| outcome.changes)
+        .collect();
+    let handles = readback.keys().cloned().collect::<Vec<_>>();
+    BuildExecutionTrace {
+        changes,
+        readback: json!(readback),
+        trace,
+        scope: json!({
+            "kind": "report-build",
+            "mode": if dry_run { "dry-run" } else { "out-dir" },
+            "projectDir": project_dir,
+            "operationCount": compiled.operations.len(),
+            "handles": handles
+        }),
+    }
+}
+
+fn generated_handles(schema: &Value) -> Vec<String> {
+    let mut handles = Vec::new();
+    for table in schema["tables"].as_array().into_iter().flatten() {
+        let Some(table_name) = table["name"].as_str() else {
+            continue;
+        };
+        handles.push(table_handle(table_name));
+        for measure in table["measures"].as_array().into_iter().flatten() {
+            if let Some(name) = measure["name"].as_str() {
+                handles.push(measure_handle(table_name, name));
+            }
+        }
+    }
+    for page in schema["pages"].as_array().into_iter().flatten() {
+        let Some(page_name_value) = page["name"]
+            .as_str()
+            .or_else(|| page["displayName"].as_str())
+        else {
+            continue;
+        };
+        let page_handle = format!("page:{}", page_name(page_name_value));
+        handles.push(page_handle.clone());
+        for (visual_index, visual) in page["visuals"].as_array().into_iter().flatten().enumerate() {
+            let name = visual["name"]
+                .as_str()
+                .or_else(|| visual["id"].as_str())
+                .or_else(|| visual["title"].as_str())
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| format!("visual-{visual_index}"));
+            handles.push(format!(
+                "visual:{}:{}",
+                page_name(page_name_value),
+                visual_name(&name)
+            ));
+        }
+    }
+    handles.sort();
+    handles.dedup();
+    handles
+}
+
+fn readback_command_for_handle(handle: &str, project_arg: &str) -> Option<String> {
+    let handle_arg = shell_arg(handle);
+    if handle == "report:main" {
+        return Some(format!("powerbi-cli inspect --deep {project_arg} --json"));
+    }
+    if handle.starts_with("page:") {
+        return Some(format!(
+            "powerbi-cli report pages show --project {project_arg} --handle {handle_arg} --json"
+        ));
+    }
+    if handle.starts_with("visual:") {
+        return Some(format!(
+            "powerbi-cli report visuals show --project {project_arg} --handle {handle_arg} --json"
+        ));
+    }
+    if handle.starts_with("measure:") {
+        return Some(format!(
+            "powerbi-cli model measures show --project {project_arg} --handle {handle_arg} --json"
+        ));
+    }
+    if handle.starts_with("table:") {
+        return Some(format!(
+            "powerbi-cli model tables show --project {project_arg} --handle {handle_arg} --json"
+        ));
+    }
+    None
 }
 
 fn next_for_build(
@@ -2120,6 +2321,13 @@ fn parse_build_args(args: &[String]) -> CliResult<BuildOptions> {
             }
             "--force" => {
                 options.force = true;
+                i += 1;
+            }
+            "--trace" => {
+                if options.trace {
+                    return Err(CliError::invalid_args("--trace may be specified only once"));
+                }
+                options.trace = true;
                 i += 1;
             }
             "--dry-run" => {

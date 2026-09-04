@@ -729,7 +729,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "triageResult.v1",
             "flags": ["<project-dir-or.pbip>", "--json", "--format json"],
             "examples": ["powerbi-cli triage build/sales --json", "powerbi-cli --json triage build/sales"],
-            "followUpFields": ["ok", "exitCode", "validation", "lint", "lint.findings[].stepKind", "topFindings", "next"]
+            "followUpFields": ["ok", "exitCode", "validation", "lint", "lint.findings[].stepKind", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "topFindings", "next"]
         }),
         json!({
             "path": "guid",
@@ -1188,7 +1188,7 @@ fn schema_manifest() -> Value {
         "reportSpecValidateFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "errors[].field", "errors[].reason", "errors[].candidatesCommand", "errors[].example", "next"],
         "reportSpecUpgradeFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
-        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "profileSummary", "executedPrimitives", "operations", "warnings", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
         "lintFindingFields": ["code", "severity", "message", "handle", "path", "hint", "stepKind"],
@@ -1504,6 +1504,30 @@ fn response_shapes() -> Value {
             "transformedPointers": "RFC 6901 pointers for fields rewritten or inserted; v1-to-v2 currently reports /schema",
             "normalization": "Object keys are recursively sorted while array order is preserved.",
             "unknownFieldFailure": "Unknown v1 keys return spec.unknown_field on stderr with no output file written."
+        },
+        "scorecard.v1": {
+            "schema": "scorecard.v1",
+            "transport": "embedded stdout object",
+            "requiredFields": ["schema", "validation", "microsoftValidator", "lint", "designLint", "handoff", "proofLevel", "next"],
+            "validation": {"requiredFields": ["ok", "errors", "warnings"]},
+            "microsoftValidator": {"status": ["ok", "warnings", "failed", "not-installed", "unsupported-platform"]},
+            "lint": {"requiredFields": ["ok", "counts", "findings", "findingsList"], "findingsBySeverity": ["error", "warning", "info"]},
+            "designLint": {"requiredFields": ["status", "findings"], "unavailableReason": "design lint lands in t5-3 until that bead fills the fixed shape"},
+            "handoff": {"requiredFields": ["status", "safeForOfflineHandoff"]},
+            "proofLevel": "The highest compatibility level actually established by the local workflow; build and triage default to unit-smoke.",
+            "next": "Executable powerbi-cli command templates only."
+        },
+        "reportBuild": {
+            "schema": "powerbi-cli.report.build.v1",
+            "trace": "Optional top-level trace[] appears only when report build receives --trace; legacy paths use deterministic zero-millisecond planning buckets.",
+            "changes": "Flat aggregation of operation changes; dry-run describes planned before/after states without writing files.",
+            "readback": "Object keyed by stable handles (report:, page:, visual:, table:, measure:) whose values are executable command arrays.",
+            "scope": "The report-build mode, project target, operation count, and stable handles covered by the response.",
+            "compiledOps": "compiled.ops is the count of operation summaries that the response adapter will replace with OpPlan outcomes."
+        },
+        "triageResult": {
+            "schema": "triageResult.v1",
+            "scorecard": "The embedded scorecard uses scorecard.v1 and the same projection as report build for the inspected project."
         },
         "ops.v1": {
             "schema": "powerbi-cli.ops.v1",
