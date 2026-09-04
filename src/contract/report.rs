@@ -89,8 +89,8 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report plan",
-            "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json> --json",
-            "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and an explicit dashboard objective",
+            "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] --json",
+            "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text)",
             "tags": ["report", "dashboard", "plan", "intent", "spec", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -99,9 +99,13 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.plan.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--json", "--format json"],
-            "examples": ["powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "spec", "compiled.counts", "decisions", "warnings", "next"]
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|intent.json|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.dashboard.json --json",
+                "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"
+            ],
+            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "spec", "compiled.counts", "decisions", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "diagnosticCodes": ["spec.invalid_intent", "spec.missing_input", "input_safety_violation", "invalid_args"]
         }),
         json!({
             "path": "report design-plan",

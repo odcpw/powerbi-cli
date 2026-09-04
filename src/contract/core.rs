@@ -197,7 +197,7 @@ Usage:
   powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> --handle <visual-handle> --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> --display-name <text> --dry-run --json
   powerbi-cli report spec fields --schema <schema.json> --json
   powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json
-  powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json> --json
+  powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) --out <dashboard.json> --json
   powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
   powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json
@@ -230,7 +230,7 @@ pub(crate) fn help_json() -> Value {
             "powerbi-cli profile infer --schema <schema.json> --out <profile.json> --json",
             "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
             "powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json",
-            "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <dashboard-goal> --out <dashboard.json> --json",
+            "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json> --json",
             "powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json",
             "powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json"
         ],
@@ -377,7 +377,7 @@ Rules for agents:
 - Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features and returns proof/handoff follow-up commands.
 - Use `report spec fields --schema <schema.json> [--profile <profile.json>]` to get exact column/measure binding references before writing a dashboard spec.
 - Use `report spec upgrade --spec <v1.json> --out <v2.json>` to produce a normalized v2 spec without dropping any validated v1 fields; use `--dry-run` to inspect the result without writing.
-- Use `report plan --schema <schema.json> --profile <profile.json> --objective <goal> --out <dashboard.json>` to create a deterministic starter dashboard spec, then `report spec validate --schema <schema.json> --spec <dashboard.json>` before build.
+- Use `report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json>` (or the backward-compatible `--objective <goal>`) to create a deterministic starter dashboard spec, then `report spec validate --schema <schema.json> --spec <dashboard.json>` before build. Intent v1 accepts audience, questions, KPIs, comparisons, periods, drill paths, alerts, filter dimensions, preferred archetypes, page flow, and handoff requirements; uncompiled fields remain in the response with an owning-bead warning.
 - Use project-only `report design-plan --project <project>` to get visual opportunities from an already scaffolded project.
 - Use `report tree/find/cat/query` for stable report-object navigation across pages, visuals, bindings, filters, slicers, bookmarks, and interactions. Use `--include-raw` only when you explicitly need raw PBIR JSON.
 - Use `report audit` and `report sanitize plan/apply` before handoff when a Desktop-authored or template-derived report might contain persisted filter/slicer/bookmark state, literal values, or stale interaction references.
@@ -396,7 +396,7 @@ Common workflow:
 2. `powerbi-cli profile infer --schema <schema.json> --out <profile.json> --json`
 3. `powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json`
 4. `powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json` (when starting from v1)
-5. `powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <dashboard-goal> --out <dashboard.json> --json`
+5. `powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json> --json`
 6. `powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json`
 7. `powerbi-cli report build --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --out-dir <project-dir> --json`
 8. `powerbi-cli inspect --deep <project-dir> --json`
@@ -434,7 +434,7 @@ pub(crate) fn robot_triage() -> Value {
             "profileValidate": "powerbi-cli profile validate <profile.json> --json",
             "reportSpecFields": "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
             "reportSpecUpgrade": "powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json",
-            "reportPlan": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --objective <dashboard-goal> --out <dashboard.json> --json",
+            "reportPlan": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json> --json",
             "reportSpecValidate": "powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json",
             "reportBuild": "powerbi-cli report build --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             "packageSourcePack": "powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json",
@@ -1081,6 +1081,8 @@ fn diagnostic_codes() -> Vec<Value> {
         json!({"code": "unsupported_feature", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "input_safety_violation", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "spec.unknown_field", "exitCode": EXIT_VALIDATION_FAILED}),
+        json!({"code": "spec.invalid_intent", "exitCode": EXIT_VALIDATION_FAILED}),
+        json!({"code": "spec.missing_input", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "file_not_found", "exitCode": EXIT_FILE_NOT_FOUND}),
         json!({"code": "validation_failed", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "integrity_failed", "exitCode": EXIT_VALIDATION_FAILED}),
@@ -1124,6 +1126,8 @@ fn schema_manifest() -> Value {
         "profileFields": ["schema", "source", "tables", "tables[].role", "tables[].rowCount", "tables[].columns", "tables[].columns[].roles", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "warnings"],
         "dashboardSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
+        "intentVersions": ["intent.v1"],
+        "intentFields": ["schema", "audience", "questions[]", "kpis[].name", "kpis[].measure", "kpis[].target", "comparisons[]", "periods[]", "drillPaths[]", "alerts[].measure", "alerts[].op", "alerts[].threshold", "alerts[].semantic", "filterDimensions[]", "preferredArchetypes[]", "pageFlow[]", "handoff.target", "handoff.sourceKinds[]"],
         "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
         "reportSpecUpgradeFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
@@ -1250,12 +1254,30 @@ fn schema_manifest() -> Value {
         "schemaPath",
         "profilePath",
         "specPath",
+        "intent.schema",
+        "intent.source",
+        "intent.format",
         "intent.text",
+        "intent.audience",
+        "intent.questions",
+        "intent.kpis",
+        "intent.comparisons",
+        "intent.periods",
+        "intent.drillPaths",
+        "intent.alerts",
+        "intent.filterDimensions",
+        "intent.preferredArchetypes",
+        "intent.pageFlow",
+        "intent.handoff",
         "profileSummary",
         "spec",
         "compiled.counts",
         "decisions",
         "warnings",
+        "warnings[].code",
+        "warnings[].message",
+        "warnings[].pointer",
+        "warnings[].owningBead",
         "next"
     ]);
     manifest

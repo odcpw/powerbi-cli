@@ -1,0 +1,35 @@
+{
+  "schema": "intent.v1",
+  "audience": "Finance leaders",
+  "questions": [
+    "How is revenue trending?",
+    "Which segments need attention?"
+  ],
+  "kpis": [
+    {
+      "name": "Total Revenue",
+      "target": 1000000
+    },
+    {
+      "name": "Total Units"
+    }
+  ],
+  "comparisons": ["Segment"],
+  "periods": ["Last 12 months"],
+  "drillPaths": ["Segment -> Customer"],
+  "alerts": [
+    {
+      "measure": "Total Revenue",
+      "op": "<",
+      "threshold": 100000,
+      "semantic": "warning"
+    }
+  ],
+  "filterDimensions": ["Region"],
+  "preferredArchetypes": ["kpi-overview", "time-series"],
+  "pageFlow": ["Overview", "Trend", "Detail"],
+  "handoff": {
+    "target": "work",
+    "sourceKinds": ["csv"]
+  }
+}

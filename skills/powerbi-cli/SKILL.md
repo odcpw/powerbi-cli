@@ -412,6 +412,7 @@ discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
 pbi --json schema validate examples/sales.schema.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
 pbi --json profile validate examples/sales.profile.json
+pbi --json report plan --schema examples/sales.schema.json --profile examples/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.planned.dashboard.json
 pbi --json report spec validate --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json
 pbi --json report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json
 pbi --json report build --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/generic-sales --force
@@ -421,9 +422,15 @@ pbi --json fixture verify build/generic-sales --expected testdata/golden/generic
 ```
 
 `report plan` is implemented as a deterministic starter-spec planner. Give it a
-schema, optional profile, objective, and `--out <dashboard.json>`, then validate
-the emitted spec before `report build`. It is not a substitute for reviewing the
-generated report intent or for Desktop compatibility proof.
+schema, optional profile, and either `--intent <intent.md|intent.json>` or the
+backward-compatible objective text, then validate the emitted spec before
+`report build`. Intent v1 normalizes audience, questions, KPIs, comparisons,
+periods, drill paths, alerts, filter dimensions, preferred archetypes, page
+flow, and handoff requirements. KPI names resolve to exact model measures;
+unresolved names return `spec.missing_input` with a pointer and candidates.
+Fields not compiled by this starter planner remain in the response with an
+owning-bead warning. It is not a substitute for reviewing generated report
+intent or for Desktop compatibility proof.
 
 ### Scaffold From A Schema
 

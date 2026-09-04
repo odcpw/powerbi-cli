@@ -246,6 +246,7 @@ cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --jso
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
+cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
@@ -364,6 +365,16 @@ cargo run --bin powerbi-cli -- handoff check .\build\sales --json
 cargo run --bin powerbi-cli -- validate --strict .\build\sales --json
 cargo run --bin powerbi-cli -- --json validate .\build\sales
 ```
+
+`report plan` accepts a bounded `--intent <intent.md|intent.json>` document in
+the `intent.v1` shape. JSON fields and Markdown H2 sections cover audience,
+questions, KPIs, comparisons, periods, drill paths, alert rules, filter
+dimensions, preferred visual archetypes, page flow, and handoff requirements.
+The response preserves the normalized document under `intent`; each KPI must
+resolve to an exact model measure or the command returns `spec.missing_input`
+with its pointer and measure candidates. Fields that the starter planner does
+not compile remain visible in `warnings[]` with their owning bead. The
+free-form `--objective` form remains available for quick question-only plans.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
