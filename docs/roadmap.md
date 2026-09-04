@@ -191,6 +191,9 @@ validation, proof, then mutation breadth.
   errors.
 - Require generated follow-up commands on every mutation.
 - Keep `skills/powerbi-cli/SKILL.md` aligned with the live binary.
+- Enforce the shared input-surface contract: fixed byte/row/column/depth/count
+  budgets, strict decoding, traversal/symlink refusal, PNG sniffing, and one
+  `input_safety_violation` diagnostic, exposed under `capabilities.limits`.
 
 ### Phase 0: Contract And Portability
 

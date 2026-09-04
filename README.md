@@ -148,6 +148,19 @@ metadata, and unproven Power BI features fail with
 Use `powerbi-cli features list --json` to see which feature surfaces are
 supported, read-only, planned, or Desktop-golden gated.
 
+## Input Safety Limits
+
+User-supplied schema, profile, dashboard-spec, JSON bundle, intent, DAX/text,
+and binding files are read through bounded, strict-UTF-8, non-symlink input
+guards. Safety refusals use `error.code = "input_safety_violation"` (exit 10)
+with a hint and executable next command. `capabilities.limits` is the
+machine-readable source for every current and reserved surface limit, including
+`$include` depth/count, CSV/JSON rows and columns, PNG magic-byte checks, ops
+schema validation, snapshots, and harvested PBIR fragments. See
+[`docs/input-safety-contract.md`](docs/input-safety-contract.md) for the exact
+numbers and the APIs future command owners must call. Package archives and the
+staged workflow retain their stronger specialized streaming/identity policies.
+
 ## JSON Response Contract
 
 Successful JSON is family-specific; there is no mandatory five-field success

@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
 };
@@ -159,9 +160,7 @@ fn validation_json(
 }
 
 pub(crate) fn load_schema_value(path: &Path) -> CliResult<Value> {
-    let text = fs::read_to_string(path).map_err(|err| {
-        CliError::file_not_found(format!("read schema {}: {err}", path.display()))
-    })?;
+    let text = read_utf8(path, InputKind::Schema)?;
     serde_json::from_str(&text)
         .map_err(|err| CliError::invalid_args(format!("parse schema {}: {err}", path.display())))
 }

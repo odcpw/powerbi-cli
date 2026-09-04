@@ -1,6 +1,6 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::tmdl::{TableDocument, find_table, load_table_documents, same_name};
 use crate::{CliError, CliResult, ResolvedProject};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -263,8 +263,7 @@ pub(crate) fn normalize_cross_filtering_behavior(value: &str) -> CliResult<Strin
 }
 
 fn parse_relationship_document(path: PathBuf) -> CliResult<RelationshipDocument> {
-    let text = fs::read_to_string(&path)
-        .map_err(|err| CliError::file_not_found(format!("read {}: {err}", path.display())))?;
+    let text = read_utf8(&path, InputKind::ProjectText)?;
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
     let had_final_newline = text.ends_with('\n');
     let normalized = text.replace("\r\n", "\n").replace('\r', "\n");

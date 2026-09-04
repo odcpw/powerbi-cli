@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::inspect::deep_inspect;
 use crate::model_dax::{add_cycle_findings, analyze_dax};
 use crate::tmdl::load_table_documents;
@@ -396,8 +397,7 @@ fn add_desktop_compat_findings(
         if !path.is_file() {
             continue;
         }
-        let text = fs::read_to_string(&path)
-            .map_err(|err| CliError::unexpected(format!("read {}: {err}", path.display())))?;
+        let text = read_utf8(&path, InputKind::ProjectText)?;
         findings.extend(relationship_comment_findings(
             &text,
             &canonical_display(&path),

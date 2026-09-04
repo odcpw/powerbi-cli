@@ -2,6 +2,7 @@
 
 use super::{desktop, integrations, model, report, workflow_pkg};
 use crate::feature_catalog::{feature_catalog_schema_fields, feature_policy_json};
+use crate::input_safety;
 use crate::visual_catalog::{
     schema_golden_visual_type_names, supported_visual_type_names, visual_type_contracts,
 };
@@ -261,6 +262,7 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "globalFlags": global_flags(),
         "exitCodes": exit_codes(),
         "diagnosticCodes": diagnostic_codes(),
+        "limits": input_safety::limits_json(),
         "responseShapes": response_shapes(),
         "featurePolicy": feature_policy_json(),
         "filter": filter,
@@ -313,6 +315,7 @@ Rules for agents:
 - Start with `powerbi-cli --json capabilities` and trust that payload over memory.
 - Use `powerbi-cli version --json` for a cheap provenance check before relying on cached command knowledge.
 - Use `powerbi-cli features list --json` to distinguish supported, read-only, planned, and explicitly refused Power BI feature surfaces. If a command returns `error.code = "unsupported_feature"`, stop or choose a supported workflow; do not raw-patch guessed PBIR/TMDL.
+- Read `capabilities.limits` before supplying files. Schema, profile, spec, JSON bundle, intent, and source-text reads are byte-bounded, strict UTF-8, and refuse symlinks; planned include, rows, PNG, ops, snapshot, and harvested-fragment surfaces have reserved numeric contracts there. Safety refusals use `input_safety_violation`; do not bypass them or silently strip content.
 - Use `package inspect/extract/import/source-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only documented PBIP/PBIR/TMDL files and generated sidecars, refuses dot-directories/unknown files, and scans every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
 - For arbitrary dashboards, start with `schema validate`, `profile infer`, `report plan`, `report spec validate`, then `report build`.
 - After any scaffold, report build, or mutation, run the returned inspect and validate commands.
@@ -592,7 +595,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "capabilities.v1",
             "flags": ["--for <filter>", "--json", "--format json"],
             "examples": ["powerbi-cli --json capabilities", "powerbi-cli capabilities --json --for scaffold"],
-            "followUpFields": ["scope", "commands[].usage", "commands[].examples", "exitCodes", "omittedCatalogs", "fullContractCommand", "schemaManifest"]
+            "followUpFields": ["scope", "commands[].usage", "commands[].examples", "exitCodes", "limits", "omittedCatalogs", "fullContractCommand", "schemaManifest"]
         }),
         json!({
             "path": "version",
@@ -990,6 +993,7 @@ fn diagnostic_codes() -> Vec<Value> {
     vec![
         json!({"code": "invalid_args", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "unsupported_feature", "exitCode": EXIT_INVALID_ARGS}),
+        json!({"code": "input_safety_violation", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "file_not_found", "exitCode": EXIT_FILE_NOT_FOUND}),
         json!({"code": "validation_failed", "exitCode": EXIT_VALIDATION_FAILED}),
         json!({"code": "integrity_failed", "exitCode": EXIT_VALIDATION_FAILED}),

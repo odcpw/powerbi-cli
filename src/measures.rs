@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 use crate::project_io::{copy_project_dir, write_text_atomic_validated};
 use crate::tmdl::{
     MeasureDefinition, MeasureRecord, MeasureSelector, MutationPlan, TableDocument,
@@ -9,9 +10,8 @@ use crate::{
     resolve_project, validate_project,
 };
 use serde_json::{Value, json};
-use std::fs;
-use std::io::{self, Read};
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 pub(crate) fn measures_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
@@ -611,24 +611,15 @@ fn require_selector(selector: &MeasureSelector, action: &str) -> CliResult<()> {
 }
 
 fn read_expression_file(path: &str) -> CliResult<String> {
-    let bytes = if path == "-" {
-        let mut bytes = Vec::new();
-        io::stdin()
-            .read_to_end(&mut bytes)
-            .map_err(|err| CliError::unexpected(format!("read expression from stdin: {err}")))?;
-        bytes
+    let text = if path == "-" {
+        read_utf8_stream(
+            &mut io::stdin(),
+            InputKind::SourceText,
+            "expression from stdin",
+        )?
     } else {
-        fs::read(path).map_err(|err| {
-            CliError::file_not_found(format!("read expression file {path}: {err}"))
-        })?
+        read_utf8(Path::new(path), InputKind::SourceText)?
     };
-    let text = String::from_utf8(bytes).map_err(|_| {
-        CliError::invalid_args(format!("expression file is not valid UTF-8: {path}"))
-            .with_hint("Save the DAX expression as UTF-8 text and retry.")
-            .with_suggested_command(
-                "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression-file <path> --dry-run --json",
-            )
-    })?;
     let expression = text
         .trim_start_matches('\u{feff}')
         .trim_end_matches(['\r', '\n'])

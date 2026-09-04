@@ -247,6 +247,12 @@ supported.
 - Treat package-extraction limits as a security boundary. Defaults are 10,000
   entries, 256 MiB per entry, 2 GiB total uncompressed, and 200:1 compression;
   raise them only with the matching explicit `--max-*` flag after inspection.
+- Treat `capabilities.limits` as the input-surface safety contract. Schema,
+  profile, spec, JSON bundle, intent, and DAX/text files have fixed byte limits,
+  strict UTF-8 decoding, and symlink refusal. Planned includes, rows, PNG
+  resources, ops, snapshots, and harvested fragments already have reserved
+  numeric limits and typed guards in `docs/input-safety-contract.md`; do not
+  bypass those guards or silently strip rejected content when adding a command.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.

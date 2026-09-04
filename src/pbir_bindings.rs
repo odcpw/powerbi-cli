@@ -1,10 +1,10 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::tmdl::{TableDocument, same_name};
 use crate::visual_catalog::{
     column_binding_is_aggregated, column_binding_is_proven, normalize_role, supported_roles,
 };
 use crate::{CliError, CliResult};
 use serde_json::{Map, Value, json};
-use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Clone, Default)]
@@ -75,9 +75,7 @@ pub(crate) fn parse_bindings_json_text(text: &str) -> CliResult<Vec<VisualBindin
 }
 
 pub(crate) fn parse_bindings_json_file(path: &Path) -> CliResult<Vec<VisualBindingInput>> {
-    let text = fs::read_to_string(path).map_err(|err| {
-        CliError::file_not_found(format!("read bindings file {}: {err}", path.display()))
-    })?;
+    let text = read_utf8(path, InputKind::JsonArtifact)?;
     parse_bindings_json_text(&text)
 }
 

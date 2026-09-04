@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::project_io::copy_project_dir;
 use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect_text};
 use crate::tmdl::load_table_documents;
@@ -1090,9 +1091,7 @@ fn scan_source_archive_content(
     let mut pii_review_files = BTreeSet::new();
     let mut non_dummy_partition_files = BTreeSet::new();
     for (name, path) in entries {
-        let bytes = fs::read(path)
-            .map_err(|err| CliError::unexpected(format!("scan {}: {err}", path.display())))?;
-        let text = String::from_utf8_lossy(&bytes);
+        let text = read_utf8(path, InputKind::ProjectText)?;
         if contains_credential_like_text_str(&text) {
             credential_files.insert(name.clone());
         }

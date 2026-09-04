@@ -598,7 +598,11 @@ fn model_measures_expression_file_is_utf8_trimmed_and_mutually_exclusive_with_in
         "--dry-run",
         "--json",
     ]);
-    assert_eq!(invalid.code, 2);
+    assert_eq!(invalid.code, 10);
+    assert_eq!(
+        stderr_json(&invalid)["error"]["code"],
+        Value::from("input_safety_violation")
+    );
     assert!(invalid.stderr.contains("not valid UTF-8"));
 }
 

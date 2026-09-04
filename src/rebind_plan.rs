@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 use crate::project_io::write_text_atomic;
 use crate::source_templates::{
     SOURCE_TEMPLATES_SCHEMA, SourceTemplateStore, find_template, load_source_template_store,
@@ -10,8 +11,8 @@ use crate::{
 };
 use serde_json::{Value, json};
 use std::fs;
-use std::io::{self, Read};
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
 struct RebindOptions {
@@ -298,14 +299,13 @@ fn load_rebind_template_store(
 ) -> CliResult<(SourceTemplateStore, PathBuf)> {
     if let Some(path) = templates {
         let text = if path == "-" {
-            let mut text = String::new();
-            io::stdin()
-                .read_to_string(&mut text)
-                .map_err(|err| CliError::unexpected(format!("read templates from stdin: {err}")))?;
-            text
+            read_utf8_stream(
+                &mut io::stdin(),
+                InputKind::JsonArtifact,
+                "templates from stdin",
+            )?
         } else {
-            fs::read_to_string(path)
-                .map_err(|err| CliError::file_not_found(format!("read templates {path}: {err}")))?
+            read_utf8(Path::new(path), InputKind::JsonArtifact)?
         };
         let mut store: SourceTemplateStore = serde_json::from_str(&text)
             .map_err(|err| CliError::validation_failed(format!("parse templates {path}: {err}")))?;

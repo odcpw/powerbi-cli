@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::project_io::write_json_atomic;
 use crate::safety_scan::{
     contains_credential_like_text_str, redact_credential_parameter, redact_credential_values,
@@ -114,8 +115,7 @@ pub(crate) fn load_source_template_store(
     if !path.exists() {
         return Ok(SourceTemplateStore::default());
     }
-    let text = fs::read_to_string(&path)
-        .map_err(|err| CliError::file_not_found(format!("read {}: {err}", path.display())))?;
+    let text = read_utf8(&path, InputKind::JsonArtifact)?;
     let mut store: SourceTemplateStore = serde_json::from_str(&text).map_err(|err| {
         CliError::validation_failed(format!("parse JSON {}: {err}", path.display()))
     })?;

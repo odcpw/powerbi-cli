@@ -1,3 +1,4 @@
+use crate::input_safety::{InputKind, read_utf8};
 use crate::pbir_themes::{
     THEME_BUNDLE_SCHEMA, list_report_themes, theme_record_json, theme_safety, theme_safety_json,
     write_theme_bundle, write_theme_json,
@@ -9,7 +10,6 @@ use crate::{
     read_json_value, report_schema_major, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
-use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) fn themes_command(args: &[String]) -> CliResult<Value> {
@@ -564,9 +564,7 @@ fn validate_theme_collection(value: &Value, path: &Path) -> CliResult<()> {
 }
 
 fn read_bundle(path: &Path) -> CliResult<Value> {
-    let text = fs::read_to_string(path).map_err(|err| {
-        CliError::file_not_found(format!("read bundle {}: {err}", path.display()))
-    })?;
+    let text = read_utf8(path, InputKind::JsonArtifact)?;
     let value = serde_json::from_str::<Value>(&text).map_err(|err| {
         CliError::validation_failed(format!("parse theme bundle {}: {err}", path.display()))
     })?;
