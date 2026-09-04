@@ -308,6 +308,7 @@ cargo run --bin powerbi-cli -- report visuals delete --project .\build\sales-lay
 cargo run --bin powerbi-cli -- report visuals delete --project .\build\sales-layout --handle <visual-handle> --out-dir .\build\sales-layout-minus-visual --json
 cargo run --bin powerbi-cli -- report visuals set-bindings --project .\build\sales --handle <visual-handle> --bindings-json "[{""role"":""Values"",""table"":""FactSales"",""measure"":""Total Revenue""}]" --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-bindings --project .\build\sales --handle <visual-handle> --bindings-json "[{""role"":""Values"",""table"":""FactSales"",""measure"":""Total Revenue""}]" --out-dir .\build\sales-bound --json
+cargo run --bin powerbi-cli -- report visuals repair-bindings --project .\build\sales --handle <visual-handle> --dry-run --json
 cargo run --bin powerbi-cli -- report drilldown set-hierarchy --project .\build\sales --handle <line-chart-handle> --field "DimDate[FiscalYear]" --field "DimDate[Month]" --dry-run --json
 cargo run --bin powerbi-cli -- lint .\build\sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\sales --json
@@ -441,6 +442,15 @@ three pages.
   `desktop-golden-pending` until Desktop open/refresh/save re-verification;
   automated `desktop-canvas-refresh` proof and broader typed formatting remain
   open.
+  `report visuals catalog` exposes one closed role-map row per generated visual
+  type: required and optional roles, measure-only roles, per-role projection
+  limits, mutually exclusive roles, runtime-parity rules, proof level, and
+  fixture provenance. Only the pie, donut, pivotTable, and slicer rows cite
+  independent Desktop-authored reference files; other rows identify their
+  repository-generated proof level. `report visuals repair-bindings --dry-run`
+  can propose a typed `setBindings` op for mechanical, proven repairs such as
+  scatter `Details` to `Category` and bare scatter value-axis columns to Sum
+  aggregations. It never writes, invents fields, or drops ambiguous bindings.
   `report visuals formatting list/show` inventories existing PBIR formatting
   object cards and property names with raw payloads omitted unless
   `--include-raw` is passed. `report visuals formatting extract/apply` copies

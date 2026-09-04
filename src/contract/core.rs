@@ -4,6 +4,7 @@ use super::{desktop, integrations, model, report, workflow_pkg};
 use crate::feature_catalog::{feature_catalog_schema_fields, feature_policy_json};
 use crate::visual_catalog::{
     schema_golden_visual_type_names, supported_visual_type_names, visual_type_contracts,
+    visual_type_role_rules,
 };
 use crate::{
     CliError, CliResult, EXIT_FILE_NOT_FOUND, EXIT_INVALID_ARGS, EXIT_ORACLE_FAILED,
@@ -187,6 +188,7 @@ Usage:
   powerbi-cli report visuals delete --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json
   powerbi-cli report visuals set-position --project <project-dir-or.pbip> --handle <visual-handle> --x <n> --y <n> --dry-run --json
   powerbi-cli report visuals set-bindings --project <project-dir-or.pbip> --handle <visual-handle> --bindings-json <json> --dry-run --json
+  powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> --handle <visual-handle> --dry-run --json
   powerbi-cli report visuals set-topn-guard --project <project-dir-or.pbip> --handle <visual-handle> --field <Table.Column> --order-by <Table.Measure> --top <N> --dry-run --json
   powerbi-cli report visuals set-object --project <project-dir-or.pbip> --handle <visual-handle> --object <name> --property <name> --value <raw> --dry-run --json
   powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> --handle <visual-handle> --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> --display-name <text> --dry-run --json
@@ -1098,7 +1100,7 @@ fn schema_manifest() -> Value {
         "reportThemePresetFields": ["presets[].id", "presets[].name", "presets[].command", "preset.id", "preset.bundle", "preset.fingerprint"],
         "visualFields": ["name", "visualType", "title", "mode", "bindings", "x", "y", "z", "width", "height", "tabOrder"],
         "visualBindingFields": ["role", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
-        "visualCatalogFields": ["supportedVisualTypes", "visualTypes[].visualType", "visualTypes[].aliases", "visualTypes[].proofLevel", "visualTypes[].roles", "templateOnlyVisualTypes", "plannedVisualTypes", "next"],
+        "visualCatalogFields": ["supportedVisualTypes", "visualTypes[].visualType", "visualTypes[].aliases", "visualTypes[].proofLevel", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].proofLevel", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"],
         "visualFormattingFields": ["rawIncluded", "formatObjectContainerCount", "formatCardCount", "formatPropertyCount", "unsupportedContainerCount", "literalValueCount", "sources", "objectNames", "containers", "safety"],
         "visualFormattingContainerFields": ["source", "objectName", "shape", "unsupportedShape", "cardCount", "propertyCount", "selectorCount", "literalValueCount", "propertyNames", "cards", "raw"],
         "visualFormattingBundleFields": ["schema", "bundleVersion", "sourceFingerprint", "source.visual", "formatting.visualObjects", "formatting.topLevelObjects", "summary", "safety"],
@@ -1111,6 +1113,7 @@ fn schema_manifest() -> Value {
         "visualCloneMutationFields": ["dryRun", "mode", "source.handle", "target.handle", "clonePlan.strategy", "clonePlan.sourcePath", "clonePlan.targetPath", "clonePlan.position.before", "clonePlan.position.after", "changes[].path", "changes[].after", "readbackCommand", "slicerReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "visualDeleteMutationFields": ["dryRun", "mode", "target.handle", "target.page.handle", "deletePlan.before", "deletePlan.after", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "visualBindingMutationFields": ["bindingPlan.before", "bindingPlan.after", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
+        "visualBindingRepairFields": ["dryRun", "changed", "target.handle", "rule", "repairs[].ruleId", "repairs[].action", "repairPlan.before", "repairPlan.after", "repairPlan.op", "previewCommand", "applyCommand", "readbackCommand", "validateCommand"],
         "columnDataTypes": ["string", "int64", "double", "decimal", "date", "dateTime", "boolean"],
         "samples": ["examples/sales.schema.json", "examples/archetypes/regional-sales.schema.json"]
     });
@@ -1163,6 +1166,7 @@ fn generated_visual_contract() -> Value {
         "summary": "Generated dashboard specs and report visuals add use this small visual role contract. Exact card, tableEx, lineChart, scatterChart, and hundredPercentStackedColumnChart visual.json goldens replicate Desktop-rendered shapes from the 2026-08 production pilot and carry schema-golden proof. Use clone/template workflows for visuals outside the catalog.",
         "supportedVisualTypes": supported_visual_type_names(),
         "visualTypes": visual_type_contracts(),
+        "rules": visual_type_role_rules(),
         "schemaGoldenVisualTypes": schema_golden_visual_type_names(),
         "desktopGoldenPendingVisualTypes": supported_visual_type_names().into_iter().filter(|visual_type| !schema_golden_visual_type_names().contains(visual_type)).collect::<Vec<_>>(),
         "bindingManualDesktopCanvasRefreshVisualTypes": ["pieChart", "donutChart", "pivotTable", "slicer"],

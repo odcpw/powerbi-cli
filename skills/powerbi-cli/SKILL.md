@@ -149,6 +149,7 @@ one-shot desktop open-check/screenshot,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
+fixture-backed visual role maps plus dry-run binding repair proposals,
 report slicer list/show/clear, report interaction list/show/set/disable, report bookmark
 list/show plus metadata-only display-name/reorder/delete, raw report theme
 show/extract/apply bundles, master report style inspect/extract/diff/apply,
@@ -683,6 +684,7 @@ pbi --json report visuals delete --project build/sales --handle "visual:ReportSe
 pbi --json report visuals set-position --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --x 120 --y 140 --width 360 --height 220 --dry-run
 pbi --json report visuals set-bindings --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --bindings-json '[{"role":"Values","table":"FactSales","measure":"Total Revenue"}]' --dry-run
 pbi --json report visuals set-bindings --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --bindings-json '[{"role":"Values","table":"FactSales","measure":"Total Revenue"}]' --out-dir build/sales-bound
+pbi --json report visuals repair-bindings --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --dry-run
 pbi --json report visuals formatting set-color --project build/sales --handle "visual:ReportSectionOverview:<visual-name>" --slot title.fontColor --color "#123456" --dry-run
 pbi --json report visuals show --project build/sales-bound --handle "visual:ReportSectionOverview:<visual-name>"
 ```
@@ -693,6 +695,16 @@ returned readback, wireframe, inspect, and validate commands before chaining
 more work.
 
 `report visuals catalog` returns the generated visual type and role contract.
+Its `rules[]` table has one row per generated type with required/optional roles,
+measure-only roles, projection limits, mutually exclusive roles,
+runtime-parity rules, and honest fixture provenance. Only pie, donut,
+pivotTable, and slicer currently cite independent Desktop-authored reference
+files; do not promote repository-generated rows beyond their reported proof
+level. When strict validation finds a mechanical binding parity defect, run
+`report visuals repair-bindings --dry-run`: it may propose only proven role
+canonicalization or Sum aggregation wrappers as a typed `setBindings` op.
+Review the returned preview before applying it. Missing roles, duplicate fields,
+and unproven substitutions remain explicit refusals.
 `report visuals add` creates only cataloged generated visual containers: card,
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
 lineClusteredColumnComboChart, matrix (PBIR `pivotTable`), and slicer.
