@@ -506,8 +506,8 @@ fn deserialize_tagged(tag: &str, payload: Value) -> Result<Op, String> {
     }
 }
 
-/// JSON Schema for an operation plan. It intentionally describes the T1a
-/// closed set; T1b kernels extend the `oneOf` list additively.
+/// JSON Schema for an operation plan. The `oneOf` list is the closed set of
+/// operation tags accepted by this version of the ops.v1 contract.
 pub(crate) fn schema_json() -> Value {
     let operation = |tag: &str, properties: Value, required: &[&str]| {
         let mut value = serde_json::json!({
@@ -717,7 +717,7 @@ mod tests {
             schema["properties"]["ops"]["items"]["oneOf"]
                 .as_array()
                 .map(Vec::len),
-            Some(9)
+            Some(10)
         );
     }
 
