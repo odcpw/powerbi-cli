@@ -576,8 +576,12 @@ This generated snapshot keeps status and proof claims aligned with
   `spec.unknown_field` before the output is created.
   Validation failures are returned on stdout as `errors[]` objects with required
   `code` and `message` fields plus optional `pointer`, `didYouMean`, `hint`, and
-  `suggestedCommands`; they are not legacy error strings. The exact response
-  shape is published at `capabilities.responseShapes.reportSpecValidate`.
+  `suggestedCommands`; `spec.missing_input` additionally includes `field`,
+  `reason`, `candidatesCommand`, and an `example` value. The compiler refuses
+  to infer required schema, intent, and field-well inputs; optional documented
+  defaults remain explicit in `defaultsApplied[]`. These are not legacy error
+  strings. The exact response shape is published at
+  `capabilities.responseShapes.reportSpecValidate`.
 - The live feature boundary is `powerbi-cli features list --json`. Known but
   unimplemented or unproven report features such as tooltip pages, bookmark
   state capture/create/update/grouping, slicer selection/sync authoring, interaction

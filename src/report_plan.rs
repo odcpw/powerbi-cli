@@ -1,7 +1,9 @@
 use crate::input_safety::{InputKind, read_utf8, validate_text};
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::project_io::write_json_pretty;
-use crate::report_build::compile_dashboard_summary;
+use crate::report_build::{
+    compile_dashboard_summary, spec_missing_input, spec_missing_input_with_command,
+};
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -116,10 +118,13 @@ struct PlanModel<'a> {
 pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     let options = parse_plan_args(args)?;
     let schema_path = options.schema.ok_or_else(|| {
-        CliError::invalid_args("report plan requires --schema <schema.json>")
-            .with_suggested_command(
-                "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|text> --out <dashboard.json> --json",
-            )
+        spec_missing_input_with_command(
+            "/schema",
+            "schema",
+            "report plan needs a schema manifest to resolve measures and candidate fields",
+            json!({"--schema": "<schema.json>"}),
+            "powerbi-cli schema validate <schema.json> --json",
+        )
     })?;
     let schema_value = load_schema_value(&schema_path)?;
     let schema_validation = validate_schema_value(&schema_value);
@@ -141,6 +146,10 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     planned.warnings.extend(loaded_intent.warnings);
     sort_intent_warnings(&mut planned.warnings);
     let compiled = compile_dashboard_summary(&schema_value, &planned.spec)?;
+    let mut defaults_applied = planned.defaults_applied.clone();
+    if let Some(compiled_defaults) = compiled.get("defaultsApplied").and_then(Value::as_array) {
+        defaults_applied.extend(compiled_defaults.iter().cloned());
+    }
 
     if let Some(out) = options.out.as_ref() {
         if out.exists() && !options.force {
@@ -169,6 +178,7 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         "profileSummary": profile_value.as_ref().map(profile_summary),
         "spec": planned.spec,
         "compiled": compiled,
+        "defaultsApplied": defaults_applied,
         "decisions": planned.decisions,
         "warnings": planned.warnings,
         "next": next_for_plan(options.out.as_deref(), &schema_path, options.profile.as_deref())
@@ -179,6 +189,7 @@ struct PlannedDashboard {
     spec: Value,
     decisions: Vec<Value>,
     warnings: Vec<Value>,
+    defaults_applied: Vec<Value>,
 }
 
 fn build_dashboard_plan(
@@ -188,6 +199,31 @@ fn build_dashboard_plan(
 ) -> CliResult<(PlannedDashboard, Intent)> {
     let mut decisions = Vec::new();
     let mut warnings = Vec::new();
+    let mut defaults_applied = Vec::new();
+    if model.profile.is_none() {
+        defaults_applied.push(json!({
+            "pointer": "/profile",
+            "field": "profile",
+            "value": "schema metadata",
+            "reason": "profile is optional for report plan; schema columns are used when no profile is supplied"
+        }));
+    }
+    if profile_fact_tables(model.profile).is_empty() {
+        defaults_applied.push(json!({
+            "pointer": "/profile/candidates/factTables",
+            "field": "profile.candidates.factTables",
+            "value": model.fact_tables.first(),
+            "reason": "profile did not identify a fact table; the first schema table is used as the documented fallback"
+        }));
+    }
+    if model.fact_tables.is_empty() {
+        return Err(spec_missing_input(
+            "/profile/candidates/factTables",
+            "profile.candidates.factTables",
+            "the planner needs a fact table candidate to choose measures and visual fields",
+            json!({"factTables": ["FactSales"]}),
+        ));
+    }
     let mut generated_measures = Vec::new();
     let mut measures = model.existing_measures.clone();
     if measures.is_empty() {
@@ -208,13 +244,28 @@ fn build_dashboard_plan(
             });
         }
         if generated_measures.is_empty() {
-            return Err(CliError::validation_failed(
-                "report plan could not find an existing measure or numeric column to summarize",
-            )
-            .with_hint("Add at least one measure to the schema, or include a numeric fact column.")
-            .with_suggested_command(
-                "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
+            return Err(spec_missing_input(
+                "/model/measures",
+                "model.measures",
+                "the planner needs an existing measure or numeric column from which to construct a summary",
+                json!({"measures": [{"table": "FactSales", "name": "Total Revenue"}]}),
             ));
+        }
+        for measure in &generated_measures {
+            let table = measure
+                .get("table")
+                .and_then(Value::as_str)
+                .unwrap_or("<table>");
+            let name = measure
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("<measure>");
+            defaults_applied.push(json!({
+                "pointer": "/model/measures",
+                "field": "model.measures",
+                "value": field_reference(table, name),
+                "reason": "schema had no measure; report plan generated a deterministic SUM measure from a numeric column"
+            }));
         }
         warnings.push(json!({
             "code": "report_plan.generated_measures",
@@ -250,6 +301,42 @@ fn build_dashboard_plan(
         .get("name")
         .and_then(Value::as_str)
         .unwrap_or("PowerBIDashboard");
+    if !schema
+        .get("displayName")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+        && !schema
+            .get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty())
+    {
+        defaults_applied.push(json!({
+            "pointer": "/report/displayName",
+            "field": "report.displayName",
+            "value": display_name,
+            "reason": "schema has no display name; the documented planner label is used"
+        }));
+    }
+    if !schema
+        .get("name")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        defaults_applied.push(json!({
+            "pointer": "/report/name",
+            "field": "report.name",
+            "value": report_name,
+            "reason": "schema has no report name; the documented deterministic name is used"
+        }));
+    }
+    if intent.audience.is_none() {
+        defaults_applied.push(json!({
+            "pointer": "/report/audience",
+            "field": "report.audience",
+            "value": "agent-authored Power BI users",
+            "reason": "intent omitted an audience; the planner's documented audience label is used"
+        }));
+    }
 
     decisions.push(json!({
         "kind": "fact-table",
@@ -396,6 +483,7 @@ fn build_dashboard_plan(
             spec,
             decisions,
             warnings,
+            defaults_applied,
         },
         intent,
     ))
@@ -643,12 +731,12 @@ fn load_intent(intent: Option<&str>, objective: Option<&str>) -> CliResult<Loade
         });
     }
     let Some(intent) = intent.filter(|value| !value.trim().is_empty()) else {
-        return Err(CliError::invalid_args(
-            "report plan requires --intent <intent.md|intent.json|text> or --objective <text>",
-        )
-        .with_hint("Give the planner an intent.v1 document or business objective to optimize for.")
-        .with_suggested_command(
-            "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out dashboard.json --json",
+        return Err(spec_missing_input_with_command(
+            "/intent",
+            "intent",
+            "report plan needs an intent document or objective so it can choose report questions and visuals",
+            json!({"--intent": "<intent.md|intent.json>"}),
+            "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --json",
         ));
     };
     let path = Path::new(intent);
@@ -1478,22 +1566,18 @@ fn resolve_intent_kpis(
             } else {
                 candidates.join(", ")
             };
-            return Err(CliError::new(
-                "spec.missing_input",
-                EXIT_VALIDATION_FAILED,
+            return Err(spec_missing_input(
+                if kpi.pointer.is_empty() {
+                    "/kpis".to_string()
+                } else {
+                    kpi.pointer.clone()
+                },
+                "intent.kpis[].measure",
                 format!(
                     "KPI `{}` does not resolve to a model measure; candidates: {candidate_text}",
                     kpi.name
                 ),
-            )
-            .with_pointer(if kpi.pointer.is_empty() {
-                "/kpis".to_string()
-            } else {
-                kpi.pointer.clone()
-            })
-            .with_hint("Rename the KPI to an existing measure or set its `measure` field to an exact model measure name.")
-            .with_suggested_command(
-                "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
+                json!({"measure": candidate_text}),
             ));
         };
         kpi.measure = Some(choice.reference.clone());
