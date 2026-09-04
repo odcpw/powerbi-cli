@@ -1,4 +1,5 @@
 use crate::input_safety::{InputKind, RowsDocument, read_rows, read_utf8};
+use crate::profile_shape::classify_profile;
 use crate::safety_scan::{contains_credential_like_text_str, contains_pii_suspect_text};
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{
@@ -236,6 +237,10 @@ fn infer_profile(schema: &Value, schema_path: &Path) -> Value {
         },
         "dataValues": false,
         "tables": tables,
+        "relationships": schema
+            .get("relationships")
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
         "candidates": {
             "factTables": fact_tables,
             "dimensionTables": dimension_tables,
@@ -347,6 +352,10 @@ fn infer_profile_from_rows(
         },
         "dataValues": include_data_values,
         "tables": tables,
+        "relationships": schema
+            .get("relationships")
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new())),
         "candidates": {
             "factTables": fact_tables,
             "dimensionTables": dimension_tables,
@@ -1422,7 +1431,8 @@ pub(crate) fn profile_summary(profile: &Value) -> Value {
         "candidateNumericColumns": profile["candidates"]["numericColumns"].as_array().map_or(0, Vec::len),
         "candidateCategoryColumns": profile["candidates"]["categoryColumns"].as_array().map_or(0, Vec::len),
         "grainConflicts": profile["grainConflicts"].as_array().map_or(0, Vec::len),
-        "diagnostics": profile["diagnostics"].as_array().map_or(0, Vec::len)
+        "diagnostics": profile["diagnostics"].as_array().map_or(0, Vec::len),
+        "shape": classify_profile(profile).into_value()
     })
 }
 

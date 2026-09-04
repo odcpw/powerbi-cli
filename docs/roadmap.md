@@ -103,7 +103,7 @@ Required contract rules:
 
 ### Semantic Model
 
-- `model tables list/show/add/rename/delete` (shipped guarded TMDL CRUD;
+- `model tables list/show/add/add-calculated/rename/delete` (shipped guarded TMDL CRUD;
   rename can rewrite references explicitly)
 - `model columns list/show/add/update/delete` (shipped guarded base and
   calculated-column CRUD with unknown-metadata refusal)
@@ -115,14 +115,15 @@ Required contract rules:
 - `model roles list/show/add/update/delete`
 - `model perspectives list/show/add/update/delete`
 - `model cultures list/show/add/update/delete`
-- `model expressions list/show/add/update/delete`
+- `model expressions list/show/add/update/delete` (shipped guarded named M-expression CRUD;
+  duplicate-step lint and unknown-metadata refusal are explicit)
 - `model translations list/show/add/update/delete`
 
 The first semantic milestone should focus on tables, columns, measures,
-relationships, dummy partitions, static DAX reference checks, and readback of
-advanced TMDL already present in a project. Mutating roles, perspectives,
-cultures, expressions, translations, and refresh policies can wait until the
-object-specific writers and fixtures exist.
+relationships, dummy partitions, calculated tables, named expressions, static
+DAX/M reference checks, and readback of advanced TMDL already present in a
+project. Mutating roles, perspectives, cultures, translations, and refresh
+policies can wait until the object-specific writers and fixtures exist.
 
 ### Report Authoring
 
@@ -134,8 +135,16 @@ object-specific writers and fixtures exist.
   validation also checks the visual catalog before writing files. `report spec
   fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
-  its not-yet-compiled sections return `unsupported_feature` with their owning
-  T3 bead id.
+  root/page/visual `filters[]` compile through the typed AddFilter kernel with
+  model/type checks, and page `drillthrough` blocks compile through
+  SetDrillthrough with target-column validation and a hidden-by-default page;
+  `backButton:true` reports the pending action-button bead without emitting a
+  guessed visual. Remaining not-yet-compiled sections return
+  `unsupported_feature` with their owning T3 bead id.
+- `report spec schema` emits a draft 2020-12 JSON Schema for both strict
+  dashboard-spec versions, while `report spec explain` previews the typed
+  staged operation plan, handles, layout/defaults, unsupported sections, and
+  proof follow-ups without writing a project.
 - Missing required dashboard intent now returns the registered
   `spec.missing_input` diagnostic with an RFC 6901 pointer, expected field,
   reason, example, and `report spec fields` candidate command; documented
@@ -155,6 +164,11 @@ object-specific writers and fixtures exist.
   measures; unresolved names return `spec.missing_input` with pointer and
   candidates. Uncompiled intent fields remain visible with an owning-bead
   warning.
+- Profile summaries and report plans classify model shape as flat, star,
+  snowflake, or multi-fact only when relationship/cardinality and profile
+  column evidence supports it. Ambiguous models remain explicitly ambiguous;
+  date-like columns without a date dimension produce a date-table proposal and
+  high-cardinality categorical noise is reported for planner review.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
@@ -164,10 +178,10 @@ object-specific writers and fixtures exist.
   Category/Y charts with two or more resolved model columns.
 - `report visuals format`: set title, labels, legend, colors, display units,
   sort, and interactions.
-- `report filters list/show/add/delete/clear` (`list/show/add/delete/clear`
-  implemented first as raw readback, categorical authoring, exact-handle
-  deletion, and owner-scoped clear with data-value safety warnings;
-  advanced/range/TopN filters, update, and sort remain planned)
+- `report filters list/show/add/update/delete/clear` (raw readback,
+  categorical/numeric-range/relative-date authoring, visual TopN, type-preserving
+  updates, exact-handle deletion, and owner-scoped clear with data-value safety
+  warnings)
 - `report slicers list/show/clear/add/update` (`list/show/clear` implemented
   first as slicer visual readback plus guarded persisted-selection clear with
   data-value safety warnings; add/update/richer state authoring remain planned)
@@ -175,8 +189,10 @@ object-specific writers and fixtures exist.
   (`list/show` plus metadata-only display-name edits, flat reorder, and guarded
   delete are implemented; captured-state create/update and grouped reorder
   remain planned)
-- `report interactions list/show/set/disable` (`list/show` and first guarded
-  set/disable slice implemented; Default/reset semantics remain planned)
+- `report interactions list/show/set/disable/reset` (`list/show` and guarded
+  set/disable/reset slices implemented; reset removes one explicit
+  `visualInteractions` row and documents that absence restores the target
+  visual's default interaction behavior)
 - `report themes show/extract/apply/presets/apply-preset`
 - `report style inspect/extract/diff/apply`
 - `report visuals formatting conditional-formatting list/show/add/update/delete`
@@ -251,7 +267,8 @@ validation, proof, then mutation breadth.
   partitions, pages, visuals, bindings, filters, themes, proof state, and
   offline hazards.
 - Return stable handles from every inspected object.
-- Add `report wireframe export` as JSON first, HTML/SVG later if useful.
+- Add `report wireframe export` as deterministic JSON plus offline HTML/SVG
+  previews with grid slots, visual geometry, and lint markers.
 - Add `diff` over normalized `inspect --deep` summaries early; semantic diffs
   are how agents verify mutations.
 
@@ -353,6 +370,9 @@ validation, proof, then mutation breadth.
 - Implemented visual catalog and first visual creation slices:
   `report visuals catalog` exposes generated visual types, aliases, binding
   roles, template-only visual types, and planned visual families.
+  `report visuals catalog --formatting` additionally exposes the strict,
+  embedded eleven-entry formatting catalog consumed by `set-object`, including
+  PBIR containers, encoding, wildcard visual scope, and dated evidence.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
   columnChart, lineClusteredColumnComboChart, and scatterChart containers from
@@ -457,17 +477,21 @@ frozen until proven.
   passes them to shared M generator functions, so the same seed is
   byte-deterministic while multiple scales reproduce Desktop refresh cost
   without live data or credentials.
-- Implemented first filter slice: `report filters list/show` inventories raw
-  report/page/visual PBIR filter containers, returns stable filter handles, and
-  warns when filter metadata may contain selected semantic-model values.
-- Implemented guarded filter add, deletion, and clear slices: `report filters
-  add` writes one categorical filter to report/page/visual
-  `/filterConfig/filters` after TMDL column validation; `report filters delete`
-  removes one explicit report/page/visual filter by stable handle; `report
-  filters clear` removes filters by exact filter handle, report scope, one page
-  owner, one visual owner, or explicit `--all`. Mutations require `--dry-run`,
-  `--out-dir`, or guarded `--in-place`; broader advanced/range/TopN filters,
-  update/sort, and expression-level edits remain fixture-gated.
+- Implemented filter authoring and compiler parity: `report filters
+  list/show/add/update/delete/clear` inventories raw report/page/visual PBIR
+  filter containers, writes categorical, numeric-range, relative-date, and
+  visual TopN shapes after TMDL validation, and returns stable handles with
+  data-value safety warnings. Dashboard v2 root/page/visual `filters[]` use
+  the same typed AddFilter kernel during `report build`; spec builds and the
+  equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
+  `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
+  type-changing updates remain fixture-gated.
+- Implemented dashboard-spec drillthrough compiler parity: v2
+  `pages[].drillthrough` uses the SetDrillthrough kernel, validates a model
+  column target, defaults pages to hidden, and matches the two regional-sales
+  CLI drillthrough mutations byte-for-byte. `backButton:true` emits a
+  `spec.feature_pending` warning for `pbi-t4-pbir-catalog-expansion-sn2.8`
+  until the proven action-button kernel lands.
 - Implemented first bookmark slice: `report bookmarks list/show` inventories
   raw PBIR bookmark files plus bookmark order/group metadata, returns stable
   bookmark handles, and warns when captured bookmark state may contain selected
@@ -490,7 +514,10 @@ frozen until proven.
   set/disable` upserts explicit `visualInteractions` rows for live source/target
   visual pairs with `--dry-run`, `--out-dir`, or `--in-place`, refuses duplicate
   rows and stale endpoints, returns readback/wireframe/inspect/validate
-  commands, and leaves `Default`/reset behavior fixture-gated.
+  commands. `report interactions reset` removes one matching explicit row with
+  the same guarded output modes and returns a deterministic readback explaining
+  that the absent row restores the target visual's default behavior. The local
+  proof level is `unit-smoke`; Desktop canvas confirmation remains open.
 - Implemented typed formatting mutation slices: `report visuals formatting
   set-text` patches title text/visibility and clears rejected alt-text metadata,
   while `set-color` patches static literal
@@ -498,7 +525,14 @@ frozen until proven.
   selectors and conditional-formatting authoring remain Desktop-fixture gated.
 - Implemented first design/layout slices: `report design-plan` profiles local
   TMDL/PBIR metadata and emits agent-ready visual commands; `report layout auto`
-  rewrites only visual `position` blocks; `report drilldown set-hierarchy`
+  now resolves a deterministic twelve-column grid through named templates
+  (`overview`, `time-series`, `ranking`, `distribution`, `comparison`,
+  `detail-table`, `drillthrough-detail`, `exception-list`, `matrix-focus`,
+  `scatter-focus`, and `kpi-strip-trend-breakdown`), returning slot assignments
+  and SVG-free JSON previews with overlap/minimum-size invariants while
+  rewriting only visual `position` blocks; standard and wide page-size presets
+  plus explicit grid overrides are supported, and legacy `--preset` values map
+  to the corresponding named templates. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
 
@@ -513,17 +547,19 @@ frozen until proven.
 - Add bookmark captured-state create/update and grouped reorder validation
   against pages and visuals on top of the implemented readback and metadata
   mutation handles.
-- Add visual interaction reset/default controls and Desktop-authored
-  round-trip fixtures on top of the implemented set/disable handles.
+- Keep the implemented visual interaction reset/default control aligned with
+  Desktop-authored round-trip fixtures and promote its proof level when a
+  Windows canvas check confirms that removing a row restores the default.
 - Build on the implemented same-report `report drillthrough set/show/clear`
-  linked `pageBinding` + Drillthrough filter slice with Desktop re-verification,
+  linked `pageBinding` + Drillthrough filter slice and declarative v2 compiler
+  with Desktop re-verification,
   then add Desktop-authored goldens for visual drillthrough action links,
   multi-field drillthrough, and cross-report drillthrough.
 - Build on the implemented `report drilldown set-hierarchy` slice with
   Desktop-authored goldens for chart-family coverage and transient UI
   expand/collapse state. Keep tooltip pages, bookmark captured-state mutation,
-  slicer authoring/sync, interaction reset/default semantics, non-catalog visual
-  generation, and conditional-formatting authoring behind
+  slicer authoring/sync, non-catalog visual generation, and conditional-formatting
+  authoring behind
   `unsupported_feature` until Desktop-authored goldens exist.
 
 ### Phase 8: Agent Batch Operations
@@ -610,9 +646,90 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
+- [x] Planner v2 shape-aware rule catalog (`planner-rules.v1`) now evaluates
+  deterministic scored visual/page proposals with evidence and emits a
+  slot/template/style `specV2` candidate while preserving the build-compatible
+  dashboard.v1 plan output.
 
 Remaining work—such as `report compose`, full v2 compilation, design lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
 is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
 associated beads. Keep command and feature claims synchronized with the live
 `capabilities --json` and `features list --json` catalogs.
+
+The immediate work is no longer "can we generate something?" The generic
+archetypes (`flat-ops`, `scatter-bubble`, `catalog-proof`) open, refresh, and
+render in Desktop under manual oracle inspection. The next work is turning
+that manual proof into repeatable guardrails and then expanding feature
+coverage only from Desktop-authored or Desktop-proved fixtures.
+
+The detailed near-term backlog below remains useful for implementation context:
+
+1. **Upgrade `desktop open-check` into canvas proof.**
+   Current `desktop open-check` is mostly launch/title proof. It should detect
+   issue modals, blank canvases, page tabs, data pane tables, expected visual
+   count, and optionally capture screenshots. It should fail if Desktop opens a
+   title but the report canvas is empty.
+2. **Add `desktop refresh-check`.**
+   Open a PBIP, click/trigger refresh, wait for dummy partitions to load, and
+   verify seeded visuals no longer show only `(Blank)` when dummy rows exist.
+3. **Extend Desktop proof metadata.**
+   `desktop open-check` now reports detected Power BI Desktop file version when
+   available and distinguishes `desktop-launch` from future
+   `desktop-canvas-refresh` compatibility proof. Canvas automation still needs
+   report name, page count, screenshot paths when captured, refresh result, and
+   any modal text.
+4. **Commit Desktop golden fixtures.**
+   `testdata/golden/sales-desktop-filter-contract.summary.json` now freezes a
+   sales sample plus Desktop-proven report/page categorical filters, and
+   `testdata/golden/archetypes/regional-sales.summary.json` freezes a
+   drillthrough chain, TopN-by-measure filters, multi-page slicers, and
+   non-ASCII column/measure round trip.
+   `testdata/golden/archetypes/flat-ops.summary.json` and
+   `testdata/golden/archetypes/scatter-bubble.summary.json` freeze generated
+   non-domain archetypes, with manual Desktop proof records under
+   `testdata/desktop-proof/`. Next add a `testdata/desktop-golden/` corpus with
+   Desktop-authored normalized summaries for card, tableEx, line chart,
+   clustered bar/column, slicer, page filter, report filter, theme, and
+   conditional-formatting examples. Include the Desktop version used to create
+   each fixture.
+5. **Decide Microsoft validator integration.**
+   Choose one of: vendor Microsoft JSON schemas, optional shell-out to
+   `@microsoft/powerbi-report-authoring-cli`, or a separate
+   `validate --microsoft` proof. Keep local rules for Desktop-only constraints
+   the Microsoft validator misses, such as 1-50 char filter names.
+6. **Add structured PBIR diagnostic codes.**
+   Validation errors should carry codes and JSON-pointer-ish paths, not only
+   strings. Agents need stable repair targets.
+7. **Expand filter authoring from fixtures.**
+   Add `report filters update`, advanced filters, range filters, TopN,
+   relative date/time, include/exclude, pane visibility, and sort/order
+   metadata. Every new filter type needs a Desktop-authored fixture first.
+8. **Harden the visual catalog with Desktop-authored role maps.**
+   Current generated patterns render for the proof report. Next, build a
+   fixture-backed catalog for card, table, matrix, line, bar, column, combo,
+   slicer, text box, KPI, gauge, map, and decomposition tree where feasible.
+   Validate required roles, measure-only roles, max/min projections, and
+   unsupported combinations.
+9. **Harden style bundles.**
+   `report style inspect/extract/diff/apply` now combines theme material and
+   per-visual formatting and applies it without copying bindings/data roles.
+   Next, add fixture-backed page background, filter pane/card styling,
+   title/data-label/legend/axis typed defaults, style lint, and conditional
+   formatting once fixtures exist.
+10. **Version and compose schema manifests.**
+    `schema validate` and `schema normalize` now accept bounded relative
+    `$include` fragments, reject traversal/symlink/cycle and resource-budget
+    violations, and expose deterministic `normalizedFrom[]` provenance.
+    `schemaVersion` is warning-only for one compatibility release before it
+    becomes required. `report spec normalize` provides the corresponding
+    canonicalization for v2 dashboard specs; report build consumes normalized
+    documents so include-composed and inline-equivalent inputs preserve parity.
+11. **Broaden semantic model authoring.**
+    Tables/columns CRUD beyond scaffold, calculated tables, and named
+    expressions are shipped. Next add date-table helpers, roles/RLS, perspectives, translations,
+    calculation groups/items, and broader DAX format/lint. Bounded Desktop DAX
+    execution is delivered; authenticated Fabric/XMLA execution remains optional.
+12. **Add durable batch operations.**
+    Add `apply --ops`, `plan validate`, `plan replay`, and `plan diff` so one
+    agent can produce a mutation plan and another can inspect or replay it.

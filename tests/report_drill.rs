@@ -310,7 +310,6 @@ fn known_unimplemented_report_features_return_structured_refusals() {
         vec!["report", "bookmarks", "add", "--json"],
         vec!["report", "slicers", "add", "--json"],
         vec!["report", "slicers", "sync", "--json"],
-        vec!["report", "interactions", "reset", "--json"],
     ];
 
     for args in cases {

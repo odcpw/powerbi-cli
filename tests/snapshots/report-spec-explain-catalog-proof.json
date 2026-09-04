@@ -1,0 +1,753 @@
+{
+  "defaults": {
+    "perVisual": [
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+        "pointer": "/pages/0/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 720,
+          "x": 40,
+          "y": 40
+        },
+        "visualType": "pieChart"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+        "pointer": "/pages/1/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 720,
+          "x": 40,
+          "y": 40
+        },
+        "visualType": "donutChart"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+        "pointer": "/pages/2/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 720,
+          "x": 40,
+          "y": 40
+        },
+        "visualType": "lineClusteredColumnComboChart"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+        "pointer": "/pages/3/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 720,
+          "x": 40,
+          "y": 40
+        },
+        "visualType": "pivotTable"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+        "pointer": "/pages/4/visuals/0",
+        "position": {
+          "height": 240,
+          "width": 360,
+          "x": 40,
+          "y": 40
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": false,
+        "defaultedFields": [],
+        "handle": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+        "pointer": "/pages/5/visuals/0",
+        "position": {
+          "height": 400,
+          "width": 720,
+          "x": 40,
+          "y": 40
+        },
+        "visualType": "lineChart"
+      }
+    ]
+  },
+  "handles": {
+    "declared": [
+      {
+        "handle": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+        "kind": "visual",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+        "kind": "visual",
+        "opIndex": 1,
+        "pointer": "/pages/1/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+        "kind": "visual",
+        "opIndex": 2,
+        "pointer": "/pages/2/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+        "kind": "visual",
+        "opIndex": 3,
+        "pointer": "/pages/3/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+        "kind": "visual",
+        "opIndex": 4,
+        "pointer": "/pages/4/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+        "kind": "visual",
+        "opIndex": 5,
+        "pointer": "/pages/5/visuals/0"
+      }
+    ],
+    "references": [
+      {
+        "field": "page",
+        "handle": "page:ReportSectionPieProof",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionDonutProof",
+        "opIndex": 1,
+        "pointer": "/pages/1/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionComboProof",
+        "opIndex": 2,
+        "pointer": "/pages/2/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionMatrixProof",
+        "opIndex": 3,
+        "pointer": "/pages/3/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionSlicerProof",
+        "opIndex": 4,
+        "pointer": "/pages/4/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionLineControl",
+        "opIndex": 5,
+        "pointer": "/pages/5/visuals/0/page"
+      }
+    ]
+  },
+  "layout": {
+    "available": true,
+    "pages": [
+      {
+        "page": "page:ReportSectionPieProof",
+        "pointer": "/pages/0",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 720,
+              "x": 40,
+              "y": 40
+            },
+            "height": 400,
+            "pointer": "/pages/0/visuals/0",
+            "visual": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+            "width": 720,
+            "x": 40,
+            "y": 40
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionDonutProof",
+        "pointer": "/pages/1",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 720,
+              "x": 40,
+              "y": 40
+            },
+            "height": 400,
+            "pointer": "/pages/1/visuals/0",
+            "visual": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+            "width": 720,
+            "x": 40,
+            "y": 40
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionComboProof",
+        "pointer": "/pages/2",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 720,
+              "x": 40,
+              "y": 40
+            },
+            "height": 400,
+            "pointer": "/pages/2/visuals/0",
+            "visual": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+            "width": 720,
+            "x": 40,
+            "y": 40
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionMatrixProof",
+        "pointer": "/pages/3",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 720,
+              "x": 40,
+              "y": 40
+            },
+            "height": 400,
+            "pointer": "/pages/3/visuals/0",
+            "visual": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+            "width": 720,
+            "x": 40,
+            "y": 40
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionSlicerProof",
+        "pointer": "/pages/4",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 240,
+              "width": 360,
+              "x": 40,
+              "y": 40
+            },
+            "height": 240,
+            "pointer": "/pages/4/visuals/0",
+            "visual": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+            "width": 360,
+            "x": 40,
+            "y": 40
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionLineControl",
+        "pointer": "/pages/5",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 400,
+              "width": 720,
+              "x": 40,
+              "y": 40
+            },
+            "height": 400,
+            "pointer": "/pages/5/visuals/0",
+            "visual": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+            "width": 720,
+            "x": 40,
+            "y": 40
+          }
+        ]
+      }
+    ],
+    "unavailable": null
+  },
+  "plan": {
+    "operationCount": 6,
+    "ops": [
+      {
+        "handle": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+        "index": 0,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Category",
+              "role": "Category",
+              "table": "CatalogFacts"
+            },
+            {
+              "measure": "Total Amount",
+              "role": "Y",
+              "table": "CatalogFacts"
+            }
+          ],
+          "handle": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+          "name": "VisualContainerCategorySharePie",
+          "op": "addVisual",
+          "page": "page:ReportSectionPieProof",
+          "position": {
+            "height": 400,
+            "width": 720,
+            "x": 40,
+            "y": 40
+          },
+          "title": "Pie Category Share",
+          "visualType": "pieChart"
+        },
+        "pointer": "/pages/0/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+        "index": 1,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Category",
+              "role": "Category",
+              "table": "CatalogFacts"
+            },
+            {
+              "measure": "Total Amount",
+              "role": "Y",
+              "table": "CatalogFacts"
+            }
+          ],
+          "handle": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+          "name": "VisualContainerCategoryShareDonut",
+          "op": "addVisual",
+          "page": "page:ReportSectionDonutProof",
+          "position": {
+            "height": 400,
+            "width": 720,
+            "x": 40,
+            "y": 40
+          },
+          "title": "Donut Category Share",
+          "visualType": "donutChart"
+        },
+        "pointer": "/pages/1/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+        "index": 2,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Category",
+              "role": "Category",
+              "table": "CatalogFacts"
+            },
+            {
+              "measure": "Total Amount",
+              "role": "Y",
+              "sortDirection": "Descending",
+              "table": "CatalogFacts"
+            },
+            {
+              "measure": "Cumulative Share",
+              "role": "Y2",
+              "table": "CatalogFacts"
+            }
+          ],
+          "handle": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+          "name": "VisualContainerParetoCombo",
+          "op": "addVisual",
+          "page": "page:ReportSectionComboProof",
+          "position": {
+            "height": 400,
+            "width": 720,
+            "x": 40,
+            "y": 40
+          },
+          "title": "Pareto Combo",
+          "visualType": "lineClusteredColumnComboChart"
+        },
+        "pointer": "/pages/2/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+        "index": 3,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Category",
+              "role": "Rows",
+              "table": "CatalogFacts"
+            },
+            {
+              "column": "Year",
+              "role": "Columns",
+              "table": "CatalogFacts"
+            },
+            {
+              "measure": "Total Amount",
+              "role": "Values",
+              "table": "CatalogFacts"
+            }
+          ],
+          "handle": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+          "name": "VisualContainerRowsColumnsValuesMatrix",
+          "op": "addVisual",
+          "page": "page:ReportSectionMatrixProof",
+          "position": {
+            "height": 400,
+            "width": 720,
+            "x": 40,
+            "y": 40
+          },
+          "title": "Matrix Rows Columns Values",
+          "visualType": "pivotTable"
+        },
+        "pointer": "/pages/3/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+        "index": 4,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Category",
+              "role": "Values",
+              "table": "CatalogFacts"
+            }
+          ],
+          "handle": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+          "mode": "Basic",
+          "name": "VisualContainerBasicCategorySlicer",
+          "op": "addVisual",
+          "page": "page:ReportSectionSlicerProof",
+          "position": {
+            "height": 240,
+            "width": 360,
+            "x": 40,
+            "y": 40
+          },
+          "title": "Basic Category Slicer",
+          "visualType": "slicer"
+        },
+        "pointer": "/pages/4/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+        "index": 5,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Year",
+              "role": "Category",
+              "table": "CatalogFacts"
+            },
+            {
+              "measure": "Total Amount",
+              "role": "Y",
+              "table": "CatalogFacts"
+            }
+          ],
+          "handle": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+          "name": "VisualContainerKnownGoodLineControl",
+          "op": "addVisual",
+          "page": "page:ReportSectionLineControl",
+          "position": {
+            "height": 400,
+            "width": 720,
+            "x": 40,
+            "y": 40
+          },
+          "title": "Known-Good Line Control",
+          "visualType": "lineChart"
+        },
+        "pointer": "/pages/5/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      }
+    ],
+    "schema": "powerbi-cli.ops.v1",
+    "stages": [
+      {
+        "index": 2,
+        "name": "visual",
+        "operationIndexes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "ops": [
+          {
+            "handle": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+            "index": 0,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Category",
+                  "role": "Category",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "measure": "Total Amount",
+                  "role": "Y",
+                  "table": "CatalogFacts"
+                }
+              ],
+              "handle": "visual:ReportSectionPieProof:VisualContainerCategorySharePie",
+              "name": "VisualContainerCategorySharePie",
+              "op": "addVisual",
+              "page": "page:ReportSectionPieProof",
+              "position": {
+                "height": 400,
+                "width": 720,
+                "x": 40,
+                "y": 40
+              },
+              "title": "Pie Category Share",
+              "visualType": "pieChart"
+            },
+            "pointer": "/pages/0/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+            "index": 1,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Category",
+                  "role": "Category",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "measure": "Total Amount",
+                  "role": "Y",
+                  "table": "CatalogFacts"
+                }
+              ],
+              "handle": "visual:ReportSectionDonutProof:VisualContainerCategoryShareDonut",
+              "name": "VisualContainerCategoryShareDonut",
+              "op": "addVisual",
+              "page": "page:ReportSectionDonutProof",
+              "position": {
+                "height": 400,
+                "width": 720,
+                "x": 40,
+                "y": 40
+              },
+              "title": "Donut Category Share",
+              "visualType": "donutChart"
+            },
+            "pointer": "/pages/1/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+            "index": 2,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Category",
+                  "role": "Category",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "measure": "Total Amount",
+                  "role": "Y",
+                  "sortDirection": "Descending",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "measure": "Cumulative Share",
+                  "role": "Y2",
+                  "table": "CatalogFacts"
+                }
+              ],
+              "handle": "visual:ReportSectionComboProof:VisualContainerParetoCombo",
+              "name": "VisualContainerParetoCombo",
+              "op": "addVisual",
+              "page": "page:ReportSectionComboProof",
+              "position": {
+                "height": 400,
+                "width": 720,
+                "x": 40,
+                "y": 40
+              },
+              "title": "Pareto Combo",
+              "visualType": "lineClusteredColumnComboChart"
+            },
+            "pointer": "/pages/2/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+            "index": 3,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Category",
+                  "role": "Rows",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "column": "Year",
+                  "role": "Columns",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "measure": "Total Amount",
+                  "role": "Values",
+                  "table": "CatalogFacts"
+                }
+              ],
+              "handle": "visual:ReportSectionMatrixProof:VisualContainerRowsColumnsValuesMatrix",
+              "name": "VisualContainerRowsColumnsValuesMatrix",
+              "op": "addVisual",
+              "page": "page:ReportSectionMatrixProof",
+              "position": {
+                "height": 400,
+                "width": 720,
+                "x": 40,
+                "y": 40
+              },
+              "title": "Matrix Rows Columns Values",
+              "visualType": "pivotTable"
+            },
+            "pointer": "/pages/3/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+            "index": 4,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Category",
+                  "role": "Values",
+                  "table": "CatalogFacts"
+                }
+              ],
+              "handle": "visual:ReportSectionSlicerProof:VisualContainerBasicCategorySlicer",
+              "mode": "Basic",
+              "name": "VisualContainerBasicCategorySlicer",
+              "op": "addVisual",
+              "page": "page:ReportSectionSlicerProof",
+              "position": {
+                "height": 240,
+                "width": 360,
+                "x": 40,
+                "y": 40
+              },
+              "title": "Basic Category Slicer",
+              "visualType": "slicer"
+            },
+            "pointer": "/pages/4/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+            "index": 5,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Year",
+                  "role": "Category",
+                  "table": "CatalogFacts"
+                },
+                {
+                  "measure": "Total Amount",
+                  "role": "Y",
+                  "table": "CatalogFacts"
+                }
+              ],
+              "handle": "visual:ReportSectionLineControl:VisualContainerKnownGoodLineControl",
+              "name": "VisualContainerKnownGoodLineControl",
+              "op": "addVisual",
+              "page": "page:ReportSectionLineControl",
+              "position": {
+                "height": 400,
+                "width": 720,
+                "x": 40,
+                "y": 40
+              },
+              "title": "Known-Good Line Control",
+              "visualType": "lineChart"
+            },
+            "pointer": "/pages/5/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          }
+        ]
+      }
+    ]
+  },
+  "proofUnavailable": [
+    {
+      "level": "desktop-canvas-refresh",
+      "reason": "Power BI Desktop is the compatibility oracle; explain is a unit-smoke preview and does not launch Desktop."
+    }
+  ],
+  "schema": "powerbi-cli.report.spec.explain.v1",
+  "specVersion": "powerbi-cli.dashboard.v1",
+  "unsupportedSections": []
+}

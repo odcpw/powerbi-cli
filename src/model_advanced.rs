@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AdvancedFamily {
+pub(crate) enum AdvancedFamily {
     Roles,
     Perspectives,
     Cultures,
@@ -63,15 +63,15 @@ struct Options {
 }
 
 #[derive(Debug, Clone)]
-struct AdvancedRecord {
-    family: AdvancedFamily,
-    handle: String,
-    name: String,
-    path: PathBuf,
-    start_line: usize,
-    end_line: usize,
-    block: String,
-    summary: Value,
+pub(crate) struct AdvancedRecord {
+    pub(crate) family: AdvancedFamily,
+    pub(crate) handle: String,
+    pub(crate) name: String,
+    pub(crate) path: PathBuf,
+    pub(crate) start_line: usize,
+    pub(crate) end_line: usize,
+    pub(crate) block: String,
+    pub(crate) summary: Value,
 }
 
 pub(crate) fn advanced_model_command(family: &str, args: &[String]) -> CliResult<Value> {
@@ -220,7 +220,7 @@ fn show_family(family: AdvancedFamily, args: &[String]) -> CliResult<Value> {
     }))
 }
 
-fn load_family_records(
+pub(crate) fn load_family_records(
     semantic_model_dir: &Path,
     family: AdvancedFamily,
 ) -> CliResult<Vec<AdvancedRecord>> {
@@ -283,19 +283,7 @@ fn parse_records_from_file(family: AdvancedFamily, path: &Path) -> CliResult<Vec
         }
     }
     if starts.is_empty() {
-        let name = path
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("expressions")
-            .to_string();
-        return Ok(vec![record_from_block(
-            family,
-            name,
-            path.to_path_buf(),
-            0,
-            lines.len(),
-            text,
-        )]);
+        return Ok(Vec::new());
     }
     let mut records = Vec::new();
     for (ordinal, start) in starts.iter().enumerate() {
@@ -323,7 +311,11 @@ fn record_from_block(
     end_line: usize,
     block: String,
 ) -> AdvancedRecord {
-    let handle = format!("{}:{}", family.singular(), name);
+    let handle = if family == AdvancedFamily::Expressions {
+        crate::tmdl::expression_handle(&name)
+    } else {
+        format!("{}:{}", family.singular(), name)
+    };
     let summary = summary_for_block(family, &block);
     AdvancedRecord {
         family,
@@ -401,6 +393,22 @@ fn object_name_from_line(line: &str, keyword: &str) -> Option<String> {
 }
 
 fn record_json(record: &AdvancedRecord, include_raw: bool) -> Value {
+    let mutation_support = if record.family == AdvancedFamily::Expressions {
+        json!({
+            "status": "read-write",
+            "commands": [
+                "model expressions add",
+                "model expressions update",
+                "model expressions delete"
+            ],
+            "reason": "Named expression mutation is guarded by bounded M input, newline-preserving TMDL edits, and unknown-metadata refusal."
+        })
+    } else {
+        json!({
+            "status": "read-only",
+            "reason": "Advanced TMDL object mutation is fixture-gated; this command inventories source files only."
+        })
+    };
     let mut value = json!({
         "handle": record.handle,
         "family": record.family.plural(),
@@ -412,10 +420,7 @@ fn record_json(record: &AdvancedRecord, include_raw: bool) -> Value {
             "end": record.end_line
         },
         "summary": record.summary,
-        "mutationSupport": {
-            "status": "read-only",
-            "reason": "Advanced TMDL object mutation is fixture-gated; this command inventories source files only."
-        }
+        "mutationSupport": mutation_support
     });
     if include_raw {
         value["block"] = Value::String(record.block.clone());
@@ -429,6 +434,9 @@ fn find_record<'a>(
     family: AdvancedFamily,
 ) -> CliResult<&'a AdvancedRecord> {
     if let Some(handle) = &options.handle {
+        if family == AdvancedFamily::Expressions {
+            crate::tmdl::parse_expression_handle(handle)?;
+        }
         return records
             .iter()
             .find(|record| &record.handle == handle)

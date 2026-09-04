@@ -14,6 +14,7 @@ use crate::model::model_command;
 use crate::package::package_command;
 use crate::profile::profile_command;
 use crate::report::report_command;
+use crate::robot_docs::render_robot_docs;
 use crate::schema::schema_command;
 use crate::skill_package::skill_command;
 use crate::source_template::source_template_command;
@@ -219,22 +220,28 @@ fn robot_docs_output(args: &[String], force_json: bool) -> CliResult<CliOutput> 
                 ))
             }
         }
+        [render, rest @ ..] if render == "render" => {
+            value_output(render_robot_docs(rest)?, force_json)
+        }
         [] => Err(
-            CliError::invalid_args("robot-docs requires a subcommand: guide")
+            CliError::invalid_args("robot-docs requires a subcommand: guide or render")
                 .with_hint(
-                    "Run `powerbi-cli robot-docs guide` or `powerbi-cli --json robot-docs guide`.",
+                    "Run `powerbi-cli robot-docs guide` or `powerbi-cli robot-docs render --check`.",
                 )
-                .with_suggested_command("powerbi-cli robot-docs guide"),
+                .with_suggested_command("powerbi-cli robot-docs guide")
+                .with_suggested_command("powerbi-cli robot-docs render --check --json"),
         ),
         _ => Err(CliError::invalid_args("unknown robot-docs subcommand")
-            .with_hint("Run `powerbi-cli robot-docs guide`.")
-            .with_suggested_command("powerbi-cli robot-docs guide")),
+            .with_hint("Run `powerbi-cli robot-docs guide` or `powerbi-cli robot-docs render --check`.")
+            .with_suggested_command("powerbi-cli robot-docs guide")
+            .with_suggested_command("powerbi-cli robot-docs render --check --json")),
     }
 }
 
 fn parse_global_flags(raw_args: &[String]) -> CliResult<(GlobalFlags, Vec<String>)> {
     let mut flags = GlobalFlags::default();
     let mut args = Vec::new();
+    let mut deferred_local_flags = Vec::new();
     let mut i = 0;
     while i < raw_args.len() {
         match raw_args[i].as_str() {
@@ -248,6 +255,19 @@ fn parse_global_flags(raw_args: &[String]) -> CliResult<(GlobalFlags, Vec<String
                         .with_hint("Use `--format json` or the shorter `--json`.")
                         .with_suggested_command("powerbi-cli --json capabilities")
                 })?;
+                if is_wireframe_local_format(raw_args, value) {
+                    if wireframe_command_index(raw_args)
+                        .is_some_and(|command_index| i < command_index)
+                    {
+                        deferred_local_flags.push(raw_args[i].clone());
+                        deferred_local_flags.push(value.clone());
+                    } else {
+                        args.push(raw_args[i].clone());
+                        args.push(value.clone());
+                    }
+                    i += 2;
+                    continue;
+                }
                 if value != "json" {
                     return Err(CliError::invalid_args(format!(
                         "invalid format: {value}; only json is supported"
@@ -259,7 +279,33 @@ fn parse_global_flags(raw_args: &[String]) -> CliResult<(GlobalFlags, Vec<String
                 i += 2;
             }
             "--format=json" | "-f=json" => {
-                flags.json = true;
+                let value = raw_args[i]
+                    .split_once('=')
+                    .map(|(_, value)| value)
+                    .unwrap_or("json");
+                if is_wireframe_local_format(raw_args, value) {
+                    if wireframe_command_index(raw_args)
+                        .is_some_and(|command_index| i < command_index)
+                    {
+                        deferred_local_flags.push(raw_args[i].clone());
+                    } else {
+                        args.push(raw_args[i].clone());
+                    }
+                } else {
+                    flags.json = true;
+                }
+                i += 1;
+            }
+            value
+                if value.starts_with("--format=")
+                    && is_wireframe_local_format(raw_args, &value[9..]) =>
+            {
+                if wireframe_command_index(raw_args).is_some_and(|command_index| i < command_index)
+                {
+                    deferred_local_flags.push(value.to_string());
+                } else {
+                    args.push(value.to_string());
+                }
                 i += 1;
             }
             flag if looks_like_json_flag(flag) => {
@@ -275,7 +321,18 @@ fn parse_global_flags(raw_args: &[String]) -> CliResult<(GlobalFlags, Vec<String
             }
         }
     }
+    args.extend(deferred_local_flags);
     Ok((flags, args))
+}
+
+fn is_wireframe_local_format(raw_args: &[String], value: &str) -> bool {
+    value != "json" && wireframe_command_index(raw_args).is_some()
+}
+
+fn wireframe_command_index(raw_args: &[String]) -> Option<usize> {
+    raw_args.windows(3).position(|window| {
+        window[0] == "report" && window[1] == "wireframe" && window[2] == "export"
+    })
 }
 
 fn looks_like_json_flag(flag: &str) -> bool {

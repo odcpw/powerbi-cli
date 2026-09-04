@@ -1,0 +1,152 @@
+{
+  "assignments": [
+    {
+      "position": {
+        "height": 336.0,
+        "tabOrder": 0,
+        "width": 1232.0,
+        "x": 24.0,
+        "y": 96.0,
+        "z": 0
+      },
+      "preferredFamilies": [
+        "lineChart",
+        "areaChart"
+      ],
+      "slot": "primary",
+      "visual": "visual:ReportSectionOverview:VisualContainerRevenue83556a914d",
+      "visualType": "card"
+    },
+    {
+      "position": {
+        "height": 232.0,
+        "tabOrder": 1,
+        "width": 608.0,
+        "x": 24.0,
+        "y": 448.0,
+        "z": 1
+      },
+      "preferredFamilies": [
+        "columnChart",
+        "barChart"
+      ],
+      "slot": "secondary",
+      "visual": "visual:ReportSectionOverview:VisualContainerRevenueTrendf33e67f559",
+      "visualType": "lineChart"
+    },
+    {
+      "position": {
+        "height": 232.0,
+        "tabOrder": 2,
+        "width": 608.0,
+        "x": 648.0,
+        "y": 448.0,
+        "z": 2
+      },
+      "preferredFamilies": [
+        "tableEx",
+        "matrix"
+      ],
+      "slot": "tertiary",
+      "visual": "visual:ReportSectionOverview:VisualContainerCustomerDetail6665af72a7",
+      "visualType": "tableEx"
+    }
+  ],
+  "grid": {
+    "columns": 12,
+    "gutter": 16.0,
+    "margin": 24.0,
+    "rowUnit": 8.0
+  },
+  "invariants": {
+    "minimumSizes": true,
+    "overlapFree": true,
+    "withinPage": true
+  },
+  "pageSize": {
+    "height": 720.0,
+    "width": 1280.0
+  },
+  "slots": [
+    {
+      "col": 0,
+      "colSpan": 12,
+      "minFamily": "textbox",
+      "name": "heading",
+      "position": {
+        "height": 56.0,
+        "width": 1232.0,
+        "x": 24.0,
+        "y": 24.0
+      },
+      "preferredFamilies": [
+        "textbox"
+      ],
+      "row": 0,
+      "rowSpan": 7
+    },
+    {
+      "col": 0,
+      "colSpan": 12,
+      "minFamily": "chart",
+      "name": "primary",
+      "position": {
+        "height": 336.0,
+        "width": 1232.0,
+        "x": 24.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "lineChart",
+        "areaChart"
+      ],
+      "row": 9,
+      "rowSpan": 42
+    },
+    {
+      "col": 0,
+      "colSpan": 6,
+      "minFamily": "chart",
+      "name": "secondary",
+      "position": {
+        "height": 232.0,
+        "width": 608.0,
+        "x": 24.0,
+        "y": 448.0
+      },
+      "preferredFamilies": [
+        "columnChart",
+        "barChart"
+      ],
+      "row": 53,
+      "rowSpan": 29
+    },
+    {
+      "col": 6,
+      "colSpan": 6,
+      "minFamily": "table",
+      "name": "tertiary",
+      "position": {
+        "height": 232.0,
+        "width": 608.0,
+        "x": 648.0,
+        "y": 448.0
+      },
+      "preferredFamilies": [
+        "tableEx",
+        "matrix"
+      ],
+      "row": 53,
+      "rowSpan": 29
+    }
+  ],
+  "template": {
+    "budget": 6,
+    "headingBand": {
+      "row": 0,
+      "rowSpan": 7
+    },
+    "name": "time-series",
+    "rail": null
+  }
+}

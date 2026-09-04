@@ -17,8 +17,10 @@ const OP_KIND_CATALOG: &[&str] = &[
     "addFilter",
     "setDrillthrough",
     "setInteraction",
+    "resetInteraction",
     "applyThemePreset",
     "setObject",
+    "setPosition",
     // Compatibility spellings accepted by the safety harness while older
     // plans are migrated to the tagged IR representation.
     "AddMeasure",
@@ -27,8 +29,10 @@ const OP_KIND_CATALOG: &[&str] = &[
     "AddFilter",
     "SetDrillthrough",
     "SetInteraction",
+    "ResetInteraction",
     "ApplyThemePreset",
     "SetObject",
+<<<<<<< HEAD
     "addCalculatedColumn",
     "addStaticTable",
     "setSortBy",
@@ -83,6 +87,9 @@ const OP_KIND_CATALOG: &[&str] = &[
     "ApplyStyleBundle",
     "BookmarkMetadata",
     "SanitizeAction",
+=======
+    "SetPosition",
+>>>>>>> main
 ];
 
 pub(crate) fn read_plan_file(path: &Path) -> CliResult<OpPlan> {
@@ -127,8 +134,10 @@ fn normalize_tag(value: Value) -> Value {
         "AddFilter" => "addFilter",
         "SetDrillthrough" => "setDrillthrough",
         "SetInteraction" => "setInteraction",
+        "ResetInteraction" => "resetInteraction",
         "ApplyThemePreset" => "applyThemePreset",
         "SetObject" => "setObject",
+<<<<<<< HEAD
         "AddCalculatedColumn" => "addCalculatedColumn",
         "AddStaticTable" => "addStaticTable",
         "SetSortBy" => "setSortBy",
@@ -156,6 +165,9 @@ fn normalize_tag(value: Value) -> Value {
         "ApplyStyleBundle" => "applyStyleBundle",
         "BookmarkMetadata" => "bookmarkMetadata",
         "SanitizeAction" => "sanitizeAction",
+=======
+        "SetPosition" => "setPosition",
+>>>>>>> main
         _ => tag,
     };
     Value::String(normalized.to_string())

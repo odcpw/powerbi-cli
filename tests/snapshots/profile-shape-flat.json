@@ -1,0 +1,58 @@
+{
+  "dateTables": [
+    {
+      "column": "EventDate",
+      "evidence": [
+        "column EventDate has date-like signal from data type date",
+        "date coverage is unavailable in the supplied profile",
+        "no related date dimension was found",
+        "proposal: add a dedicated date table and relate this date-like column"
+      ],
+      "proposed": true,
+      "table": "Events"
+    }
+  ],
+  "dimensions": [
+    {
+      "evidence": [
+        "1 categorical column(s) provide descriptive-attribute signals",
+        "1 declared key column(s) provide a dimension-key signal",
+        "numeric column share is 2/4 (50%)",
+        "profile role is explicitly dimension",
+        "row count is unavailable or zero; row-ratio evidence is inconclusive"
+      ],
+      "table": "Events"
+    }
+  ],
+  "facts": [],
+  "highCardinality": [],
+  "hypotheses": [],
+  "keyCandidates": [
+    {
+      "column": "EventId",
+      "evidence": [
+        "column name uses an id/key suffix signal",
+        "schema/profile marks the column as a key",
+        "uniqueness is unavailable because no positive row count was profiled"
+      ],
+      "table": "Events",
+      "uniqueness": null
+    }
+  ],
+  "kind": "flat",
+  "relationships": [],
+  "warnings": [
+    {
+      "code": "shape.date_table_proposal",
+      "column": "EventDate",
+      "evidence": [
+        "column EventDate has date-like signal from data type date",
+        "date coverage is unavailable in the supplied profile",
+        "no related date dimension was found",
+        "proposal: add a dedicated date table and relate this date-like column"
+      ],
+      "message": "date-like column Events[EventDate] has no date dimension; propose a dedicated date table",
+      "table": "Events"
+    }
+  ]
+}

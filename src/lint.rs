@@ -354,7 +354,19 @@ fn add_model_findings(deep: &Value, findings: &mut Vec<Value>) {
             let table_handle = table["handle"].as_str();
             let table_name = table["name"].as_str().unwrap_or("table");
             let path = table["path"].as_str();
-            if table["columns"].as_array().is_some_and(Vec::is_empty) {
+            // A calculated-table partition can be authored with only its DAX
+            // source. Desktop materializes the resulting columns on refresh,
+            // so defer the generic no-columns error for this supported shape.
+            let schema_deferred_to_desktop =
+                table["partitions"].as_array().is_some_and(|partitions| {
+                    partitions.iter().any(|partition| {
+                        partition["expressionKind"]
+                            .as_str()
+                            .is_some_and(|kind| kind.eq_ignore_ascii_case("calculated"))
+                    })
+                });
+            if table["columns"].as_array().is_some_and(Vec::is_empty) && !schema_deferred_to_desktop
+            {
                 findings.push(finding(
                     rules::MODEL_TABLE_WITHOUT_COLUMNS,
                     "error",

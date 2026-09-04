@@ -1,11 +1,14 @@
 use crate::cli_support::{
     MutationMode, mode_name, required_project, set_mode, take_value, target_project,
 };
+use crate::design::grid::{
+    Grid, PageSize, RailSide, SlotPosition, Template, content_slots, resolve_with_grid, template,
+};
 use crate::pbir::{PageRecord, PageSelector, find_page, load_report_snapshot, page_summary};
-use crate::project_io::write_json_atomic;
+use crate::report_visuals::apply_positions;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
-    command_arg, read_json_value, resolve_project, validate_project,
+    command_arg, resolve_project, validate_project,
 };
 use serde_json::{Map, Number, Value, json};
 use std::cmp::Ordering;
@@ -16,10 +19,12 @@ struct LayoutOptions {
     project: Option<PathBuf>,
     selector: PageSelector,
     preset: LayoutPreset,
+    preset_explicit: bool,
+    template: Option<String>,
+    grid: Grid,
+    page_size: Option<PageSize>,
     mode: Option<MutationMode>,
     out_dir: Option<PathBuf>,
-    margin: Option<f64>,
-    gap: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -33,21 +38,19 @@ enum LayoutPreset {
 
 struct PageLayoutPlan {
     page: PageRecord,
+    template: Template,
+    grid: Grid,
+    preview: Value,
+    assignments: Vec<LayoutAssignment>,
+    updates: Vec<(PathBuf, Value)>,
     changes: Vec<Value>,
-    writes: Vec<VisualWrite>,
+    warnings: Vec<Value>,
 }
 
-struct VisualWrite {
-    path: PathBuf,
-    visual_json: Value,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct CanvasSlots {
-    width: f64,
-    height: f64,
-    margin: f64,
-    gap: f64,
+struct LayoutAssignment {
+    visual: crate::pbir::VisualRecord,
+    slot_name: String,
+    position: Value,
 }
 
 pub(crate) fn layout_command(args: &[String]) -> CliResult<Value> {
@@ -84,11 +87,55 @@ fn auto_layout(args: &[String]) -> CliResult<Value> {
         plans.push(build_page_layout_plan(&page, &options)?);
     }
 
-    if !matches!(mode, MutationMode::DryRun) {
-        for plan in &plans {
-            for write in &plan.writes {
-                write_json_atomic(&write.path, &write.visual_json)?;
+    let dry_run = matches!(mode, MutationMode::DryRun);
+    for plan in &mut plans {
+        let applied = apply_positions(
+            &plan.updates,
+            plan.page.width.as_f64(),
+            plan.page.height.as_f64(),
+            false,
+            dry_run,
+            "report layout auto",
+        )?;
+        for application in applied {
+            if application.before == application.after {
+                continue;
             }
+            let visual = plan
+                .assignments
+                .iter()
+                .find(|assignment| {
+                    assignment
+                        .visual
+                        .path
+                        .as_ref()
+                        .is_some_and(|path| path == &application.path)
+                })
+                .map(|assignment| &assignment.visual)
+                .ok_or_else(|| {
+                    CliError::validation_failed(format!(
+                        "layout application path is not assigned to a visual: {}",
+                        application.path.display()
+                    ))
+                })?;
+            plan.changes.push(json!({
+                "kind": "pbir.visual.position",
+                "action": "auto-layout",
+                "path": canonical_display(&application.path),
+                "page": {
+                    "handle": plan.page.handle,
+                    "name": plan.page.name,
+                    "displayName": plan.page.display_name
+                },
+                "visual": {
+                    "handle": visual.handle,
+                    "name": visual.name,
+                    "title": visual.title,
+                    "visualType": visual.visual_type
+                },
+                "before": application.before,
+                "after": application.after
+            }));
         }
     }
 
@@ -105,269 +152,153 @@ fn selected_pages(pages: &[PageRecord], options: &LayoutOptions) -> CliResult<Ve
 }
 
 fn build_page_layout_plan(page: &PageRecord, options: &LayoutOptions) -> CliResult<PageLayoutPlan> {
-    let page_width = page.width.as_f64().unwrap_or(1280.0);
-    let page_height = page.height.as_f64().unwrap_or(720.0);
-    let margin = options.margin.unwrap_or(32.0);
-    let gap = options.gap.unwrap_or(24.0);
-    validate_spacing(page_width, page_height, margin, gap)?;
-
-    let positions = match options.preset {
-        LayoutPreset::Overview => overview_positions(page, page_width, page_height, margin, gap)?,
-        LayoutPreset::Analysis => analysis_positions(page, page_width, page_height, margin, gap)?,
-        LayoutPreset::Detail => detail_positions(page, page_width, page_height, margin, gap)?,
-        LayoutPreset::Grid => grid_positions(page, page_width, page_height, margin, gap)?,
+    let page_size = options
+        .page_size
+        .unwrap_or_else(|| page_size_for_page(page));
+    let template_name = options
+        .template
+        .as_deref()
+        .unwrap_or_else(|| preset_template(options.preset));
+    let template = template(template_name)?;
+    let positions = if options.grid == Grid::default() {
+        crate::design::grid::resolve(&template, page_size, None)?
+    } else {
+        resolve_with_grid(&template, page_size, options.grid, None)?
     };
-    let mut changes = Vec::new();
-    let mut writes = Vec::new();
-    for (visual, after) in positions {
-        let path = visual.path.as_ref().ok_or_else(|| {
+    let slots = template.slots.iter().collect::<Vec<_>>();
+    let content_slot_count = content_slots(&template).count();
+    let visuals = sorted_visuals(page);
+    if visuals.len() > slots.len() {
+        return Err(CliError::invalid_args(format!(
+            "layout template {} has {} slots ({} content slots) but page {} contains {} visuals",
+            template.name,
+            slots.len(),
+            content_slot_count,
+            page.handle,
+            visuals.len()
+        ))
+        .with_pointer(format!("/pages/{}/visuals/{}", page.ordinal, slots.len()))
+        .with_hint("Choose a template with more slots, remove visuals, or provide explicit layout positions."));
+    }
+
+    let mut assignments = Vec::new();
+    let mut updates = Vec::new();
+    let mut warnings = Vec::new();
+    let mut used_slots = vec![false; slots.len()];
+    for visual in visuals {
+        // Prefer a slot whose catalog family matches the visual.  If no
+        // preferred slot remains, use the next deterministic slot and expose
+        // the mismatch as design.slot_family_mismatch for the design linter.
+        let slot_index = slots
+            .iter()
+            .enumerate()
+            .find(|(index, slot)| {
+                !used_slots[*index]
+                    && preferred_family_matches(&visual.visual_type, &slot.preferred_families)
+            })
+            .map(|(index, _)| index)
+            // Structural slots (heading and rail) are reserved for matching
+            // textbox/slicer visuals.  A chart or table that has no matching
+            // preferred slot should consume a content slot before it can
+            // displace a structural feature.
+            .or_else(|| {
+                slots.iter().enumerate().find_map(|(index, slot)| {
+                    (!used_slots[index] && !is_structural_slot(slot)).then_some(index)
+                })
+            })
+            .or_else(|| used_slots.iter().position(|used| !*used))
+            .ok_or_else(|| {
+                CliError::validation_failed("layout ran out of unassigned visual slots")
+                    .with_pointer(format!("/pages/{}/visuals", page.ordinal))
+            })?;
+        used_slots[slot_index] = true;
+        let slot = slots[slot_index];
+        let resolved = positions.get(&slot.name).ok_or_else(|| {
+            CliError::validation_failed(format!(
+                "template {} did not resolve slot {}",
+                template.name, slot.name
+            ))
+            .with_pointer(format!("/template/slots/{}", slot.name))
+        })?;
+        let after = position_from_slot(*resolved, assignments.len() as u64)?;
+        let path = visual.path.clone().ok_or_else(|| {
             CliError::validation_failed(format!("visual has no path: {}", visual.handle))
         })?;
-        let mut visual_json = read_json_value(path)?;
-        let before = visual_json["position"].clone();
-        if before != after {
-            visual_json["position"] = after.clone();
-            changes.push(json!({
-                "kind": "pbir.visual.position",
-                "action": "auto-layout",
-                "path": canonical_display(path),
-                "page": {
-                    "handle": page.handle,
-                    "name": page.name,
-                    "displayName": page.display_name
-                },
-                "visual": {
-                    "handle": visual.handle,
-                    "name": visual.name,
-                    "title": visual.title,
-                    "visualType": visual.visual_type
-                },
-                "before": before,
-                "after": after
+        let family_mismatch =
+            !preferred_family_matches(&visual.visual_type, &slot.preferred_families);
+        if family_mismatch {
+            warnings.push(json!({
+                "code": "design.slot_family_mismatch",
+                "pointer": format!("/pages/{}/visuals/{}/slot", page.ordinal, assignments.len()),
+                "message": format!("visual {} ({}) is assigned to slot {} preferred for {}", visual.handle, visual.visual_type, slot.name, slot.preferred_families.join(", ")),
+                "visual": visual.handle,
+                "slot": slot.name,
+                "preferredFamilies": slot.preferred_families
             }));
-            writes.push(VisualWrite {
-                path: path.clone(),
-                visual_json,
-            });
         }
+        assignments.push(LayoutAssignment {
+            visual,
+            slot_name: slot.name.clone(),
+            position: after.clone(),
+        });
+        updates.push((path, after));
     }
+
+    let preview_slots = template
+        .slots
+        .iter()
+        .map(|slot| {
+            let position = positions
+                .get(&slot.name)
+                .copied()
+                .map(slot_position_json)
+                .unwrap_or(Value::Null);
+            json!({
+                "name": slot.name,
+                "col": slot.col,
+                "row": slot.row,
+                "colSpan": slot.col_span,
+                "rowSpan": slot.row_span,
+                "preferredFamilies": slot.preferred_families,
+                "minFamily": slot.min_family,
+                "position": position
+            })
+        })
+        .collect::<Vec<_>>();
+    let preview = json!({
+        "page": page_summary(page),
+        "pageSize": page_size,
+        "grid": options.grid,
+        "template": {
+            "name": template.name,
+            "rail": template.rail.map(RailSide::as_str),
+            "headingBand": template.heading_band,
+            "budget": template.budget
+        },
+        "slots": preview_slots,
+        "assignments": assignments.iter().map(|assignment| json!({
+            "visual": assignment.visual.handle,
+            "visualType": assignment.visual.visual_type,
+            "slot": assignment.slot_name,
+            "preferredFamilies": template.slots.iter().find(|slot| slot.name == assignment.slot_name).map(|slot| slot.preferred_families.clone()).unwrap_or_default(),
+            "position": assignment.position
+        })).collect::<Vec<_>>(),
+        "invariants": {
+            "overlapFree": true,
+            "minimumSizes": true,
+            "withinPage": true
+        }
+    });
     Ok(PageLayoutPlan {
         page: page.clone(),
-        changes,
-        writes,
+        template,
+        grid: options.grid,
+        preview,
+        assignments,
+        updates,
+        changes: Vec::new(),
+        warnings,
     })
-}
-
-fn overview_positions(
-    page: &PageRecord,
-    width: f64,
-    height: f64,
-    margin: f64,
-    gap: f64,
-) -> CliResult<Vec<(crate::pbir::VisualRecord, Value)>> {
-    let mut visuals = sorted_visuals(page);
-    let mut cards = Vec::new();
-    let mut others = Vec::new();
-    for visual in visuals.drain(..) {
-        if visual.visual_type == "card" {
-            cards.push(visual);
-        } else {
-            others.push(visual);
-        }
-    }
-    let mut out = Vec::new();
-    let mut y = margin;
-    let mut z = 0_u64;
-    if !cards.is_empty() {
-        let columns = cards.len().min(4);
-        let card_height = 116.0;
-        let card_width = slot_width(width, margin, gap, columns)?;
-        for (index, visual) in cards.into_iter().enumerate() {
-            let col = index % columns;
-            let row = index / columns;
-            let x = margin + col as f64 * (card_width + gap);
-            let y_pos = y + row as f64 * (card_height + gap);
-            out.push((visual, position(x, y_pos, card_width, card_height, z)?));
-            z += 1;
-        }
-        let rows = div_ceil(out.len(), columns);
-        y += rows as f64 * card_height + (rows.saturating_sub(1)) as f64 * gap + gap;
-    }
-    out.extend(grid_slots(
-        others,
-        CanvasSlots {
-            width,
-            height,
-            margin,
-            gap,
-        },
-        y,
-        2,
-        z,
-    )?);
-    Ok(out)
-}
-
-fn analysis_positions(
-    page: &PageRecord,
-    width: f64,
-    height: f64,
-    margin: f64,
-    gap: f64,
-) -> CliResult<Vec<(crate::pbir::VisualRecord, Value)>> {
-    let visuals = sorted_visuals(page);
-    if visuals.len() <= 2 {
-        return grid_slots(
-            visuals,
-            CanvasSlots {
-                width,
-                height,
-                margin,
-                gap,
-            },
-            margin,
-            1,
-            0,
-        );
-    }
-    let mut out = Vec::new();
-    let usable_width = width - margin * 2.0;
-    let usable_height = height - margin * 2.0;
-    let main_width = (usable_width * 0.62).max(320.0);
-    let side_width = usable_width - main_width - gap;
-    let main = visuals[0].clone();
-    out.push((
-        main,
-        position(margin, margin, main_width, usable_height, 0)?,
-    ));
-    let side = visuals.into_iter().skip(1).collect::<Vec<_>>();
-    let side_slots = stacked_slots(
-        side,
-        margin + main_width + gap,
-        margin,
-        side_width,
-        usable_height,
-        gap,
-        1,
-    )?;
-    out.extend(side_slots);
-    Ok(out)
-}
-
-fn detail_positions(
-    page: &PageRecord,
-    width: f64,
-    height: f64,
-    margin: f64,
-    gap: f64,
-) -> CliResult<Vec<(crate::pbir::VisualRecord, Value)>> {
-    let mut visuals = sorted_visuals(page);
-    visuals.sort_by(|left, right| {
-        detail_rank(left)
-            .cmp(&detail_rank(right))
-            .then_with(|| compare_visuals(left, right))
-    });
-    grid_slots(
-        visuals,
-        CanvasSlots {
-            width,
-            height,
-            margin,
-            gap,
-        },
-        margin,
-        1,
-        0,
-    )
-}
-
-fn grid_positions(
-    page: &PageRecord,
-    width: f64,
-    height: f64,
-    margin: f64,
-    gap: f64,
-) -> CliResult<Vec<(crate::pbir::VisualRecord, Value)>> {
-    let visuals = sorted_visuals(page);
-    let columns = if visuals.len() <= 2 {
-        visuals.len().max(1)
-    } else {
-        3
-    };
-    grid_slots(
-        visuals,
-        CanvasSlots {
-            width,
-            height,
-            margin,
-            gap,
-        },
-        margin,
-        columns,
-        0,
-    )
-}
-
-fn grid_slots(
-    visuals: Vec<crate::pbir::VisualRecord>,
-    canvas: CanvasSlots,
-    start_y: f64,
-    columns: usize,
-    start_z: u64,
-) -> CliResult<Vec<(crate::pbir::VisualRecord, Value)>> {
-    if visuals.is_empty() {
-        return Ok(Vec::new());
-    }
-    let columns = columns.max(1).min(visuals.len());
-    let rows = div_ceil(visuals.len(), columns);
-    let slot_w = slot_width(canvas.width, canvas.margin, canvas.gap, columns)?;
-    let available_h = (canvas.height - start_y - canvas.margin).max(120.0);
-    let slot_h =
-        ((available_h - canvas.gap * rows.saturating_sub(1) as f64) / rows as f64).max(80.0);
-    let mut out = Vec::new();
-    for (index, visual) in visuals.into_iter().enumerate() {
-        let col = index % columns;
-        let row = index / columns;
-        let x = canvas.margin + col as f64 * (slot_w + canvas.gap);
-        let y = start_y + row as f64 * (slot_h + canvas.gap);
-        out.push((
-            visual,
-            position(x, y, slot_w, slot_h, start_z + index as u64)?,
-        ));
-    }
-    Ok(out)
-}
-
-fn stacked_slots(
-    visuals: Vec<crate::pbir::VisualRecord>,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-    gap: f64,
-    start_z: u64,
-) -> CliResult<Vec<(crate::pbir::VisualRecord, Value)>> {
-    if visuals.is_empty() {
-        return Ok(Vec::new());
-    }
-    let slot_h =
-        ((height - gap * visuals.len().saturating_sub(1) as f64) / visuals.len() as f64).max(80.0);
-    visuals
-        .into_iter()
-        .enumerate()
-        .map(|(index, visual)| {
-            Ok((
-                visual,
-                position(
-                    x,
-                    y + index as f64 * (slot_h + gap),
-                    width,
-                    slot_h,
-                    start_z + index as u64,
-                )?,
-            ))
-        })
-        .collect()
 }
 
 fn sorted_visuals(page: &PageRecord) -> Vec<crate::pbir::VisualRecord> {
@@ -393,73 +324,87 @@ fn compare_visuals(
         .then_with(|| left.name.cmp(&right.name))
 }
 
-fn detail_rank(visual: &crate::pbir::VisualRecord) -> usize {
-    match visual.visual_type.as_str() {
-        "card" => 0,
-        "tableEx" => 2,
-        _ => 1,
-    }
-}
-
 fn position_number(value: &Value, field: &str) -> f64 {
     value[field].as_f64().unwrap_or(0.0)
 }
 
-fn position(x: f64, y: f64, width: f64, height: f64, z: u64) -> CliResult<Value> {
+fn preset_template(preset: LayoutPreset) -> &'static str {
+    match preset {
+        LayoutPreset::Overview => "overview",
+        LayoutPreset::Analysis => "time-series",
+        LayoutPreset::Detail => "drillthrough-detail",
+        LayoutPreset::Grid => "kpi-strip-trend-breakdown",
+    }
+}
+
+fn page_size_for_page(page: &PageRecord) -> PageSize {
+    PageSize {
+        width: page.width.as_f64().unwrap_or(PageSize::STANDARD.width),
+        height: page.height.as_f64().unwrap_or(PageSize::STANDARD.height),
+    }
+}
+
+fn position_from_slot(slot: SlotPosition, z: u64) -> CliResult<Value> {
     let mut object = Map::new();
-    object.insert("x".to_string(), number(x, "x")?);
-    object.insert("y".to_string(), number(y, "y")?);
+    object.insert("x".to_string(), finite_number(slot.x, "x")?);
+    object.insert("y".to_string(), finite_number(slot.y, "y")?);
     object.insert("z".to_string(), Value::Number(Number::from(z)));
-    object.insert("height".to_string(), number(height, "height")?);
-    object.insert("width".to_string(), number(width, "width")?);
+    object.insert("height".to_string(), finite_number(slot.height, "height")?);
+    object.insert("width".to_string(), finite_number(slot.width, "width")?);
     object.insert("tabOrder".to_string(), Value::Number(Number::from(z)));
     Ok(Value::Object(object))
 }
 
-fn number(value: f64, name: &str) -> CliResult<Value> {
+fn slot_position_json(slot: SlotPosition) -> Value {
+    json!({
+        "x": slot.x,
+        "y": slot.y,
+        "width": slot.width,
+        "height": slot.height
+    })
+}
+
+fn finite_number(value: f64, name: &str) -> CliResult<Value> {
     if !value.is_finite() || value < 0.0 {
         return Err(CliError::invalid_args(format!(
             "layout {name} must be a finite nonnegative number"
         )));
     }
-    Number::from_f64((value * 100.0).round() / 100.0)
+    Number::from_f64(value)
         .map(Value::Number)
         .ok_or_else(|| CliError::invalid_args(format!("layout {name} is not a JSON number")))
 }
 
-fn slot_width(width: f64, margin: f64, gap: f64, columns: usize) -> CliResult<f64> {
-    if columns == 0 {
-        return Err(CliError::invalid_args(
-            "layout requires at least one column",
-        ));
-    }
-    Ok(
-        ((width - margin * 2.0 - gap * columns.saturating_sub(1) as f64) / columns as f64)
-            .max(80.0),
-    )
+fn preferred_family_matches(visual_type: &str, preferred: &[String]) -> bool {
+    let visual_type = visual_type.to_ascii_lowercase();
+    preferred.iter().any(|family| {
+        let family = family.to_ascii_lowercase();
+        family == visual_type
+            || (family == "chart"
+                && matches!(
+                    visual_type.as_str(),
+                    "linechart"
+                        | "areachart"
+                        | "stackedareachart"
+                        | "barchart"
+                        | "clusteredbarchart"
+                        | "columnchart"
+                        | "clusteredcolumnchart"
+                        | "combochart"
+                        | "lineclusteredcolumncombochart"
+                ))
+            || (family == "areachart" && visual_type == "stackedareachart")
+            || (family == "barchart" && visual_type == "clusteredbarchart")
+            || (family == "columnchart" && visual_type == "clusteredcolumnchart")
+            || (family == "combochart" && visual_type == "lineclusteredcolumncombochart")
+            || (family == "table" && matches!(visual_type.as_str(), "tableex" | "table"))
+            || (family == "matrix" && matches!(visual_type.as_str(), "matrix" | "pivottable"))
+            || (family == "card" && visual_type == "kpi")
+    })
 }
 
-fn div_ceil(value: usize, by: usize) -> usize {
-    value.div_ceil(by.max(1))
-}
-
-fn validate_spacing(width: f64, height: f64, margin: f64, gap: f64) -> CliResult<()> {
-    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
-        return Err(CliError::validation_failed(
-            "page width and height must be positive numbers",
-        ));
-    }
-    if !margin.is_finite() || !gap.is_finite() || margin < 0.0 || gap < 0.0 {
-        return Err(CliError::invalid_args(
-            "--margin and --gap must be finite nonnegative numbers",
-        ));
-    }
-    if margin * 2.0 >= width || margin * 2.0 >= height {
-        return Err(CliError::invalid_args(
-            "--margin leaves no usable canvas space",
-        ));
-    }
-    Ok(())
+fn is_structural_slot(slot: &crate::design::grid::Slot) -> bool {
+    matches!(slot.name.as_str(), "heading" | "rail")
 }
 
 fn layout_response(
@@ -514,10 +459,17 @@ fn layout_response(
         "pbip": canonical_display(&resolved.pbip_path),
         "reportDir": canonical_display(&resolved.report_dir),
         "layoutPlan": {
+            "template": plans.first().map(|plan| plan.template.name.clone()),
+            "grid": plans.first().map(|plan| plan.grid),
             "pages": plans.iter().map(|plan| page_summary(&plan.page)).collect::<Vec<_>>(),
             "changedVisuals": changes.len()
         },
+        "preview": {
+            "pages": plans.iter().map(|plan| plan.preview.clone()).collect::<Vec<_>>(),
+            "svg": false
+        },
         "changes": changes,
+        "warnings": plans.iter().flat_map(|plan| plan.warnings.iter().cloned()).collect::<Vec<_>>(),
         "validation": validation.map(|report| json!({
             "ok": report.errors.is_empty(),
             "warnings": report.warnings,
@@ -551,10 +503,37 @@ fn parse_auto_args(args: &[String]) -> CliResult<LayoutOptions> {
                 set_page_selector(&mut options.selector, take_value(args, &mut i, "--page")?);
             }
             "--preset" => {
+                if options.template.is_some() || options.preset_explicit {
+                    return Err(CliError::invalid_args(
+                        "report layout auto accepts either --preset or --template, not both",
+                    )
+                    .with_pointer("/template")
+                    .with_hint("Use a named --template for the design-system grid, or keep the legacy --preset alias."));
+                }
                 options.preset = parse_preset(&take_value(args, &mut i, "--preset")?)?;
+                options.preset_explicit = true;
             }
-            "--margin" => options.margin = Some(take_f64(args, &mut i, "--margin")?),
-            "--gap" => options.gap = Some(take_f64(args, &mut i, "--gap")?),
+            "--template" => {
+                if options.template.is_some() || options.preset_explicit {
+                    return Err(CliError::invalid_args(
+                        "report layout auto accepts either --template or --preset, not both",
+                    )
+                    .with_pointer("/template"));
+                }
+                options.template = Some(take_value(args, &mut i, "--template")?);
+            }
+            "--grid" => {
+                parse_grid_override(&mut options.grid, &take_value(args, &mut i, "--grid")?)?
+            }
+            "--page-size" | "--size" => {
+                options.page_size =
+                    Some(parse_page_size(&take_value(args, &mut i, "--page-size")?)?);
+            }
+            "--margin" => options.grid.margin = take_f64(args, &mut i, "--margin")?,
+            "--gap" | "--gutter" => options.grid.gutter = take_f64(args, &mut i, "--gap")?,
+            "--row-unit" | "--rowUnit" => {
+                options.grid.row_unit = take_f64(args, &mut i, "--row-unit")?;
+            }
             "--dry-run" => {
                 set_mode(
                     &mut options.mode,
@@ -586,12 +565,85 @@ fn parse_auto_args(args: &[String]) -> CliResult<LayoutOptions> {
                 ))
                 .with_hint("Run `powerbi-cli --json capabilities --for \"report layout auto\"`.")
                 .with_suggested_command(
-                    "powerbi-cli report layout auto --project <project-dir-or.pbip> --page <page-handle> --preset overview --dry-run --json",
+                    "powerbi-cli report layout auto --project <project-dir-or.pbip> --page <page-handle> --template overview --dry-run --json",
                 ));
             }
         }
     }
     Ok(options)
+}
+
+fn parse_grid_override(grid: &mut Grid, raw: &str) -> CliResult<()> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(CliError::invalid_args("--grid requires a value")
+            .with_pointer("/grid")
+            .with_hint("Use --grid columns=12,gutter=16,margin=24,rowUnit=8."));
+    }
+    if trimmed.starts_with('{') {
+        let parsed: Grid = serde_json::from_str(trimmed).map_err(|error| {
+            CliError::invalid_args(format!("--grid must be a grid object: {error}"))
+                .with_pointer("/grid")
+        })?;
+        *grid = parsed;
+        return Ok(());
+    }
+    for entry in trimmed.split(',') {
+        let (key, value) = entry.split_once('=').ok_or_else(|| {
+            CliError::invalid_args(format!("--grid entry must be key=value: {entry}"))
+                .with_pointer("/grid")
+                .with_hint("Use --grid columns=12,gutter=16,margin=24,rowUnit=8.")
+        })?;
+        let key = key.trim();
+        let value = value.trim();
+        match key.to_ascii_lowercase().as_str() {
+            "columns" => {
+                grid.columns = value.parse::<u32>().map_err(|_| {
+                    CliError::invalid_args("--grid columns must be a positive integer")
+                        .with_pointer("/grid/columns")
+                })?;
+            }
+            "gutter" => grid.gutter = parse_grid_number(value, "/grid/gutter")?,
+            "margin" => grid.margin = parse_grid_number(value, "/grid/margin")?,
+            "rowunit" | "row-unit" => grid.row_unit = parse_grid_number(value, "/grid/rowUnit")?,
+            _ => {
+                return Err(
+                    CliError::invalid_args(format!("unknown --grid setting: {key}"))
+                        .with_pointer(format!("/grid/{key}"))
+                        .with_hint("Supported settings are columns, gutter, margin, and rowUnit."),
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn parse_grid_number(value: &str, pointer: &str) -> CliResult<f64> {
+    value.parse::<f64>().map_err(|_| {
+        CliError::invalid_args(format!("grid value must be a number: {value}"))
+            .with_pointer(pointer)
+    })
+}
+
+fn parse_page_size(raw: &str) -> CliResult<PageSize> {
+    if let Some(page_size) = PageSize::preset(raw) {
+        return Ok(page_size);
+    }
+    let (width, height) = raw
+        .split_once('x')
+        .or_else(|| raw.split_once('X'))
+        .ok_or_else(|| {
+            CliError::invalid_args(format!("unknown page-size preset: {raw}"))
+                .with_pointer("/pageSize")
+                .with_hint("Use 1280x720, 1920x1080, standard, or wide.")
+        })?;
+    let width = width.parse::<f64>().map_err(|_| {
+        CliError::invalid_args("page-size width must be a number").with_pointer("/pageSize/width")
+    })?;
+    let height = height.parse::<f64>().map_err(|_| {
+        CliError::invalid_args("page-size height must be a number").with_pointer("/pageSize/height")
+    })?;
+    Ok(PageSize { width, height })
 }
 
 fn set_page_selector(selector: &mut PageSelector, value: String) {

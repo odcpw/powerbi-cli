@@ -1,0 +1,93 @@
+{
+  "schema": "powerbi-cli.formatting-catalog.v1",
+  "entries": [
+    {
+      "object": "labels",
+      "property": "show",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/reference/desktop-authored-visuals/pieChart.visual.json (Desktop-authored BCApps reference, retrieved 2026-07-09)"
+    },
+    {
+      "object": "labels",
+      "property": "fontSize",
+      "encoding": "double",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/reference/desktop-authored-visuals/pieChart.visual.json (Desktop-authored BCApps reference, retrieved 2026-07-09)"
+    },
+    {
+      "object": "categoryLabels",
+      "property": "show",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "categoryLabels",
+      "property": "fontSize",
+      "encoding": "double",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "categoryLabels",
+      "property": "wordWrap",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "categoryAxis",
+      "property": "show",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "categoryAxis",
+      "property": "showAxisTitle",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "valueAxis",
+      "property": "show",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "valueAxis",
+      "property": "showAxisTitle",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "objects",
+      "reference": "docs/pilot-lessons.md (production pilot formatting findings, 2026-08-17/18)"
+    },
+    {
+      "object": "title",
+      "property": "show",
+      "encoding": "bool",
+      "visualTypes": ["*"],
+      "container": "visualContainerObjects",
+      "reference": "docs/reference/desktop-authored-visuals/slicer.visual.json#visual-container-titles (Desktop-authored BCApps reference, retrieved 2026-07-09)"
+    },
+    {
+      "object": "title",
+      "property": "text",
+      "encoding": "string",
+      "visualTypes": ["*"],
+      "container": "visualContainerObjects",
+      "reference": "docs/reference/desktop-authored-visuals/slicer.visual.json#visual-container-titles (Desktop-authored BCApps reference, retrieved 2026-07-09)"
+    }
+  ]
+}

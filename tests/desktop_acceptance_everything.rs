@@ -156,6 +156,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let style_after = h.root.join("style.after.json");
     let visual_formatting_bundle = h.root.join("visual-formatting.bundle.json");
     let wireframe = h.root.join("wireframe.json");
+    let wireframe_svg = h.root.join("wireframe-svg");
+    let wireframe_html = h.root.join("wireframe.html");
     let dax_file = h.root.join("average-cost.dax");
     let desktop_screenshot = h.root.join("everything-desktop.png");
     let desktop_reference = h.root.join("everything-reference.json");
@@ -190,6 +192,10 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok("version", &svec(["version", "--json"]));
     h.ok("features list", &svec(["features", "list", "--json"]));
     h.ok("robot-docs guide", &svec(["robot-docs", "guide", "--json"]));
+    h.ok(
+        "robot-docs render",
+        &svec(["robot-docs", "render", "--check", "--json"]),
+    );
     h.ok("--robot-triage", &svec(["--robot-triage", "--json"]));
     h.ok("robot-triage", &svec(["robot-triage", "--json"]));
     h.ok("doctor", &svec(["doctor", "--json"]));
@@ -347,6 +353,26 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &p(&profile),
             "--json",
         ]),
+    );
+    let explained = h.ok(
+        "report spec explain",
+        &svec([
+            "report",
+            "spec",
+            "explain",
+            "--schema",
+            &p(&schema),
+            "--profile",
+            &p(&profile),
+            "--spec",
+            &p(&spec),
+            "--json",
+        ]),
+    );
+    assert!(explained["plan"]["stages"].as_array().is_some());
+    h.ok(
+        "report spec schema",
+        &svec(["report", "spec", "schema", "--json"]),
     );
     h.ok(
         "scaffold",
@@ -1160,6 +1186,48 @@ fn everything_acceptance_invokes_every_catalog_command() {
     );
     assert_eq!(generic_table_delete["action"], Value::from("delete"));
 
+    let calculated_table = h.ok(
+        "model tables add-calculated",
+        &svec([
+            "model",
+            "tables",
+            "add-calculated",
+            "--project",
+            &generic_project_arg,
+            "--table",
+            "CalculatedProbe",
+            "--expression",
+            "FILTER('FactSales', 'FactSales'[Revenue] > 0)",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        calculated_table["schema"],
+        Value::from("powerbi-cli.model.tables.mutation.v1")
+    );
+    assert_eq!(calculated_table["action"], Value::from("add-calculated"));
+    assert_eq!(
+        calculated_table["target"]["partitionKind"],
+        Value::from("calculated")
+    );
+    h.ok(
+        "model tables delete",
+        &svec([
+            "model",
+            "tables",
+            "delete",
+            "--project",
+            &generic_project_arg,
+            "--handle",
+            "table:CalculatedProbe",
+            "--in-place",
+            "--confirm",
+            "table:CalculatedProbe",
+            "--json",
+        ]),
+    );
+
     h.ok(
         "model tables add-static",
         &svec([
@@ -1580,6 +1648,58 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let named_expression = h.ok(
+        "model expressions add",
+        &svec([
+            "model",
+            "expressions",
+            "add",
+            "--project",
+            &project_arg,
+            "--name",
+            "TransientExpression",
+            "--expression",
+            "let Source = #table(type table [Value = Int64.Type], {{1}}), Result = Source in Result",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        named_expression["schema"],
+        Value::from("powerbi-cli.model.expressions.mutation.v1")
+    );
+    h.ok(
+        "model expressions update",
+        &svec([
+            "model",
+            "expressions",
+            "update",
+            "--project",
+            &project_arg,
+            "--handle",
+            "expression:TransientExpression",
+            "--expression",
+            "let Source = #table(type table [Value = Int64.Type], {{2}}), Result = Source in Result",
+            "--in-place",
+            "--json",
+        ]),
+    );
+    h.ok(
+        "model expressions delete",
+        &svec([
+            "model",
+            "expressions",
+            "delete",
+            "--project",
+            &project_arg,
+            "--handle",
+            "expression:TransientExpression",
+            "--in-place",
+            "--confirm",
+            "expression:TransientExpression",
+            "--json",
+        ]),
+    );
 
     install_conditional_formatting_fixture(&project, "Total Incidents");
     install_slicer_fixture(&project, "Branch Slicer Seed");
@@ -1856,7 +1976,54 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["report", "wireframe", "export", &project_arg, "--json"]),
     );
     write_json(&wireframe, &wireframe_json);
-    h.ok(
+    let wireframe_svg_json = h.ok(
+        "report wireframe export",
+        &svec([
+            "report",
+            "wireframe",
+            "export",
+            &project_arg,
+            "--format",
+            "svg",
+            "--out",
+            &p(&wireframe_svg),
+            "--json",
+        ]),
+    );
+    assert_eq!(wireframe_svg_json["format"], "svg");
+    assert_eq!(wireframe_svg_json["dryRun"], false);
+    assert!(
+        wireframe_svg.is_dir(),
+        "SVG wireframe output directory missing"
+    );
+    assert!(
+        wireframe_svg_json["artifacts"]
+            .as_array()
+            .is_some_and(|artifacts| !artifacts.is_empty()),
+        "SVG wireframe did not report page artifacts"
+    );
+    let wireframe_html_json = h.ok(
+        "report wireframe export",
+        &svec([
+            "report",
+            "wireframe",
+            "export",
+            &project_arg,
+            "--format",
+            "html",
+            "--out",
+            &p(&wireframe_html),
+            "--json",
+        ]),
+    );
+    assert_eq!(wireframe_html_json["format"], "html");
+    assert_eq!(wireframe_html_json["dryRun"], false);
+    assert!(wireframe_html.is_file(), "HTML wireframe artifact missing");
+    assert_eq!(
+        wireframe_html_json["artifacts"][0]["kind"], "html",
+        "HTML wireframe artifact kind"
+    );
+    let layout_json = h.ok(
         "report layout auto",
         &svec([
             "report",
@@ -1866,11 +2033,21 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &project_arg,
             "--page",
             &visual_catalog,
-            "--preset",
-            "grid",
+            "--template",
+            "kpi-strip-trend-breakdown",
             "--in-place",
             "--json",
         ]),
+    );
+    assert_eq!(layout_json["ok"], Value::Bool(true));
+    assert_eq!(layout_json["preview"]["svg"], Value::Bool(false));
+    assert_eq!(
+        layout_json["preview"]["pages"][0]["template"]["name"],
+        Value::from("kpi-strip-trend-breakdown")
+    );
+    assert_eq!(
+        layout_json["preview"]["pages"][0]["invariants"]["overlapFree"],
+        Value::Bool(true)
     );
     h.ok(
         "report design-plan",
@@ -1949,6 +2126,10 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok(
         "report visuals catalog",
         &svec(["report", "visuals", "catalog", "--json"]),
+    );
+    h.ok(
+        "report visuals catalog",
+        &svec(["report", "visuals", "catalog", "--formatting", "--json"]),
     );
     h.ok(
         "report visuals repair-bindings",
@@ -2875,6 +3056,31 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--in-place",
             "--json",
         ]),
+    );
+    let reset = h.ok(
+        "report interactions reset",
+        &svec([
+            "report",
+            "interactions",
+            "reset",
+            "--project",
+            &project_arg,
+            "--page",
+            &overview,
+            "--source",
+            &line,
+            "--target",
+            &table,
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    assert_eq!(reset["action"], "reset");
+    assert!(reset["target"]["defaulted"].as_bool().unwrap_or(false));
+    assert!(
+        reset["interactionPlan"]["changed"]
+            .as_bool()
+            .unwrap_or(false)
     );
 
     h.ok(

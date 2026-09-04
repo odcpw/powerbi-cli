@@ -1,6 +1,6 @@
 use crate::input_safety::{InputKind, read_utf8};
 use crate::rules;
-use crate::tmdl::{ColumnRecord, load_table_documents};
+use crate::tmdl::{ColumnRecord, expression_handle, load_table_documents};
 use crate::{CliError, CliResult, ResolvedProject, canonical_display};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -47,13 +47,13 @@ pub(super) fn buffer_reuse_findings(resolved: &ResolvedProject) -> CliResult<Vec
         findings.extend(duplicate_step_document_findings(
             &expression.source,
             "expression",
-            &format!("expression:{}", expression.name),
+            &expression_handle(&expression.name),
             &expression.path,
         ));
         findings.extend(document_findings(
             &expression.source,
             "expression",
-            &format!("expression:{}", expression.name),
+            &expression_handle(&expression.name),
             &expression.path,
         ));
     }

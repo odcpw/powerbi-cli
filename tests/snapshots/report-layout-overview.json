@@ -1,0 +1,236 @@
+{
+  "assignments": [
+    {
+      "position": {
+        "height": 96.0,
+        "tabOrder": 0,
+        "width": 192.0,
+        "x": 232.0,
+        "y": 96.0,
+        "z": 0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "slot": "kpi.1",
+      "visual": "visual:ReportSectionOverview:VisualContainerRevenue83556a914d",
+      "visualType": "card"
+    },
+    {
+      "position": {
+        "height": 240.0,
+        "tabOrder": 1,
+        "width": 504.0,
+        "x": 232.0,
+        "y": 208.0,
+        "z": 1
+      },
+      "preferredFamilies": [
+        "lineChart",
+        "columnChart"
+      ],
+      "slot": "primary",
+      "visual": "visual:ReportSectionOverview:VisualContainerRevenueTrendf33e67f559",
+      "visualType": "lineChart"
+    },
+    {
+      "position": {
+        "height": 216.0,
+        "tabOrder": 2,
+        "width": 1024.0,
+        "x": 232.0,
+        "y": 464.0,
+        "z": 2
+      },
+      "preferredFamilies": [
+        "tableEx",
+        "matrix"
+      ],
+      "slot": "detail",
+      "visual": "visual:ReportSectionOverview:VisualContainerCustomerDetail6665af72a7",
+      "visualType": "tableEx"
+    }
+  ],
+  "grid": {
+    "columns": 12,
+    "gutter": 16.0,
+    "margin": 24.0,
+    "rowUnit": 8.0
+  },
+  "invariants": {
+    "minimumSizes": true,
+    "overlapFree": true,
+    "withinPage": true
+  },
+  "pageSize": {
+    "height": 720.0,
+    "width": 1280.0
+  },
+  "slots": [
+    {
+      "col": 2,
+      "colSpan": 10,
+      "minFamily": "textbox",
+      "name": "heading",
+      "position": {
+        "height": 56.0,
+        "width": 1024.0,
+        "x": 232.0,
+        "y": 24.0
+      },
+      "preferredFamilies": [
+        "textbox"
+      ],
+      "row": 0,
+      "rowSpan": 7
+    },
+    {
+      "col": 0,
+      "colSpan": 2,
+      "minFamily": "slicer",
+      "name": "rail",
+      "position": {
+        "height": 600.0,
+        "width": 192.0,
+        "x": 24.0,
+        "y": 80.0
+      },
+      "preferredFamilies": [
+        "slicer"
+      ],
+      "row": 7,
+      "rowSpan": 75
+    },
+    {
+      "col": 2,
+      "colSpan": 2,
+      "minFamily": "card",
+      "name": "kpi.1",
+      "position": {
+        "height": 96.0,
+        "width": 192.0,
+        "x": 232.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 4,
+      "colSpan": 2,
+      "minFamily": "card",
+      "name": "kpi.2",
+      "position": {
+        "height": 96.0,
+        "width": 192.0,
+        "x": 440.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 6,
+      "colSpan": 2,
+      "minFamily": "card",
+      "name": "kpi.3",
+      "position": {
+        "height": 96.0,
+        "width": 192.0,
+        "x": 648.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 8,
+      "colSpan": 2,
+      "minFamily": "card",
+      "name": "kpi.4",
+      "position": {
+        "height": 96.0,
+        "width": 192.0,
+        "x": 856.0,
+        "y": 96.0
+      },
+      "preferredFamilies": [
+        "card"
+      ],
+      "row": 9,
+      "rowSpan": 12
+    },
+    {
+      "col": 2,
+      "colSpan": 5,
+      "minFamily": "chart",
+      "name": "primary",
+      "position": {
+        "height": 240.0,
+        "width": 504.0,
+        "x": 232.0,
+        "y": 208.0
+      },
+      "preferredFamilies": [
+        "lineChart",
+        "columnChart"
+      ],
+      "row": 23,
+      "rowSpan": 30
+    },
+    {
+      "col": 7,
+      "colSpan": 5,
+      "minFamily": "chart",
+      "name": "secondary",
+      "position": {
+        "height": 240.0,
+        "width": 504.0,
+        "x": 752.0,
+        "y": 208.0
+      },
+      "preferredFamilies": [
+        "barChart",
+        "areaChart"
+      ],
+      "row": 23,
+      "rowSpan": 30
+    },
+    {
+      "col": 2,
+      "colSpan": 10,
+      "minFamily": "table",
+      "name": "detail",
+      "position": {
+        "height": 216.0,
+        "width": 1024.0,
+        "x": 232.0,
+        "y": 464.0
+      },
+      "preferredFamilies": [
+        "tableEx",
+        "matrix"
+      ],
+      "row": 55,
+      "rowSpan": 27
+    }
+  ],
+  "template": {
+    "budget": 8,
+    "headingBand": {
+      "row": 0,
+      "rowSpan": 7
+    },
+    "name": "overview",
+    "rail": "left"
+  }
+}

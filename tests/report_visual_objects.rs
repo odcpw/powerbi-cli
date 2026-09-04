@@ -132,6 +132,110 @@ fn set_object_dry_run_plans_changes_and_leaves_file_untouched() {
 }
 
 #[test]
+fn formatting_catalog_command_lists_the_complete_migrated_surface() {
+    let output = run_powerbi(&["report", "visuals", "catalog", "--formatting", "--json"]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    assert!(output.stderr.trim().is_empty(), "stderr: {}", output.stderr);
+    let value = stdout_json(&output);
+    assert_eq!(
+        value["schema"],
+        Value::from("powerbi-cli.report.visuals.formattingCatalog.v1")
+    );
+    assert_eq!(
+        value["catalogSchema"],
+        Value::from("powerbi-cli.formatting-catalog.v1")
+    );
+    assert_eq!(value["entryCount"], Value::from(11));
+    let keys = value["entries"]
+        .as_array()
+        .expect("formatting catalog entries")
+        .iter()
+        .map(|entry| {
+            format!(
+                "{}.{}",
+                entry["object"].as_str().expect("object"),
+                entry["property"].as_str().expect("property")
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        keys,
+        vec![
+            "labels.show",
+            "labels.fontSize",
+            "categoryLabels.show",
+            "categoryLabels.fontSize",
+            "categoryLabels.wordWrap",
+            "categoryAxis.show",
+            "categoryAxis.showAxisTitle",
+            "valueAxis.show",
+            "valueAxis.showAxisTitle",
+            "title.show",
+            "title.text"
+        ]
+    );
+    assert!(
+        value["entries"]
+            .as_array()
+            .expect("entries")
+            .iter()
+            .all(|entry| {
+                entry["visualTypes"] == json!(["*"])
+                    && entry["reference"]
+                        .as_str()
+                        .is_some_and(|reference| !reference.is_empty())
+            })
+    );
+}
+
+#[test]
+fn catalog_backed_set_object_dry_run_is_byte_identical_across_repeated_calls() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let visual_path = card_visual_json(&project);
+    let handle = visual_handle(&project, &visual_path);
+    let args = set_object_args(
+        project_arg,
+        &handle,
+        "categoryLabels",
+        "fontSize",
+        "20",
+        "--dry-run",
+    );
+
+    let first = run_powerbi(&args);
+    let second = run_powerbi(&args);
+    assert_eq!(first.code, 0, "stderr: {}", first.stderr);
+    assert_eq!(second.code, 0, "stderr: {}", second.stderr);
+    assert_eq!(first.stdout, second.stdout);
+    assert_eq!(first.stderr, second.stderr);
+}
+
+#[test]
+fn formatting_catalog_rejects_visual_type_filters() {
+    let output = run_powerbi(&[
+        "report",
+        "visuals",
+        "catalog",
+        "--formatting",
+        "--visual-type",
+        "lineChart",
+        "--json",
+    ]);
+    assert_eq!(output.code, 2);
+    assert!(output.stdout.trim().is_empty(), "stdout: {}", output.stdout);
+    let error = stderr_json(&output);
+    assert_eq!(error["error"]["code"], Value::from("invalid_args"));
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("cannot be combined")
+    );
+}
+
+#[test]
 fn set_object_in_place_writes_card_literals_and_stays_strict_valid() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

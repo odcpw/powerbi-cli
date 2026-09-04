@@ -1,0 +1,143 @@
+{
+  "schema": "powerbi-cli.design.templates.v1",
+  "grid": {
+    "columns": 12,
+    "gutter": 16,
+    "margin": 24,
+    "rowUnit": 8
+  },
+  "templates": [
+    {
+      "name": "kpi-strip-trend-breakdown",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 8,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 12, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "kpi.1", "col": 0, "row": 9, "colSpan": 3, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "kpi.2", "col": 3, "row": 9, "colSpan": 3, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "kpi.3", "col": 6, "row": 9, "colSpan": 3, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "kpi.4", "col": 9, "row": 9, "colSpan": 3, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "primary", "col": 0, "row": 23, "colSpan": 7, "rowSpan": 33, "preferredFamilies": ["lineChart", "areaChart", "columnChart"], "minFamily": "chart" },
+        { "name": "secondary", "col": 7, "row": 23, "colSpan": 5, "rowSpan": 33, "preferredFamilies": ["barChart", "lineChart", "chart"], "minFamily": "chart" },
+        { "name": "detail", "col": 0, "row": 58, "colSpan": 12, "rowSpan": 24, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "overview",
+      "rail": "left",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 8,
+      "slots": [
+        { "name": "heading", "col": 2, "row": 0, "colSpan": 10, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "rail", "col": 0, "row": 7, "colSpan": 2, "rowSpan": 75, "preferredFamilies": ["slicer"], "minFamily": "slicer" },
+        { "name": "kpi.1", "col": 2, "row": 9, "colSpan": 2, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "kpi.2", "col": 4, "row": 9, "colSpan": 2, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "kpi.3", "col": 6, "row": 9, "colSpan": 2, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "kpi.4", "col": 8, "row": 9, "colSpan": 2, "rowSpan": 12, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "primary", "col": 2, "row": 23, "colSpan": 5, "rowSpan": 30, "preferredFamilies": ["lineChart", "columnChart"], "minFamily": "chart" },
+        { "name": "secondary", "col": 7, "row": 23, "colSpan": 5, "rowSpan": 30, "preferredFamilies": ["barChart", "areaChart"], "minFamily": "chart" },
+        { "name": "detail", "col": 2, "row": 55, "colSpan": 10, "rowSpan": 27, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "time-series",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 6,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 12, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "primary", "col": 0, "row": 9, "colSpan": 12, "rowSpan": 42, "preferredFamilies": ["lineChart", "areaChart"], "minFamily": "chart" },
+        { "name": "secondary", "col": 0, "row": 53, "colSpan": 6, "rowSpan": 29, "preferredFamilies": ["columnChart", "barChart"], "minFamily": "chart" },
+        { "name": "tertiary", "col": 6, "row": 53, "colSpan": 6, "rowSpan": 29, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "ranking",
+      "rail": "right",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 5,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 10, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "rail", "col": 10, "row": 7, "colSpan": 2, "rowSpan": 75, "preferredFamilies": ["slicer"], "minFamily": "slicer" },
+        { "name": "primary", "col": 0, "row": 9, "colSpan": 7, "rowSpan": 50, "preferredFamilies": ["barChart", "columnChart"], "minFamily": "chart" },
+        { "name": "secondary", "col": 7, "row": 9, "colSpan": 3, "rowSpan": 50, "preferredFamilies": ["card", "barChart"], "minFamily": "card" },
+        { "name": "detail", "col": 0, "row": 59, "colSpan": 10, "rowSpan": 23, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "distribution",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 5,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 12, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "primary", "col": 0, "row": 9, "colSpan": 8, "rowSpan": 40, "preferredFamilies": ["barChart", "columnChart", "areaChart"], "minFamily": "chart" },
+        { "name": "secondary", "col": 8, "row": 9, "colSpan": 4, "rowSpan": 40, "preferredFamilies": ["scatterChart", "chart"], "minFamily": "chart" },
+        { "name": "detail", "col": 0, "row": 51, "colSpan": 12, "rowSpan": 31, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "comparison",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 5,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 12, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "primary", "col": 0, "row": 9, "colSpan": 6, "rowSpan": 38, "preferredFamilies": ["columnChart", "barChart"], "minFamily": "chart" },
+        { "name": "secondary", "col": 6, "row": 9, "colSpan": 6, "rowSpan": 38, "preferredFamilies": ["columnChart", "lineChart"], "minFamily": "chart" },
+        { "name": "detail", "col": 0, "row": 50, "colSpan": 12, "rowSpan": 32, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "detail-table",
+      "rail": "left",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 3,
+      "slots": [
+        { "name": "heading", "col": 2, "row": 0, "colSpan": 10, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "rail", "col": 0, "row": 7, "colSpan": 2, "rowSpan": 75, "preferredFamilies": ["slicer"], "minFamily": "slicer" },
+        { "name": "detail", "col": 2, "row": 9, "colSpan": 10, "rowSpan": 72, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "drillthrough-detail",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 4,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 12, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "detail", "col": 0, "row": 9, "colSpan": 8, "rowSpan": 72, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" },
+        { "name": "secondary", "col": 8, "row": 9, "colSpan": 4, "rowSpan": 20, "preferredFamilies": ["card"], "minFamily": "card" },
+        { "name": "tertiary", "col": 8, "row": 31, "colSpan": 4, "rowSpan": 50, "preferredFamilies": ["barChart", "lineChart"], "minFamily": "chart" }
+      ]
+    },
+    {
+      "name": "exception-list",
+      "rail": "right",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 4,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 10, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "rail", "col": 10, "row": 7, "colSpan": 2, "rowSpan": 75, "preferredFamilies": ["slicer"], "minFamily": "slicer" },
+        { "name": "primary", "col": 0, "row": 9, "colSpan": 10, "rowSpan": 72, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    },
+    {
+      "name": "matrix-focus",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 3,
+      "slots": [
+        { "name": "heading", "col": 0, "row": 0, "colSpan": 12, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "primary", "col": 0, "row": 9, "colSpan": 12, "rowSpan": 72, "preferredFamilies": ["matrix", "tableEx"], "minFamily": "matrix" }
+      ]
+    },
+    {
+      "name": "scatter-focus",
+      "rail": "left",
+      "headingBand": { "row": 0, "rowSpan": 7 },
+      "budget": 4,
+      "slots": [
+        { "name": "heading", "col": 2, "row": 0, "colSpan": 10, "rowSpan": 7, "preferredFamilies": ["textbox"], "minFamily": "textbox" },
+        { "name": "rail", "col": 0, "row": 7, "colSpan": 2, "rowSpan": 75, "preferredFamilies": ["slicer"], "minFamily": "slicer" },
+        { "name": "primary", "col": 2, "row": 9, "colSpan": 10, "rowSpan": 48, "preferredFamilies": ["scatterChart"], "minFamily": "scatter" },
+        { "name": "detail", "col": 2, "row": 59, "colSpan": 10, "rowSpan": 23, "preferredFamilies": ["tableEx", "matrix"], "minFamily": "table" }
+      ]
+    }
+  ]
+}

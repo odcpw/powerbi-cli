@@ -536,6 +536,7 @@ fn capabilities_advertise_report_layout_commands() {
     assert!(paths.contains(&"report interactions show"));
     assert!(paths.contains(&"report interactions set"));
     assert!(paths.contains(&"report interactions disable"));
+    assert!(paths.contains(&"report interactions reset"));
     assert!(paths.contains(&"report themes show"));
     assert!(paths.contains(&"report themes extract"));
     assert!(paths.contains(&"report themes apply"));
@@ -1147,6 +1148,44 @@ fn capabilities_advertise_report_layout_commands() {
             .iter()
             .any(|field| field == "interactionPlan.after.type")
     );
+    let interaction_reset = value["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["path"] == "report interactions reset")
+        .expect("interaction reset command");
+    assert_eq!(interaction_reset["mutates"], Value::Bool(true));
+    assert_eq!(interaction_reset["requiresOutput"], Value::Bool(true));
+    assert_eq!(interaction_reset["writesDataCache"], Value::Bool(false));
+    assert_eq!(
+        interaction_reset["outputSchema"],
+        Value::from("powerbi-cli.report.interactions.resetMutation.v1")
+    );
+    assert_eq!(interaction_reset["proofLevel"], Value::from("unit-smoke"));
+    for expected_flag in [
+        "--page <page-name-or-handle>",
+        "--source <visual-name-or-handle>",
+        "--target <visual-name-or-handle>",
+        "--dry-run",
+        "--in-place",
+        "--out-dir <dir>",
+    ] {
+        assert!(
+            interaction_reset["flags"]
+                .as_array()
+                .expect("flags")
+                .iter()
+                .any(|flag| flag == expected_flag),
+            "missing interaction reset flag {expected_flag}"
+        );
+    }
+    assert!(
+        interaction_reset["followUpFields"]
+            .as_array()
+            .expect("followUpFields")
+            .iter()
+            .any(|field| field == "resetSemantics")
+    );
     let delete_visual = value["commands"]
         .as_array()
         .expect("commands")
@@ -1506,6 +1545,7 @@ fn capabilities_advertise_report_layout_commands() {
     assert!(interaction_paths.contains(&"report interactions show"));
     assert!(interaction_paths.contains(&"report interactions set"));
     assert!(interaction_paths.contains(&"report interactions disable"));
+    assert!(interaction_paths.contains(&"report interactions reset"));
     for path in [
         "report pages add",
         "report pages update",
