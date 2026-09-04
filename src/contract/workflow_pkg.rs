@@ -74,6 +74,24 @@ pub(super) fn package_commands() -> Vec<Value> {
             "followUpFields": ["ok", "changed", "dryRun", "projectDir", "pbip", "package", "packageClass", "entries[].name", "validation", "next"]
         }),
         json!({
+            "path": "package work-pack",
+            "aliases": ["package work-package"],
+            "usage": "powerbi-cli package work-pack --project <project-dir-or.pbip> [--out <archive.pbit|archive.pbix|archive.zip>] [--force] [--dry-run] --json",
+            "summary": "Write a deterministic credential-free work-machine archive containing only recognized materialized live connectors",
+            "tags": ["package", "pbit", "pbip", "pbir", "tmdl", "work", "handoff", "live-source", "no-fallback", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "requiresOutput": true,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.package.workPack.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--out <archive>", "--kind <pbit|pbix|zip>", "--force", "--dry-run", "--json", "--format json"],
+            "examples": ["powerbi-cli package work-pack --project build/sales-work --json", "powerbi-cli package work-pack --project build/sales-work --out build/sales-work.pbit --json"],
+            "limitations": ["Writes a ZIP-format PBIP source archive, not a Desktop imported-data binary; the default output is the sibling <project>-work.pbit.", "Uses the source-pack allowlist for root .pbip, selected report PBIR/definition JSON, selected semantic-model PBISM/TMDL, registered/shared JSON resources, and generated .gitignore, POWERBI_HANDOFF.md, powerbi-cli.manifest.copy.json, plus the generated powerbi-cli.work-pack.json class marker.", "Refuses all unknown files, dot-directories, caches, localSettings.json, PBIX/PBIT files inside the project, credential-like content, PII-suspect row literals, dummy/unknown/model-derived partitions, and live partitions not accepted by handoff check --target work.", "Contains connection metadata only; it never materializes or packages imported data rows. Authentication remains a Power BI Desktop responsibility on the work machine."],
+            "followUpFields": ["ok", "changed", "dryRun", "projectDir", "pbip", "package", "packageClass", "sourcePolicy", "entries[].name", "entries[].generated", "validation", "next"]
+        }),
+        json!({
             "path": "package export-plan",
             "aliases": ["package pbit-plan", "package template-plan"],
             "usage": "powerbi-cli package export-plan --project <project-dir-or.pbip> --json",

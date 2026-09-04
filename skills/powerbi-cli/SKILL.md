@@ -130,7 +130,7 @@ When the canonical command path is already known exactly, append `--compact`
 to receive only its path, usage, flags, examples, proof level, follow-up fields,
 and output schema.
 
-Key live surfaces include package inspect/extract/import/source-pack/export-plan,
+Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
 schema validate/normalize, profile
 infer/validate/summarize, deterministic report planning, declarative report spec
 validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
@@ -253,6 +253,12 @@ supported.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.
+- `package work-pack` is the separate materialized work-machine variant. It
+  applies the same strict allowlist and content scans, requires every partition
+  to be a recognized credential-free live connector accepted by `handoff check
+  --target work`, and packages source metadata only—never imported rows, caches,
+  PBIX files, or local settings. Without `--out`, it writes the sibling
+  `<project>-work.pbit`.
 - If a command refuses an unsupported visual, format, source, or model feature,
   preserve the refusal. `error.code = "unsupported_feature"` is a stop sign, not
   an invitation to patch raw PBIR/TMDL by memory.
@@ -313,6 +319,7 @@ pbi --json package inspect template.pbit
 pbi --json package extract template.pbit --out-dir build/template-source
 pbi --json handoff check build/sales
 pbi --json package source-pack --project build/sales --out build/sales-source.pbit
+pbi --json package work-pack --project build/sales-live
 ```
 
 Extraction removes partial output if the entry-count, per-entry, total-size, or

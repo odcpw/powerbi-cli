@@ -80,11 +80,12 @@ Required contract rules:
   visuals, tables, columns, measures, relationships, and offline hazards.
 - `validate <project|pbip>`: parse required files, validate known schemas, check
   references, detect unsafe files, and report Desktop-proof status if available.
-- `package inspect|extract|import|export-plan`: inspect PBIX/PBIT archives,
+- `package inspect|extract|import|source-pack|work-pack|export-plan`: inspect PBIX/PBIT archives,
   extract safe metadata/source files, import real PBIP/PBIR/TMDL source entries
-  when present, and emit the Desktop export handoff. Binary export/compile/pack
-  remains refused unless a future implementation can prove valid Power BI
-  binary writing without opaque fallbacks.
+  when present, package dummy source projects or credential-free materialized
+  work variants under separate policies, and emit the Desktop export handoff.
+  Binary export/compile/pack remains refused unless a future implementation can
+  prove valid Power BI binary writing without opaque fallbacks.
 
 ### Project Authoring
 

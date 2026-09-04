@@ -194,6 +194,7 @@ cargo run --bin powerbi-cli -- package inspect .\template.pbit --json
 cargo run --bin powerbi-cli -- package extract .\template.pbit --out-dir .\build\template-source --json
 cargo run --bin powerbi-cli -- package import .\source.pbix --out-dir .\build\imported-source --json
 cargo run --bin powerbi-cli -- package source-pack --project .\build\sales --out .\build\sales-source.pbit --json
+cargo run --bin powerbi-cli -- package work-pack --project .\build\sales-live --json
 cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
@@ -371,7 +372,12 @@ three pages.
   real allowlisted PBIP/PBIR/TMDL source files exist inside the archive,
   `package source-pack` first refuses unknown files and files in dot-directories,
   then scans every included file for credentials and PII-suspect row literals;
-  non-dummy or unverified partition sources are also refused, and
+  non-dummy or unverified partition sources are also refused. The separate
+  `package work-pack` uses the same allowlist and scans, but requires every
+  partition to be a recognized credential-free materialized live source
+  accepted by `handoff check --target work`; it writes source metadata only,
+  never imported rows, caches, PBIX files, or local settings. Its default output
+  is the sibling `<project>-work.pbit`. Finally,
   `package export-plan` emits the Desktop handoff. `package export/compile/pack`
   is intentionally refused.
 - Package extraction streams through four default budgets: 10,000 archive
@@ -384,7 +390,8 @@ three pages.
   `definition.pbir`/definition JSON, semantic-model `.platform`/
   `definition.pbism`/definition TMDL, registered/shared JSON resources, and the
   generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-  `powerbi-cli.manifest.copy.json` sidecars. Other files—including every file
+  `powerbi-cli.manifest.copy.json` sidecars. A work-pack additionally contains
+  the generated `powerbi-cli.work-pack.json` class marker. Other files—including every file
   below `.git`, `.vscode`, `.powerbi-cli`, or another dot-directory—cause a
   deterministic refusal listing and no archive is written.
 - Programmatic visual authoring currently covers first-slice PBIR visual

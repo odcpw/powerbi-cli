@@ -59,6 +59,7 @@ Usage:
   powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json
   powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> --json
   powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json
+  powerbi-cli package work-pack --project <project-dir-or.pbip> [--out <archive.pbit>] --json
   powerbi-cli package export-plan --project <project-dir-or.pbip> --json
   powerbi-cli robot-docs guide [--json]
   powerbi-cli --robot-triage
@@ -342,7 +343,7 @@ Rules for agents:
 - Start with `powerbi-cli --json capabilities` and trust that payload over memory.
 - Use `powerbi-cli version --json` for a cheap provenance check before relying on cached command knowledge.
 - Use `powerbi-cli features list --json` to distinguish supported, read-only, planned, and explicitly refused Power BI feature surfaces. If a command returns `error.code = "unsupported_feature"`, stop or choose a supported workflow; do not raw-patch guessed PBIR/TMDL.
-- Use `package inspect/extract/import/source-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only documented PBIP/PBIR/TMDL files and generated sidecars, refuses dot-directories/unknown files, and scans every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
+- Use `package inspect/extract/import/source-pack/work-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only dummy partitions. `work-pack` uses the same strict file allowlist but requires every partition to be a recognized credential-free materialized live source accepted by `handoff check --target work`; it contains source metadata, never imported rows or caches. Both scan every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
 - For arbitrary dashboards, start with `schema validate`, `profile infer`, `report plan`, `report spec validate`, then `report build`.
 - After any scaffold, report build, or mutation, run the returned inspect and validate commands.
 - Use `diff <before> <after> --json` to verify measure-level semantic changes after mutations; pass `--scope model.calculatedColumns` for calculated columns or `--scope model.relationships` for relationships.
@@ -420,6 +421,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportSpecValidate": "powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json",
             "reportBuild": "powerbi-cli report build --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             "packageSourcePack": "powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json",
+            "packageWorkPack": "powerbi-cli package work-pack --project <project-dir-or.pbip> --json",
             "scaffold": "powerbi-cli --json scaffold --schema examples/sales.schema.json --out-dir build/sales",
             "inspect": "powerbi-cli --json inspect <project-dir-or.pbip>",
             "diff": "powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --json",
@@ -1187,6 +1189,22 @@ fn schema_manifest() -> Value {
         "packageClass",
         "entries[].name",
         "entries[].category",
+        "validation",
+        "next"
+    ]);
+    manifest["packageWorkPackFields"] = json!([
+        "ok",
+        "changed",
+        "dryRun",
+        "projectDir",
+        "pbip",
+        "package",
+        "packageKind",
+        "packageClass",
+        "sourcePolicy",
+        "entries[].name",
+        "entries[].category",
+        "entries[].generated",
         "validation",
         "next"
     ]);
