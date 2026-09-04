@@ -104,6 +104,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
     VALIDATION_WARNING => ("validation.warning", Validation, "warning", "Native project validation reported a non-fatal compatibility warning.", "Review the corresponding validation warning and use Power BI Desktop when compatibility proof is required.", None),
     VALIDATION_MISSING_FILE => ("validation.missing_file", Validation, "error", "A required PBIP/PBIR/TMDL project file is missing.", "Restore the generated project file or regenerate the project before opening it in Desktop.", None),

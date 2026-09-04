@@ -387,5 +387,20 @@ fn error_json(err: &CliError) -> Value {
             Value::String(did_you_mean.to_string()),
         );
     }
+    if let Some(field) = err.field() {
+        error.insert("field".to_string(), Value::String(field.to_string()));
+    }
+    if let Some(reason) = err.reason() {
+        error.insert("reason".to_string(), Value::String(reason.to_string()));
+    }
+    if let Some(candidates_command) = err.candidates_command() {
+        error.insert(
+            "candidatesCommand".to_string(),
+            Value::String(candidates_command.to_string()),
+        );
+    }
+    if let Some(example) = err.example() {
+        error.insert("example".to_string(), example.clone());
+    }
     json!({ "error": Value::Object(error) })
 }

@@ -719,7 +719,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables and deny-unknown-fields models. `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. The currently compiled subset is artifact-identical to v1; every recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables and deny-unknown-fields models. `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. The currently compiled subset is artifact-identical to v1; every recognized future section stops with unsupported_feature and its owning T3 bead id.",
         next_proof: &[
             "Land the named T3 compiler bead for each currently refused v2 section",
             "Promote generated v2 archetypes through the existing Desktop proof ladder",

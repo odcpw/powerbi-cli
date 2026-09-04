@@ -432,6 +432,16 @@ Fields not compiled by this starter planner remain in the response with an
 owning-bead warning. It is not a substitute for reviewing generated report
 intent or for Desktop compatibility proof.
 
+When the compiler cannot safely infer a required value, it asks through a
+structured `spec.missing_input` diagnostic instead of silently choosing a
+visual type, binding, TopN order, drillthrough target, slicer column, semantic
+color, or date for a measure pattern. Read `pointer`, `field`, and `reason`,
+then run the returned `candidatesCommand` (normally
+`powerbi-cli report spec fields --schema <schema.json> --json`) and repair that
+pointer. The error also includes an `example` shape. Optional documented
+defaults are listed in `defaultsApplied[]` in build/plan responses, so a
+downstream agent can distinguish an intentional default from a missing input.
+
 ### Scaffold From A Schema
 
 ```bash
