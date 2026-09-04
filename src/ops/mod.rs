@@ -28,6 +28,7 @@ mod page_kernels;
 mod plan;
 mod set_interaction;
 mod transaction;
+mod visual_kernels;
 
 #[allow(unused_imports)]
 pub(crate) use crate::report_drillthrough::{
@@ -53,6 +54,7 @@ pub(crate) use plan::*;
 pub(crate) use set_interaction::*;
 #[allow(unused_imports)]
 pub(crate) use transaction::*;
+pub(crate) use visual_kernels::*;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -86,9 +88,8 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         | Op::SetActivePage(_)
         | Op::DeleteEmptyPage(_)
         | Op::ClonePage(_) => Some(Box::new(PageKernel)),
-        Op::SetBindings(_)
-        | Op::SetDisplayName(_)
-        | Op::SetTopNGuard(_)
+        Op::SetBindings(_) | Op::SetDisplayName(_) => Some(Box::new(VisualKernel)),
+        Op::SetTopNGuard(_)
         | Op::SetDrilldownHierarchy(_)
         | Op::CloneVisual(_)
         | Op::DeleteVisual(_)

@@ -344,6 +344,12 @@ mod tests {
             Op::SetActivePage(payload.clone()),
             Op::DeleteEmptyPage(payload.clone()),
             Op::ClonePage(payload),
+            Op::SetBindings(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::SetDisplayName(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
         ];
         for operation in operations {
             let value = serde_json::to_value(&operation).expect("serialize operation");
