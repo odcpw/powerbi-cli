@@ -129,7 +129,7 @@ object-specific writers and fixtures exist.
 - `report pages list/show/add/update/reorder/set-active/delete-empty`
 - `report design-plan`
 - `report layout auto`
-- `report visuals list/show/formatting list/formatting show/formatting extract/formatting apply/add/clone/update/delete/set-position`
+- `report visuals list/show/formatting list/formatting show/formatting extract/formatting apply/add/clone/update/delete/set-position/set-bindings/repair-bindings`
 - `report visuals bind`: bind a visual to fields or measures using PBIR queries.
 - `report drilldown set-hierarchy`: replace Category projections on existing
   Category/Y charts with two or more resolved model columns.
@@ -324,6 +324,13 @@ frozen until proven.
   by generated visual creation. It remains scoped to existing card/table and
   standard category/value chart visuals; slicer mutations, filters, and
   formatting remain fixture-gated.
+- Implemented fixture-backed role-map slice: `report visuals catalog` publishes
+  one complete rule row for each of the sixteen generated visual types, with
+  required/optional and measure-only roles, projection limits, runtime-parity
+  constraints, proof level, and evidence kind. `report visuals
+  repair-bindings --dry-run` proposes only deterministic role-name and proven
+  Sum-wrapper repairs as a typed set-bindings op; ambiguous or missing fields
+  remain `unsupported_feature` refusals.
 - Implemented first formatting readback slice: `report visuals formatting
   list/show` inventories existing PBIR formatting object containers and
   property names while omitting raw literal values unless `--include-raw` is

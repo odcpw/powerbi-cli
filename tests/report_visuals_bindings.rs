@@ -315,7 +315,7 @@ fn report_visuals_catalog_advertises_generated_types_roles_and_limits() {
     let catalog_json = stdout_json(&catalog);
     assert_eq!(
         catalog_json["schema"],
-        Value::from("powerbi-cli.report.visuals.catalog.v1")
+        Value::from("powerbi-cli.report.visuals.catalog.v2")
     );
     let supported = catalog_json["supportedVisualTypes"]
         .as_array()

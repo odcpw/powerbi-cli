@@ -415,6 +415,7 @@ fn visual_bindings(visual_json: &Value) -> Vec<Value> {
                         "queryRef": projection["queryRef"],
                         "nativeQueryRef": projection["nativeQueryRef"],
                         "displayName": projection["displayName"],
+                        "format": projection["format"],
                         "kind": projection_kind(projection),
                         "table": projection_table(projection),
                         "field": projection_field(projection),

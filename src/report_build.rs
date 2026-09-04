@@ -862,6 +862,21 @@ fn validate_binding_contract(
                     visual_path()
                 )));
             }
+            if bindings.iter().any(|binding| {
+                matches!(
+                    binding.get("role").and_then(Value::as_str),
+                    Some("Y" | "Y2")
+                ) && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::unsupported_feature(format!(
+                    "{} {visual_type} Y and Y2 bindings require measures; bare columns are not fixture-proven",
+                    visual_path()
+                ))
+                .with_hint("Define measures for both value axes; the compiler refuses to invent an aggregation shape for combo charts.")
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
+                )));
+            }
         }
         VisualBindingFamily::CategoryShare => {
             let categories = count("Category");
@@ -879,6 +894,19 @@ fn validate_binding_contract(
                 return Err(CliError::invalid_args(format!(
                     "{} {visual_type} Category binding must be a column, not a measure",
                     visual_path()
+                )));
+            }
+            if bindings.iter().any(|binding| {
+                binding.get("role").and_then(Value::as_str) == Some("Y")
+                    && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::unsupported_feature(format!(
+                    "{} {visual_type} Y bindings require measures; bare columns are not proven by the Desktop-authored reference",
+                    visual_path()
+                ))
+                .with_hint("Define a measure for the value well; the reference fixture proves measure projections only.")
+                .with_suggested_command(format!(
+                    "powerbi-cli report visuals catalog --visual-type {visual_type} --json"
                 )));
             }
         }
@@ -900,6 +928,19 @@ fn validate_binding_contract(
                     "{} matrix (pivotTable) Rows and Columns bindings must be columns, not measures",
                     visual_path()
                 )));
+            }
+            if bindings.iter().any(|binding| {
+                binding.get("role").and_then(Value::as_str) == Some("Values")
+                    && binding.get("measure").is_none()
+            }) {
+                return Err(CliError::unsupported_feature(format!(
+                    "{} matrix (pivotTable) Values bindings require measures; bare columns are not proven by the Desktop-authored reference",
+                    visual_path()
+                ))
+                .with_hint("Define a measure for matrix Values; the reference fixture does not prove an aggregation wrapper for raw columns.")
+                .with_suggested_command(
+                    "powerbi-cli report visuals catalog --visual-type matrix --json",
+                ));
             }
         }
         VisualBindingFamily::SlicerField => {

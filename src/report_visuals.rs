@@ -14,6 +14,7 @@ use crate::pbir_bindings::{
 use crate::pbir_visual_factory::validate_between_slicer_data_type;
 use crate::project_io::write_json_atomic;
 use crate::report_topn_guard::set_topn_guard;
+use crate::report_visual_binding_repair::repair_bindings;
 use crate::report_visual_clone::clone_visual;
 use crate::report_visual_delete::delete_visual;
 use crate::report_visual_formatting::formatting_command;
@@ -32,7 +33,7 @@ use std::path::PathBuf;
 pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "report visuals requires a subcommand: list, show, catalog, formatting, add, add-card, add-slicer, add-textbox, clone, delete, set-position, set-bindings, set-topn-guard, set-object, set-display-name",
+            "report visuals requires a subcommand: list, show, catalog, formatting, add, add-card, add-slicer, add-textbox, clone, delete, set-position, set-bindings, repair-bindings, set-topn-guard, set-object, set-display-name",
         )
         .with_hint("Run `powerbi-cli report visuals list --project <project-dir-or.pbip> --json`.")
         .with_suggested_command(
@@ -53,6 +54,7 @@ pub(crate) fn visuals_command(args: &[String]) -> CliResult<Value> {
         "delete" | "remove" => delete_visual(rest),
         "set-position" | "setPosition" => set_position(rest),
         "set-bindings" | "setBindings" | "bind" => set_bindings(rest),
+        "repair-bindings" | "repairBindings" => repair_bindings(rest),
         "set-topn-guard" | "setTopnGuard" | "set-top-n-guard" => set_topn_guard(rest),
         "set-object" | "setObject" => set_object(rest),
         "set-display-name" | "setDisplayName" | "display-name" => set_display_name(rest),
