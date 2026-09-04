@@ -7,7 +7,7 @@ use crate::pbir_visual_factory::{
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_spec_fields::fields_command;
-use crate::report_spec_schema::validate_known_fields;
+use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
 use crate::{
@@ -162,7 +162,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         options.schema.as_deref()
     {
         let schema_value = load_schema_value(schema_path)?;
-        match known_fields.and_then(|()| compile_dashboard(&schema_value, Some(&spec_value))) {
+        match known_fields.and_then(|_| compile_dashboard(&schema_value, Some(&spec_value))) {
             Ok(compiled) => {
                 let schema_validation = validate_schema_value(&compiled.schema);
                 (
@@ -189,7 +189,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         }
     } else {
         let errors = match known_fields {
-            Ok(()) => validate_spec_shape(&spec_value)
+            Ok(_) => validate_spec_shape(&spec_value)
                 .into_iter()
                 .map(Value::String)
                 .collect(),
@@ -275,6 +275,8 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
                 .collect(),
         });
     };
+    validate_known_fields(spec)?;
+    reject_uncompiled_v2_sections(spec)?;
     if spec.get("report").is_none() && spec.get("pages").is_some() {
         let (schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
         return Ok(CompiledDashboard {

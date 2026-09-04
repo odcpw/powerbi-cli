@@ -1,5 +1,5 @@
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
-use crate::report_spec_schema::allowed_fields_json;
+use crate::report_spec_schema::{allowed_fields_json, versioned_allowed_fields_json};
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::visual_catalog::supported_visual_type_names;
 use crate::{
@@ -24,8 +24,9 @@ pub(crate) fn fields_command(args: &[String]) -> CliResult<Value> {
             "exitCode": EXIT_SUCCESS,
             "schemaPath": Value::Null,
             "profilePath": Value::Null,
-            "supportedSpecVersions": ["powerbi-cli.dashboard.v1"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
             "allowedFields": allowed_fields_json(),
+            "versionedAllowedFields": versioned_allowed_fields_json(),
             "supportedVisualTypes": supported_visual_type_names(),
             "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
             "tables": [],
@@ -111,8 +112,9 @@ pub(crate) fn fields_command(args: &[String]) -> CliResult<Value> {
         "schemaPath": canonical_display(&schema_path),
         "profilePath": options.profile.as_ref().map(|path| canonical_display(path)),
         "profileSummary": profile.as_ref().map(profile_summary),
-        "supportedSpecVersions": ["powerbi-cli.dashboard.v1"],
+        "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
         "allowedFields": allowed_fields_json(),
+        "versionedAllowedFields": versioned_allowed_fields_json(),
         "supportedVisualTypes": supported_visual_type_names(),
         "bindingFields": ["role", "field", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
         "tables": tables,

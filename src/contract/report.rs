@@ -8,7 +8,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) --json",
-            "summary": "Compile a data schema plus optional profile/dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -27,7 +27,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report spec validate",
             "usage": "powerbi-cli report spec validate [--schema <schema.json>] --spec <dashboard.json> [--profile <profile.json>] --json",
-            "summary": "Validate a dashboard spec shape, and compile-check it against a schema/profile when --schema is supplied before report build",
+            "summary": "Validate a strict powerbi-cli.dashboard.v1 or v2 shape, and compile-check it against a schema/profile when --schema is supplied before report build",
             "tags": ["report", "dashboard", "spec", "schema", "profile", "validation", "agent"],
             "readOnly": true,
             "mutates": false,
@@ -42,7 +42,8 @@ pub(super) fn commands() -> Vec<Value> {
                 {"level": "shape-only", "ok": null, "meaning": "Checks JSON/spec shape only; cannot prove field references, visual roles, measures, or build compatibility."},
                 {"level": "compiled", "ok": "boolean", "meaning": "Compiles the spec against a schema and enforces generated visual role contracts."}
             ],
-            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args"]
+            "diagnosticCodes": ["spec.unknown_field", "unsupported_feature", "invalid_args"],
+            "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
         }),
         json!({
             "path": "report spec fields",
@@ -56,8 +57,8 @@ pub(super) fn commands() -> Vec<Value> {
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.spec.fields.v1",
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--json", "--format json"],
-            "examples": ["powerbi-cli report spec fields --schema examples/sales.schema.json --profile examples/sales.profile.json --json"],
-            "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
+            "examples": ["powerbi-cli report spec fields --json", "powerbi-cli report spec fields --schema examples/sales.schema.json --profile examples/sales.profile.json --json"],
+            "followUpFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].columns[].reference", "tables[].measures[].reference", "tables[].columns[].structuredBinding", "tables[].measures[].structuredBinding", "fields[]", "examples", "next"]
         }),
         json!({
             "path": "report plan",

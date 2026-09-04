@@ -359,6 +359,12 @@ without a schema for the allowed-key catalog or with `--schema` for both the
 catalog and exact binding references. An unknown key returns
 `spec.unknown_field` with an RFC 6901 pointer and, when available, a
 `didYouMean` correction; do not bypass that diagnostic with raw PBIR edits.
+The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. A v2
+section is safe to retain before its compiler lands: compiled validation/build
+will return `unsupported_feature` with the owning T3 bead id, never silently
+discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
+reference; `report spec upgrade` remains assigned to
+`pbi-t2-dashboard-spec-v2-dsd.6`.
 
 ```bash
 pbi --json schema validate examples/sales.schema.json

@@ -249,6 +249,13 @@ fn capabilities_include_agent_contract_metadata() {
             .any(|code| code["code"] == "unsupported_feature")
     );
     assert!(
+        value["diagnosticCodes"]
+            .as_array()
+            .expect("diagnosticCodes")
+            .iter()
+            .any(|code| code["code"] == "spec.unknown_field" && code["exitCode"] == 10)
+    );
+    assert!(
         value["globalFlags"]
             .as_array()
             .expect("globalFlags")
@@ -355,6 +362,22 @@ fn capabilities_include_agent_contract_metadata() {
             .expect("dashboard spec fields")
             .iter()
             .any(|field| field == "pages[].visuals[].bindings[].field")
+    );
+    assert_eq!(
+        value["schemaManifest"]["dashboardSpecVersions"],
+        json!(["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"])
+    );
+    assert!(
+        value["schemaManifest"]["dashboardSpecV2AllowedFields"]
+            .as_array()
+            .expect("v2 allowed fields")
+            .iter()
+            .any(|node| node["node"] == "pages[].visuals[].format"
+                && node["fields"]
+                    .as_array()
+                    .expect("format fields")
+                    .iter()
+                    .any(|field| field == "title.show"))
     );
     assert!(
         value["schemaManifest"]["profileFields"]
