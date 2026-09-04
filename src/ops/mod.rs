@@ -71,13 +71,36 @@ pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
 /// one match arm while the public `ops apply` dispatcher remains a later bead.
 pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
     match operation {
-        Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
-        Op::ResetInteraction(_) => Some(Box::new(ResetInteractionKernel)),
+        Op::AddMeasure(_) => Some(Box::new(AddMeasureKernel)),
+        Op::AddRelationship(_) => Some(Box::new(AddRelationshipKernel)),
+        Op::AddVisual(_) => Some(Box::new(AddVisualKernel)),
+        Op::AddFilter(_) => Some(Box::new(AddFilterKernel)),
+        Op::SetDrillthrough(_) => Some(Box::new(SetDrillthroughKernel)),
         Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
+        Op::ResetInteraction(_) => Some(Box::new(ResetInteractionKernel)),
+        Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
         Op::SetObject(_) => Some(Box::new(SetObjectKernel::default())),
         Op::SetPosition(_) => Some(Box::new(SetPositionKernel::default())),
-        _ => None,
     }
+}
+
+/// Operation tags with a concrete kernel in this build.
+///
+/// Keep this list next to the registry match so equivalence tests fail as soon
+/// as a new kernel is registered without adding its table-driven case.
+pub(crate) const fn registered_kernel_tags() -> &'static [&'static str] {
+    &[
+        "addMeasure",
+        "addRelationship",
+        "addVisual",
+        "addFilter",
+        "setDrillthrough",
+        "setInteraction",
+        "resetInteraction",
+        "applyThemePreset",
+        "setObject",
+        "setPosition",
+    ]
 }
 
 /// A typed operation accepted by the operation-plan compiler.
@@ -717,7 +740,7 @@ mod tests {
             schema["properties"]["ops"]["items"]["oneOf"]
                 .as_array()
                 .map(Vec::len),
-            Some(9)
+            Some(10)
         );
     }
 
@@ -730,5 +753,18 @@ mod tests {
         assert_eq!(value["schema"], OPS_SCHEMA);
         assert_eq!(value["ops"][0]["op"], "applyThemePreset");
         assert_eq!(value["ops"][0]["preset"], "operations");
+    }
+
+    #[test]
+    fn registered_kernel_tags_match_the_kernel_registry() {
+        for operation in variants() {
+            let registered = registered_kernel_tags().contains(&operation.tag());
+            assert_eq!(
+                kernel_for(&operation).is_some(),
+                registered,
+                "{} registry tag drifted from kernel_for",
+                operation.tag()
+            );
+        }
     }
 }
