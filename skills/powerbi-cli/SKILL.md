@@ -597,6 +597,17 @@ On Linux and macOS, Desktop-dependent commands are listed in
 `proofPlan.unavailable[]` with the Windows oracle instruction; the compiler
 never claims a Desktop proof level that the host cannot deliver.
 
+`report build` returns `compiled.ops`, flattened `changes[]`, and a `readback`
+object keyed by stable `report:`, `page:`, `visual:`, `table:`, and `measure:`
+handles. The embedded `scorecard.v1` is shared with `triage` and separates
+native validation, Microsoft-validator availability, lint findings grouped by
+severity, the fixed unavailable design-lint shape, offline handoff status, and
+the honest proof level. Pass `--trace` when diagnosing a build to include the
+deterministic `{op, ms}` planning trace; it is omitted by default so ordinary
+responses stay small. The complete field contract is published at
+`capabilities.responseShapes.scorecard.v1` and
+`capabilities.responseShapes.reportBuild`.
+
 ### Scaffold From A Schema
 
 ```bash

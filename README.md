@@ -217,6 +217,17 @@ mutation responses and `report build` expose `changes[]`, including dry-run
 before/after plans. Artifact writers such as scaffold, schema normalize, and
 profile output retain their documented family-specific fields.
 
+`report build` also returns `compiled.ops`, a flat operation-change aggregate,
+and `readback` command arrays keyed by stable report/page/visual/table/measure
+handles. Its shared `scorecard.v1` contains native validation, Microsoft
+validator availability, lint grouped by severity, the fixed unavailable design
+lint shape, offline handoff status, and the honest proof level. Add `--trace`
+to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
+default response omits that optional field. `triage` embeds the same scorecard
+projection for an existing project. See
+`capabilities.responseShapes.scorecard.v1` and
+`capabilities.responseShapes.reportBuild` for the machine-readable details.
+
 Validation/result families may emit `ok:false` with a nonzero `exitCode` on
 stdout. CLI errors are written to stderr with required `code`, `exitCode`, and
 `message`, for example

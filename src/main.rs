@@ -104,6 +104,7 @@ mod rules;
 mod safety_scan;
 mod scaffold;
 mod schema;
+mod scorecard;
 mod skill_package;
 mod source_template;
 mod source_template_paths;
