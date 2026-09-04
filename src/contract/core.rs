@@ -132,7 +132,7 @@ Usage:
   powerbi-cli model expressions list --project <project-dir-or.pbip> --json
   powerbi-cli source-template list --project <project-dir-or.pbip> --json
   powerbi-cli source-template show --project <project-dir-or.pbip> --handle <source-template-handle> --json
-  powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint> --dry-run --json
+  powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m> [--m-template <M-expression> | --m-file <path-or->] --dry-run --json
   powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json
   powerbi-cli report design-plan --project <project-dir-or.pbip> --json
   powerbi-cli report tree --project <project-dir-or.pbip> --json
@@ -314,7 +314,11 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "contractNotes": {
             "explainFlagDiscipline": "--explain <id> always takes an identifier. Whole-artifact explanations are subcommands, such as report spec explain and report plan explain."
         },
-        "responseShapes": response_shapes(),
+        // The response-shape catalog includes the internal ops.v1 spine and
+        // is intentionally emitted only by full discovery. Focused command
+        // discovery must stay small and omit unrelated catalogs, matching the
+        // null-shaped schemaManifest/generatedVisualContract fields below.
+        "responseShapes": if focused { Value::Null } else { response_shapes() },
         "featurePolicy": feature_policy_json(),
         "filter": filter,
         "scope": if focused { "focused" } else { "full" },
@@ -326,7 +330,7 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "desktopProofedArchetypes": if focused { Value::Null } else { desktop_proofed_archetypes() },
         "formatTargets": if focused { Value::Null } else { format_targets() },
         "omittedCatalogs": if focused {
-            json!(["schemaManifest", "generatedVisualContract", "desktopProofedArchetypes", "formatTargets"])
+            json!(["responseShapes", "schemaManifest", "generatedVisualContract", "desktopProofedArchetypes", "formatTargets"])
         } else {
             json!([])
         },
@@ -382,7 +386,7 @@ Rules for agents:
 - Use `model advanced inventory`, `model roles list/show`, `model perspectives list/show`, `model cultures list/show`, and `model expressions list/show` for advanced TMDL readback. Mutations remain fixture-gated.
 - Use `model relationships list/show/add/update/delete` for model relationships. Endpoint rewiring is delete+add in this alpha surface; `update` changes active state and cross-filtering behavior.
 - Use `model partitions list/show` to inspect generated dummy M partitions and their offline safety classification.
-- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, or SharePoint/OneDrive rebind metadata as sidecar JSON.
+- Use `source-template add/list/show` to store credential-free SQL Server, PostgreSQL, ODBC, Excel, CSV, folder, SharePoint/OneDrive, or closed-grammar generic M rebind metadata as sidecar JSON.
 - Use `source-template apply` to replace one safe generated dummy partition with a concrete credential-free source. Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint sources require `--replace-existing` plus the exact `--confirm <partition-handle>`; unresolved placeholders, unknown/web sources, embedded credentials, and unconfirmed replacements are refused.
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.

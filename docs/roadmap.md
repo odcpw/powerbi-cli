@@ -405,8 +405,11 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
-  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
+- Source-template support covers SQL Server, PostgreSQL, ODBC, Excel, CSV,
+  folder, SharePoint/OneDrive, and generic M expressions. Generic M uses the
+  workflow/source-profile closed connector grammar with complete placeholder
+  tokens and refuses credentials, hard-coded paths, unknown functions, and
+  computed/postfix calls with an M-text pointer.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
