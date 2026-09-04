@@ -23,13 +23,13 @@ mod plan;
 mod set_interaction;
 mod transaction;
 
-pub(crate) use apply_theme_preset::*;
 #[allow(unused_imports)]
 pub(crate) use crate::report_drillthrough::{
     SetDrillthroughKernel, parse_args as parse_set_drillthrough_args,
 };
 #[allow(unused_imports)]
 pub(crate) use crate::report_filter_add::{AddFilterKernel, parse_args as parse_add_filter_args};
+pub(crate) use apply_theme_preset::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
