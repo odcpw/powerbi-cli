@@ -1345,6 +1345,20 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["report", "visuals", "catalog", "--json"]),
     );
     h.ok(
+        "report visuals repair-bindings",
+        &svec([
+            "report",
+            "visuals",
+            "repair-bindings",
+            "--project",
+            &project_arg,
+            "--handle",
+            &scatter,
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    h.ok(
         "report visuals set-position",
         &svec([
             "report",
