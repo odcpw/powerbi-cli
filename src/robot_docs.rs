@@ -236,8 +236,7 @@ fn render_commands(capabilities_value: &Value) -> CliResult<String> {
             .unwrap_or_default()
             .cmp(right["path"].as_str().unwrap_or_default())
     });
-    let mut markdown =
-        String::from("### Commands (generated from `capabilities --json`)\n\n".to_string());
+    let mut markdown = String::from("### Commands (generated from `capabilities --json`)\n\n");
     markdown.push_str(
         "This list is generated; edit the live command catalog in `src/contract/` rather than this region.\n\n",
     );
@@ -279,7 +278,7 @@ fn render_features(features_value: &Value) -> CliResult<String> {
             .cmp(right["id"].as_str().unwrap_or_default())
     });
     let mut markdown =
-        String::from("### Feature catalog (generated from `features list --json`)\n\n".to_string());
+        String::from("### Feature catalog (generated from `features list --json`)\n\n");
     markdown.push_str(
         "Each feature carries its live support status and proof level; update `src/feature_catalog.rs` rather than this region.\n\n",
     );
@@ -403,7 +402,7 @@ fn render_diff(path: &Path, original: &str, rendered: &str, sections: &[Section]
     output.trim_end().to_string()
 }
 
-fn marked_region<'a>(text: &'a str, section: Section) -> Option<&'a str> {
+fn marked_region(text: &str, section: Section) -> Option<&str> {
     let start = section.start_marker();
     let end = section.end_marker();
     let start_end = text.find(&start)? + start.len();

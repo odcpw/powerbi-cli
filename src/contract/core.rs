@@ -349,9 +349,13 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         } else {
             Value::Null
         },
-        "proofLevels": proof_levels(),
-        "architectureGuardrails": architecture_guardrails(),
-        "designRules": design_rules()
+        // Focused discovery keeps the command records and safety contract
+        // needed for the requested family, while broad explanatory catalogs
+        // stay on the full capabilities surface so focused JSON remains
+        // bounded as the command catalog grows.
+        "proofLevels": if focused { Value::Null } else { json!(proof_levels()) },
+        "architectureGuardrails": if focused { Value::Null } else { json!(architecture_guardrails()) },
+        "designRules": if focused { Value::Null } else { json!(design_rules()) }
     }))
 }
 
