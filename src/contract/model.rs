@@ -347,6 +347,7 @@ pub(super) fn commands() -> Vec<Value> {
             "outputSchema": "powerbi-cli.model.dax.lint.v1",
             "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
             "examples": ["powerbi-cli model dax lint --project build/sales --json"],
+            "diagnosticCodes": crate::rules::rules_for_family(crate::rules::RuleFamily::Dax).map(|rule| rule.id).collect::<Vec<_>>(),
             "limitations": ["Static reference lint only; Power BI Desktop remains the compatibility oracle for DAX syntax and semantics."],
             "followUpFields": ["ok", "analysisBoundary", "counts.errors", "counts.warnings", "findings[].code", "validation", "next"]
         }),

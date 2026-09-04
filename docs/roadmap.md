@@ -228,6 +228,10 @@ validation, proof, then mutation breadth.
 - Implemented first BPA-lite lint slice: static DAX findings, duplicate
   page/visual titles, and validator-rejected `general.altText` placements with
   explicit cleanup guidance. Generated visuals omit the rejected property.
+- Implemented a single typed rule registry shared by lint, report audit, DAX
+  lint, and M lint. `lint --rules` inventories it and `lint --explain
+  <rule-id>` returns versioned remediation metadata; the empty design family is
+  reserved for the future design-lint implementation.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 

@@ -1,4 +1,5 @@
 use crate::pbir::{PageRecord, load_report_snapshot};
+use crate::rules;
 use crate::safety_scan::data_value_safety;
 use crate::{CliResult, ResolvedProject, canonical_display, read_json_value};
 use serde_json::{Value, json};
@@ -463,7 +464,7 @@ fn unsupported_reasons(raw: &Value) -> Vec<String> {
 fn safety_json(record: &ReportBookmarkRecord, raw_included: bool) -> Value {
     let findings = if record.may_contain_data_values {
         vec![json!({
-            "code": "bookmark.possible_persisted_values",
+            "code": rules::BOOKMARK_POSSIBLE_PERSISTED_VALUES,
             "severity": "warning",
             "message": "Power BI bookmark metadata can persist report, page, visual, filter, slicer, highlight, or selected data state; review raw bookmark JSON before sharing outside the work environment."
         })]

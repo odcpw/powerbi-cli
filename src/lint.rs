@@ -1,9 +1,10 @@
 use crate::inspect::deep_inspect;
 use crate::model_dax::{add_cycle_findings, analyze_dax};
+use crate::rules;
 use crate::tmdl::load_table_documents;
 use crate::{
-    CliError, CliResult, ResolvedProject, ValidationReport, canonical_display, command_arg,
-    read_json_value, resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, ResolvedProject, ValidationReport, canonical_display,
+    command_arg, read_json_value, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -16,10 +17,38 @@ mod m_lint;
 const DESKTOP_ROUND_TRIP_REPORT_VERSION: &str = "2.0.0";
 
 pub(crate) fn lint_command(args: &[String]) -> CliResult<Value> {
-    let path = parse_lint_args(args)?;
-    let resolved = resolve_project(&path)?;
-    let validation = validate_project(&resolved)?;
-    lint_project(&resolved, &validation)
+    rules::validate_registry().map_err(CliError::unexpected)?;
+    match parse_lint_args(args)? {
+        LintRequest::Project(path) => {
+            let resolved = resolve_project(&path)?;
+            let validation = validate_project(&resolved)?;
+            lint_project(&resolved, &validation)
+        }
+        LintRequest::Rules => Ok(json!({
+            "schema": "powerbi-cli.lint.rules.v1",
+            "ok": true,
+            "exitCode": EXIT_SUCCESS,
+            "count": rules::all_rules().len(),
+            "families": rules::rule_family_names(),
+            "rules": rules::rule_definitions_json(),
+            "next": ["powerbi-cli lint --explain <rule-id> --json"]
+        })),
+        LintRequest::Explain(id) => {
+            let rule = rules::find_rule(&id).ok_or_else(|| {
+                CliError::invalid_args(format!("unknown lint rule id: {id}"))
+                    .with_hint("Run `powerbi-cli lint --rules --json` to list registered rule ids.")
+                    .with_suggested_command("powerbi-cli lint --rules --json")
+            })?;
+            Ok(json!({
+                "schema": "powerbi-cli.lint.ruleExplanation.v1",
+                "ok": true,
+                "exitCode": EXIT_SUCCESS,
+                "rule": rule.to_json(),
+                "exampleFinding": rule.example_finding(),
+                "next": ["powerbi-cli lint --rules --json"]
+            }))
+        }
+    }
 }
 
 pub(crate) fn lint_project(
@@ -35,6 +64,7 @@ pub(crate) fn lint_project(
     add_dax_findings(resolved, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
     add_desktop_compat_findings(resolved, &mut findings)?;
+    rules::ensure_finding_ids_registered(&findings, "code")?;
 
     let error_count = findings
         .iter()
@@ -68,38 +98,91 @@ pub(crate) fn lint_project(
     }))
 }
 
-fn parse_lint_args(args: &[String]) -> CliResult<PathBuf> {
+#[derive(Debug, PartialEq, Eq)]
+enum LintRequest {
+    Project(PathBuf),
+    Rules,
+    Explain(String),
+}
+
+fn parse_lint_args(args: &[String]) -> CliResult<LintRequest> {
     let mut path = None;
-    for arg in args {
-        match arg.as_str() {
+    let mut request = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--rules" => {
+                if request.is_some() {
+                    return Err(lint_mode_conflict());
+                }
+                request = Some(LintRequest::Rules);
+                index += 1;
+            }
+            "--explain" => {
+                if request.is_some() {
+                    return Err(lint_mode_conflict());
+                }
+                let id = args.get(index + 1).ok_or_else(|| {
+                    CliError::invalid_args("--explain requires a rule id")
+                        .with_hint(
+                            "Run `powerbi-cli lint --rules --json` to list registered rule ids.",
+                        )
+                        .with_suggested_command("powerbi-cli lint --rules --json")
+                })?;
+                if id.starts_with('-') {
+                    return Err(CliError::invalid_args("--explain requires a rule id")
+                        .with_hint(
+                            "Run `powerbi-cli lint --rules --json` to list registered rule ids.",
+                        )
+                        .with_suggested_command("powerbi-cli lint --rules --json"));
+                }
+                request = Some(LintRequest::Explain(id.clone()));
+                index += 2;
+            }
             other if other.starts_with('-') => {
                 return Err(
                     CliError::invalid_args(format!("unknown lint flag: {other}"))
-                        .with_hint("Run `powerbi-cli lint <project-dir-or.pbip> --json`.")
-                        .with_suggested_command("powerbi-cli lint <project-dir-or.pbip> --json"),
+                        .with_hint(
+                            "Run `powerbi-cli --json capabilities --for lint` for exact usage.",
+                        )
+                        .with_suggested_command("powerbi-cli --json capabilities --for lint"),
                 );
             }
             other => {
-                if path.is_some() {
+                if path.is_some() || request.is_some() {
                     return Err(CliError::invalid_args("lint accepts exactly one path")
-                        .with_hint("Run `powerbi-cli lint <project-dir-or.pbip> --json`.")
-                        .with_suggested_command("powerbi-cli lint <project-dir-or.pbip> --json"));
+                        .with_hint(
+                            "Pass one project path, or use one of --rules and --explain <rule-id>.",
+                        )
+                        .with_suggested_command("powerbi-cli --json capabilities --for lint"));
                 }
                 path = Some(PathBuf::from(other));
+                index += 1;
             }
         }
     }
-    path.ok_or_else(|| {
-        CliError::invalid_args("lint requires a path")
-            .with_hint("Run `powerbi-cli lint <project-dir-or.pbip> --json`.")
-            .with_suggested_command("powerbi-cli lint <project-dir-or.pbip> --json")
-    })
+    match (path, request) {
+        (Some(path), None) => Ok(LintRequest::Project(path)),
+        (None, Some(request)) => Ok(request),
+        (Some(_), Some(_)) => Err(lint_mode_conflict()),
+        (None, None) => Err(CliError::invalid_args(
+            "lint requires a path, --rules, or --explain <rule-id>",
+        )
+        .with_hint("Run `powerbi-cli --json capabilities --for lint` for exact usage.")
+        .with_suggested_command("powerbi-cli --json capabilities --for lint")),
+    }
+}
+
+fn lint_mode_conflict() -> CliError {
+    CliError::invalid_args("lint accepts one mode: a project path, --rules, or --explain <rule-id>")
+        .with_hint("Choose exactly one lint operation.")
+        .with_suggested_command("powerbi-cli --json capabilities --for lint")
 }
 
 fn add_validation_findings(validation: &ValidationReport, findings: &mut Vec<Value>) {
     for message in &validation.errors {
         findings.push(finding(
-            "validation.structure",
+            rules::VALIDATION_STRUCTURE,
             "error",
             message,
             None,
@@ -108,7 +191,7 @@ fn add_validation_findings(validation: &ValidationReport, findings: &mut Vec<Val
     }
     for message in &validation.warnings {
         findings.push(finding(
-            "validation.warning",
+            rules::VALIDATION_WARNING,
             "warning",
             message,
             None,
@@ -130,7 +213,7 @@ fn add_pbir_metadata_findings(
     if version != DESKTOP_ROUND_TRIP_REPORT_VERSION {
         let path = canonical_display(&version_path);
         findings.push(finding(
-            "pbir.report_definition_version",
+            rules::PBIR_REPORT_DEFINITION_VERSION,
             "error",
             &format!(
                 "PBIR report definition version {version:?} is not Desktop round-trip proven; expected {DESKTOP_ROUND_TRIP_REPORT_VERSION}"
@@ -163,7 +246,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                     > 1
             {
                 findings.push(finding(
-                    "bpa.report.duplicate_page_title",
+                    rules::BPA_REPORT_DUPLICATE_PAGE_TITLE,
                     "warning",
                     &format!("multiple pages share display name: {page_name}"),
                     page_handle,
@@ -182,7 +265,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
             }
             if visuals.is_empty() {
                 findings.push(finding(
-                    "report.page_empty",
+                    rules::REPORT_PAGE_EMPTY,
                     "warning",
                     &format!("page has no visuals: {page_name}"),
                     page_handle,
@@ -194,7 +277,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                 let title = visual["title"].as_str().unwrap_or_default();
                 if title.trim().is_empty() {
                     findings.push(finding(
-                        "report.visual_missing_title",
+                        rules::REPORT_VISUAL_MISSING_TITLE,
                         "warning",
                         "visual is missing a title",
                         visual_handle,
@@ -207,7 +290,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                     > 1
                 {
                     findings.push(finding(
-                        "bpa.report.duplicate_visual_title",
+                        rules::BPA_REPORT_DUPLICATE_VISUAL_TITLE,
                         "warning",
                         &format!("multiple visuals on page `{page_name}` share title: {title}"),
                         visual_handle,
@@ -216,7 +299,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                 }
                 if visual["bindings"].as_array().is_some_and(Vec::is_empty) {
                     findings.push(finding(
-                        "report.visual_unbound",
+                        rules::REPORT_VISUAL_UNBOUND,
                         "info",
                         &format!("visual has no field bindings: {title}"),
                         visual_handle,
@@ -228,7 +311,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                     // known general.altText placements. Absence is valid PBIR.
                     VisualAltTextStatus::Missing => {}
                     VisualAltTextStatus::VisualObjects => findings.push(finding(
-                        "pbir.visual_alt_text_legacy_location",
+                        rules::PBIR_VISUAL_ALT_TEXT_LEGACY_LOCATION,
                         "warning",
                         &format!(
                             "visual contains validator-rejected alt text under visual.objects.general: {title}; remove it with report visuals formatting set-text --clear-alt-text"
@@ -238,7 +321,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                     )),
                     VisualAltTextStatus::VisualContainerObjects | VisualAltTextStatus::Both => {
                         findings.push(finding(
-                            "pbir.visual_alt_text_unsupported_location",
+                            rules::PBIR_VISUAL_ALT_TEXT_UNSUPPORTED_LOCATION,
                             "warning",
                             &format!(
                                 "visual contains validator-rejected alt text under visual.visualContainerObjects.general: {title}; remove it with report visuals formatting set-text --clear-alt-text"
@@ -250,7 +333,7 @@ fn add_report_findings(deep: &Value, findings: &mut Vec<Value>) {
                 }
                 if visual_outside_page(&visual, page_width, page_height) {
                     findings.push(finding(
-                        "report.visual_outside_page",
+                        rules::REPORT_VISUAL_OUTSIDE_PAGE,
                         "warning",
                         &format!("visual is outside page bounds: {title}"),
                         visual_handle,
@@ -270,7 +353,7 @@ fn add_model_findings(deep: &Value, findings: &mut Vec<Value>) {
             let path = table["path"].as_str();
             if table["columns"].as_array().is_some_and(Vec::is_empty) {
                 findings.push(finding(
-                    "model.table_without_columns",
+                    rules::MODEL_TABLE_WITHOUT_COLUMNS,
                     "error",
                     &format!("table has no columns: {table_name}"),
                     table_handle,
@@ -279,7 +362,7 @@ fn add_model_findings(deep: &Value, findings: &mut Vec<Value>) {
             }
             if table["partitions"].as_array().is_some_and(Vec::is_empty) {
                 findings.push(finding(
-                    "model.table_without_partition",
+                    rules::MODEL_TABLE_WITHOUT_PARTITION,
                     "warning",
                     &format!("table has no partition: {table_name}"),
                     table_handle,
@@ -441,7 +524,7 @@ fn relationship_comment_findings(text: &str, path: &str) -> Vec<Value> {
         };
         if previous.trim_start().starts_with("//") {
             findings.push(finding(
-                "model.relationship_comment_unsupported",
+                rules::MODEL_RELATIONSHIP_COMMENT_UNSUPPORTED,
                 "error",
                 &format!(
                     "comment above relationship '{name}': relationships have no description in TOM, so Power BI Desktop 2.156 refuses to open the project (\"Property 'description' is unknown and is not expected in the situation it appears\"); delete the comment lines and keep the prose in the commit message"
@@ -461,7 +544,7 @@ fn platform_metadata_findings(value: &Value, path: &str) -> Vec<Value> {
         for key in metadata.keys() {
             if !KNOWN_METADATA_PROPERTIES.contains(&key.as_str()) {
                 findings.push(finding(
-                    "platform.unknown_metadata_property",
+                    rules::PLATFORM_UNKNOWN_METADATA_PROPERTY,
                     "warning",
                     &format!(
                         "unknown .platform metadata property '{key}': the Fabric platformProperties 2.0.0 schema defines only type and displayName, and unknown properties risk Desktop-version rejection"
