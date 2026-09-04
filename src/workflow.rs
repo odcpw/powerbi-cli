@@ -40,7 +40,7 @@ use plan::workflow_plan;
 use run::workflow_run;
 pub(crate) use shared::{
     ExportShapeProof, PreparedStagedModel, SourceTreeEvidence, SourceTreeSnapshot,
-    validate_tmdl_definition,
+    validate_generic_m_template, validate_tmdl_definition,
 };
 pub(crate) use synthesize::workflow_synthesize_command;
 use verify::workflow_verify;
@@ -602,6 +602,35 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn generic_m_template_reuses_closed_roots_placeholders_and_dynamic_call_guards() {
+        for source in [
+            "let Source = Sql.Database(\"{{powerbi-cli.placeholder:server}}\", \"{{powerbi-cli.placeholder:database}}\") in Source",
+            "let Source = Excel.Workbook(File.Contents(\"{{powerbi-cli.resourcePath:workbook}}\"), null, true) in Source",
+            "let Source = Csv.Document(File.Contents(\"{{powerbi-cli.resourcePath:file}}\"), [Delimiter=\",\", Encoding=65001]) in Source",
+            "let Source = Folder.Files(\"{{powerbi-cli.placeholder:folder}}\") in Source",
+            "let Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/Finance\", [ApiVersion=15]) in Source",
+        ] {
+            validate_generic_m_template(source).expect("allowlisted generic M root");
+        }
+        for source in [
+            "let Source = Web.Contents(\"https://evil.invalid\") in Source",
+            "let Source = Sql.Database(\"server\", \"db\"), Leak = ([Run = Sql.Database][Run])(\"other\", \"db\") in Source",
+            "let Source = Sql.Database(\"Password=secret\", \"db\") in Source",
+            "let Source = Excel.Workbook(File.Contents(\"C:\\\\private\\\\book.xlsx\"), null, true) in Source",
+        ] {
+            let error = validate_generic_m_template(source).expect_err("unsafe generic M");
+            assert_eq!(error.code, "invalid_args");
+            assert!(
+                error
+                    .pointer()
+                    .is_some_and(|pointer| pointer.starts_with("/mTemplate/"))
+            );
+            assert!(error.hint.is_some());
+            assert!(!error.suggested_commands.is_empty());
+        }
     }
 
     #[test]

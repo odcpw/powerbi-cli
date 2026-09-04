@@ -78,7 +78,9 @@ Required contract rules:
   manifest before building a report.
 - `profile infer|validate|summarize`: derive or check schema/profile metadata
   from schema manifests and embedded dummy/profile rows without connecting to
-  live sources.
+  live sources. `profile infer --rows <rows.csv|rows.json>` now emits profile
+  v2 statistics under bounded input-safety limits; top literals stay redacted
+  unless explicitly opted in with `--include-data-values`.
 - `inspect <project|pbip>`: summarize PBIP, report, semantic model, pages,
   visuals, tables, columns, measures, relationships, and offline hazards.
 - `validate <project|pbip>`: parse required files, validate known schemas, check
@@ -101,8 +103,10 @@ Required contract rules:
 
 ### Semantic Model
 
-- `model tables list/show/add/update/delete`
-- `model columns list/show/add/update/delete`
+- `model tables list/show/add/rename/delete` (shipped guarded TMDL CRUD;
+  rename can rewrite references explicitly)
+- `model columns list/show/add/update/delete` (shipped guarded base and
+  calculated-column CRUD with unknown-metadata refusal)
 - `model measures list/show/add/update/delete`
 - `model dax dependencies|lint`
 - `model relationships list/show/add/update/delete`
@@ -122,10 +126,13 @@ object-specific writers and fixtures exist.
 
 ### Report Authoring
 
-- `report spec validate`: check a declarative dashboard spec against the schema
-  and visual catalog before writing files. The spec key walker is strict at
-  every supported node and reports `spec.unknown_field` with an RFC 6901
-  pointer; `report spec fields` publishes the same versioned allowed-key
+- `report spec validate|normalize`: check or canonicalize a declarative
+  dashboard spec against the schema before writing files. Both commands resolve
+  bounded relative `$include` fragments and expose deterministic
+  `normalizedFrom[]` provenance. The spec key walker is strict at every
+  supported node and reports `spec.unknown_field` with an RFC 6901 pointer;
+  validation also checks the visual catalog before writing files. `report spec
+  fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
   its not-yet-compiled sections return `unsupported_feature` with their owning
   T3 bead id.
@@ -185,6 +192,8 @@ visual binding is too strict to invent by memory.
 - `handoff check`: verify a project is safe to take home.
 - `handoff rebind-plan`: produce work-machine instructions mapping dummy
   partitions to real source templates without storing credentials.
+- `handoff rebind-check`: verify every rebound partition offline (connector
+  syntax and local path readability only) before the separate Desktop refresh.
 
 ### Proof
 
@@ -193,6 +202,11 @@ visual binding is too strict to invent by memory.
   save the project without corrupting it.
 - `desktop export-snapshot <project|pbip> --out-dir <dir>`: capture a
   Desktop-saved version for golden comparison.
+- `desktop harvest-reference --project <saved.pbip> --visual <handle> --out
+  docs/reference/desktop-authored-visuals/<name>.json`: archive one safe
+  Desktop-saved visual, page, or report fragment with source fingerprint and
+  provenance. Linux runs remain `desktop-golden-pending`; persisted selection
+  and filter values are refused by the shared input-safety guard.
 
 These commands should be optional. CI should run them only on Windows machines
 that explicitly opt in with Power BI Desktop installed.
@@ -395,8 +409,11 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
-  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
+- Source-template support covers SQL Server, PostgreSQL, ODBC, Excel, CSV,
+  folder, SharePoint/OneDrive, and generic M expressions. Generic M uses the
+  workflow/source-profile closed connector grammar with complete placeholder
+  tokens and refuses credentials, hard-coded paths, unknown functions, and
+  computed/postfix calls with an M-text pointer.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
@@ -418,6 +435,12 @@ frozen until proven.
   Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
+- Implemented offline `handoff rebind-check`: it reports deterministic,
+  per-partition materialization state and registered findings for placeholders,
+  incomplete connector syntax, unknown sources, and missing/unreadable local
+  paths. It runs strict native validation and deliberately never opens a source
+  or Desktop connection; `refresh.status` remains `not-run` until the returned
+  Desktop handoff command is performed on the work machine.
 - Implemented first theme slice: `report themes show/extract/apply` creates and
   applies raw report-level theme bundles from `themeCollection` and already
   present registered theme JSON resources. Per-visual raw formatting bundle
@@ -506,8 +529,15 @@ frozen until proven.
 ### Phase 8: Agent Batch Operations
 
 - Add `diff` and `apply --ops` once individual commands are stable.
+- The internal `powerbi-cli.ops.v1` spine now provides typed operation JSON,
+  pointer-rich plan validation, deterministic handles, and a temporary-tree
+  transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
+  public `apply --ops` command only after the individual kernels are converted.
 - Make operation JSON durable enough for another agent to inspect and replay.
-- Include generated proof commands in mutation outputs.
+- Include generated proof commands in mutation outputs. `report build` now
+  compiles v2 `proof` requirements into a deterministic `proofPlan` and
+  `next[]`; Desktop-dependent steps remain explicitly unavailable off Windows
+  until the T9 refresh/canvas oracle lands.
 
 ### Phase 9: Optional Bridges
 
@@ -562,74 +592,27 @@ When Desktop rejects a generated file:
 
 ## Near-Term Backlog
 
-The immediate work is no longer "can we generate something?" The generic
-archetypes (`flat-ops`, `scatter-bubble`, `catalog-proof`) open, refresh, and
-render in Desktop under manual oracle inspection. The next work is turning
-that manual proof into repeatable guardrails and then expanding feature
-coverage only from Desktop-authored or Desktop-proved fixtures.
+The dated [bridge plan](bridge-plan-2026-09.md) is now the authoritative
+ordering for the remaining compiler, design-system, planner, fixture, and
+Desktop-oracle work. The old numbered list is retained in that plan with bead
+IDs and dependencies; this roadmap records what has already landed:
 
-1. **Upgrade `desktop open-check` into canvas proof.**
-   Current `desktop open-check` is mostly launch/title proof. It should detect
-   issue modals, blank canvases, page tabs, data pane tables, expected visual
-   count, and optionally capture screenshots. It should fail if Desktop opens a
-   title but the report canvas is empty.
-2. **Add `desktop refresh-check`.**
-   Open a PBIP, click/trigger refresh, wait for dummy partitions to load, and
-   verify seeded visuals no longer show only `(Blank)` when dummy rows exist.
-3. **Extend Desktop proof metadata.**
-   `desktop open-check` now reports detected Power BI Desktop file version when
-   available and distinguishes `desktop-launch` from future
-   `desktop-canvas-refresh` compatibility proof. Canvas automation still needs
-   report name, page count, screenshot paths when captured, refresh result, and
-   any modal text.
-4. **Commit Desktop golden fixtures.**
-   `testdata/golden/sales-desktop-filter-contract.summary.json` now freezes a
-   sales sample plus Desktop-proven report/page categorical filters, and
-   `testdata/golden/archetypes/regional-sales.summary.json` freezes a
-   drillthrough chain, TopN-by-measure filters, multi-page slicers, and
-   non-ASCII column/measure round trip.
-   `testdata/golden/archetypes/flat-ops.summary.json` and
-   `testdata/golden/archetypes/scatter-bubble.summary.json` freeze generated
-   non-domain archetypes, with manual Desktop proof records under
-   `testdata/desktop-proof/`. Next add a `testdata/desktop-golden/` corpus with
-   Desktop-authored normalized summaries for card, tableEx, line chart,
-   clustered bar/column, slicer, page filter, report filter, theme, and
-   conditional-formatting examples. Include the Desktop version used to create
-   each fixture.
-5. **Decide Microsoft validator integration.**
-   Choose one of: vendor Microsoft JSON schemas, optional shell-out to
-   `@microsoft/powerbi-report-authoring-cli`, or a separate
-   `validate --microsoft` proof. Keep local rules for Desktop-only constraints
-   the Microsoft validator misses, such as 1-50 char filter names.
-6. **Add structured PBIR diagnostic codes.**
-   Validation errors should carry codes and JSON-pointer-ish paths, not only
-   strings. Agents need stable repair targets.
-7. **Expand filter authoring from fixtures.**
-   Add `report filters update`, advanced filters, range filters, TopN,
-   relative date/time, include/exclude, pane visibility, and sort/order
-   metadata. Every new filter type needs a Desktop-authored fixture first.
-8. **Harden the visual catalog with Desktop-authored role maps.**
-   Current generated patterns render for the proof report. Next, build a
-   fixture-backed catalog for card, table, matrix, line, bar, column, combo,
-   slicer, text box, KPI, gauge, map, and decomposition tree where feasible.
-   Validate required roles, measure-only roles, max/min projections, and
-   unsupported combinations.
-9. **Harden style bundles.**
-   `report style inspect/extract/diff/apply` now combines theme material and
-   per-visual formatting and applies it without copying bindings/data roles.
-   Next, add fixture-backed page background, filter pane/card styling,
-   title/data-label/legend/axis typed defaults, style lint, and conditional
-   formatting once fixtures exist.
-10. **Version and compose schema manifests.**
-    Add required `schemaVersion`, `$include` or directory-based manifests,
-    `schema validate`, and `schema normalize`. Large real-world schema
-    manifests will eventually be too big for a single JSON file, and agents
-    will want composition.
-11. **Broaden semantic model authoring.**
-    Add tables/columns CRUD beyond scaffold, calculated tables, named
-    expressions, date-table helpers, roles/RLS, perspectives, translations,
-    calculation groups/items, and broader DAX format/lint. Bounded Desktop DAX
-    execution is delivered; authenticated Fabric/XMLA execution remains optional.
-12. **Add durable batch operations.**
-    Add `apply --ops`, `plan validate`, `plan replay`, and `plan diff` so one
-    agent can produce a mutation plan and another can inspect or replay it.
+- [x] Schema/profile validation, normalization, deterministic report planning,
+  report-spec v1/v2 validation/normalize/upgrade, and guarded report build.
+- [x] Offline-safe package inspect/extract/import/source-pack/work-pack and
+  Desktop export-plan handoff.
+- [x] Semantic-model table/column/measure/calculated-column/relationship
+  authoring, static-table controls, partition inspection, grouped-rank
+  generation, and advanced metadata readback.
+- [x] PBIR page/visual/filter/slicer/interaction/bookmark metadata surfaces,
+  theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
+  harvester, with each feature's proof level published by `features list`.
+- [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
+  execution, and read-only live TMDL export remain explicit opt-in Windows
+  tracks; no command claims automated canvas/refresh proof.
+
+Remaining work—such as `report compose`, full v2 compilation, design lint,
+broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
+is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
+associated beads. Keep command and feature claims synchronized with the live
+`capabilities --json` and `features list --json` catalogs.

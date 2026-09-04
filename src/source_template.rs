@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
 };
+use crate::input_safety::{InputKind, read_utf8, read_utf8_stream};
 use crate::project_io::write_text_atomic_validated;
 use crate::source_template_paths::{
     add_connector_column_types, is_placeholder, parse_bool_flag, parse_csv_encoding,
@@ -9,9 +10,10 @@ use crate::source_template_paths::{
 };
 use crate::source_templates::{
     CsvSourceTemplateInput, ExcelSourceTemplateInput, FolderSourceTemplateInput,
-    OdbcSourceTemplateInput, PostgresSourceTemplateInput, SharePointSourceTemplateInput,
-    SourceTemplateRecord, SqlSourceTemplateInput, csv_source_template, excel_source_template,
-    find_template, folder_source_template, load_source_template_store, odbc_source_template,
+    GenericMSourceTemplateInput, OdbcSourceTemplateInput, PostgresSourceTemplateInput,
+    SharePointSourceTemplateInput, SourceTemplateRecord, SqlSourceTemplateInput,
+    csv_source_template, excel_source_template, find_template, folder_source_template,
+    generic_m_source_template, load_source_template_store, odbc_source_template,
     postgres_source_template, save_source_template_store, sharepoint_source_template,
     source_template_findings, source_template_json, source_templates_path, sql_source_template,
     template_has_errors, upsert_template,
@@ -26,6 +28,7 @@ use crate::{
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+use std::io;
 use std::path::PathBuf;
 
 pub(crate) fn source_template_command(args: &[String]) -> CliResult<Value> {
@@ -89,6 +92,8 @@ struct AddOptions {
     pattern: Option<String>,
     site_url: Option<String>,
     library: Option<String>,
+    m_template: Option<String>,
+    m_file: Option<String>,
     description: Option<String>,
     mode: Option<MutationMode>,
     out_dir: Option<PathBuf>,
@@ -114,6 +119,8 @@ struct ApplyOptions {
     pattern: Option<String>,
     site_url: Option<String>,
     library: Option<String>,
+    m_template: Option<String>,
+    m_file: Option<String>,
     replace_existing: bool,
     confirm: Option<String>,
     mode: Option<MutationMode>,
@@ -207,6 +214,14 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
     if kind == "odbc" {
         validate_bare_odbc_dsn(options.dsn.as_deref().unwrap_or("<dsn>"))?;
     }
+    let generic_m_template = if kind == "generic-m" {
+        let m_template =
+            read_generic_m_input(options.m_template.as_deref(), options.m_file.as_deref())?;
+        crate::workflow::validate_generic_m_template(&m_template)?;
+        Some(m_template)
+    } else {
+        None
+    };
 
     let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
 
@@ -385,6 +400,14 @@ fn add_source_template(args: &[String]) -> CliResult<Value> {
                 description: options.description.clone(),
             })
         }
+        "generic-m" => generic_m_source_template(GenericMSourceTemplateInput {
+            table: partition.table.clone(),
+            partition: partition.name.clone(),
+            name: options.template_name.clone(),
+            m_template: generic_m_template
+                .expect("generic M input was validated before target resolution"),
+            description: options.description.clone(),
+        }),
         _ => return Err(unsupported_kind_error(&kind)),
     };
     if template_has_errors(&record) {
@@ -611,7 +634,8 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
     let requires_desktop_authentication = matches!(
         record.kind.as_str(),
         "sql" | "postgres" | "odbc" | "sharepoint"
-    );
+    ) || (record.kind == "generic-m"
+        && generic_m_requires_desktop_authentication(&m_source));
     let instructions = match record.kind.as_str() {
         "excel" => vec![
             "Ensure the configured Excel workbook exists at the materialized path.",
@@ -627,6 +651,11 @@ fn apply_source_template(args: &[String]) -> CliResult<Value> {
             "Ensure the configured folder exists and contains files matching the stored pattern.",
             "Open the PBIP in Power BI Desktop and refresh the semantic model.",
             "If the project moves, reapply the folder source template with the new absolute path.",
+        ],
+        "generic-m" => vec![
+            "Review the validated generic M expression and ensure each placeholder resolves on the work machine.",
+            "Open the PBIP in Power BI Desktop and refresh the semantic model.",
+            "Enter any required connector credentials only in Power BI Desktop; they are never stored by powerbi-cli.",
         ],
         _ => vec![
             "Open the PBIP in Power BI Desktop on the work machine.",
@@ -805,6 +834,12 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                 options.site_url = Some(take_value(args, &mut i, "--site-url")?)
             }
             "--library" => options.library = Some(take_value(args, &mut i, "--library")?),
+            "--m-template" | "--m" | "--template" | "--m-expression" => {
+                options.m_template = Some(take_value(args, &mut i, "--m-template")?)
+            }
+            "--m-file" | "--template-file" => {
+                options.m_file = Some(take_value(args, &mut i, "--m-file")?)
+            }
             "--description" => {
                 options.description = Some(take_value(args, &mut i, "--description")?)
             }
@@ -863,7 +898,7 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
     }
     if options.kind.is_none() {
         return Err(CliError::invalid_args("source-template add requires --kind")
-            .with_hint("Supported kinds are `sql`, `postgres`, `odbc`, `excel`, `csv`, `folder`, and `sharepoint`.")
+            .with_hint("Supported kinds are `sql`, `postgres`, `odbc`, `excel`, `csv`, `folder`, `sharepoint`, and `generic-m`.")
             .with_suggested_command(
                 "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             ));
@@ -904,6 +939,12 @@ fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
                 options.site_url = Some(take_value(args, &mut i, "--site-url")?)
             }
             "--library" => options.library = Some(take_value(args, &mut i, "--library")?),
+            "--m-template" | "--m" | "--template" | "--m-expression" => {
+                options.m_template = Some(take_value(args, &mut i, "--m-template")?)
+            }
+            "--m-file" | "--template-file" => {
+                options.m_file = Some(take_value(args, &mut i, "--m-file")?)
+            }
             "--replace-existing" => {
                 options.replace_existing = true;
                 i += 1;
@@ -1165,6 +1206,15 @@ fn materialize_template(
             })
             .m_template
         }
+        "generic-m" => {
+            let source = if options.m_template.is_some() || options.m_file.is_some() {
+                read_generic_m_input(options.m_template.as_deref(), options.m_file.as_deref())?
+            } else {
+                record.m_template.clone()
+            };
+            crate::workflow::validate_generic_m_template(&source)?;
+            source
+        }
         _ => return Err(unsupported_kind_error(&kind)),
     };
     Ok((source, parameters))
@@ -1232,6 +1282,8 @@ fn validate_add_kind_flags(options: &AddOptions, kind: &str) -> CliResult<()> {
             (options.pattern.is_some(), "--pattern", &["folder"]),
             (options.site_url.is_some(), "--site-url", &["sharepoint"]),
             (options.library.is_some(), "--library", &["sharepoint"]),
+            (options.m_template.is_some(), "--m-template", &["generic-m"]),
+            (options.m_file.is_some(), "--m-file", &["generic-m"]),
         ],
     )
 }
@@ -1271,6 +1323,8 @@ fn validate_apply_kind_flags(options: &ApplyOptions, kind: &str) -> CliResult<()
             (options.pattern.is_some(), "--pattern", &["folder"]),
             (options.site_url.is_some(), "--site-url", &["sharepoint"]),
             (options.library.is_some(), "--library", &["sharepoint"]),
+            (options.m_template.is_some(), "--m-template", &["generic-m"]),
+            (options.m_file.is_some(), "--m-file", &["generic-m"]),
         ],
     )
 }
@@ -1473,13 +1527,13 @@ fn reject_flag_for_kind(
 
 fn unsupported_kind_error(kind: &str) -> CliError {
     CliError::invalid_args(format!(
-        "source-template add supports kinds sql, postgres, odbc, excel, csv, folder, and sharepoint; got {kind}"
+        "source-template add supports kinds sql, postgres, odbc, excel, csv, folder, sharepoint, and generic-m; got {kind}"
     ))
     .with_hint(
-        "Use `--kind sql`, `--kind postgres`, `--kind odbc`, `--kind excel`, `--kind csv`, `--kind folder`, or `--kind sharepoint`.",
+        "Use `--kind sql`, `--kind postgres`, `--kind odbc`, `--kind excel`, `--kind csv`, `--kind folder`, `--kind sharepoint`, or `--kind generic-m`.",
     )
     .with_suggested_command(
-        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint> --dry-run --json",
+        "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m> --dry-run --json",
     )
 }
 
@@ -1510,9 +1564,48 @@ fn normalize_kind_arg(value: &str) -> String {
         "postgres" | "postgresql" => "postgres".to_string(),
         "excel" | "xlsx" | "xls" => "excel".to_string(),
         "share-point" | "sharepoint-files" | "onedrive" | "one-drive" => "sharepoint".to_string(),
-        "generic-m" | "genericm" | "m" => "generic-m".to_string(),
+        "generic-m" | "genericm" | "m-template" | "mtemplate" | "m" => "generic-m".to_string(),
         other => other.to_string(),
     }
+}
+
+fn read_generic_m_input(inline: Option<&str>, file: Option<&str>) -> CliResult<String> {
+    if inline.is_some() && file.is_some() {
+        return Err(CliError::invalid_args(
+            "generic M source templates accept either --m-template or --m-file, not both",
+        )
+        .with_hint("Pass one complete M expression inline or in a bounded UTF-8 file.")
+        .with_suggested_command(
+            "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind generic-m --m-template <M-expression> --dry-run --json",
+        ));
+    }
+    let text = if let Some(inline) = inline {
+        crate::input_safety::validate_text(inline, InputKind::SourceText)?;
+        inline.to_string()
+    } else if let Some(file) = file {
+        if file == "-" {
+            let mut stdin = io::stdin();
+            read_utf8_stream(
+                &mut stdin,
+                InputKind::SourceText,
+                "generic M template from stdin",
+            )?
+        } else {
+            read_utf8(PathBuf::from(file).as_path(), InputKind::SourceText)?
+        }
+    } else {
+        return Err(CliError::invalid_args(
+            "generic-m source templates require --m-template or --m-file",
+        )
+        .with_hint("Provide one complete M expression and keep source paths as placeholder tokens.")
+        .with_suggested_command(
+            "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind generic-m --m-template <M-expression> --dry-run --json",
+        ));
+    };
+    Ok(text
+        .trim_start_matches('\u{feff}')
+        .trim_end_matches(['\r', '\n'])
+        .to_string())
 }
 
 fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<String> {
@@ -1529,4 +1622,11 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<Strin
 
 fn shell_arg(value: &str) -> String {
     crate::cli_support::shell_arg(value)
+}
+
+fn generic_m_requires_desktop_authentication(source: &str) -> bool {
+    let normalized = source.to_ascii_lowercase();
+    !normalized.contains("excel.workbook")
+        && !normalized.contains("csv.document")
+        && !normalized.contains("folder.files")
 }

@@ -81,6 +81,36 @@ pub(super) fn commands() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "changes", "oracle.available", "oracle.desktopVersion", "proof.level", "proof.observedStage", "proof.status", "proof.claimedCompatibility", "proof.signals.windowObserved", "proof.signals.titleMatched", "proof.signals.observedWindowTitle", "proof.signals.windowSelectionReason", "proof.signals.observation", "proof.signals.observation.exactTitleCandidateCount", "proof.signals.screenshotCaptured", "proof.signals.screenshotPath", "proof.signals.screenshotActivationSucceeded", "proof.signals.screenshotForegroundVerified", "proof.signals.screenshotForegroundProcessId", "proof.signals.cleanup", "proof.signals.cleanup.targeted", "screenshot.path", "screenshot.captured", "screenshot.activationSucceeded", "screenshot.foregroundVerified", "screenshot.foregroundProcessId", "screenshot.allowUnverifiedCapture", "screenshot.purpose", "screenshot.automatedCompatibilityProof", "diagnostics", "next"]
         }),
         json!({
+            "path": "desktop refresh-check",
+            "usage": "powerbi-cli desktop refresh-check <project-dir-or.pbip-or.pbix> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json",
+            "summary": "Planned Windows Desktop refresh proof that will verify dummy-partition refresh and issue-dialog absence",
+            "tags": ["desktop", "oracle", "proof", "refresh", "windows", "planned", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "planned",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.desktop.refreshCheck.v1",
+            "platforms": ["windows when T9.1 is available", "linux unsupported_feature", "macos unsupported_feature"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--enable-oracle", "--json", "--format json"],
+            "limitations": ["T9.1 is not implemented in this release; the command is advertised so proof plans remain forward-compatible and returns unsupported_feature until the Windows oracle implementation lands."],
+            "followUpFields": ["ok", "exitCode", "project", "refresh.completed", "refresh.errors", "proof", "diagnostics", "next"]
+        }),
+        json!({
+            "path": "desktop canvas-check",
+            "usage": "powerbi-cli desktop canvas-check <project-dir-or.pbip-or.pbix> --page <page> --expect <values.json> [--timeout-ms <ms>] [--desktop-path <PBIDesktop.exe>] [--enable-oracle] --json",
+            "summary": "Planned Windows Desktop canvas proof that will assert expected values and reject a blank rendered page",
+            "tags": ["desktop", "oracle", "proof", "canvas", "refresh", "windows", "planned", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "stability": "planned",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.desktop.canvasCheck.v1",
+            "platforms": ["windows when T9.2 is available", "linux unsupported_feature", "macos unsupported_feature"],
+            "flags": ["<project-dir-or.pbip-or.pbix>", "--project <project-dir-or.pbip-or.pbix>", "--page <page>", "--expect <values.json>", "--timeout-ms <ms>", "--desktop-path <PBIDesktop.exe>", "--enable-oracle", "--json", "--format json"],
+            "limitations": ["T9.2 is not implemented in this release; the command is advertised so proof plans remain forward-compatible and returns unsupported_feature until the Windows oracle implementation lands."],
+            "followUpFields": ["ok", "exitCode", "project", "page", "expectations", "canvas.rendered", "canvas.blankRejected", "proof", "diagnostics", "next"]
+        }),
+        json!({
             "path": "desktop bridge status",
             "usage": "powerbi-cli desktop bridge status [--pid <pid>] --json",
             "summary": "Inspect pinned Microsoft Desktop Bridge instances and their exact current-file, dirty-state, and PBIR page inventory",
@@ -158,6 +188,28 @@ pub(super) fn commands() -> Vec<Value> {
             "examples": ["powerbi-cli desktop bridge screenshot-all --project build/sales --pid 1234 --out-dir proof/pages --json"],
             "limitations": ["Capture inventory must equal the bounded status inventory. Dirty-instance captures are diagnostic and cannot represent on-disk workflow output. Screenshots do not prove refresh, save/reopen, interactions, drill behavior, issue-dialog absence, or semantic correctness."],
             "followUpFields": ["ok", "exitCode", "project", "pid", "hasUnsavedChanges", "pageInventory", "screenshots[].pageId", "screenshots[].file.path", "screenshots[].file.width", "screenshots[].file.height", "screenshots[].file.sha256", "outputDirectory", "ownership", "desktop.desktopVersion", "backend", "proof", "next"]
+        }),
+        json!({
+            "path": "desktop harvest-reference",
+            "usage": "powerbi-cli desktop harvest-reference --project <saved.pbip> --visual <visual:<page>:<name>|page:<name>|report:main> --out docs/reference/desktop-authored-visuals/<name>.json [--desktop-version <version>] [--license-note <text>] [--dry-run] --json",
+            "summary": "Archive one Desktop-saved visual, page, or report fragment with source fingerprint, date, license note, and honest pending proof",
+            "tags": ["desktop", "oracle", "fixture", "reference", "provenance", "offline", "agent"],
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesReferenceArtifact": true,
+            "networkRequired": false,
+            "stability": "alpha-output",
+            "proofLevel": "desktop-golden-pending",
+            "observedStage": "reference-archived",
+            "outputSchema": "powerbi-cli.desktop.harvestReference.v1",
+            "platforms": ["linux already-saved PBIP", "macos already-saved PBIP", "windows already-saved PBIP; Desktop execution evidence is optional and never inferred"],
+            "inputSafety": "The selected visual.json, page.json, or report.json is read through input_safety::read_harvested_fragment. Persisted selection/filter values, symlinks, invalid UTF-8, oversized files, and malformed JSON are refused; no rejected value is silently stripped.",
+            "proofContract": "Linux and non-oracle runs record desktopVersion=unknown and proofLevel=desktop-golden-pending. A harvested reference is never promoted to a Desktop canvas/refresh proof without explicit evidence.",
+            "flags": ["--project <saved.pbip>", "--visual <visual:<page>:<name>|page:<name>|report:main>", "--out <reference.json>", "--desktop-version <version>", "--license-note <text>", "--dry-run", "--json", "--format json"],
+            "examples": ["powerbi-cli desktop harvest-reference --project build/sales --visual visual:ReportSectionOverview:VisualContainer1 --out docs/reference/desktop-authored-visuals/sales-card.json --json", "powerbi-cli desktop harvest-reference --project build/sales.pbip --visual page:ReportSectionOverview --out docs/reference/desktop-authored-visuals/overview-page.json --dry-run --json"],
+            "limitations": ["The archive wraps the source fragment under fragment and keeps provenance separate from PBIR fields.", "Already-saved Linux projects have no Desktop version or canvas evidence unless supplied explicitly; the output remains desktop-golden-pending.", "Persisted slicer/filter values are refused rather than silently removed; use a clean saved fragment or clear state in Desktop before retrying."],
+            "followUpFields": ["ok", "exitCode", "action", "dryRun", "projectDir", "pbip", "reportDir", "out", "source.kind", "source.handle", "source.path", "source.sha256", "source.sourceFingerprint", "destination.path", "destination.name", "destination.created", "provenance.sourcePath", "provenance.sourceProject", "provenance.desktopVersion", "provenance.date", "provenance.sourceFingerprint", "provenance.fragmentSha256", "provenance.licenseNote", "proofLevel", "proof.schema", "proof.fixture", "proof.signals.featureIds", "proof.signals.desktopReferencePresent", "proof.signals.schemaGolden", "safety.persistedDataValues", "safety.silentStripping", "changes", "next", "notes", "warnings", "errors"]
         }),
     ]
 }

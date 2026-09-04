@@ -125,6 +125,72 @@ pbi --json capabilities --for semantic-model
 pbi --json capabilities --for add-static
 pbi --json capabilities --for report
 pbi --json capabilities --for handoff
+
+# Generated catalog paths not covered by the focused queries above.
+pbi guid --json
+pbi package export-plan --project build/sales --json
+pbi robot-docs guide
+pbi --robot-triage
+pbi robot-triage
+pbi integrations status --json
+pbi integrations install --allow-network --json
+pbi skill status --json
+pbi skill install --json
+pbi desktop bridge status --json
+pbi desktop bridge reload --project build/sales --pid 1234 --json
+pbi desktop bridge screenshot-page --project build/sales --pid 1234 --page ReportSection --out proof/page.png --json
+pbi desktop bridge screenshot-all --project build/sales --pid 1234 --out-dir proof/pages --json
+pbi schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json --json
+pbi profile summarize build/sales.profile.json --json
+pbi model columns show --project build/sales --handle column:FactSales:Revenue --json
+pbi model columns set-sort-by --project build/sales --table DimDate --column Month --by MonthNumber --dry-run --json
+pbi model calculated-columns show --project build/sales --handle 'column:FactSales:Revenue Band' --json
+pbi model calculated-columns update --project build/sales --handle 'column:FactSales:Revenue Band' --expression 'IF(''FactSales''[Revenue] >= 5000, ""High"", ""Standard"")' --dry-run --json
+pbi model calculated-columns delete --project build/sales --handle 'column:FactSales:Revenue Band' --dry-run --json
+pbi model measures update --project build/sales --handle 'measure:FactSales:Total Revenue' --expression 'SUM(''FactSales''[Revenue])' --dry-run --json
+pbi model measures delete --project build/sales --handle 'measure:FactSales:Average Revenue' --dry-run --json
+pbi model relationships list --project build/sales --json
+pbi model relationships show --project build/sales --handle <relationship-handle> --json
+pbi model relationships update --project build/sales --handle <relationship-handle> --cross-filtering-behavior bothDirections --dry-run --json
+pbi model relationships delete --project build/sales --handle <relationship-handle> --dry-run --json
+pbi model dax bridge-plan --project build/sales --json
+pbi model roles list --project build/sales --json
+pbi model perspectives list --project build/sales --json
+pbi model cultures list --project build/sales --json
+pbi model expressions list --project build/sales --json
+pbi model roles show --project build/sales --handle role:Safety --json
+pbi model perspectives show --project build/sales --handle perspective:Executive --json
+pbi model cultures show --project build/sales --handle culture:de-CH --json
+pbi model expressions show --project build/sales --handle expression:RefreshDate --json
+pbi source-template show --project build/sales --handle source-template:FactSales:FactSales --json
+pbi report design-plan --project build/sales --json
+pbi report tree --project build/sales --json
+pbi report find --project build/sales --kind visual --json
+pbi report cat --project build/sales --handle visual:ReportSectionOverview:VisualContainerSalesKpi --json
+pbi report query --project build/sales --selector kind:visual --json
+pbi report audit --project build/sales --json
+pbi report sanitize plan --project build/sales --json
+pbi report sanitize apply --project build/sales --dry-run --json
+pbi report layout auto --project build/sales --page page:ReportSectionOverview --preset overview --dry-run --json
+pbi report pages show --project build/sales --handle page:ReportSectionOverview --json
+pbi report pages clone --project build/sales --from page:ReportSectionOverview --new-name ReportSectionOverviewCopy --visual-prefix Copy --dry-run --json
+pbi report drillthrough show --project build/sales --page page:ReportSectionOverview --json
+pbi report drillthrough clear --project build/sales --page page:ReportSectionOverview --dry-run --json
+pbi report bookmarks reorder --project build/sales --order bookmark:A,bookmark:B --dry-run --json
+pbi report bookmarks delete --project build/sales --handle bookmark:OldView --dry-run --json
+pbi report filters delete --project build/sales --handle filter:report:main:ReportSegmentFilter --dry-run --json
+pbi report themes presets list --json
+pbi report themes apply-preset --project build/sales --preset risk-dashboard --dry-run --json
+pbi report style extract --project corp/template --out master-style.json --json
+pbi report style apply --project build/generated --bundle master-style.json --dry-run --json
+pbi report visuals formatting conditional-formatting list --project build/sales --json
+pbi report visuals formatting conditional-formatting show --project build/sales --handle <visual-handle> --include-raw --json
+pbi report visuals add-card --project build/sales --page page:ReportSectionOverview --measure "FactSales.Total Revenue" --title "Revenue Card" --x 40 --y 40 --width 200 --height 120 --value-font-size 20 --category-font-size 9 --word-wrap --dry-run --json
+pbi report visuals add-slicer --project build/sales --page page:ReportSectionOverview --field "DimCustomer.Segment" --title "Segment" --x 40 --y 40 --width 240 --height 80 --mode Dropdown --single-select --dry-run --json
+pbi report visuals add-textbox --project build/sales --page page:ReportSectionOverview --title "Reading guide" --paragraphs-file guide.txt --x 40 --y 520 --width 400 --height 120 --dry-run --json
+pbi report visuals set-topn-guard --project build/sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by "FactSales[Total Revenue]" --top 28 --dry-run --json
+pbi report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
+pbi report visuals set-display-name --project build/sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 ```
 
 A focused `--for` response returns the matching commands and small shared
@@ -135,10 +201,36 @@ When the canonical command path is already known exactly, append `--compact`
 to receive only its path, usage, flags, examples, proof level, follow-up fields,
 and output schema.
 
+## Authoring Loop
+
+Use the compose-free loop that is implemented today. Keep every intermediate
+artifact inspectable and let each response provide the next exact command:
+
+```text
+schema validate -> profile infer -> report plan -> report spec validate
+-> report build -> triage -> report visuals add-card/add-slicer/set-object
+-> validate --strict --backend all -> desktop open
+```
+
+The final `desktop open` step is an opt-in Windows oracle operation. On Linux
+and macOS it returns `unsupported_feature`; local validation and schema/golden
+proof remain valid but do not claim Desktop canvas or refresh compatibility.
+
+The 2026-09-04 feature catalog has 50 IDs (45 supported, 5 planned). Keep the
+proof level from `features list --json` with every claim:
+
+| status / proof | feature IDs |
+|---|---|
+| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
+| supported / `schema-golden` | `model.partition-grouped-rank`, `report.drillthrough`, `report.filters.numeric-range`, `report.filters.relative-date`, `report.filters.topn`, `report.visuals.generated`, `workflow.synthetic-source` |
+| supported / `desktop-golden-pending` | `desktop.reference-harvest`, `report.slicer-authoring`, `report.visuals.category-share`, `report.visuals.matrix` |
+| supported / `manual-desktop-canvas-refresh` | `report.visuals.combo-pareto` |
+| planned / `unit-smoke` | `report.bookmark-mutations`, `report.interaction-default-reset`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
+
 Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
-schema validate/normalize, profile
+schema validate/normalize (including bounded `$include` composition), profile
 infer/validate/summarize, deterministic report planning, declarative report spec
-validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
+validation/normalization, report build from schema/profile/spec inputs, scaffold, shallow/deep
 inspect, semantic measure,
 calculated-column, and relationship diff, report wireframe JSON export,
 measure list/show/add/update/delete, static DAX dependencies/lint, explicitly
@@ -149,9 +241,11 @@ advanced semantic-model inventory plus roles/perspectives/cultures/expressions
 readback, calculated-column
 list/show/add/update/delete, relationship list/show/add/update/delete,
 partition list/show, source-template list/show/add/apply for SQL Server,
-PostgreSQL, ODBC, Excel, CSV, folder, and SharePoint/OneDrive rebind metadata,
-handoff rebind-plan, fixture normalize/verify, managed desktop open/close plus
-one-shot desktop open-check/screenshot,
+PostgreSQL, ODBC, Excel, CSV, folder, SharePoint/OneDrive, and closed-grammar
+generic-M rebind metadata,
+handoff rebind-plan and offline handoff rebind-check, fixture normalize/verify,
+managed desktop open/close plus one-shot desktop open-check/screenshot and
+Linux-capable desktop harvest-reference,
 report page list/show/add/update/reorder/set-active/
 delete-empty, report visual list/show/catalog/add/clone/delete, visual set-position,
 existing-visual set-bindings, report filter list/show/add/update/delete/clear,
@@ -161,11 +255,10 @@ list/show plus metadata-only display-name/reorder/delete, raw report theme
 show/extract/apply bundles, master report style inspect/extract/diff/apply,
 visual
 formatting list/show/extract/apply bundles, visual formatting set-text for
-title/alt-text patches, conditional-formatting readback list/show, handoff
+title/legacy-alt-text cleanup, conditional-formatting readback list/show, handoff
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
-Treat planned generic-M source templates, filter sort and arbitrary expression
-updates, bookmark state capture/create/update/grouping,
+Treat filter sort and arbitrary expression updates, bookmark state capture/create/update/grouping,
 slicer selection/sync mutation, interaction Default/reset semantics, unsupported
 slicer modes, style
 drift lint, conditional formatting authoring,
@@ -258,10 +351,22 @@ supported.
   raise them only with the matching explicit `--max-*` flag after inspection.
 - Treat `capabilities.limits` as the input-surface safety contract. Schema,
   profile, spec, JSON bundle, intent, and DAX/text files have fixed byte limits,
-  strict UTF-8 decoding, and symlink refusal. Planned includes, rows, PNG
+  strict UTF-8 decoding, and symlink refusal. Profile row inference consumes
+  bounded CSV/JSON rows through the same contract. Planned includes, PNG
   resources, ops, snapshots, and harvested fragments already have reserved
   numeric limits and typed guards in `docs/input-safety-contract.md`; do not
   bypass those guards or silently strip rejected content when adding a command.
+- Schema and v2 dashboard specs may use bounded, relative `$include` fragments.
+  Use `schema normalize` and `report spec normalize` when you need one
+  canonical artifact for review, caching, or parity checks. Their
+  `normalizedFrom[]` values are root-relative, sorted, and deterministic;
+  traversal, symlink, cycle, depth, count, and fragment-size failures are
+  refusals, not best-effort omissions.
+- The internal operation-plan spine is `powerbi-cli.ops.v1`: typed `op` records
+  use the same stable page, visual, filter, and percent-encoded semantic-model
+  handles as CLI readbacks. Plans validate references and stage order before a
+  temporary-directory transaction is published; no public `apply --ops` command
+  is advertised until the individual mutation kernels are converted.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.
@@ -328,7 +433,7 @@ required for manual canvas/refresh proof together with
 | Matching Desktop window title appeared | `desktop open-check` with `proof.observedStage=desktop-window`, `windowObserved=true`, and `titleMatched=true`; matching is exact on the normalized project stem | Manual/screen-agent canvas inspection |
 | Reviewable screen evidence was captured | `desktop screenshot <project> --out <outside-project.png>` with `screenshot.captured=true` and `screenshot.foregroundVerified=true` | Human or screen-agent review of the PNG plus refresh/canvas inspection |
 | Report canvas rendered and refreshed correctly | Manual Desktop canvas/refresh inspection and a committed proof record | Future `desktop-canvas-refresh` automation; window/title/screenshot signals alone are insufficient |
-| Work-machine rebind is prepared | `source-template add` plus `handoff rebind-plan` | successful Desktop refresh at work |
+| Work-machine rebind is prepared | `source-template add` plus `handoff rebind-plan` and post-apply `handoff rebind-check` | successful Desktop refresh at work |
 
 Always name what remains unproven. Validation can prove local file invariants;
 Desktop proves Power BI compatibility.
@@ -348,12 +453,14 @@ pbi --json package work-pack --project build/sales-live
 Extraction removes partial output if the entry-count, per-entry, total-size, or
 compression-ratio budget is exceeded. Source packing permits only root `.pbip`,
 report PBIR/definition JSON, semantic-model PBISM/TMDL, registered/shared JSON
-resources, and generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-`powerbi-cli.manifest.copy.json` sidecars. Files under `.git`, `.vscode`,
+resources, generated `.gitignore`, `POWERBI_HANDOFF.md`,
+`powerbi-cli.manifest.copy.json` sidecars, and root `profile*.json`/`*.profile*.json`
+metadata.
+Files under `.git`, `.vscode`,
 `.powerbi-cli`, or any other dot-directory are refused. The command scans all
 included content before creating the archive; credential-like content is unsafe,
-PII-suspect row literals require review, and non-dummy or unverified partition
-sources are refused.
+PII-suspect row literals require review, data-bearing profile v2 documents are
+refused, and non-dummy or unverified partition sources are refused.
 
 ### Export A Live PBIX Semantic Model To TMDL
 
@@ -408,18 +515,41 @@ discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
   read `errors[].message`, never treat an entry as a bare string. See
   `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
+For a composed spec, normalize it before handing it to another agent or build
+stage, then validate the normalized file. `report spec normalize` accepts the
+same positional path or `--spec` spelling as validation and writes a canonical
+JSON document plus `normalizedFrom[]` provenance. The schema-side equivalent is
+`schema normalize`; report build and artifact parity already normalize their
+schema/spec inputs internally, so an inline and include-composed document are
+expected to be byte-equivalent when their content is equivalent.
+
 ```bash
 pbi --json schema validate examples/sales.schema.json
+pbi --json schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
+pbi --json profile infer --schema examples/sales.schema.json --rows build/sales-rows.csv --out build/sales.profile.v2.json
 pbi --json profile validate examples/sales.profile.json
 pbi --json report plan --schema examples/sales.schema.json --profile examples/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.planned.dashboard.json
 pbi --json report spec validate --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json
+pbi --json report spec normalize examples/sales.dashboard.json --out build/sales.dashboard.normalized.json
 pbi --json report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json
 pbi --json report build --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/generic-sales --force
 pbi --json validate --strict build/generic-sales
 pbi --json handoff check build/generic-sales
 pbi --json fixture verify build/generic-sales --expected testdata/golden/generic-sales.summary.json
 ```
+
+For bounded profile statistics, pass `--rows <rows.csv|rows.json>` to
+`profile infer`. The rows reader enforces the limits in
+`docs/input-safety-contract.md`; CSV uses its first record as a header and JSON
+accepts object records or a header-row array. Profile v2 emits null rates,
+distinct counts, numeric/date min/max, time coverage, duplicate-key grain
+conflicts, and type-coercion diagnostics. Literal top values are redacted by
+default (`topValueCounts` and cardinality remain available). Only an explicit
+`--include-data-values` may emit at most five bounded top values per column,
+after credential/PII scanning; profiles stamped `dataValues:true` are
+data-bearing and are reported by `handoff check` and refused by
+`package source-pack`. `--redact` is retained as a deprecated no-op alias.
 
 `report plan` is implemented as a deterministic starter-spec planner. Give it a
 schema, optional profile, and either `--intent <intent.md|intent.json>` or the
@@ -441,6 +571,15 @@ then run the returned `candidatesCommand` (normally
 pointer. The error also includes an `example` shape. Optional documented
 defaults are listed in `defaultsApplied[]` in build/plan responses, so a
 downstream agent can distinguish an intentional default from a missing input.
+
+V2 proof requirements are compiled into `proofPlan` and the report build
+`next[]` list. `proof.desktop.expectValues[]` becomes one bounded
+`model dax execute` command per expectation, and each `proof.goldens[]` entry
+becomes a `fixture verify` command. Proof planning is side-effect free: no
+Desktop session, query, refresh, or fixture verification runs automatically.
+On Linux and macOS, Desktop-dependent commands are listed in
+`proofPlan.unavailable[]` with the Windows oracle instruction; the compiler
+never claims a Desktop proof level that the host cannot deliver.
 
 ### Scaffold From A Schema
 
@@ -483,7 +622,10 @@ identifiers and the final step before `in` are included; comments and string
 literals are ignored. Each finding includes the first and duplicate one-based
 source positions. Use `pbi lint --explain m.duplicate_step_name --json` for the
 remediation contract, then rename or remove the duplicate before opening the
-project in Desktop.
+project in Desktop. The warning-level `m.untyped_expansion` and
+`m.unbuffered_reuse` rules also flag unsafe expansion and reused table values
+without buffering; inspect their explanations before shipping a refresh
+partition.
 
 ### Repair And Verify An Existing Dashboard
 
@@ -545,6 +687,8 @@ pbi --json validate build/sales-v2
 ```
 
 Use `--expression-file <path|->` for multiline DAX or awkward shell quoting.
+Measure add/update also accepts `--format-string-definition <dax>` for a
+dynamic format expression; static formats use `--format-string`.
 Use `--in-place` only after the dry-run block is correct. For in-place delete,
 pass `--confirm <measure-handle>`. These commands preserve and rewrite TMDL
 structure and refuse update blocks with unsupported Desktop-authored TMDL
@@ -573,6 +717,36 @@ and receives `formatString: "Short Date"` unless an explicit format string is
 provided. Colon-bearing table and column names round-trip through percent-encoded
 handles returned by the CLI.
 
+### Author Tables And Columns
+
+Use the generic semantic-model commands for typed table and column inventory
+and guarded CRUD:
+
+```bash
+pbi --json capabilities --for "model tables"
+pbi --json model tables list --project build/sales
+pbi --json model tables show --project build/sales --handle table:FactSales
+pbi --json model tables add --project build/sales --table DimSegment --column Code --data-type string --dry-run
+pbi --json model tables rename --project build/sales --handle table:DimDate --new-name Calendar --rename-references --dry-run
+pbi --json model tables delete --project build/sales --handle table:DimSegment --dry-run
+pbi --json capabilities --for "model columns"
+pbi --json model columns list --project build/sales
+pbi --json model columns add --project build/sales --table FactSales --name Margin --data-type decimal --dry-run
+pbi --json model columns update --project build/sales --handle column:FactSales:Revenue --format-string '$#,##0' --dry-run
+pbi --json model columns delete --project build/sales --handle column:FactSales:Margin --dry-run
+pbi --json diff build/sales build/sales-v2 --scope model.tables
+pbi --json diff build/sales build/sales-v2 --scope model.columns
+```
+
+Table handles are `table:<name>` and column handles are
+`column:<table>:<name>`; literal `%` and `:` in every component are encoded as
+`%25` and `%3A`. Table rename refuses and lists relationship/DAX/variation
+references unless `--rename-references` is explicit. Column updates refuse a
+targeted block containing unknown Desktop-authored properties (including
+annotations or extended properties) rather than dropping them. Every mutation
+supports `--dry-run`, guarded `--in-place`, and isolated `--out-dir`; run the
+returned inspect and validate commands after applying a plan.
+
 ### Add A Small Selector Or Lookup Table
 
 Use the guarded static-table command for report controls such as a metric toggle
@@ -597,7 +771,10 @@ credentials, multiline cells, duplicate keys/rows, and arbitrary fact tables.
 Relationships are deliberately separate: dry-run and add one with `model
 relationships add`. Use a DAX `SELECTEDVALUE`/`SWITCH` measure to connect a
 disconnected selector to report behavior; Desktop remains the DAX and
-interaction oracle.
+interaction oracle. Relationship add/update also exposes endpoint
+`one|many` cardinalities, `active`/`inactive` state, and
+`oneDirection`/`bothDirections`/`automatic` cross-filtering behavior; review
+the returned metadata before relying on bidirectional filtering.
 
 ### Inspect Partitions And Handoff Safety
 
@@ -642,8 +819,8 @@ bounded DAX assertion remain required for semantic proof.
 
 ### Prepare Source Templates And Rebind Plans
 
-Use source-template and rebind-plan commands only when `capabilities` advertises
-them:
+Use source-template, rebind-plan, and rebind-check commands only when
+`capabilities` advertises them:
 
 ```bash
 pbi --json capabilities --for source-template
@@ -654,10 +831,13 @@ pbi --json source-template add --project build/sales --table FactSales --kind ex
 pbi --json source-template add --project build/sales --table FactSales --kind csv --file "<file.csv>" --delimiter , --encoding 65001 --has-header true --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind folder --path "<folder>" --pattern *.csv --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind sharepoint --site-url "<siteUrl>" --library "<library>" --path "<path>" --dry-run
+pbi --json source-template add --project build/sales --table FactSales --kind generic-m --m-template 'let Source = Sql.Database("{{powerbi-cli.placeholder:server}}", "{{powerbi-cli.placeholder:database}}") in Source' --dry-run
 pbi --json source-template add --project build/sales --table FactSales --kind postgres --server "<server>" --database "<database>" --schema public --object "<object>" --out-dir build/sales-rebind
 pbi --json source-template list --project build/sales-rebind
 pbi --json handoff rebind-plan build/sales-rebind --out build/sales-rebind/work-machine-rebind.md
-pbi --json handoff check build/sales-rebind
+pbi --json source-template apply --project build/sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir build/sales-live
+pbi --json handoff check build/sales-live --target work
+pbi --json handoff rebind-check build/sales-live --partition partition:FactSales:FactSales
 ```
 
 Source templates are sidecar metadata in `.powerbi-cli/source-templates.json`.
@@ -678,6 +858,22 @@ named DSN there. The rebind runbook includes these prerequisites and post-refres
 checks. `--out` refuses to overwrite an existing runbook unless `--force` is
 passed, and credential detection redacts response content and suppresses the
 runbook write entirely.
+
+After `source-template apply` on the work machine, run
+`pbi --json handoff rebind-check build/sales-live`. This offline gate checks
+every selected partition for a concrete non-placeholder source, validates
+SQL/PostgreSQL/ODBC/SharePoint call shapes, probes only local paths, and runs
+strict native validation. It emits stable per-partition findings and
+`refresh.status: not-run`; follow its `desktop open` command for the separate
+authenticated refresh and canvas proof. Rebind-check never evaluates M or
+opens a source connection.
+
+The `generic-m` kind accepts one complete expression through `--m-template` or
+`--m-file`. It reuses the workflow/source-profile closed grammar: a direct
+allowlisted connector root, complete placeholder tokens, and safe transformation
+namespaces only. Credential-like text, hard-coded file/URI paths, unknown
+functions, and computed/postfix calls are refused with a pointer into the M text;
+the expression is checked again when `source-template apply` materializes it.
 
 ### Copy Report Theme Bundles
 
@@ -708,7 +904,7 @@ pbi --json report visuals formatting list --project corp/template
 pbi --json report visuals formatting extract --project corp/template --handle "visual:<page>:<source-visual>" --out build/visual-formatting-bundle.json
 pbi --json report visuals formatting apply --project build/sales --handle "visual:<page>:<target-visual>" --bundle build/visual-formatting-bundle.json --dry-run
 pbi --json report visuals formatting apply --project build/sales --handle "visual:<page>:<target-visual>" --bundle build/visual-formatting-bundle.json --allow-literal-text --out-dir build/sales-styled
-pbi --json report visuals formatting set-text --project build/sales-styled --handle "visual:<page>:<target-visual>" --title "Revenue Overview" --alt-text "Revenue KPI card" --dry-run
+pbi --json report visuals formatting set-text --project build/sales-styled --handle "visual:<page>:<target-visual>" --title "Revenue Overview" --show-title true --dry-run
 pbi --json report visuals formatting show --project build/sales-styled --handle "visual:<page>:<target-visual>"
 pbi --json validate --strict build/sales-styled
 ```
@@ -717,8 +913,11 @@ This is raw per-visual PBIR formatting portability. Apply writes only
 `/visual/objects` on a same-type target visual and removes forbidden root-level
 `/objects`. It refuses
 copied literal title/alt-text/display strings unless `--allow-literal-text` is
-explicit. `set-text` is the typed patch surface for title text, title
-visibility, and the official shared visual-container alt text; it preserves sibling formatting properties and removes only a legacy misplaced altText during an explicit alt-text mutation.
+explicit. `set-text` is the typed patch surface for title text and title
+visibility; with `--clear-alt-text` it removes only a legacy misplaced
+`altText` property. Authoring a new alt-text value remains unsupported until
+Microsoft exposes a validator-supported PBIR location. It preserves sibling
+formatting properties.
 `set-color` is the typed patch surface for static literal `title.fontColor` and
 wildcard/static `dataPoint.fill`. These commands are not typed legend, axis,
 data-label, selector-specific color, or conditional formatting APIs.
@@ -795,7 +994,8 @@ Review the returned preview before applying it. Missing roles, duplicate fields,
 and unproven substitutions remain explicit refusals.
 `report visuals add` creates only cataloged generated visual containers: card,
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
-lineClusteredColumnComboChart, matrix (PBIR `pivotTable`), and slicer.
+hundredPercentStackedColumnChart, lineClusteredColumnComboChart, matrix (PBIR
+`pivotTable`), and slicer.
 Combo charts require Category columns, Y column measures, and Y2 line measures.
 Use `sort=descending` in binding text or `sortDirection=Descending` in JSON on
 at most one projected measure for explicit category ordering; ascending and
@@ -1022,6 +1222,7 @@ The target workflow is:
 pbi --json validate build/sales
 pbi --json handoff check build/sales
 pbi --json handoff rebind-plan build/sales --allow-unmapped
+pbi --json handoff rebind-check build/sales-live --partition partition:FactSales:FactSales
 pbi --json fixture normalize build/sales --out testdata/golden/sales-desktop-filter-contract.summary.json
 pbi --json fixture verify build/sales --expected testdata/golden/sales-desktop-filter-contract.summary.json
 ```
@@ -1059,6 +1260,7 @@ launching:
 export POWERBI_DESKTOP_ORACLE=1
 pbi --json desktop open-check build/sales
 pbi --json desktop screenshot build/sales --out proof/sales.png
+pbi --json desktop open build/sales --preflight normal
 ```
 
 Use `open-check` or `screenshot` for one-shot proof; both attempt bounded
@@ -1093,6 +1295,25 @@ follows only the exact observed PID and verified descendants, never sweeps by
 title or executable path, and verifies targeted PIDs are dead. `--leave-open` is
 rejected; use the managed `desktop open`/`desktop close` pair.
 
+Use `desktop harvest-reference` to archive a Desktop-saved `visual.json`,
+`page.json`, or `report.json` fragment by stable handle:
+
+```bash
+pbi --json desktop harvest-reference \
+  --project build/sales \
+  --visual visual:ReportSectionOverview:VisualContainer1 \
+  --out docs/reference/desktop-authored-visuals/sales-card.json
+```
+
+The archive wraps the fragment under `fragment` and records `provenance` with
+the source path, source-project SHA-256 fingerprint, date, license note, and
+Desktop version (`unknown` when none is supplied). The command calls the
+shared harvested-fragment input guard and refuses persisted selection/filter
+values, malformed or oversized files, links, and invalid UTF-8; it never
+silently strips rejected state. Already-saved Linux projects remain
+`desktop-golden-pending` because this path does not prove a Desktop canvas or
+refresh.
+
 When duplicate Desktop windows share the project title, selection prefers the
 association-launch PID and then a new post-baseline Desktop PID. If only
 pre-existing duplicates remain, the command reports `desktop_title_ambiguous`
@@ -1118,9 +1339,12 @@ and timeout state. The status/exit mapping is:
 - Launch, observer, capture, or cleanup subsystem failure:
   `oracle_failed`, exit 40.
 
-`desktop refresh-check`, `desktop save-check`, and Desktop round-trip
-diffing are planned oracle commands; do not call them until
-`capabilities --for desktop` advertises them.
+`desktop refresh-check`, `desktop canvas-check`, `desktop save-check`, and
+Desktop round-trip diffing are planned oracle commands. Proof plans may emit
+the first two as forward-compatible templates; they return
+`unsupported_feature` until their T9 implementation lands. Do not expect a
+Desktop proof claim until `capabilities --for desktop` advertises an available
+implementation.
 
 If Desktop commands are unavailable, say the project has local validation and
 fixture-summary proof only, not Desktop compatibility proof.

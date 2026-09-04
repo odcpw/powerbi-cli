@@ -131,6 +131,11 @@ fn dispatch(flags: &GlobalFlags, args: &[String]) -> CliResult<CliOutput> {
             rebind_args.extend_from_slice(&args[1..]);
             value_output(handoff_command(&rebind_args)?, flags.json)
         }
+        "handoff-rebind-check" => {
+            let mut rebind_args = vec!["rebind-check".to_string()];
+            rebind_args.extend_from_slice(&args[1..]);
+            value_output(handoff_command(&rebind_args)?, flags.json)
+        }
         "scaffold" => value_output(scaffold_command(&args[1..])?, flags.json),
         "schema" => value_output(schema_command(&args[1..])?, flags.json),
         "skill" | "skills" => value_output(skill_command(&args[1..])?, flags.json),

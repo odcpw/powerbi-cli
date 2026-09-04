@@ -1,5 +1,5 @@
 use crate::relationship_tmdl::{RelationshipRecord, load_relationship_document};
-use crate::tmdl::{ColumnRecord, MeasureRecord, load_table_documents};
+use crate::tmdl::{ColumnRecord, MeasureRecord, TableDocument, load_table_documents, table_handle};
 use crate::{
     CliError, CliResult, ResolvedProject, ValidationReport, canonical_display, command_arg,
     resolve_project, validate_project,
@@ -20,6 +20,8 @@ pub(crate) fn diff_command(args: &[String]) -> CliResult<Value> {
         "model.relationships" => {
             diff_relationship_maps(&before.relationships, &after.relationships)
         }
+        "model.tables" => diff_table_maps(&before.tables, &after.tables),
+        "model.columns" => diff_column_maps(&before.columns, &after.columns),
         _ => unreachable!("validated diff scope"),
     };
     let same = diff.changes.is_empty();
@@ -72,7 +74,37 @@ struct ProjectSnapshot {
     validation: ValidationReport,
     measures: BTreeMap<String, MeasureSummary>,
     calculated_columns: BTreeMap<String, CalculatedColumnSummary>,
+    tables: BTreeMap<String, TableSummary>,
+    columns: BTreeMap<String, ColumnSummary>,
     relationships: BTreeMap<String, RelationshipSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TableSummary {
+    handle: String,
+    name: String,
+    path: String,
+    columns: usize,
+    measures: usize,
+    partitions: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ColumnSummary {
+    handle: String,
+    table: String,
+    name: String,
+    expression: Option<String>,
+    data_type: Option<String>,
+    lineage_tag: Option<String>,
+    format_string: Option<String>,
+    summarize_by: Option<String>,
+    sort_by_column: Option<String>,
+    source_column: Option<String>,
+    display_folder: Option<String>,
+    description: Option<String>,
+    is_hidden: bool,
+    is_key: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -163,12 +195,14 @@ fn parse_diff_args(args: &[String]) -> CliResult<DiffOptions> {
         "model.calculatedColumns" | "model.calculated-columns" => {
             "model.calculatedColumns".to_string()
         }
+        "model.tables" | "model.table" => "model.tables".to_string(),
+        "model.columns" | "model.column" => "model.columns".to_string(),
         "model.relationships" => "model.relationships".to_string(),
         _ => {
             return Err(CliError::unsupported_feature(format!(
                 "unsupported diff scope: {scope}"
             ))
-            .with_hint("Supported semantic diff scopes are `model.measures`, `model.calculatedColumns`, and `model.relationships`.")
+            .with_hint("Supported semantic diff scopes are `model.tables`, `model.columns`, `model.measures`, `model.calculatedColumns`, and `model.relationships`.")
             .with_suggested_command(
                 "powerbi-cli diff <before-project-or.pbip> <after-project-or.pbip> --scope model.relationships --json",
             ));
@@ -210,6 +244,15 @@ fn project_snapshot(path: &Path) -> CliResult<ProjectSnapshot> {
         .filter(|column| column.is_calculated())
         .map(|column| (column.handle(), calculated_column_summary(column)))
         .collect::<BTreeMap<_, _>>();
+    let tables = docs
+        .iter()
+        .map(|table| (table_handle(&table.table), table_summary(table)))
+        .collect::<BTreeMap<_, _>>();
+    let columns = docs
+        .iter()
+        .flat_map(|table| table.columns.iter())
+        .map(|column| (column.handle(), column_summary(column)))
+        .collect::<BTreeMap<_, _>>();
     let relationships = load_relationship_document(&resolved)?
         .relationships
         .iter()
@@ -220,6 +263,8 @@ fn project_snapshot(path: &Path) -> CliResult<ProjectSnapshot> {
         validation,
         measures,
         calculated_columns,
+        tables,
+        columns,
         relationships,
     })
 }
@@ -239,6 +284,268 @@ fn project_side_json(resolved: &ResolvedProject, validation: &ValidationReport) 
         },
         "warnings": validation.warnings,
         "errors": validation.errors
+    })
+}
+
+fn diff_table_maps(
+    before: &BTreeMap<String, TableSummary>,
+    after: &BTreeMap<String, TableSummary>,
+) -> SemanticDiff {
+    let mut result = SemanticDiff {
+        added: 0,
+        removed: 0,
+        modified: 0,
+        unchanged: 0,
+        changes: Vec::new(),
+    };
+    let handles = before
+        .keys()
+        .chain(after.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for handle in handles {
+        match (before.get(&handle), after.get(&handle)) {
+            (Some(left), Some(right)) if left == right => result.unchanged += 1,
+            (Some(left), Some(right)) => {
+                result.modified += 1;
+                result.changes.push(modified_table_change(left, right));
+            }
+            (Some(left), None) => {
+                result.removed += 1;
+                result.changes.push(json!({
+                    "kind": "model.table",
+                    "op": "removed",
+                    "handle": left.handle,
+                    "table": left.name,
+                    "name": left.name,
+                    "fieldsChanged": [],
+                    "before": table_json(left),
+                    "after": Value::Null
+                }));
+            }
+            (None, Some(right)) => {
+                result.added += 1;
+                result.changes.push(json!({
+                    "kind": "model.table",
+                    "op": "added",
+                    "handle": right.handle,
+                    "table": right.name,
+                    "name": right.name,
+                    "fieldsChanged": ["name", "path", "counts.columns", "counts.measures", "counts.partitions"],
+                    "before": Value::Null,
+                    "after": table_json(right)
+                }));
+            }
+            (None, None) => {}
+        }
+    }
+    result
+}
+
+fn diff_column_maps(
+    before: &BTreeMap<String, ColumnSummary>,
+    after: &BTreeMap<String, ColumnSummary>,
+) -> SemanticDiff {
+    let mut result = SemanticDiff {
+        added: 0,
+        removed: 0,
+        modified: 0,
+        unchanged: 0,
+        changes: Vec::new(),
+    };
+    let handles = before
+        .keys()
+        .chain(after.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    for handle in handles {
+        match (before.get(&handle), after.get(&handle)) {
+            (Some(left), Some(right)) if left == right => result.unchanged += 1,
+            (Some(left), Some(right)) => {
+                result.modified += 1;
+                result.changes.push(modified_column_change(left, right));
+            }
+            (Some(left), None) => {
+                result.removed += 1;
+                result.changes.push(json!({
+                    "kind": "model.column",
+                    "op": "removed",
+                    "handle": left.handle,
+                    "table": left.table,
+                    "name": left.name,
+                    "fieldsChanged": [],
+                    "before": column_json(left),
+                    "after": Value::Null
+                }));
+            }
+            (None, Some(right)) => {
+                result.added += 1;
+                result.changes.push(json!({
+                    "kind": "model.column",
+                    "op": "added",
+                    "handle": right.handle,
+                    "table": right.table,
+                    "name": right.name,
+                    "fieldsChanged": ["expression", "properties.dataType", "properties.lineageTag", "properties.formatString", "properties.summarizeBy", "properties.sortByColumn", "properties.sourceColumn", "properties.displayFolder", "properties.description", "properties.isHidden", "properties.isKey"],
+                    "before": Value::Null,
+                    "after": column_json(right)
+                }));
+            }
+            (None, None) => {}
+        }
+    }
+    result
+}
+
+fn modified_table_change(before: &TableSummary, after: &TableSummary) -> Value {
+    let mut fields = Vec::new();
+    if before.name != after.name {
+        fields.push("name");
+    }
+    if before.path != after.path {
+        fields.push("path");
+    }
+    if before.columns != after.columns {
+        fields.push("counts.columns");
+    }
+    if before.measures != after.measures {
+        fields.push("counts.measures");
+    }
+    if before.partitions != after.partitions {
+        fields.push("counts.partitions");
+    }
+    json!({
+        "kind": "model.table",
+        "op": "modified",
+        "handle": after.handle,
+        "table": after.name,
+        "name": after.name,
+        "fieldsChanged": fields,
+        "before": table_json(before),
+        "after": table_json(after)
+    })
+}
+
+fn modified_column_change(before: &ColumnSummary, after: &ColumnSummary) -> Value {
+    let mut fields = Vec::new();
+    if before.table != after.table {
+        fields.push("table");
+    }
+    if before.name != after.name {
+        fields.push("name");
+    }
+    if before.expression != after.expression {
+        fields.push("expression");
+    }
+    if before.data_type != after.data_type {
+        fields.push("properties.dataType");
+    }
+    if before.lineage_tag != after.lineage_tag {
+        fields.push("properties.lineageTag");
+    }
+    if before.format_string != after.format_string {
+        fields.push("properties.formatString");
+    }
+    if before.summarize_by != after.summarize_by {
+        fields.push("properties.summarizeBy");
+    }
+    if before.sort_by_column != after.sort_by_column {
+        fields.push("properties.sortByColumn");
+    }
+    if before.source_column != after.source_column {
+        fields.push("properties.sourceColumn");
+    }
+    if before.display_folder != after.display_folder {
+        fields.push("properties.displayFolder");
+    }
+    if before.description != after.description {
+        fields.push("properties.description");
+    }
+    if before.is_hidden != after.is_hidden {
+        fields.push("properties.isHidden");
+    }
+    if before.is_key != after.is_key {
+        fields.push("properties.isKey");
+    }
+    json!({
+        "kind": "model.column",
+        "op": "modified",
+        "handle": after.handle,
+        "table": after.table,
+        "name": after.name,
+        "fieldsChanged": fields,
+        "before": column_json(before),
+        "after": column_json(after)
+    })
+}
+
+fn table_summary(table: &TableDocument) -> TableSummary {
+    TableSummary {
+        handle: table_handle(&table.table),
+        name: table.table.clone(),
+        // Keep the diff semantic across two otherwise identical projects
+        // rooted in different temporary directories.  Absolute output paths
+        // are useful in inspect/readback, but would make every table appear
+        // modified during a normal before/after comparison.
+        path: table
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        columns: table.columns.len(),
+        measures: table.measures.len(),
+        partitions: table.partitions.len(),
+    }
+}
+
+fn column_summary(column: &ColumnRecord) -> ColumnSummary {
+    ColumnSummary {
+        handle: column.handle(),
+        table: column.table.clone(),
+        name: column.name.clone(),
+        expression: column.expression.clone(),
+        data_type: column.data_type.clone(),
+        lineage_tag: column.lineage_tag.clone(),
+        format_string: column.format_string.clone(),
+        summarize_by: column.summarize_by.clone(),
+        sort_by_column: column.sort_by_column.clone(),
+        source_column: column.source_column.clone(),
+        display_folder: column.display_folder.clone(),
+        description: column.description.clone(),
+        is_hidden: column.is_hidden,
+        is_key: column.is_key,
+    }
+}
+
+fn table_json(table: &TableSummary) -> Value {
+    json!({
+        "handle": table.handle,
+        "name": table.name,
+        "path": table.path,
+        "counts": {"columns": table.columns, "measures": table.measures, "partitions": table.partitions}
+    })
+}
+
+fn column_json(column: &ColumnSummary) -> Value {
+    json!({
+        "handle": column.handle,
+        "table": column.table,
+        "name": column.name,
+        "isCalculated": column.expression.is_some(),
+        "expression": column.expression,
+        "properties": {
+            "lineageTag": column.lineage_tag,
+            "dataType": column.data_type,
+            "formatString": column.format_string,
+            "summarizeBy": column.summarize_by,
+            "sortByColumn": column.sort_by_column,
+            "sourceColumn": column.source_column,
+            "displayFolder": column.display_folder,
+            "description": column.description,
+            "isHidden": column.is_hidden,
+            "isKey": column.is_key
+        }
     })
 }
 
@@ -548,6 +855,12 @@ fn first_readback_command(changes: &[Value], after: &ResolvedProject) -> Option<
                         command_arg(&after.project_dir)
                     ));
                 }
+                if change["kind"].as_str() == Some("model.table") {
+                    return Some(format!(
+                        "powerbi-cli model tables list --project {} --json",
+                        command_arg(&after.project_dir)
+                    ));
+                }
                 let table = change["table"].as_str()?;
                 Some(format!(
                     "powerbi-cli model {} list --project {} --table {} --json",
@@ -563,6 +876,8 @@ fn first_readback_command(changes: &[Value], after: &ResolvedProject) -> Option<
 
 fn readback_family(kind: &str) -> &'static str {
     match kind {
+        "model.table" => "tables",
+        "model.column" => "columns",
         "model.calculatedColumn" => "calculated-columns",
         "model.relationship" => "relationships",
         _ => "measures",
