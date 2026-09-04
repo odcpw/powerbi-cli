@@ -343,8 +343,8 @@ frozen until proven.
 
 ### Phase 6: Binding, Style, And Handoff
 
-- Add source template support for CSV and generic M; SQL Server, PostgreSQL,
-  ODBC, and Excel are implemented.
+- Add source template support for generic M; SQL Server, PostgreSQL, ODBC,
+  Excel, CSV, folder, and SharePoint/OneDrive are implemented.
 - Store source templates without credentials.
 - Generate rebind checklists and diffs from dummy partitions to work-source
   partitions.
@@ -359,7 +359,11 @@ frozen until proven.
 - Extended source templates with typed Excel workbook sheet/table sources. Applying
   an Excel template promotes headers, emits explicit Power Query conversions from
   the table's TMDL column types, and materializes an absolute workbook path.
-  Existing recognized credential-free SQL, PostgreSQL, ODBC, or external-file
+- Extended source templates with typed CSV file, folder, and
+  SharePoint/OneDrive path sources. Applying them emits `Csv.Document`,
+  `Folder.Files`, or `SharePoint.Files` M plus explicit TMDL-derived column type
+  conversions; Desktop refresh proof remains pending on Windows.
+  Existing recognized credential-free SQL, PostgreSQL, ODBC, external-file, or SharePoint
   sources can be retargeted only with `--replace-existing` plus the exact partition
   handle; unknown, web, credential-bearing, and unconfirmed sources remain refused.
 - Implemented first theme slice: `report themes show/extract/apply` creates and

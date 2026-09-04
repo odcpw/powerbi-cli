@@ -92,6 +92,39 @@ pub(crate) struct ExcelSourceTemplateInput {
     pub(crate) description: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct CsvSourceTemplateInput {
+    pub(crate) table: String,
+    pub(crate) partition: String,
+    pub(crate) name: Option<String>,
+    pub(crate) file: String,
+    pub(crate) delimiter: String,
+    pub(crate) encoding: u32,
+    pub(crate) has_header: bool,
+    pub(crate) description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct FolderSourceTemplateInput {
+    pub(crate) table: String,
+    pub(crate) partition: String,
+    pub(crate) name: Option<String>,
+    pub(crate) path: String,
+    pub(crate) pattern: String,
+    pub(crate) description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct SharePointSourceTemplateInput {
+    pub(crate) table: String,
+    pub(crate) partition: String,
+    pub(crate) name: Option<String>,
+    pub(crate) site_url: String,
+    pub(crate) library: String,
+    pub(crate) path: String,
+    pub(crate) description: Option<String>,
+}
+
 impl Default for SourceTemplateStore {
     fn default() -> Self {
         Self {
@@ -301,6 +334,92 @@ pub(crate) fn excel_source_template(input: ExcelSourceTemplateInput) -> SourceTe
     }
 }
 
+pub(crate) fn csv_source_template(input: CsvSourceTemplateInput) -> SourceTemplateRecord {
+    let mut parameters = BTreeMap::new();
+    parameters.insert("file".to_string(), input.file.clone());
+    parameters.insert("delimiter".to_string(), input.delimiter.clone());
+    parameters.insert("encoding".to_string(), input.encoding.to_string());
+    parameters.insert("hasHeader".to_string(), input.has_header.to_string());
+    SourceTemplateRecord {
+        handle: source_template_handle(
+            &input.table,
+            input.name.as_deref().unwrap_or(&input.partition),
+        ),
+        name: input.name,
+        partition_handle: crate::tmdl::partition_handle(&input.table, &input.partition),
+        table: input.table,
+        partition: input.partition,
+        kind: "csv".to_string(),
+        parameters,
+        m_template: render_csv_m_template(
+            &input.file,
+            &input.delimiter,
+            input.encoding,
+            input.has_header,
+        ),
+        description: input.description,
+        requirements: vec![
+            "The CSV file must exist at the configured path on the machine that refreshes the project."
+                .to_string(),
+        ],
+    }
+}
+
+pub(crate) fn folder_source_template(input: FolderSourceTemplateInput) -> SourceTemplateRecord {
+    let mut parameters = BTreeMap::new();
+    parameters.insert("path".to_string(), input.path.clone());
+    parameters.insert("pattern".to_string(), input.pattern.clone());
+    SourceTemplateRecord {
+        handle: source_template_handle(
+            &input.table,
+            input.name.as_deref().unwrap_or(&input.partition),
+        ),
+        name: input.name,
+        partition_handle: crate::tmdl::partition_handle(&input.table, &input.partition),
+        table: input.table,
+        partition: input.partition,
+        kind: "folder".to_string(),
+        parameters,
+        m_template: render_folder_m_template(&input.path, &input.pattern),
+        description: input.description,
+        requirements: vec![
+            "The folder must exist at the configured path on the machine that refreshes the project."
+                .to_string(),
+        ],
+    }
+}
+
+pub(crate) fn sharepoint_source_template(
+    input: SharePointSourceTemplateInput,
+) -> SourceTemplateRecord {
+    let mut parameters = BTreeMap::new();
+    parameters.insert("siteUrl".to_string(), input.site_url.clone());
+    parameters.insert("library".to_string(), input.library.clone());
+    parameters.insert("path".to_string(), input.path.clone());
+    SourceTemplateRecord {
+        handle: source_template_handle(
+            &input.table,
+            input.name.as_deref().unwrap_or(&input.partition),
+        ),
+        name: input.name,
+        partition_handle: crate::tmdl::partition_handle(&input.table, &input.partition),
+        table: input.table,
+        partition: input.partition,
+        kind: "sharepoint".to_string(),
+        parameters,
+        m_template: render_sharepoint_m_template(
+            &input.site_url,
+            &input.library,
+            &input.path,
+        ),
+        description: input.description,
+        requirements: vec![
+            "Authenticate to the SharePoint or OneDrive site in Power BI Desktop on the work machine."
+                .to_string(),
+        ],
+    }
+}
+
 pub(crate) fn source_template_json(record: &SourceTemplateRecord, path: &Path) -> Value {
     let safety = source_template_safety_json(record);
     let redact = safety["credentialFree"] == Value::Bool(false);
@@ -487,6 +606,46 @@ fn render_excel_m_template(file: &str, item: &str, item_kind: &str) -> String {
         m_string(file),
         m_string(item),
         m_string(item_kind)
+    )
+}
+
+fn render_csv_m_template(file: &str, delimiter: &str, encoding: u32, has_header: bool) -> String {
+    let source = format!(
+        "Csv.Document(File.Contents(\"{}\"), [Delimiter=\"{}\", Encoding={}, QuoteStyle=QuoteStyle.Csv])",
+        m_string(file),
+        m_string(delimiter),
+        encoding
+    );
+    if has_header {
+        format!(
+            "let\n    Source = {source},\n    PromotedHeaders = Table.PromoteHeaders(Source, [PromoteAllScalars = true])\nin\n    PromotedHeaders"
+        )
+    } else {
+        format!("let\n    Source = {source}\nin\n    Source")
+    }
+}
+
+fn render_folder_m_template(path: &str, pattern: &str) -> String {
+    let predicate = if let Some(suffix) = pattern.strip_prefix('*') {
+        format!(
+            "Text.EndsWith([Name], \"{}\", Comparer.OrdinalIgnoreCase)",
+            m_string(suffix)
+        )
+    } else {
+        format!("[Name] = \"{}\"", m_string(pattern))
+    };
+    format!(
+        "let\n    Source = Folder.Files(\"{}\"),\n    FilteredFiles = Table.SelectRows(Source, each {predicate})\nin\n    FilteredFiles",
+        m_string(path)
+    )
+}
+
+fn render_sharepoint_m_template(site_url: &str, library: &str, path: &str) -> String {
+    let relative_path = format!("{}/{}", library.trim_matches('/'), path.trim_matches('/'));
+    format!(
+        "let\n    Source = SharePoint.Files(\"{}\", [ApiVersion = 15]),\n    SelectedFiles = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/{}/\", Comparer.OrdinalIgnoreCase))\nin\n    SelectedFiles",
+        m_string(site_url),
+        m_string(&relative_path)
     )
 }
 

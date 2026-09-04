@@ -90,6 +90,7 @@ mod scaffold;
 mod schema;
 mod skill_package;
 mod source_template;
+mod source_template_paths;
 mod source_templates;
 mod static_tables;
 mod tmdl;
