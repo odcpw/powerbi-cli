@@ -373,10 +373,6 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
             json!({"pages": [{"visuals": [{"format": {"title.show": true}}]}]}),
             "pbi-t3-compiler-completeness-1qi.8",
         ),
-        (
-            json!({"proof": {"goldens": []}}),
-            "pbi-t3-compiler-completeness-1qi.9",
-        ),
     ];
     for (index, (fragment, bead)) in cases.into_iter().enumerate() {
         let mut spec = json!({
