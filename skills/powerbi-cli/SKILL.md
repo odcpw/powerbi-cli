@@ -125,6 +125,72 @@ pbi --json capabilities --for semantic-model
 pbi --json capabilities --for add-static
 pbi --json capabilities --for report
 pbi --json capabilities --for handoff
+
+# Generated catalog paths not covered by the focused queries above.
+pbi guid --json
+pbi package export-plan --project build/sales --json
+pbi robot-docs guide
+pbi --robot-triage
+pbi robot-triage
+pbi integrations status --json
+pbi integrations install --allow-network --json
+pbi skill status --json
+pbi skill install --json
+pbi desktop bridge status --json
+pbi desktop bridge reload --project build/sales --pid 1234 --json
+pbi desktop bridge screenshot-page --project build/sales --pid 1234 --page ReportSection --out proof/page.png --json
+pbi desktop bridge screenshot-all --project build/sales --pid 1234 --out-dir proof/pages --json
+pbi schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json --json
+pbi profile summarize build/sales.profile.json --json
+pbi model columns show --project build/sales --handle column:FactSales:Revenue --json
+pbi model columns set-sort-by --project build/sales --table DimDate --column Month --by MonthNumber --dry-run --json
+pbi model calculated-columns show --project build/sales --handle 'column:FactSales:Revenue Band' --json
+pbi model calculated-columns update --project build/sales --handle 'column:FactSales:Revenue Band' --expression 'IF(''FactSales''[Revenue] >= 5000, ""High"", ""Standard"")' --dry-run --json
+pbi model calculated-columns delete --project build/sales --handle 'column:FactSales:Revenue Band' --dry-run --json
+pbi model measures update --project build/sales --handle 'measure:FactSales:Total Revenue' --expression 'SUM(''FactSales''[Revenue])' --dry-run --json
+pbi model measures delete --project build/sales --handle 'measure:FactSales:Average Revenue' --dry-run --json
+pbi model relationships list --project build/sales --json
+pbi model relationships show --project build/sales --handle <relationship-handle> --json
+pbi model relationships update --project build/sales --handle <relationship-handle> --cross-filtering-behavior bothDirections --dry-run --json
+pbi model relationships delete --project build/sales --handle <relationship-handle> --dry-run --json
+pbi model dax bridge-plan --project build/sales --json
+pbi model roles list --project build/sales --json
+pbi model perspectives list --project build/sales --json
+pbi model cultures list --project build/sales --json
+pbi model expressions list --project build/sales --json
+pbi model roles show --project build/sales --handle role:Safety --json
+pbi model perspectives show --project build/sales --handle perspective:Executive --json
+pbi model cultures show --project build/sales --handle culture:de-CH --json
+pbi model expressions show --project build/sales --handle expression:RefreshDate --json
+pbi source-template show --project build/sales --handle source-template:FactSales:FactSales --json
+pbi report design-plan --project build/sales --json
+pbi report tree --project build/sales --json
+pbi report find --project build/sales --kind visual --json
+pbi report cat --project build/sales --handle visual:ReportSectionOverview:VisualContainerSalesKpi --json
+pbi report query --project build/sales --selector kind:visual --json
+pbi report audit --project build/sales --json
+pbi report sanitize plan --project build/sales --json
+pbi report sanitize apply --project build/sales --dry-run --json
+pbi report layout auto --project build/sales --page page:ReportSectionOverview --preset overview --dry-run --json
+pbi report pages show --project build/sales --handle page:ReportSectionOverview --json
+pbi report pages clone --project build/sales --from page:ReportSectionOverview --new-name ReportSectionOverviewCopy --visual-prefix Copy --dry-run --json
+pbi report drillthrough show --project build/sales --page page:ReportSectionOverview --json
+pbi report drillthrough clear --project build/sales --page page:ReportSectionOverview --dry-run --json
+pbi report bookmarks reorder --project build/sales --order bookmark:A,bookmark:B --dry-run --json
+pbi report bookmarks delete --project build/sales --handle bookmark:OldView --dry-run --json
+pbi report filters delete --project build/sales --handle filter:report:main:ReportSegmentFilter --dry-run --json
+pbi report themes presets list --json
+pbi report themes apply-preset --project build/sales --preset risk-dashboard --dry-run --json
+pbi report style extract --project corp/template --out master-style.json --json
+pbi report style apply --project build/generated --bundle master-style.json --dry-run --json
+pbi report visuals formatting conditional-formatting list --project build/sales --json
+pbi report visuals formatting conditional-formatting show --project build/sales --handle <visual-handle> --include-raw --json
+pbi report visuals add-card --project build/sales --page page:ReportSectionOverview --measure "FactSales.Total Revenue" --title "Revenue Card" --x 40 --y 40 --width 200 --height 120 --value-font-size 20 --category-font-size 9 --word-wrap --dry-run --json
+pbi report visuals add-slicer --project build/sales --page page:ReportSectionOverview --field "DimCustomer.Segment" --title "Segment" --x 40 --y 40 --width 240 --height 80 --mode Dropdown --single-select --dry-run --json
+pbi report visuals add-textbox --project build/sales --page page:ReportSectionOverview --title "Reading guide" --paragraphs-file guide.txt --x 40 --y 520 --width 400 --height 120 --dry-run --json
+pbi report visuals set-topn-guard --project build/sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by "FactSales[Total Revenue]" --top 28 --dry-run --json
+pbi report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
+pbi report visuals set-display-name --project build/sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 ```
 
 A focused `--for` response returns the matching commands and small shared
@@ -134,6 +200,32 @@ catalogs null and names them in `omittedCatalogs`; run the returned
 When the canonical command path is already known exactly, append `--compact`
 to receive only its path, usage, flags, examples, proof level, follow-up fields,
 and output schema.
+
+## Authoring Loop
+
+Use the compose-free loop that is implemented today. Keep every intermediate
+artifact inspectable and let each response provide the next exact command:
+
+```text
+schema validate -> profile infer -> report plan -> report spec validate
+-> report build -> triage -> report visuals add-card/add-slicer/set-object
+-> validate --strict --backend all -> desktop open
+```
+
+The final `desktop open` step is an opt-in Windows oracle operation. On Linux
+and macOS it returns `unsupported_feature`; local validation and schema/golden
+proof remain valid but do not claim Desktop canvas or refresh compatibility.
+
+The 2026-09-04 feature catalog has 50 IDs (45 supported, 5 planned). Keep the
+proof level from `features list --json` with every claim:
+
+| status / proof | feature IDs |
+|---|---|
+| supported / `unit-smoke` | `agent.codex-skill-distribution`, `desktop.dax-query-execution`, `desktop.live-tmdl-export`, `desktop.window-evidence`, `integrations.microsoft-toolchain`, `model.advanced-readback`, `model.calculated-columns`, `model.columns`, `model.dax-static-analysis`, `model.measures`, `model.relationships`, `model.source-templates`, `model.static-control-tables`, `model.tables`, `package.pbix-pbit-boundary`, `profile.data-profile-v2`, `quality.lint-rule-registry`, `quality.model-completeness-lint`, `report.bookmarks.readback`, `report.conditional-formatting`, `report.dashboard-spec-v2`, `report.design-layout`, `report.drilldown`, `report.filters.categorical`, `report.intent-parser`, `report.interactions.overrides`, `report.pages`, `report.slicer-clear`, `report.themes`, `report.visuals.role-maps`, `report.visuals.template-clone`, `validation.microsoft-report`, `workflow.source-profile` |
+| supported / `schema-golden` | `model.partition-grouped-rank`, `report.drillthrough`, `report.filters.numeric-range`, `report.filters.relative-date`, `report.filters.topn`, `report.visuals.generated`, `workflow.synthetic-source` |
+| supported / `desktop-golden-pending` | `desktop.reference-harvest`, `report.slicer-authoring`, `report.visuals.category-share`, `report.visuals.matrix` |
+| supported / `manual-desktop-canvas-refresh` | `report.visuals.combo-pareto` |
+| planned / `unit-smoke` | `report.bookmark-mutations`, `report.interaction-default-reset`, `report.slicer-sync-authoring`, `report.tooltip-pages`, `report.visuals.planned-types` |
 
 Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
 schema validate/normalize (including bounded `$include` composition), profile
@@ -163,7 +255,7 @@ list/show plus metadata-only display-name/reorder/delete, raw report theme
 show/extract/apply bundles, master report style inspect/extract/diff/apply,
 visual
 formatting list/show/extract/apply bundles, visual formatting set-text for
-title/alt-text patches, conditional-formatting readback list/show, handoff
+title/legacy-alt-text cleanup, conditional-formatting readback list/show, handoff
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
 Treat filter sort and arbitrary expression updates, bookmark state capture/create/update/grouping,
@@ -511,7 +603,10 @@ identifiers and the final step before `in` are included; comments and string
 literals are ignored. Each finding includes the first and duplicate one-based
 source positions. Use `pbi lint --explain m.duplicate_step_name --json` for the
 remediation contract, then rename or remove the duplicate before opening the
-project in Desktop.
+project in Desktop. The warning-level `m.untyped_expansion` and
+`m.unbuffered_reuse` rules also flag unsafe expansion and reused table values
+without buffering; inspect their explanations before shipping a refresh
+partition.
 
 ### Repair And Verify An Existing Dashboard
 
@@ -573,6 +668,8 @@ pbi --json validate build/sales-v2
 ```
 
 Use `--expression-file <path|->` for multiline DAX or awkward shell quoting.
+Measure add/update also accepts `--format-string-definition <dax>` for a
+dynamic format expression; static formats use `--format-string`.
 Use `--in-place` only after the dry-run block is correct. For in-place delete,
 pass `--confirm <measure-handle>`. These commands preserve and rewrite TMDL
 structure and refuse update blocks with unsupported Desktop-authored TMDL
@@ -655,7 +752,10 @@ credentials, multiline cells, duplicate keys/rows, and arbitrary fact tables.
 Relationships are deliberately separate: dry-run and add one with `model
 relationships add`. Use a DAX `SELECTEDVALUE`/`SWITCH` measure to connect a
 disconnected selector to report behavior; Desktop remains the DAX and
-interaction oracle.
+interaction oracle. Relationship add/update also exposes endpoint
+`one|many` cardinalities, `active`/`inactive` state, and
+`oneDirection`/`bothDirections`/`automatic` cross-filtering behavior; review
+the returned metadata before relying on bidirectional filtering.
 
 ### Inspect Partitions And Handoff Safety
 
@@ -785,7 +885,7 @@ pbi --json report visuals formatting list --project corp/template
 pbi --json report visuals formatting extract --project corp/template --handle "visual:<page>:<source-visual>" --out build/visual-formatting-bundle.json
 pbi --json report visuals formatting apply --project build/sales --handle "visual:<page>:<target-visual>" --bundle build/visual-formatting-bundle.json --dry-run
 pbi --json report visuals formatting apply --project build/sales --handle "visual:<page>:<target-visual>" --bundle build/visual-formatting-bundle.json --allow-literal-text --out-dir build/sales-styled
-pbi --json report visuals formatting set-text --project build/sales-styled --handle "visual:<page>:<target-visual>" --title "Revenue Overview" --alt-text "Revenue KPI card" --dry-run
+pbi --json report visuals formatting set-text --project build/sales-styled --handle "visual:<page>:<target-visual>" --title "Revenue Overview" --show-title true --dry-run
 pbi --json report visuals formatting show --project build/sales-styled --handle "visual:<page>:<target-visual>"
 pbi --json validate --strict build/sales-styled
 ```
@@ -794,8 +894,11 @@ This is raw per-visual PBIR formatting portability. Apply writes only
 `/visual/objects` on a same-type target visual and removes forbidden root-level
 `/objects`. It refuses
 copied literal title/alt-text/display strings unless `--allow-literal-text` is
-explicit. `set-text` is the typed patch surface for title text, title
-visibility, and the official shared visual-container alt text; it preserves sibling formatting properties and removes only a legacy misplaced altText during an explicit alt-text mutation.
+explicit. `set-text` is the typed patch surface for title text and title
+visibility; with `--clear-alt-text` it removes only a legacy misplaced
+`altText` property. Authoring a new alt-text value remains unsupported until
+Microsoft exposes a validator-supported PBIR location. It preserves sibling
+formatting properties.
 `set-color` is the typed patch surface for static literal `title.fontColor` and
 wildcard/static `dataPoint.fill`. These commands are not typed legend, axis,
 data-label, selector-specific color, or conditional formatting APIs.
@@ -872,7 +975,8 @@ Review the returned preview before applying it. Missing roles, duplicate fields,
 and unproven substitutions remain explicit refusals.
 `report visuals add` creates only cataloged generated visual containers: card,
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
-lineClusteredColumnComboChart, matrix (PBIR `pivotTable`), and slicer.
+hundredPercentStackedColumnChart, lineClusteredColumnComboChart, matrix (PBIR
+`pivotTable`), and slicer.
 Combo charts require Category columns, Y column measures, and Y2 line measures.
 Use `sort=descending` in binding text or `sortDirection=Descending` in JSON on
 at most one projected measure for explicit category ordering; ascending and
@@ -1137,6 +1241,7 @@ launching:
 export POWERBI_DESKTOP_ORACLE=1
 pbi --json desktop open-check build/sales
 pbi --json desktop screenshot build/sales --out proof/sales.png
+pbi --json desktop open build/sales --preflight normal
 ```
 
 Use `open-check` or `screenshot` for one-shot proof; both attempt bounded
