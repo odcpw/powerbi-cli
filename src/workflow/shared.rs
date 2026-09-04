@@ -1289,8 +1289,8 @@ pub(super) fn parse_pairs(
     if !args.len().is_multiple_of(2) {
         return Err(CliError::invalid_args("workflow flag requires a value"));
     }
-    for pair in args.chunks_exact(2) {
-        visit(&pair[0], &pair[1])?;
+    for [flag, value] in args.as_chunks::<2>().0 {
+        visit(flag, value)?;
     }
     Ok(())
 }
