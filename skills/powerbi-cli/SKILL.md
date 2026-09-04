@@ -550,6 +550,11 @@ default (`topValueCounts` and cardinality remain available). Only an explicit
 after credential/PII scanning; profiles stamped `dataValues:true` are
 data-bearing and are reported by `handoff check` and refused by
 `package source-pack`. `--redact` is retained as a deprecated no-op alias.
+`profile summarize` additionally emits a deterministic `summary.shape` object
+with facts, dimensions, date-table proposals, key candidates, high-cardinality
+noise, and evidence strings. Shape evidence names the row-count ratio, numeric
+column share, relationship/cardinality fan-out, and date coverage used; weak
+signals return `kind=ambiguous` plus competing hypotheses instead of a guess.
 
 `report plan` is implemented as a deterministic starter-spec planner. Give it a
 schema, optional profile, and either `--intent <intent.md|intent.json>` or the
@@ -561,6 +566,9 @@ unresolved names return `spec.missing_input` with a pointer and candidates.
 Fields not compiled by this starter planner remain in the response with an
 owning-bead warning. It is not a substitute for reviewing generated report
 intent or for Desktop compatibility proof.
+The response's top-level `shape` and `decisions[]` model-shape entry reuse the
+same profile/schema classifier. A date-like column without a related date
+dimension is surfaced as a proposal rather than silently treated as a calendar.
 
 When the compiler cannot safely infer a required value, it asks through a
 structured `spec.missing_input` diagnostic instead of silently choosing a
@@ -1350,12 +1358,12 @@ and timeout state. The status/exit mapping is:
 - Launch, observer, capture, or cleanup subsystem failure:
   `oracle_failed`, exit 40.
 
-`desktop refresh-check`, `desktop canvas-check`, `desktop save-check`, and
-Desktop round-trip diffing are planned oracle commands. Proof plans may emit
-the first two as forward-compatible templates; they return
-`unsupported_feature` until their T9 implementation lands. Do not expect a
-Desktop proof claim until `capabilities --for desktop` advertises an available
-implementation.
+`desktop refresh-check` and `desktop canvas-check` are cataloged forward-compatible
+oracle commands. They currently return `error.code=unsupported_feature` without
+launching Desktop or writing evidence; proof plans may emit them as templates
+until their T9 Windows implementation lands. `desktop save-check` and Desktop
+round-trip diffing remain planned as well. Do not expect a Desktop proof claim
+until `capabilities --for desktop` advertises an available implementation.
 
 If Desktop commands are unavailable, say the project has local validation and
 fixture-summary proof only, not Desktop compatibility proof.

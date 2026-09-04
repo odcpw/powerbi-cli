@@ -1,0 +1,70 @@
+{
+  "dateTables": [],
+  "dimensions": [
+    {
+      "evidence": [
+        "1 categorical column(s) provide descriptive-attribute signals",
+        "1 declared key column(s) provide a dimension-key signal",
+        "numeric column share is 1/2 (50%)",
+        "profile role is explicitly dimension",
+        "relationship FactSales[CustomerKey] -> DimCustomer[CustomerKey] has many-to-one cardinality; connected table FactSales is a classified model role",
+        "relationship fan-in is 1",
+        "row count is unavailable or zero; row-ratio evidence is inconclusive",
+        "table name uses the Dim/calendar prefix"
+      ],
+      "table": "DimCustomer"
+    }
+  ],
+  "facts": [
+    {
+      "evidence": [
+        "no date-like column signal was found on this fact candidate",
+        "numeric column share is 2/2 (100%)",
+        "profile role is explicitly fact",
+        "relationship FactSales[CustomerKey] -> DimCustomer[CustomerKey] has many-to-one cardinality; connected table DimCustomer is a classified model role",
+        "relationship fan-out is 1",
+        "row count is unavailable or zero; row-ratio evidence is inconclusive",
+        "table name uses the Fact prefix"
+      ],
+      "table": "FactSales"
+    }
+  ],
+  "highCardinality": [],
+  "hypotheses": [],
+  "keyCandidates": [
+    {
+      "column": "CustomerKey",
+      "evidence": [
+        "column name uses an id/key suffix signal",
+        "relationship endpoint identifies the column as a key candidate",
+        "schema/profile marks the column as a key",
+        "uniqueness is unavailable because no positive row count was profiled"
+      ],
+      "table": "DimCustomer",
+      "uniqueness": null
+    },
+    {
+      "column": "CustomerKey",
+      "evidence": [
+        "column name uses an id/key suffix signal",
+        "relationship endpoint identifies the column as a key candidate",
+        "uniqueness is unavailable because no positive row count was profiled"
+      ],
+      "table": "FactSales",
+      "uniqueness": null
+    }
+  ],
+  "kind": "star",
+  "relationships": [
+    {
+      "evidence": "relationship FactSales[CustomerKey] -> DimCustomer[CustomerKey] has many-to-one cardinality",
+      "fromCardinality": "many",
+      "fromColumn": "CustomerKey",
+      "fromTable": "FactSales",
+      "toCardinality": "one",
+      "toColumn": "CustomerKey",
+      "toTable": "DimCustomer"
+    }
+  ],
+  "warnings": []
+}

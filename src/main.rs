@@ -49,6 +49,7 @@ mod pbir_slicers;
 mod pbir_themes;
 mod pbir_visual_factory;
 mod profile;
+mod profile_shape;
 mod project_io;
 mod project_resolution;
 #[cfg(test)]

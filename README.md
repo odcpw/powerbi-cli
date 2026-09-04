@@ -481,6 +481,13 @@ resolve to an exact model measure or the command returns `spec.missing_input`
 with its pointer and measure candidates. Fields that the starter planner does
 not compile remain visible in `warnings[]` with their owning bead. The
 free-form `--objective` form remains available for quick question-only plans.
+The response also includes an evidence-backed `shape` classification and the
+same shape under `profileSummary` when a profile is supplied. It reports flat,
+star, snowflake, or multi-fact only when schema relationships, cardinalities,
+row-count ratios, and profile column signals support that verdict; otherwise
+it returns `ambiguous` with competing hypotheses. Date-like columns without a
+related date dimension produce a date-table proposal, and high-cardinality
+categorical columns are called out as possible noise.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
@@ -1033,9 +1040,11 @@ This generated snapshot keeps status and proof claims aligned with
   non-Windows systems Desktop commands return `error.code = "unsupported_feature"`
   before oracle opt-in evaluation. An attempted oracle subsystem failure is exit
   40, while evidence blocked by launch/observation timeout or title mismatch is
-  `proof_incomplete` (exit 20). The forward-compatible `desktop refresh-check`
-  and `desktop canvas-check` commands remain planned Windows proof surfaces and
-  return `unsupported_feature` until their Desktop implementations land.
+  `proof_incomplete` (exit 20).
+- `desktop refresh-check` and `desktop canvas-check` are cataloged forward-compatible
+  Desktop proof commands. They currently return `error.code = "unsupported_feature"`
+  without launching Desktop or writing evidence; refresh completion and canvas
+  rendering proof will be implemented by the T9 Windows work.
 - Validation checks file structure, parseable JSON, page references, TMDL table
   presence, relationship endpoints, and offline hazards. It is not a Power BI
   Desktop open proof.
