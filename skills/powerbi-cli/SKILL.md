@@ -264,6 +264,16 @@ stages, not proof levels. The capabilities catalog exposes them as
 names in `proof.level`, so interpret that field as an observation stage until the
 Desktop hardening work migrates it.
 
+Desktop evidence committed under `testdata/desktop-proof/` uses
+`powerbi-cli.desktop-proof.v1`. Each record links exact `features[].id` values
+through `signals.featureIds`; `features list` takes the maximum validated record
+level and catalog baseline. The loader rejects records whose `proofLevel`
+exceeds their signals. In particular, a current artifact, rendered canvas,
+completed refresh, absent issue dialogs, and matched expected values are all
+required for manual canvas/refresh proof together with
+`signals.manualReview=true`; automated proof instead requires
+`signals.automated=true`.
+
 | Claim | Minimum proof | Stronger proof |
 |---|---|---|
 | Project is structurally present | `pbi --json validate <project>` | `validate --strict` once available |

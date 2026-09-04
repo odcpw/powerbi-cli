@@ -1265,6 +1265,16 @@ fn response_shapes() -> Value {
             "next": "Executable powerbi-cli command templates only.",
             "instructions": "Human or agent prose steps that are not executable commands.",
             "notes": "Explanatory context; never interpret as commands."
+        },
+        "desktopProofRecord": {
+            "schema": "powerbi-cli.desktop-proof.v1",
+            "location": "testdata/desktop-proof/*.json",
+            "requiredFields": ["schema", "fixture", "date", "desktopVersion", "commands", "signals", "proofLevel"],
+            "proofLevels": ["unit-smoke", "schema-golden", "desktop-golden-pending", "manual-desktop-canvas-refresh", "desktop-canvas-refresh"],
+            "signalsFields": ["featureIds", "placeholder", "schemaGolden", "desktopReferencePresent", "currentArtifact", "desktopOpened", "canvasRendered", "refreshCompleted", "issueDialogsAbsent", "expectedValuesMatched", "saveReopenMatched", "manualReview", "automated", "notes", "evidence"],
+            "featureProjectionFields": ["path", "fixture", "date", "desktopVersion", "proofLevel"],
+            "levelRule": "proofLevel cannot exceed the strongest level justified by signals. A placeholder may remain desktop-golden-pending. Manual canvas-refresh requires a current artifact, Desktop version, open/render/refresh/no-dialog signals, matched expected values, and manualReview=true. desktop-canvas-refresh instead requires automated=true.",
+            "catalogRule": "features[].proofLevel is the maximum of its declared baseline and every valid embedded record linked by signals.featureIds; proof records never create features."
         }
     })
 }
@@ -1324,6 +1334,33 @@ mod tests {
         ] {
             assert_proof_levels(&value, catalog, &allowed);
         }
+    }
+
+    #[test]
+    fn capabilities_document_the_desktop_proof_record_contract() {
+        let value = capabilities(&[]).expect("capabilities");
+        let record = &value["responseShapes"]["desktopProofRecord"];
+        assert_eq!(record["schema"], "powerbi-cli.desktop-proof.v1");
+        assert!(
+            record["requiredFields"]
+                .as_array()
+                .expect("required fields")
+                .iter()
+                .any(|field| field == "signals")
+        );
+        assert!(
+            record["signalsFields"]
+                .as_array()
+                .expect("signal fields")
+                .iter()
+                .any(|field| field == "featureIds")
+        );
+        assert!(
+            record["catalogRule"]
+                .as_str()
+                .expect("catalog rule")
+                .contains("maximum")
+        );
     }
 
     fn assert_proof_levels(value: &Value, path: &str, allowed: &BTreeSet<&'static str>) {

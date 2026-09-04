@@ -6,8 +6,10 @@ description = "Deterministic, agent-friendly Power BI PBIP/PBIR/TMDL authoring a
 license = "MIT"
 repository = "https://github.com/odcpw/powerbi-cli"
 include = [
+    "/build.rs",
     "/src/**",
     "/integrations/microsoft/**",
+    "/testdata/desktop-proof/**",
     "/Cargo.toml",
     "/Cargo.lock",
     "/LICENSE",
