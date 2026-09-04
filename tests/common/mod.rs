@@ -41,6 +41,10 @@ pub fn run_powerbi_owned(args: &[String]) -> CliRun {
     run::run_powerbi_owned(args)
 }
 
+pub fn run_powerbi_owned_with_peak_memory(args: &[String]) -> (CliRun, u64) {
+    run::run_powerbi_owned_with_peak_memory(args)
+}
+
 pub fn assert_json_snapshot(name: &str, value: &Value) {
     snapshots::assert_json_snapshot(name, value);
 }

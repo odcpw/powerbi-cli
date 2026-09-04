@@ -253,11 +253,13 @@ cargo run --bin powerbi-cli -- package source-pack --project .\build\sales --out
 cargo run --bin powerbi-cli -- package work-pack --project .\build\sales-live --json
 cargo run --bin powerbi-cli -- package export-plan --project .\build\sales --json
 cargo run --bin powerbi-cli -- schema validate .\examples\sales.schema.json --json
+cargo run --bin powerbi-cli -- schema normalize .\examples\sales.schema.json --out .\build\sales.schema.normalized.json --json
 cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.json --out .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --intent .\examples\intents\sales.intent.json --out .\build\sales.intent.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
+cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
 cargo run --bin powerbi-cli -- validate --strict .\build\generic-sales --json
@@ -406,6 +408,19 @@ and non-ASCII column/measure names. The manifest describes:
 - `interactions`: optional same-page visual pairs with `DataFilter`,
   `HighlightFilter`, or `NoFilter`; referenced visual IDs are validated and
   compiled into PBIR `visualInteractions`
+
+Schema manifests may declare a non-empty `schemaVersion` (missing values emit
+a compatibility warning for one release before becoming an error) and compose
+bounded JSON fragments with `$include`. Includes are resolved relative to the
+including file and are supported at the schema root, table entries, and the
+v2 dashboard spec's `model`, `pages[]`, and `style` sections. The input-safety
+guard rejects traversal, canonical paths outside the root, symlinks, cycles,
+fragments deeper than eight levels, more than 200 fragments, or fragments
+larger than 8 MiB. Run `schema normalize` or `report spec normalize` to write
+a canonical, byte-stable document; the JSON response records sorted,
+root-relative `normalizedFrom[]` provenance. Schema validation and report build
+consume the same normalized values, so an inline document and an equivalent
+include tree produce the same artifact output and parity fingerprint.
 
 Semantic-model handles percent-encode literal `%` and `:` inside table, column,
 measure, and partition components as `%25` and `%3A`; always reuse returned

@@ -345,14 +345,17 @@ would reveal candidates. No guessing.
 
 ### T2.4 Composition, versioning, scale
 
-Roadmap item 10, never started: large schemas and specs will not fit one
-file. Add `schemaVersion` to the schema manifest, `$include` for both schema
-and spec (relative paths only, no traversal outside the spec directory, cycle
-detection), and `schema normalize`/`report spec normalize` to flatten into
-one canonical file for reproducibility and fingerprinting. The artifact-parity
-fingerprint must be computed on the normalized form. Perf target: a
-100-table schema with 50 included fragments normalizes and builds within the
-limits in the targets table.
+Implemented by `pbi-t2-dashboard-spec-v2-dsd.4`: large schemas and specs can be
+composed from bounded relative `$include` fragments. `schemaVersion` is
+warning-only for one compatibility release, while `schema normalize` and
+`report spec normalize` flatten the supported composition points into
+deterministic canonical JSON with sorted `normalizedFrom[]` provenance.
+Traversal, canonical-root escape, symlink, cycle, depth, fragment-count, and
+fragment-size violations are refused by `IncludeGuard`. Report build consumes
+the normalized form, so artifact parity is based on equivalent normalized
+documents. The perf test covers a 100-table schema assembled from 50
+fragments and enforces the ten-second target; the 512 MiB target remains part
+of the CI resource budget.
 
 ### T2.5 Spec extraction and spec diff
 

@@ -6,8 +6,11 @@ Every file that enters through a CLI argument is untrusted. Readers must use
 the typed guards in `src/input_safety.rs`, reject before parsing or applying
 when a limit is exceeded, decode text strictly as UTF-8, and return
 `error.code = "input_safety_violation"` (exit 10) with a hint and executable
-`suggestedCommands[]`. Limits are fixed contract values, not automatically
-raised from file metadata or content.
+`suggestedCommands[]`. Schema/spec composition additionally maps the guard's
+path and cycle refusals to the stable, more actionable `include.path_escape`
+and `include.cycle` diagnostic codes (still exit 10); budget, symlink, and
+other input-boundary failures retain `input_safety_violation`. Limits are
+fixed contract values, not automatically raised from file metadata or content.
 
 The same values are machine-readable at `capabilities.limits`, including in a
 focused `capabilities --for ...` response.
@@ -37,7 +40,9 @@ does not weaken or replace those boundaries.
 - Schema/spec composition calls `IncludeGuard::new` once for the root and
   `IncludeGuard::resolve` for every edge while passing the active canonical
   stack. The guard owns depth, total-count, traversal, containment, symlink,
-  and cycle refusals.
+  and cycle refusals; the composition layer preserves the semantic
+  `include.path_escape`/`include.cycle` codes and includes the active chain for
+  cycles.
 - Profile v2 calls `read_rows`; its returned `BoundedRows` contains exact CSV
   strings or the parsed JSON value plus observed row/column counts.
 - Registered-resource image authoring calls `read_png` before it registers or
