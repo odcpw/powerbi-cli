@@ -136,6 +136,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let normalized_schema = h.root.join("everything.schema.normalized.json");
     let profile = h.root.join("everything.profile.json");
     let spec = h.root.join("everything.dashboard.json");
+    let upgraded_spec = h.root.join("everything.dashboard.v2.json");
     let planned_spec = h.root.join("everything.planned.dashboard.json");
     let project = h.root.join("EverythingAcceptance");
     let scaffold_project = h.root.join("ScaffoldSmoke");
@@ -279,6 +280,22 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let upgraded = h.ok(
+        "report spec upgrade",
+        &svec([
+            "report",
+            "spec",
+            "upgrade",
+            "--spec",
+            &p(&spec),
+            "--out",
+            &p(&upgraded_spec),
+            "--json",
+        ]),
+    );
+    assert_eq!(upgraded["targetVersion"], "powerbi-cli.dashboard.v2");
+    assert_eq!(upgraded["transformedPointers"], json!(["/schema"]));
+    assert!(upgraded_spec.is_file());
     h.ok(
         "report spec fields",
         &svec([

@@ -248,6 +248,7 @@ cargo run --bin powerbi-cli -- profile infer --schema .\examples\sales.schema.js
 cargo run --bin powerbi-cli -- report plan --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --objective "Executive sales overview" --out .\build\sales.planned.dashboard.json --json
 cargo run --bin powerbi-cli -- report spec fields --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --json
 cargo run --bin powerbi-cli -- report spec validate --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --json
+cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
 cargo run --bin powerbi-cli -- validate --strict .\build\generic-sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\generic-sales --json
@@ -423,7 +424,11 @@ three pages.
   sections whose compiler bead has not landed return `unsupported_feature`
   with the owning bead id instead of being dropped. The checked-in
   `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
-  subset and builds byte-identically to the v1 sales fixture.
+  subset and builds byte-identically to the v1 sales fixture. To migrate any
+  validated v1 spec, run `report spec upgrade --spec <v1.json> --out <v2.json>`;
+  the command rewrites only `/schema`, preserves array order, normalizes object
+  keys, and returns every transformed pointer. Unknown v1 keys fail with
+  `spec.unknown_field` before the output is created.
   Validation failures are returned on stdout as `errors[]` objects with required
   `code` and `message` fields plus optional `pointer`, `didYouMean`, `hint`, and
   `suggestedCommands`; they are not legacy error strings. The exact response

@@ -395,8 +395,12 @@ The accepted schemas are `powerbi-cli.dashboard.v1` and the v2 superset. A v2
 section is safe to retain before its compiler lands: compiled validation/build
 will return `unsupported_feature` with the owning T3 bead id, never silently
 discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
-  reference; `report spec upgrade` remains assigned to
-  `pbi-t2-dashboard-spec-v2-dsd.6`.
+  reference. Migrate a validated v1 spec with
+  `report spec upgrade --spec <v1.json> --out <v2.json>`; it rewrites only
+  `/schema`, preserves array order, recursively normalizes object keys, and
+  reports every transformed pointer. Use `--dry-run` to inspect the v2
+  document without writing; unknown v1 keys fail with
+  `spec.unknown_field` before output.
   `report spec validate` writes validation failures to stdout as structured
   `errors[]` objects (`code` and `message` are required; `pointer`,
   `didYouMean`, `hint`, and `suggestedCommands` are optional). Consumers should
@@ -408,6 +412,7 @@ pbi --json schema validate examples/sales.schema.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
 pbi --json profile validate examples/sales.profile.json
 pbi --json report spec validate --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json
+pbi --json report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json
 pbi --json report build --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/generic-sales --force
 pbi --json validate --strict build/generic-sales
 pbi --json handoff check build/generic-sales
