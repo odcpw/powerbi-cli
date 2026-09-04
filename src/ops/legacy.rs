@@ -383,6 +383,18 @@ mod tests {
             Op::FormattingApply(MutationPayload {
                 fields: BTreeMap::new(),
             }),
+            Op::ApplyThemeBundle(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::ApplyStyleBundle(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::BookmarkMetadata(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
+            Op::SanitizeAction(MutationPayload {
+                fields: BTreeMap::new(),
+            }),
         ];
         for operation in operations {
             let value = serde_json::to_value(&operation).expect("serialize operation");

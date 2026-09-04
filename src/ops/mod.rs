@@ -29,6 +29,7 @@ mod model_kernels;
 mod page_kernels;
 mod plan;
 mod set_interaction;
+mod style_kernels;
 mod transaction;
 mod visual_kernels;
 
@@ -56,6 +57,7 @@ pub(crate) use model_kernels::*;
 pub(crate) use page_kernels::*;
 pub(crate) use plan::*;
 pub(crate) use set_interaction::*;
+pub(crate) use style_kernels::*;
 #[allow(unused_imports)]
 pub(crate) use transaction::*;
 pub(crate) use visual_kernels::*;
@@ -106,8 +108,52 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         Op::ApplyThemeBundle(_)
         | Op::ApplyStyleBundle(_)
         | Op::BookmarkMetadata(_)
-        | Op::SanitizeAction(_) => None,
+        | Op::SanitizeAction(_) => Some(Box::new(StyleKernel)),
     }
+}
+
+/// Operation tags with a concrete kernel in this branch.
+///
+/// Keep this list next to [`kernel_for`] so the equivalence harness can detect
+/// a newly registered operation that lacks a parity case. Sibling branches may
+/// extend it with their pending operation families when the branches merge.
+pub(crate) const fn registered_kernel_tags() -> &'static [&'static str] {
+    &[
+        "addMeasure",
+        "addRelationship",
+        "addVisual",
+        "addFilter",
+        "setDrillthrough",
+        "setInteraction",
+        "applyThemePreset",
+        "addCalculatedColumn",
+        "addStaticTable",
+        "setSortBy",
+        "sourceTemplateApply",
+        "addPage",
+        "updatePage",
+        "reorderPages",
+        "setActivePage",
+        "deleteEmptyPage",
+        "clonePage",
+        "setBindings",
+        "setDisplayName",
+        "setTopNGuard",
+        "setDrilldownHierarchy",
+        "cloneVisual",
+        "deleteVisual",
+        "updateFilter",
+        "deleteFilter",
+        "clearFilter",
+        "slicerClear",
+        "setText",
+        "setColor",
+        "formattingApply",
+        "applyThemeBundle",
+        "applyStyleBundle",
+        "bookmarkMetadata",
+        "sanitizeAction",
+    ]
 }
 
 /// A typed operation accepted by the operation-plan compiler.
