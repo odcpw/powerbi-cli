@@ -1,12 +1,15 @@
 mod common;
 
-use common::{run_powerbi_owned, stdout_json};
+use common::{run_powerbi_owned, run_powerbi_owned_with_peak_memory, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
 const TWENTY_TABLE_TEN_PAGE_LIMIT: Duration = Duration::from_secs(3);
+const HUNDRED_TABLE_FIFTY_INCLUDE_LIMIT: Duration = Duration::from_secs(10);
+const HUNDRED_TABLE_FIFTY_INCLUDE_MEMORY_LIMIT_BYTES: u64 = 512 * 1024 * 1024;
+const HUNDRED_THOUSAND_ROW_PROFILE_LIMIT: Duration = Duration::from_secs(3);
 
 #[test]
 #[ignore = "nightly performance gate"]
@@ -40,6 +43,153 @@ fn report_build_twenty_tables_ten_pages_completes_under_three_seconds() {
         "20-table/10-page report build took {:?}, limit is {:?}",
         run.elapsed,
         TWENTY_TABLE_TEN_PAGE_LIMIT
+    );
+}
+
+#[test]
+#[ignore = "nightly performance gate"]
+fn hundred_table_schema_with_fifty_includes_builds_under_ten_seconds() {
+    let temp = tempfile::tempdir().expect("composition perf tempdir");
+    let parts = temp.path().join("parts");
+    fs::create_dir_all(&parts).expect("composition parts directory");
+    let mut includes = Vec::new();
+    for fragment_index in 0..50 {
+        let tables = (0..2)
+            .map(|table_offset| {
+                let table_index = fragment_index * 2 + table_offset;
+                json!({
+                    "name": format!("IncludeTable{table_index:03}"),
+                    "columns": [{"name": "Value", "dataType": "int64"}],
+                    "rows": []
+                })
+            })
+            .collect::<Vec<_>>();
+        let name = format!("fragment-{fragment_index:02}.json");
+        write_json(&parts.join(&name), &json!({"tables": tables}));
+        includes.push(format!("parts/{name}"));
+    }
+    let schema_path = temp.path().join("hundred-table.schema.json");
+    write_json(
+        &schema_path,
+        &json!({
+            "schemaVersion": "1",
+            "name": "HundredTableIncludePerf",
+            "displayName": "Hundred Table Include Perf",
+            "$include": includes,
+            "relationships": []
+        }),
+    );
+    let spec_path = temp.path().join("empty.dashboard.json");
+    write_json(
+        &spec_path,
+        &json!({
+            "schema": "powerbi-cli.dashboard.v1",
+            "report": {"name": "HundredTableIncludePerf"},
+            "pages": []
+        }),
+    );
+    let normalized_path = temp.path().join("hundred-table.normalized.json");
+    let normalize = run_powerbi_owned(&[
+        "schema".into(),
+        "normalize".into(),
+        path_arg(&schema_path),
+        "--out".into(),
+        path_arg(&normalized_path),
+        "--json".into(),
+    ]);
+    assert_eq!(
+        normalize.exit, 0,
+        "normalize failed\nstdout: {}\nstderr: {}",
+        normalize.stdout, normalize.stderr
+    );
+    assert!(
+        normalize.elapsed < HUNDRED_TABLE_FIFTY_INCLUDE_LIMIT,
+        "100-table/50-include normalize took {:?}, limit is {:?}",
+        normalize.elapsed,
+        HUNDRED_TABLE_FIFTY_INCLUDE_LIMIT
+    );
+
+    let project = temp.path().join("hundred-table-project");
+    let (build, peak_memory_bytes) = run_powerbi_owned_with_peak_memory(&[
+        "report".into(),
+        "build".into(),
+        "--schema".into(),
+        path_arg(&schema_path),
+        "--spec".into(),
+        path_arg(&spec_path),
+        "--out-dir".into(),
+        path_arg(&project),
+        "--json".into(),
+    ]);
+    assert_eq!(
+        build.exit, 0,
+        "build failed\nstdout: {}\nstderr: {}",
+        build.stdout, build.stderr
+    );
+    assert_eq!(stdout_json(&build)["compiled"]["counts"]["tables"], 100);
+    assert!(
+        build.elapsed < HUNDRED_TABLE_FIFTY_INCLUDE_LIMIT,
+        "100-table/50-include build took {:?}, limit is {:?}",
+        build.elapsed,
+        HUNDRED_TABLE_FIFTY_INCLUDE_LIMIT
+    );
+    assert!(
+        peak_memory_bytes > 0,
+        "peak RSS sampler did not observe the child process"
+    );
+    assert!(
+        peak_memory_bytes < HUNDRED_TABLE_FIFTY_INCLUDE_MEMORY_LIMIT_BYTES,
+        "100-table/50-include build used {peak_memory_bytes} bytes RSS, limit is {HUNDRED_TABLE_FIFTY_INCLUDE_MEMORY_LIMIT_BYTES}"
+    );
+}
+
+#[test]
+#[ignore = "nightly performance gate"]
+fn profile_infer_one_hundred_thousand_rows_completes_under_three_seconds() {
+    let temp = tempfile::tempdir().expect("perf tempdir");
+    let schema_path = temp.path().join("rows.schema.json");
+    let rows_path = temp.path().join("rows.csv");
+    write_json(
+        &schema_path,
+        &json!({
+            "name": "RowsPerf",
+            "displayName": "Rows Performance",
+            "tables": [{
+                "name": "FactRows",
+                "columns": [
+                    {"name": "Id", "dataType": "int64", "isKey": true},
+                    {"name": "EventDate", "dataType": "date"},
+                    {"name": "Amount", "dataType": "decimal"},
+                    {"name": "Category", "dataType": "string"}
+                ]
+            }]
+        }),
+    );
+    let mut rows = String::from("Id,EventDate,Amount,Category\n");
+    for index in 0..99_999 {
+        rows.push_str(&format!(
+            "{index},2026-01-01,{},Synthetic{}\n",
+            index as f64 / 10.0,
+            index % 10
+        ));
+    }
+    fs::write(&rows_path, rows).expect("write rows perf fixture");
+    let run = run_powerbi_owned(&[
+        "profile".into(),
+        "infer".into(),
+        "--schema".into(),
+        path_arg(&schema_path),
+        "--rows".into(),
+        path_arg(&rows_path),
+        "--json".into(),
+    ]);
+    assert_eq!(run.exit, 0, "profile perf failed: {}", run.stderr);
+    assert_eq!(stdout_json(&run)["profile"]["source"]["rowCount"], 99_999);
+    assert!(
+        run.elapsed < HUNDRED_THOUSAND_ROW_PROFILE_LIMIT,
+        "100k-row profile inference took {:?}, limit is {:?}",
+        run.elapsed,
+        HUNDRED_THOUSAND_ROW_PROFILE_LIMIT
     );
 }
 

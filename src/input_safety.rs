@@ -1,11 +1,12 @@
 //! Uniform safety contract for files supplied at CLI input boundaries.
 //!
 //! Existing readers should call [`read_bytes`] or [`read_utf8`] with a typed
-//! [`InputKind`] instead of reading an unbounded file. Future `$include`, rows,
-//! image, ops, snapshot, and Desktop-reference-harvesting commands must use the
-//! purpose-built APIs in this module. The module does not add command stubs: it
-//! provides the limits and refusal behavior that the owning command beads must
-//! call when those surfaces land.
+//! [`InputKind`] instead of reading an unbounded file. Profile row inference
+//! uses [`read_rows`]; future `$include`, image, ops, snapshot, and
+//! Desktop-reference-harvesting commands must use the purpose-built APIs in
+//! this module. The module does not add command stubs: it provides the limits
+//! and refusal behavior that the owning command beads must call when those
+//! surfaces land.
 
 use crate::{CliError, CliResult, EXIT_VALIDATION_FAILED};
 use serde_json::{Value, json};
@@ -414,10 +415,17 @@ pub(crate) fn read_ops(path: &Path, known_kinds: &[&str]) -> CliResult<Value> {
         .and_then(Value::as_array)
         .ok_or_else(|| refusal(InputKind::Ops, "ops file must contain an ops array"))?;
     for (index, op) in ops.iter().enumerate() {
-        let kind = op.get("kind").and_then(Value::as_str).ok_or_else(|| {
+        // Durable operation plans use the typed IR's `op` tag. Keep accepting
+        // the historical safety-harness spelling `kind` so this boundary can
+        // validate both forms before the owning parser normalizes them.
+        let (kind_value, field) = match op.get("op") {
+            Some(value) => (Some(value), "op"),
+            None => (op.get("kind"), "kind"),
+        };
+        let kind = kind_value.and_then(Value::as_str).ok_or_else(|| {
             refusal(
                 InputKind::Ops,
-                format!("ops[{index}].kind must be a string"),
+                format!("ops[{index}].{field} must be a string"),
             )
         })?;
         if !known_kinds.contains(&kind) {

@@ -89,26 +89,35 @@ pub(crate) fn write_text_atomic_validated<T>(
     }
 }
 
-struct PendingTextWrite {
+pub(crate) struct PendingTextWrite {
     path: PathBuf,
     backup: Option<PathBuf>,
 }
 
 impl PendingTextWrite {
-    fn commit(self) -> CliResult<()> {
-        if let Some(backup) = self.backup {
-            fs::remove_file(&backup).map_err(|err| {
-                CliError::unexpected(format!(
-                    "atomic replace succeeded for {}, but backup cleanup failed; backup retained at {}: {err}",
-                    self.path.display(),
-                    backup.display()
-                ))
-            })?;
+    pub(crate) fn commit(self) -> CliResult<()> {
+        let mut pending = self;
+        pending.commit_batch()
+    }
+
+    /// Finalize a staged write while retaining the object for a batch-level
+    /// rollback if backup cleanup fails. The ordinary [`commit`] API remains
+    /// consuming for existing callers.
+    pub(crate) fn commit_batch(&mut self) -> CliResult<()> {
+        if let Some(backup) = self.backup.take()
+            && let Err(err) = fs::remove_file(&backup)
+        {
+            self.backup = Some(backup.clone());
+            return Err(CliError::unexpected(format!(
+                "atomic replace succeeded for {}, but backup cleanup failed; backup retained at {}: {err}",
+                self.path.display(),
+                backup.display()
+            )));
         }
         Ok(())
     }
 
-    fn rollback(self) -> CliResult<()> {
+    pub(crate) fn rollback(self) -> CliResult<()> {
         let Some(backup) = self.backup else {
             return fs::remove_file(&self.path).map_err(|err| {
                 CliError::unexpected(format!(
@@ -159,7 +168,7 @@ impl PendingTextWrite {
     }
 }
 
-fn begin_text_atomic(path: &Path, text: &str) -> CliResult<PendingTextWrite> {
+pub(crate) fn begin_text_atomic(path: &Path, text: &str) -> CliResult<PendingTextWrite> {
     let parent = path
         .parent()
         .ok_or_else(|| CliError::unexpected(format!("path has no parent: {}", path.display())))?;

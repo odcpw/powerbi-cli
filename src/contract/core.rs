@@ -208,6 +208,7 @@ Usage:
   powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json
   powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) --out <dashboard.json> --json
   powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json
+  powerbi-cli report spec normalize <dashboard.json> --out <canonical.json> --json
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
   powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json
   powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--out <file.md>] [--force] --json
@@ -236,7 +237,7 @@ pub(crate) fn help_json() -> Value {
             "powerbi-cli robot-docs guide",
             "powerbi-cli --json doctor",
             "powerbi-cli schema validate <schema.json> --json",
-            "powerbi-cli profile infer --schema <schema.json> --out <profile.json> --json",
+            "powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] --out <profile.json> --json",
             "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
             "powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json",
             "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json> --json",
@@ -364,7 +365,7 @@ Rules for agents:
 - Start with `powerbi-cli --json capabilities` and trust that payload over memory.
 - Use `powerbi-cli version --json` for a cheap provenance check before relying on cached command knowledge.
 - Use `powerbi-cli features list --json` to distinguish supported, read-only, planned, and explicitly refused Power BI feature surfaces. If a command returns `error.code = "unsupported_feature"`, stop or choose a supported workflow; do not raw-patch guessed PBIR/TMDL.
-- Read `capabilities.limits` before supplying files. Schema, profile, spec, JSON bundle, intent, and source-text reads are byte-bounded, strict UTF-8, and refuse symlinks; planned include, rows, PNG, ops, snapshot, and harvested-fragment surfaces have reserved numeric contracts there. Safety refusals use `input_safety_violation`; do not bypass them or silently strip content.
+- Read `capabilities.limits` before supplying files. Schema, profile, spec, JSON bundle, intent, source-text, and rows reads are byte-bounded, strict UTF-8, and refuse symlinks; planned include, PNG, ops, snapshot, and harvested-fragment surfaces have reserved numeric contracts there. Safety refusals use `input_safety_violation`; do not bypass them or silently strip content.
 - Use `package inspect/extract/import/source-pack/work-pack/export-plan` for PBIX/PBIT package boundaries. Extraction has streaming entry-count, per-entry, total-size, and compression-ratio limits. `source-pack` accepts only dummy partitions. `work-pack` uses the same strict file allowlist but requires every partition to be a recognized credential-free materialized live source accepted by `handoff check --target work`; it contains source metadata, never imported rows or caches. Both scan every included file before writing; `export-plan` is a Desktop handoff plan for opaque Desktop binaries.
 - For arbitrary dashboards, start with `schema validate`, `profile infer`, `report plan`, `report spec validate`, then `report build`.
 - To migrate a v1 dashboard spec, run `report spec upgrade --spec <v1.json> --out <v2.json>`; it validates every v1 key, rewrites only `/schema`, preserves array order, and returns the transformed pointers.
@@ -404,7 +405,7 @@ Rules for agents:
 
 Common workflow:
 1. `powerbi-cli schema validate <schema.json> --json`
-2. `powerbi-cli profile infer --schema <schema.json> --out <profile.json> --json`
+2. `powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] --out <profile.json> --json`
 3. `powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json`
 4. `powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json` (when starting from v1)
 5. `powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json> --json`
@@ -441,12 +442,13 @@ pub(crate) fn robot_triage() -> Value {
             "fixtureVerify": "powerbi-cli fixture verify <project-dir-or.pbip> --expected <summary.json> --json",
             "schemaValidate": "powerbi-cli schema validate <schema.json> --json",
             "schemaNormalize": "powerbi-cli schema normalize <schema.json> --out <canonical.json> --json",
-            "profileInfer": "powerbi-cli profile infer --schema <schema.json> --out <profile.json> --json",
+            "profileInfer": "powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] --out <profile.json> --json",
             "profileValidate": "powerbi-cli profile validate <profile.json> --json",
             "reportSpecFields": "powerbi-cli report spec fields --schema <schema.json> --profile <profile.json> --json",
             "reportSpecUpgrade": "powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json",
             "reportPlan": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json> --json",
             "reportSpecValidate": "powerbi-cli report spec validate --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --json",
+            "reportSpecNormalize": "powerbi-cli report spec normalize <dashboard.json> --out <canonical.json> --json",
             "reportBuild": "powerbi-cli report build --schema <schema.json> --profile <profile.json> --spec <dashboard.json> --out-dir <project-dir> --json",
             "packageSourcePack": "powerbi-cli package source-pack --project <project-dir-or.pbip> --out <archive.pbit> --json",
             "packageWorkPack": "powerbi-cli package work-pack --project <project-dir-or.pbip> --json",
@@ -891,12 +893,14 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.schema.validate.v1",
             "flags": ["<schema.json>", "--schema <schema.json>", "--json", "--format json"],
             "examples": ["powerbi-cli schema validate examples/sales.schema.json --json"],
-            "followUpFields": ["ok", "counts", "tables", "warnings", "errors", "next"]
+            "followUpFields": ["ok", "counts", "tables", "warnings", "errors", "normalizedFrom", "next"],
+            "supportedIncludes": ["root", "tables[]"],
+            "diagnosticCodes": ["include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"]
         }),
         json!({
             "path": "schema normalize",
             "usage": "powerbi-cli schema normalize <schema.json> --out <canonical.json> --json",
-            "summary": "Write a canonical pretty-printed schema manifest for review and reproducible dashboard builds",
+            "summary": "Resolve supported schema includes and write a canonical pretty-printed manifest for review and reproducible dashboard builds",
             "tags": ["schema", "manifest", "normalize", "golden", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -909,12 +913,14 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.schema.normalize.v1",
             "flags": ["<schema.json>", "--schema <schema.json>", "--out <canonical.json>", "--json", "--format json"],
             "examples": ["powerbi-cli schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json --json"],
-            "followUpFields": ["ok", "schemaPath", "normalizedOut", "counts", "next"]
+            "followUpFields": ["ok", "schemaPath", "normalizedOut", "normalizedFrom", "counts", "next"],
+            "supportedIncludes": ["root", "tables[]"],
+            "diagnosticCodes": ["include.invalid", "include.parse", "include.path_escape", "include.cycle", "include.unsupported_location", "input_safety_violation"]
         }),
         json!({
             "path": "profile infer",
-            "usage": "powerbi-cli profile infer --schema <schema.json> [--out <profile.json>] --json",
-            "summary": "Infer an advisory data profile from schema metadata and embedded dummy rows",
+            "usage": "powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] [--out <profile.json>] [--include-data-values] [--redact] --json",
+            "summary": "Infer an advisory profile from schema metadata and bounded CSV/JSON rows; top values are redacted unless explicitly opted in",
             "tags": ["profile", "schema", "dashboard", "inference", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -923,10 +929,11 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "writesDataCache": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
-            "outputSchema": "powerbi-cli.profile.infer.v1",
-            "flags": ["--schema <schema.json>", "--out <profile.json>", "--rows <dummy.csv|json> (planned)", "--json", "--format json"],
-            "examples": ["powerbi-cli profile infer --schema examples/sales.schema.json --out build/sales.profile.json --json"],
-            "followUpFields": ["profile", "profile.tables", "profile.candidates", "next"]
+            "outputSchema": "powerbi-cli.profile.infer.v2",
+            "outputSchemas": ["powerbi-cli.profile.infer.v1", "powerbi-cli.profile.infer.v2"],
+            "flags": ["--schema <schema.json>", "--rows <rows.csv|rows.json>", "--out <profile.json>", "--include-data-values", "--redact (deprecated no-op)", "--json", "--format json"],
+            "examples": ["powerbi-cli profile infer --schema examples/sales.schema.json --out build/sales.profile.json --json", "powerbi-cli profile infer --schema examples/sales.schema.json --rows build/sales.csv --out build/sales.profile.json --json"],
+            "followUpFields": ["profile", "profile.schema", "profile.dataValues", "profile.tables", "profile.candidates", "profile.diagnostics", "profile.grainConflicts", "deprecations", "next"]
         }),
         json!({
             "path": "profile validate",
@@ -1030,7 +1037,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "handoffCheck.v1",
             "flags": ["--project <project-dir-or.pbip>", "--target offline|work", "--json", "--format json"],
             "examples": ["powerbi-cli handoff check build/sales --json", "powerbi-cli handoff check report/live.pbip --target work --json", "powerbi-cli handoff-check build/sales --json"],
-            "followUpFields": ["ok", "exitCode", "target", "sourceMode", "status", "safeForOfflineHandoff", "safeForWorkHandoff", "counts.safeForTargetPartitions", "counts.acceptedLivePartitions", "counts.reviewPartitions", "counts.reviewFindings", "findings", "partitions", "next", "instructions"]
+            "followUpFields": ["ok", "exitCode", "target", "sourceMode", "status", "dataBearing", "dataBearingProfiles", "counts.dataBearingProfiles", "safeForOfflineHandoff", "safeForWorkHandoff", "counts.safeForTargetPartitions", "counts.acceptedLivePartitions", "counts.reviewPartitions", "counts.reviewFindings", "findings", "partitions", "next", "instructions"]
         }),
         json!({
             "path": "handoff rebind-plan",
@@ -1148,7 +1155,7 @@ fn schema_manifest() -> Value {
         "sourceTemplateFields": ["handle", "name", "partitionHandle", "table", "partition", "kind", "parameters", "mTemplate", "description", "safety"],
         "sourceTemplateKinds": ["sql", "postgres", "odbc", "excel"],
         "rebindPlanFields": ["handle", "partitionHandle", "table", "partition", "currentSourceKind", "sourceRange", "template", "mTemplate", "manualSteps"],
-        "profileFields": ["schema", "source", "tables", "tables[].role", "tables[].rowCount", "tables[].columns", "tables[].columns[].roles", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "warnings"],
+        "profileFields": ["schema", "dataValues", "source", "source.kind", "source.format", "source.schemaPath", "source.rowsPath", "source.table", "source.rowCount", "source.columnCount", "tables", "tables[].name", "tables[].role", "tables[].rowCount", "tables[].grainConflicts", "tables[].columns", "tables[].columns[].name", "tables[].columns[].dataType", "tables[].columns[].isKey", "tables[].columns[].nullCount", "tables[].columns[].nullRate", "tables[].columns[].distinctCount", "tables[].columns[].min", "tables[].columns[].max", "tables[].columns[].timeCoverage", "tables[].columns[].topValues", "tables[].columns[].topValueCounts", "tables[].columns[].valuesRedacted", "tables[].columns[].typeCoercion", "tables[].columns[].coercionDiagnostics", "tables[].columns[].roles", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "grainConflicts", "diagnostics", "warnings"],
         "dashboardSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
         "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "pages[].id", "pages[].displayName", "pages[].size", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
         "intentVersions": ["intent.v1"],
@@ -1254,6 +1261,8 @@ fn schema_manifest() -> Value {
         "package",
         "packageKind",
         "packageClass",
+        "dataBearing",
+        "profileDataBearing",
         "entries[].name",
         "entries[].category",
         "validation",
@@ -1268,6 +1277,8 @@ fn schema_manifest() -> Value {
         "package",
         "packageKind",
         "packageClass",
+        "dataBearing",
+        "profileDataBearing",
         "sourcePolicy",
         "entries[].name",
         "entries[].category",
@@ -1445,6 +1456,12 @@ fn response_shapes() -> Value {
                 }
             }
         },
+        "reportSpecNormalize": {
+            "schema": "powerbi-cli.report.spec.normalize.v1",
+            "transport": "stdout",
+            "requiredFields": ["ok", "exitCode", "specPath", "normalizedOut", "normalizedFrom", "specVersion", "next"],
+            "normalizedFrom": "Root-relative included JSON fragments, sorted and de-duplicated for deterministic provenance."
+        },
         "reportSpecUpgrade": {
             "schema": "powerbi-cli.report.spec.upgrade.v1",
             "transport": "stdout",
@@ -1454,6 +1471,17 @@ fn response_shapes() -> Value {
             "transformedPointers": "RFC 6901 pointers for fields rewritten or inserted; v1-to-v2 currently reports /schema",
             "normalization": "Object keys are recursively sorted while array order is preserved.",
             "unknownFieldFailure": "Unknown v1 keys return spec.unknown_field on stderr with no output file written."
+        },
+        "ops.v1": {
+            "schema": "powerbi-cli.ops.v1",
+            "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
+            "requiredFields": ["schema", "ops"],
+            "operationTag": "op",
+            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "applyThemePreset", "setObject"],
+            "validation": ["dangling handles must resolve in the project or an earlier declaration", "declared handles are unique", "identical operations are rejected", "model, page, visual, behavior, and style stages are ordered"],
+            "validatedPlanFields": ["ops[].index", "ops[].stage", "ops[].operation", "stages[].stage", "stages[].name", "stages[].operations"],
+            "transactionModes": ["dry-run", "out-dir", "in-place with sibling snapshot"],
+            "status": "internal-spine-no-cli-command-yet"
         },
         "followUps": {
             "next": "Executable powerbi-cli command templates only.",
@@ -1578,6 +1606,28 @@ mod tests {
                 .as_str()
                 .expect("catalog rule")
                 .contains("maximum")
+        );
+    }
+
+    #[test]
+    fn capabilities_document_the_durable_operation_plan_contract() {
+        let value = capabilities(&[]).expect("capabilities");
+        let ops = &value["responseShapes"]["ops.v1"];
+        assert_eq!(ops["schema"], "powerbi-cli.ops.v1");
+        assert_eq!(ops["operationTag"], "op");
+        assert!(
+            ops["operationTags"]
+                .as_array()
+                .expect("operation tags")
+                .iter()
+                .any(|tag| tag == "addVisual")
+        );
+        assert!(
+            ops["transactionModes"]
+                .as_array()
+                .expect("transaction modes")
+                .iter()
+                .any(|mode| mode == "in-place with sibling snapshot")
         );
     }
 

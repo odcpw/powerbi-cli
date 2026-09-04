@@ -2,7 +2,7 @@ mod common;
 
 use common::{run_powerbi_owned, stdout_json};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -79,6 +79,81 @@ fn generated_artifact_trees_are_byte_deterministic_and_match_the_bound_corpus() 
             case.name
         );
     }
+}
+
+#[test]
+fn normalized_schema_input_keeps_include_and_inline_artifact_fingerprints_equal() {
+    let temp = tempfile::tempdir().expect("normalized parity tempdir");
+    let parts = temp.path().join("parts");
+    fs::create_dir_all(&parts).expect("normalized parity parts");
+    let table = json!({
+        "name": "Fact",
+        "columns": [{"name": "Value", "dataType": "int64"}],
+        "rows": []
+    });
+    write_json(
+        &parts.join("table.json"),
+        &json!({"tables": [table.clone()]}),
+    );
+    let included_schema = temp.path().join("included.schema.json");
+    write_json(
+        &included_schema,
+        &json!({
+            "schemaVersion": "1",
+            "name": "NormalizedParity",
+            "$include": "parts/table.json"
+        }),
+    );
+    let inline_schema = temp.path().join("inline.schema.json");
+    write_json(
+        &inline_schema,
+        &json!({"schemaVersion": "1", "name": "NormalizedParity", "tables": [table]}),
+    );
+    let spec = temp.path().join("parity.dashboard.json");
+    write_json(
+        &spec,
+        &json!({
+            "schema": "powerbi-cli.dashboard.v1",
+            "report": {"name": "NormalizedParity"},
+            "pages": []
+        }),
+    );
+
+    let included_project = temp.path().join("included-project");
+    let inline_project = temp.path().join("inline-project");
+    build_paths(&included_schema, &spec, &included_project);
+    build_paths(&inline_schema, &spec, &inline_project);
+    assert_eq!(
+        fingerprint_tree(&included_project),
+        fingerprint_tree(&inline_project),
+        "artifact parity must fingerprint normalized schema content"
+    );
+}
+
+fn build_paths(schema: &Path, spec: &Path, out_dir: &Path) {
+    let output = run_powerbi_owned(&[
+        "report".to_string(),
+        "build".to_string(),
+        "--schema".to_string(),
+        path_arg(schema),
+        "--spec".to_string(),
+        path_arg(spec),
+        "--out-dir".to_string(),
+        path_arg(out_dir),
+        "--json".to_string(),
+    ]);
+    assert_eq!(
+        output.exit, 0,
+        "normalized parity build failed: {}",
+        output.stderr
+    );
+    assert_eq!(stdout_json(&output)["ok"], Value::Bool(true));
+}
+
+fn write_json(path: &Path, value: &Value) {
+    let mut bytes = serde_json::to_vec_pretty(value).expect("serialize normalized parity input");
+    bytes.push(b'\n');
+    fs::write(path, bytes).expect("write normalized parity input");
 }
 
 fn build_case(case: &CorpusCase, out_dir: &Path) {

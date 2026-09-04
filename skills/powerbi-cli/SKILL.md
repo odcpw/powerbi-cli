@@ -136,9 +136,9 @@ to receive only its path, usage, flags, examples, proof level, follow-up fields,
 and output schema.
 
 Key live surfaces include package inspect/extract/import/source-pack/work-pack/export-plan,
-schema validate/normalize, profile
+schema validate/normalize (including bounded `$include` composition), profile
 infer/validate/summarize, deterministic report planning, declarative report spec
-validation, report build from schema/profile/spec inputs, scaffold, shallow/deep
+validation/normalization, report build from schema/profile/spec inputs, scaffold, shallow/deep
 inspect, semantic measure,
 calculated-column, and relationship diff, report wireframe JSON export,
 measure list/show/add/update/delete, static DAX dependencies/lint, explicitly
@@ -259,10 +259,22 @@ supported.
   raise them only with the matching explicit `--max-*` flag after inspection.
 - Treat `capabilities.limits` as the input-surface safety contract. Schema,
   profile, spec, JSON bundle, intent, and DAX/text files have fixed byte limits,
-  strict UTF-8 decoding, and symlink refusal. Planned includes, rows, PNG
+  strict UTF-8 decoding, and symlink refusal. Profile row inference consumes
+  bounded CSV/JSON rows through the same contract. Planned includes, PNG
   resources, ops, snapshots, and harvested fragments already have reserved
   numeric limits and typed guards in `docs/input-safety-contract.md`; do not
   bypass those guards or silently strip rejected content when adding a command.
+- Schema and v2 dashboard specs may use bounded, relative `$include` fragments.
+  Use `schema normalize` and `report spec normalize` when you need one
+  canonical artifact for review, caching, or parity checks. Their
+  `normalizedFrom[]` values are root-relative, sorted, and deterministic;
+  traversal, symlink, cycle, depth, count, and fragment-size failures are
+  refusals, not best-effort omissions.
+- The internal operation-plan spine is `powerbi-cli.ops.v1`: typed `op` records
+  use the same stable page, visual, filter, and percent-encoded semantic-model
+  handles as CLI readbacks. Plans validate references and stage order before a
+  temporary-directory transaction is published; no public `apply --ops` command
+  is advertised until the individual mutation kernels are converted.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.
@@ -349,12 +361,14 @@ pbi --json package work-pack --project build/sales-live
 Extraction removes partial output if the entry-count, per-entry, total-size, or
 compression-ratio budget is exceeded. Source packing permits only root `.pbip`,
 report PBIR/definition JSON, semantic-model PBISM/TMDL, registered/shared JSON
-resources, and generated `.gitignore`, `POWERBI_HANDOFF.md`, and
-`powerbi-cli.manifest.copy.json` sidecars. Files under `.git`, `.vscode`,
+resources, generated `.gitignore`, `POWERBI_HANDOFF.md`,
+`powerbi-cli.manifest.copy.json` sidecars, and root `profile*.json`/`*.profile*.json`
+metadata.
+Files under `.git`, `.vscode`,
 `.powerbi-cli`, or any other dot-directory are refused. The command scans all
 included content before creating the archive; credential-like content is unsafe,
-PII-suspect row literals require review, and non-dummy or unverified partition
-sources are refused.
+PII-suspect row literals require review, data-bearing profile v2 documents are
+refused, and non-dummy or unverified partition sources are refused.
 
 ### Export A Live PBIX Semantic Model To TMDL
 
@@ -409,18 +423,41 @@ discard it. `examples/sales.dashboard.v2.json` is the minimal compiled-v2
   read `errors[].message`, never treat an entry as a bare string. See
   `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
+For a composed spec, normalize it before handing it to another agent or build
+stage, then validate the normalized file. `report spec normalize` accepts the
+same positional path or `--spec` spelling as validation and writes a canonical
+JSON document plus `normalizedFrom[]` provenance. The schema-side equivalent is
+`schema normalize`; report build and artifact parity already normalize their
+schema/spec inputs internally, so an inline and include-composed document are
+expected to be byte-equivalent when their content is equivalent.
+
 ```bash
 pbi --json schema validate examples/sales.schema.json
+pbi --json schema normalize examples/sales.schema.json --out build/sales.schema.normalized.json
 pbi --json profile infer --schema examples/sales.schema.json --out examples/sales.profile.json
+pbi --json profile infer --schema examples/sales.schema.json --rows build/sales-rows.csv --out build/sales.profile.v2.json
 pbi --json profile validate examples/sales.profile.json
 pbi --json report plan --schema examples/sales.schema.json --profile examples/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.planned.dashboard.json
 pbi --json report spec validate --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json
+pbi --json report spec normalize examples/sales.dashboard.json --out build/sales.dashboard.normalized.json
 pbi --json report spec upgrade --spec examples/sales.dashboard.json --out build/sales.dashboard.v2.json
 pbi --json report build --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/generic-sales --force
 pbi --json validate --strict build/generic-sales
 pbi --json handoff check build/generic-sales
 pbi --json fixture verify build/generic-sales --expected testdata/golden/generic-sales.summary.json
 ```
+
+For bounded profile statistics, pass `--rows <rows.csv|rows.json>` to
+`profile infer`. The rows reader enforces the limits in
+`docs/input-safety-contract.md`; CSV uses its first record as a header and JSON
+accepts object records or a header-row array. Profile v2 emits null rates,
+distinct counts, numeric/date min/max, time coverage, duplicate-key grain
+conflicts, and type-coercion diagnostics. Literal top values are redacted by
+default (`topValueCounts` and cardinality remain available). Only an explicit
+`--include-data-values` may emit at most five bounded top values per column,
+after credential/PII scanning; profiles stamped `dataValues:true` are
+data-bearing and are reported by `handoff check` and refused by
+`package source-pack`. `--redact` is retained as a deprecated no-op alias.
 
 `report plan` is implemented as a deterministic starter-spec planner. Give it a
 schema, optional profile, and either `--intent <intent.md|intent.json>` or the
