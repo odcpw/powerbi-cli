@@ -706,8 +706,12 @@ three pages.
   lists the single versioned registry used by lint, DAX/M checks, and report
   audit; `lint --explain <rule-id>` returns one rule's family, default severity,
   summary, remediation, optional sanitize action, and example finding without
-  requiring a project. The registry includes a typed, currently empty design
-  family so future design lint cannot introduce ad-hoc ids.
+  requiring a project. M lint raises the error-level
+  `m.duplicate_step_name` rule when a partition or named expression defines a
+  let-step name more than once (including quoted names and the final step before
+  `in`); findings include both source positions and ignore comments/string
+  literals. The registry includes a typed, currently empty design family so
+  future design lint cannot introduce ad-hoc ids.
 - Structural validation reports an empty PBIR visual container as a missing
   `visual.json` with an explicit remove-or-restore repair, instead of allowing a
   later deep-inspection `file_not_found` failure.

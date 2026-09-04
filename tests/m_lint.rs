@@ -1,6 +1,6 @@
 mod common;
 
-use common::{run_powerbi, stdout_json};
+use common::{assert_json_snapshot, run_powerbi, stdout_json};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -95,6 +95,125 @@ fn m_source(buffered: bool) -> String {
             in
                 Result"#
     )
+}
+
+fn duplicate_step_source() -> String {
+    r##"        source =
+            let
+                Source = #table(type table [DateKey = Int64.Type, CustomerKey = Int64.Type, Revenue = Currency.Type, Units = Int64.Type], {}),
+                #"Changed Type" = Source,
+                // #"Changed Type" = this is only a comment,
+                Label = "Changed Type = this is only a string",
+                #"Changed Type" = Label
+            in
+                #"Changed Type""##
+        .to_string()
+}
+
+#[test]
+fn lint_errors_for_duplicate_quoted_m_step_and_triage_preserves_positions() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales_project(temp.path());
+    replace_partition_source(&project, &duplicate_step_source());
+    let project_arg = project.to_str().expect("project path");
+
+    let first = run_powerbi(&["lint", project_arg, "--json"]);
+    assert_eq!(
+        first.code, 10,
+        "duplicate step is an error: {}",
+        first.stderr
+    );
+    let first_json = stdout_json(&first);
+    assert_eq!(first_json["ok"], false);
+    let findings = first_json["findings"]
+        .as_array()
+        .expect("findings")
+        .iter()
+        .filter(|finding| finding["code"] == "m.duplicate_step_name")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        findings.len(),
+        1,
+        "expected one duplicate finding: {first_json}"
+    );
+    let finding = &findings[0];
+    assert_eq!(finding["severity"], "error");
+    assert_eq!(finding["documentKind"], "partition");
+    assert_eq!(finding["step"], "Changed Type");
+    assert_eq!(finding["analysisBoundary"], "syntax");
+    assert_eq!(finding["handle"], "partition:FactSales:FactSales");
+    assert!(finding["firstPosition"]["line"].as_u64().is_some());
+    assert!(finding["duplicatePosition"]["line"].as_u64().is_some());
+    let first_line = finding["firstPosition"]["line"]
+        .as_u64()
+        .expect("first line");
+    let duplicate_line = finding["duplicatePosition"]["line"]
+        .as_u64()
+        .expect("duplicate line");
+    assert!(
+        first_line < duplicate_line,
+        "positions must identify both definitions: {finding}"
+    );
+    assert!(
+        finding["message"]
+            .as_str()
+            .expect("message")
+            .contains("cyclic-reference refresh error")
+    );
+
+    let mut snapshot = finding.clone();
+    snapshot["handle"] = serde_json::Value::from("<partition-handle>");
+    snapshot["path"] = serde_json::Value::from("<partition-path>");
+    assert_json_snapshot("m-duplicate-step-name-finding", &snapshot);
+
+    let second = run_powerbi(&["lint", project_arg, "--json"]);
+    assert_eq!(
+        second.code, 10,
+        "duplicate step remains an error: {}",
+        second.stderr
+    );
+    assert_eq!(
+        first.stdout, second.stdout,
+        "lint output must be byte-deterministic"
+    );
+    assert_eq!(
+        first.stderr, second.stderr,
+        "lint diagnostics must be deterministic"
+    );
+
+    let triage = run_powerbi(&["triage", project_arg, "--json"]);
+    assert_eq!(
+        triage.code, 10,
+        "triage should carry lint errors: {}",
+        triage.stderr
+    );
+    let triage_json = stdout_json(&triage);
+    assert_eq!(triage_json["ok"], false);
+    assert!(
+        triage_json["lint"]["findings"]
+            .as_array()
+            .expect("triage findings")
+            .iter()
+            .any(|finding| finding["code"] == "m.duplicate_step_name")
+    );
+    assert!(
+        triage_json["topFindings"]
+            .as_array()
+            .expect("triage top findings")
+            .iter()
+            .any(|finding| finding["code"] == "m.duplicate_step_name")
+    );
+
+    let explain = run_powerbi(&["lint", "--explain", "m.duplicate_step_name", "--json"]);
+    assert_eq!(explain.code, 0, "stderr: {}", explain.stderr);
+    let explain_json = stdout_json(&explain);
+    assert_eq!(explain_json["rule"]["id"], "m.duplicate_step_name");
+    assert_eq!(explain_json["rule"]["severity"], "error");
+    assert_eq!(
+        explain_json["exampleFinding"]["code"],
+        "m.duplicate_step_name"
+    );
 }
 
 #[test]

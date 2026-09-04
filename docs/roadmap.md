@@ -242,6 +242,11 @@ validation, proof, then mutation breadth.
   lint, and M lint. `lint --rules` inventories it and `lint --explain
   <rule-id>` returns versioned remediation metadata; the empty design family is
   reserved for the future design-lint implementation.
+- Implemented the error-level `m.duplicate_step_name` M lint rule. It catches
+  duplicate `let` identifiers in partition and named-expression sources,
+  including quoted names and the final step before `in`, reports both source
+  positions, and ignores comments and string literals; triage carries the same
+  finding and remediation path.
 - Add `handoff check` and `handoff rebind-plan` because this is the core
   locked-down corporate workflow.
 
