@@ -16,12 +16,14 @@
 // consumers are registered without weakening clippy's correctness lints.
 #![allow(dead_code)]
 
+mod apply_theme_preset;
 mod handles;
 mod io;
 mod plan;
 mod set_interaction;
 mod transaction;
 
+pub(crate) use apply_theme_preset::*;
 #[allow(unused_imports)]
 pub(crate) use handles::*;
 #[allow(unused_imports)]
@@ -43,6 +45,7 @@ pub(crate) const OPS_SCHEMA: &str = "powerbi-cli.ops.v1";
 pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
     match operation {
         Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
+        Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
         _ => None,
     }
 }

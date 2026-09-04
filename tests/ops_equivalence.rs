@@ -78,3 +78,43 @@ fn set_interaction_cli_fixture_is_byte_deterministic_and_matches_ops_shape() {
     assert_eq!(operation["op"], "setInteraction");
     assert_eq!(operation.as_object().expect("operation object").len(), 5);
 }
+
+#[test]
+fn apply_theme_preset_cli_fixture_is_byte_deterministic_and_matches_ops_shape() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let first = scaffold_sales(&temp.path().join("first"));
+    let second = scaffold_sales(&temp.path().join("second"));
+    let args = |project: &Path| {
+        vec![
+            "report".to_string(),
+            "themes".to_string(),
+            "apply-preset".to_string(),
+            "--project".to_string(),
+            project.to_string_lossy().into_owned(),
+            "--preset".to_string(),
+            "risk-dashboard".to_string(),
+            "--in-place".to_string(),
+            "--json".to_string(),
+        ]
+    };
+    let first_output = run_powerbi(&args(&first).iter().map(String::as_str).collect::<Vec<_>>());
+    let second_output = run_powerbi(&args(&second).iter().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(
+        first_output.code, 0,
+        "first preset mutation: {}",
+        first_output.stderr
+    );
+    assert_eq!(
+        second_output.code, 0,
+        "second preset mutation: {}",
+        second_output.stderr
+    );
+    assert_eq!(tree(&first), tree(&second));
+
+    let operation = json!({
+        "op": "applyThemePreset",
+        "preset": "risk-dashboard"
+    });
+    assert_eq!(operation["op"], "applyThemePreset");
+    assert_eq!(operation["preset"], "risk-dashboard");
+}
