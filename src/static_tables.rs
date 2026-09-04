@@ -1,4 +1,7 @@
-use crate::project_io::{copy_project_dir, write_text_atomic_validated};
+use crate::cli_support::{
+    MutationMode, mode_name, require_mode_with_message, set_mode_with_message, target_project,
+};
+use crate::project_io::write_text_atomic_validated;
 use crate::safety_scan::contains_credential_like_text_str;
 use crate::tmdl::{load_table_documents, same_name};
 use crate::{
@@ -36,13 +39,6 @@ pub(crate) fn static_tables_command(args: &[String]) -> CliResult<Value> {
     }
 }
 
-#[derive(Debug)]
-enum MutationMode {
-    DryRun,
-    InPlace,
-    OutDir(PathBuf),
-}
-
 #[derive(Debug, Default)]
 struct AddOptions {
     project: Option<PathBuf>,
@@ -51,6 +47,7 @@ struct AddOptions {
     rows: Option<Vec<Vec<String>>>,
     input_kind: Option<StaticInputKind>,
     mode: Option<MutationMode>,
+    out_dir: Option<PathBuf>,
     include_raw: bool,
 }
 
@@ -64,14 +61,8 @@ fn add_static_table(args: &[String]) -> CliResult<Value> {
     let options = parse_add_args(args)?;
     let source_project = options.project.as_ref().expect("validated project");
     let source_resolved = resolve_project(source_project)?;
-    let mode = options.mode.as_ref().expect("validated mode");
-    let target_resolved = match mode {
-        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
-        MutationMode::OutDir(out_dir) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)?
-        }
-    };
+    let mode = options.mode.expect("validated mode");
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
 
     let table = options.table.as_deref().expect("validated table");
     let columns = options.columns.as_ref().expect("validated columns");
@@ -302,16 +293,35 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
                 i += 1;
             }
             "--dry-run" => {
-                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                set_mode_with_message(
+                    &mut options.mode,
+                    MutationMode::DryRun,
+                    "choose exactly one of --dry-run, --in-place, or --out-dir",
+                    None,
+                    None,
+                )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                set_mode_with_message(
+                    &mut options.mode,
+                    MutationMode::InPlace,
+                    "choose exactly one of --dry-run, --in-place, or --out-dir",
+                    None,
+                    None,
+                )?;
                 i += 1;
             }
             "--out-dir" => {
                 let out_dir = PathBuf::from(required_value(args, i, "--out-dir")?);
-                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+                set_mode_with_message(
+                    &mut options.mode,
+                    MutationMode::OutDir,
+                    "choose exactly one of --dry-run, --in-place, or --out-dir",
+                    None,
+                    None,
+                )?;
+                options.out_dir = Some(out_dir);
                 i += 2;
             }
             other => {
@@ -342,12 +352,12 @@ fn parse_add_args(args: &[String]) -> CliResult<AddOptions> {
         CliError::invalid_args("model tables add-static requires --values-json or --rows-json")
     })?;
     validate_static_data(columns, rows)?;
-    if options.mode.is_none() {
-        return Err(CliError::invalid_args(
-            "model tables add-static requires --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with --dry-run and inspect the emitted plan."));
-    }
+    require_mode_with_message(
+        options.mode,
+        "model tables add-static requires --dry-run, --in-place, or --out-dir <dir>",
+        Some("Start with --dry-run and inspect the emitted plan.".to_string()),
+        None,
+    )?;
     Ok(options)
 }
 
@@ -592,16 +602,6 @@ fn required_value<'a>(args: &'a [String], index: usize, flag: &str) -> CliResult
         .ok_or_else(|| CliError::invalid_args(format!("{flag} requires a value")))
 }
 
-fn set_mode(target: &mut Option<MutationMode>, mode: MutationMode) -> CliResult<()> {
-    if target.is_some() {
-        return Err(CliError::invalid_args(
-            "choose exactly one of --dry-run, --in-place, or --out-dir",
-        ));
-    }
-    *target = Some(mode);
-    Ok(())
-}
-
 fn set_input_kind(
     target: &mut Option<StaticInputKind>,
     input_kind: StaticInputKind,
@@ -616,14 +616,6 @@ fn set_input_kind(
         *target = Some(input_kind);
     }
     Ok(())
-}
-
-fn mode_name(mode: &MutationMode) -> &'static str {
-    match mode {
-        MutationMode::DryRun => "dry-run",
-        MutationMode::InPlace => "in-place",
-        MutationMode::OutDir(_) => "out-dir",
-    }
 }
 
 fn shell_arg(value: &str) -> String {

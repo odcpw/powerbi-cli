@@ -191,6 +191,8 @@ validation, proof, then mutation breadth.
   errors.
 - Require generated follow-up commands on every mutation.
 - Keep `skills/powerbi-cli/SKILL.md` aligned with the live binary.
+- The mutation-mode contract spine is complete: mutating command modules share
+  the output-mode type and diagnostic helpers from `src/cli_support.rs`.
 
 ### Phase 0: Contract And Portability
 
