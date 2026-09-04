@@ -127,6 +127,15 @@ pub(crate) struct SharePointSourceTemplateInput {
     pub(crate) description: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct GenericMSourceTemplateInput {
+    pub(crate) table: String,
+    pub(crate) partition: String,
+    pub(crate) name: Option<String>,
+    pub(crate) m_template: String,
+    pub(crate) description: Option<String>,
+}
+
 impl Default for SourceTemplateStore {
     fn default() -> Self {
         Self {
@@ -421,6 +430,28 @@ pub(crate) fn sharepoint_source_template(
     }
 }
 
+pub(crate) fn generic_m_source_template(
+    input: GenericMSourceTemplateInput,
+) -> SourceTemplateRecord {
+    SourceTemplateRecord {
+        handle: source_template_handle(
+            &input.table,
+            input.name.as_deref().unwrap_or(&input.partition),
+        ),
+        name: input.name,
+        partition_handle: crate::tmdl::partition_handle(&input.table, &input.partition),
+        table: input.table,
+        partition: input.partition,
+        kind: "generic-m".to_string(),
+        parameters: BTreeMap::new(),
+        m_template: input.m_template,
+        description: input.description,
+        requirements: vec![
+            "The generic M expression is validated against the closed connector grammar; authenticate only in Power BI Desktop on the work machine.".to_string(),
+        ],
+    }
+}
+
 pub(crate) fn source_template_json(record: &SourceTemplateRecord, path: &Path) -> Value {
     let safety = source_template_safety_json(record);
     let redact = safety["credentialFree"] == Value::Bool(false);
@@ -555,6 +586,16 @@ pub(crate) fn source_template_findings(
             message: "ODBC DSN must be a bare DSN name without ';' or '=' attributes; configure credentials in the ODBC manager or Power BI Desktop".to_string(),
         });
     }
+    if record.kind.eq_ignore_ascii_case("generic-m")
+        && crate::workflow::validate_generic_m_template(&record.m_template).is_err()
+    {
+        findings.push(SourceTemplateFinding {
+            code: rules::SOURCE_TEMPLATE_M_GRAMMAR.to_string(),
+            severity: "error".to_string(),
+            message: "generic M source template is outside the closed connector grammar"
+                .to_string(),
+        });
+    }
     if !template_contains_placeholders(record) {
         findings.push(SourceTemplateFinding {
             code: rules::SOURCE_TEMPLATE_SPECIFIC_VALUES.to_string(),
@@ -659,6 +700,9 @@ fn template_contains_placeholders(record: &SourceTemplateRecord) -> bool {
         .parameters
         .values()
         .any(|value| value.contains('<') && value.contains('>'))
+        || (record.kind.eq_ignore_ascii_case("generic-m")
+            && (record.m_template.contains("{{powerbi-cli.")
+                || (record.m_template.contains('<') && record.m_template.contains('>'))))
 }
 
 fn sort_templates(store: &mut SourceTemplateStore) {
