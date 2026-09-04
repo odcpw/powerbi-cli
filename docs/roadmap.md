@@ -530,7 +530,10 @@ frozen until proven.
   transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
   public `apply --ops` command only after the individual kernels are converted.
 - Make operation JSON durable enough for another agent to inspect and replay.
-- Include generated proof commands in mutation outputs.
+- Include generated proof commands in mutation outputs. `report build` now
+  compiles v2 `proof` requirements into a deterministic `proofPlan` and
+  `next[]`; Desktop-dependent steps remain explicitly unavailable off Windows
+  until the T9 refresh/canvas oracle lands.
 
 ### Phase 9: Optional Bridges
 

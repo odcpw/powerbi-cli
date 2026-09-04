@@ -562,6 +562,15 @@ Fields not compiled by this starter planner remain in the response with an
 owning-bead warning. It is not a substitute for reviewing generated report
 intent or for Desktop compatibility proof.
 
+V2 proof requirements are compiled into `proofPlan` and the report build
+`next[]` list. `proof.desktop.expectValues[]` becomes one bounded
+`model dax execute` command per expectation, and each `proof.goldens[]` entry
+becomes a `fixture verify` command. Proof planning is side-effect free: no
+Desktop session, query, refresh, or fixture verification runs automatically.
+On Linux and macOS, Desktop-dependent commands are listed in
+`proofPlan.unavailable[]` with the Windows oracle instruction; the compiler
+never claims a Desktop proof level that the host cannot deliver.
+
 ### Scaffold From A Schema
 
 ```bash
@@ -1320,9 +1329,12 @@ and timeout state. The status/exit mapping is:
 - Launch, observer, capture, or cleanup subsystem failure:
   `oracle_failed`, exit 40.
 
-`desktop refresh-check`, `desktop save-check`, and Desktop round-trip
-diffing are planned oracle commands; do not call them until
-`capabilities --for desktop` advertises them.
+`desktop refresh-check`, `desktop canvas-check`, `desktop save-check`, and
+Desktop round-trip diffing are planned oracle commands. Proof plans may emit
+the first two as forward-compatible templates; they return
+`unsupported_feature` until their T9 implementation lands. Do not expect a
+Desktop proof claim until `capabilities --for desktop` advertises an available
+implementation.
 
 If Desktop commands are unavailable, say the project has local validation and
 fixture-summary proof only, not Desktop compatibility proof.
