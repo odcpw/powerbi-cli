@@ -1,4 +1,7 @@
-use crate::project_io::{copy_project_dir, write_text_atomic_validated};
+use crate::cli_support::{
+    MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
+};
+use crate::project_io::write_text_atomic_validated;
 use crate::tmdl::{
     MeasureDefinition, MeasureRecord, MeasureSelector, MutationPlan, TableDocument,
     add_measure_plan, delete_measure_plan, find_measure, load_table_documents,
@@ -65,13 +68,6 @@ impl Action {
     }
 }
 
-#[derive(Debug)]
-enum MutationMode {
-    DryRun,
-    InPlace,
-    OutDir(PathBuf),
-}
-
 #[derive(Debug, Default)]
 struct MutationOptions {
     project: Option<PathBuf>,
@@ -82,6 +78,7 @@ struct MutationOptions {
     display_folder: Option<String>,
     description: Option<String>,
     mode: Option<MutationMode>,
+    out_dir: Option<PathBuf>,
     confirm: Option<String>,
 }
 
@@ -153,25 +150,18 @@ fn mutate_measure(action: Action, args: &[String]) -> CliResult<Value> {
     let options = parse_mutation_args(action, args)?;
     let source_project = required_project(options.project.clone(), "model measures mutation")?;
     let source_resolved = resolve_project(&source_project)?;
-    let mode = options.mode.as_ref().ok_or_else(|| {
-        CliError::invalid_args(format!(
-            "model measures {} requires --dry-run, --in-place, or --out-dir <dir>",
-            action.as_str()
-        ))
-        .with_hint("Start with `--dry-run`; use `--in-place` only when the plan is correct.")
-        .with_suggested_command(format!(
+    let command = format!("model measures {}", action.as_str());
+    let mode = require_mode_with_contract(
+        options.mode,
+        &command,
+        "Start with `--dry-run`; use `--in-place` only when the plan is correct.",
+        format!(
             "powerbi-cli model measures {} --project <project-dir-or.pbip> --dry-run --json",
             action.as_str()
-        ))
-    })?;
+        ),
+    )?;
 
-    let target_resolved = match mode {
-        MutationMode::DryRun | MutationMode::InPlace => source_resolved,
-        MutationMode::OutDir(out_dir) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)?
-        }
-    };
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
 
     let docs = load_table_documents(&target_resolved)?;
     let plan = build_mutation_plan(action, &docs, &options)?;
@@ -435,16 +425,32 @@ fn parse_mutation_args(action: Action, args: &[String]) -> CliResult<MutationOpt
                 options.description = Some(take_value(args, &mut i, "--description")?);
             }
             "--dry-run" => {
-                set_mode(&mut options.mode, MutationMode::DryRun)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::DryRun,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
+                )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(&mut options.mode, MutationMode::InPlace)?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::InPlace,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
+                )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(&mut options.mode, MutationMode::OutDir(out_dir))?;
+                set_mode_with_contract(
+                    &mut options.mode,
+                    MutationMode::OutDir,
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
+                )?;
+                options.out_dir = Some(out_dir);
             }
             "--confirm" => options.confirm = Some(take_value(args, &mut i, "--confirm")?),
             other => {
@@ -558,20 +564,6 @@ fn measure_json(measure: &MeasureRecord) -> Value {
     })
 }
 
-fn set_mode(current: &mut Option<MutationMode>, next: MutationMode) -> CliResult<()> {
-    if current.is_some() {
-        return Err(CliError::invalid_args(
-            "choose exactly one output mode: --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.")
-        .with_suggested_command(
-            "powerbi-cli model measures add --project <project-dir-or.pbip> --table <table> --name <measure> --expression <dax> --dry-run --json",
-        ));
-    }
-    *current = Some(next);
-    Ok(())
-}
-
 fn take_value(args: &[String], index: &mut usize, flag: &str) -> CliResult<String> {
     let value = args.get(*index + 1).ok_or_else(|| {
         CliError::invalid_args(format!("{flag} requires a value"))
@@ -641,14 +633,6 @@ fn read_expression_file(path: &str) -> CliResult<String> {
             ));
     }
     Ok(expression)
-}
-
-fn mode_name(mode: &MutationMode) -> &'static str {
-    match mode {
-        MutationMode::DryRun => "dry-run",
-        MutationMode::InPlace => "in-place",
-        MutationMode::OutDir(_) => "out-dir",
-    }
 }
 
 fn shell_arg(value: &str) -> String {

@@ -1,10 +1,13 @@
+use crate::cli_support::{
+    MutationMode, mode_name, require_mode_with_contract, set_mode_with_contract, target_project,
+};
 use crate::pbir::{VisualRecord, VisualSelector, find_visual, load_report_snapshot, visual_detail};
-use crate::project_io::{copy_project_dir, write_json_atomic, write_json_pretty};
+use crate::project_io::{write_json_atomic, write_json_pretty};
 use crate::report_visual_formatting::formatting_summary_from_visual_json;
 use crate::safety_scan::{CREDENTIAL_NEEDLES, SafetyScan, formatting_safety};
 use crate::{
-    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
-    command_arg, read_json_value, resolve_project, validate_project,
+    CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
+    read_json_value, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -16,13 +19,6 @@ struct ExtractOptions {
     project: Option<PathBuf>,
     selector: VisualSelector,
     out: Option<PathBuf>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MutationMode {
-    DryRun,
-    InPlace,
-    OutDir,
 }
 
 #[derive(Debug, Default)]
@@ -123,7 +119,12 @@ pub(crate) fn apply_formatting(args: &[String]) -> CliResult<Value> {
                 "powerbi-cli report visuals formatting extract --project <source-project> --handle <source-visual-handle> --out visual-formatting-bundle.json --json",
             )
     })?;
-    let mode = require_mode(options.mode, "report visuals formatting apply")?;
+    let mode = require_mode_with_contract(
+        options.mode,
+        "report visuals formatting apply",
+        "Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.",
+        "powerbi-cli report visuals formatting apply --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json",
+    )?;
     let bundle = read_formatting_bundle(bundle_path)?;
     let payload = payload_from_bundle(&bundle)?;
     let source_resolved = resolve_project(&source_project)?;
@@ -496,61 +497,6 @@ fn visual_path<'a>(visual: &'a VisualRecord, command: &str) -> CliResult<&'a Pat
     })
 }
 
-fn target_project(
-    source_resolved: &ResolvedProject,
-    mode: MutationMode,
-    out_dir: Option<&Path>,
-) -> CliResult<ResolvedProject> {
-    match (mode, out_dir) {
-        (MutationMode::DryRun | MutationMode::InPlace, _) => Ok(source_resolved.clone()),
-        (MutationMode::OutDir, Some(out_dir)) => {
-            copy_project_dir(&source_resolved.project_dir, out_dir)?;
-            resolve_project(out_dir)
-        }
-        (MutationMode::OutDir, None) => {
-            Err(CliError::invalid_args("--out-dir requires a directory"))
-        }
-    }
-}
-
-fn require_mode(mode: Option<MutationMode>, command: &str) -> CliResult<MutationMode> {
-    mode.ok_or_else(|| {
-        CliError::invalid_args(format!(
-            "{command} requires --dry-run, --in-place, or --out-dir <dir>"
-        ))
-        .with_hint("Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.")
-        .with_suggested_command(format!(
-            "powerbi-cli {command} --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json"
-        ))
-    })
-}
-
-fn set_mode(
-    current: &mut Option<MutationMode>,
-    next: MutationMode,
-    command: &str,
-) -> CliResult<()> {
-    if current.is_some() {
-        return Err(CliError::invalid_args(
-            "choose exactly one output mode: --dry-run, --in-place, or --out-dir <dir>",
-        )
-        .with_hint("Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.")
-        .with_suggested_command(format!(
-            "powerbi-cli {command} --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json"
-        )));
-    }
-    *current = Some(next);
-    Ok(())
-}
-
-fn mode_name(mode: MutationMode) -> &'static str {
-    match mode {
-        MutationMode::DryRun => "dry-run",
-        MutationMode::InPlace => "in-place",
-        MutationMode::OutDir => "out-dir",
-    }
-}
-
 fn parse_extract_args(args: &[String]) -> CliResult<ExtractOptions> {
     let mut options = ExtractOptions::default();
     let mut i = 0;
@@ -620,27 +566,30 @@ fn parse_apply_args(args: &[String]) -> CliResult<ApplyOptions> {
                 i += 1;
             }
             "--dry-run" => {
-                set_mode(
+                set_mode_with_contract(
                     &mut options.mode,
                     MutationMode::DryRun,
-                    "report visuals formatting apply",
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report visuals formatting apply --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json",
                 )?;
                 i += 1;
             }
             "--in-place" => {
-                set_mode(
+                set_mode_with_contract(
                     &mut options.mode,
                     MutationMode::InPlace,
-                    "report visuals formatting apply",
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report visuals formatting apply --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json",
                 )?;
                 i += 1;
             }
             "--out-dir" | "--out" => {
                 let out_dir = PathBuf::from(take_value(args, &mut i, "--out-dir")?);
-                set_mode(
+                set_mode_with_contract(
                     &mut options.mode,
                     MutationMode::OutDir,
-                    "report visuals formatting apply",
+                    "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.",
+                    "powerbi-cli report visuals formatting apply --project <project-dir-or.pbip> --handle <visual-handle> --bundle <formatting-bundle.json> --dry-run --json",
                 )?;
                 options.out_dir = Some(out_dir);
             }
