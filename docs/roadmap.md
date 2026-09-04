@@ -191,6 +191,11 @@ visual binding is too strict to invent by memory.
   save the project without corrupting it.
 - `desktop export-snapshot <project|pbip> --out-dir <dir>`: capture a
   Desktop-saved version for golden comparison.
+- `desktop harvest-reference --project <saved.pbip> --visual <handle> --out
+  docs/reference/desktop-authored-visuals/<name>.json`: archive one safe
+  Desktop-saved visual, page, or report fragment with source fingerprint and
+  provenance. Linux runs remain `desktop-golden-pending`; persisted selection
+  and filter values are refused by the shared input-safety guard.
 
 These commands should be optional. CI should run them only on Windows machines
 that explicitly opt in with Power BI Desktop installed.

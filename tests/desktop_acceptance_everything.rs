@@ -154,6 +154,7 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let wireframe = h.root.join("wireframe.json");
     let dax_file = h.root.join("average-cost.dax");
     let desktop_screenshot = h.root.join("everything-desktop.png");
+    let desktop_reference = h.root.join("everything-reference.json");
     let live_model_export = h.root.join("live-model-export");
 
     write_json(&schema, &acceptance_schema());
@@ -1429,6 +1430,32 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let table = handles["Company Detail"].clone();
     let scatter = handles["Branch Injury Cost Bubble"].clone();
     let catalog_column = handles["Stacked Column by Year"].clone();
+    let harvested_reference = h.ok(
+        "desktop harvest-reference",
+        &svec([
+            "desktop",
+            "harvest-reference",
+            "--project",
+            &project_arg,
+            "--visual",
+            &line,
+            "--out",
+            &p(&desktop_reference),
+            "--json",
+        ]),
+    );
+    assert_eq!(
+        harvested_reference["proofLevel"],
+        Value::from("desktop-golden-pending")
+    );
+    assert_eq!(
+        harvested_reference["provenance"]["desktopVersion"],
+        Value::from("unknown")
+    );
+    assert!(
+        desktop_reference.is_file(),
+        "harvested reference was not written"
+    );
     let slicer = slicer_handle(&h.ok(
         "report slicers list",
         &svec([
