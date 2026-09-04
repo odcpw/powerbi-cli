@@ -11,7 +11,7 @@ use common::{
     first_page_name, first_two_visual_names, first_visual_json, run_powerbi, scaffold_sales,
     stdout_json,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
