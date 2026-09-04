@@ -3,6 +3,9 @@
 use super::{desktop, integrations, model, report, workflow_pkg};
 use crate::feature_catalog::{feature_catalog_schema_fields, feature_policy_json};
 use crate::input_safety;
+use crate::planner_rules::{
+    catalog_json as planner_rule_catalog_json, rule_ids as planner_rule_ids,
+};
 use crate::visual_catalog::{
     schema_golden_visual_type_names, supported_visual_type_names, visual_type_contracts,
     visual_type_role_rules,
@@ -208,7 +211,7 @@ Usage:
   powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> --handle <visual-handle> --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> --display-name <text> --dry-run --json
   powerbi-cli report spec fields --schema <schema.json> --json
   powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json
-  powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) --out <dashboard.json> --json
+  powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) --out <dashboard.json> [--explain-rules] --json
   powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json
   powerbi-cli report spec normalize <dashboard.json> --out <canonical.json> --json
   powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json
@@ -1186,6 +1189,11 @@ fn schema_manifest() -> Value {
         "intentVersions": ["intent.v1"],
         "intentFields": ["schema", "audience", "questions[]", "kpis[].name", "kpis[].measure", "kpis[].target", "comparisons[]", "periods[]", "drillPaths[]", "alerts[].measure", "alerts[].op", "alerts[].threshold", "alerts[].semantic", "filterDimensions[]", "preferredArchetypes[]", "pageFlow[]", "handoff.target", "handoff.sourceKinds[]"],
         "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
+        "plannerRuleCatalog": planner_rule_catalog_json().unwrap_or_else(|error| json!({
+            "schema": crate::planner_rules::PLANNER_RULES_SCHEMA,
+            "error": error.message
+        })),
+        "plannerRuleIds": planner_rule_ids().unwrap_or_default(),
         "reportSpecValidateFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "errors[].field", "errors[].reason", "errors[].candidatesCommand", "errors[].example", "next"],
         "reportSpecUpgradeFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
@@ -1343,6 +1351,40 @@ fn schema_manifest() -> Value {
         "shape.hypotheses[]",
         "shape.relationships[]",
         "spec",
+        "specV2",
+        "planner.schema",
+        "planner.version",
+        "planner.rules[]",
+        "planner.rules[].ruleId",
+        "planner.rules[].score",
+        "planner.rules[].summary",
+        "planner.rules[].evidence[]",
+        "planner.rules[].proposal",
+        "planner.proposals[]",
+        "planner.proposals[].kind",
+        "planner.proposals[].ruleId",
+        "planner.proposals[].ruleIds[]",
+        "planner.proposals[].score",
+        "planner.proposals[].archetype",
+        "planner.proposals[].template",
+        "planner.proposals[].visualFamily",
+        "planner.proposals[].bindings[]",
+        "planner.proposals[].bindings[].role",
+        "planner.proposals[].bindings[].field",
+        "planner.proposals[].bindings[].fields[]",
+        "planner.proposals[].bindings[].source",
+        "planner.proposals[].evidence[]",
+        "planner.proposals[].priority",
+        "planner.proposals[].sizeClass",
+        "planner.proposals[].semanticColor",
+        "planner.proposals[].page",
+        "ruleExplanations[]",
+        "ruleExplanations[].ruleId",
+        "ruleExplanations[].score",
+        "ruleExplanations[].summary",
+        "ruleExplanations[].evidence[]",
+        "ruleExplanations[].proposal",
+        "explainRules",
         "compiled.counts",
         "compiled.defaultsApplied",
         "defaultsApplied",

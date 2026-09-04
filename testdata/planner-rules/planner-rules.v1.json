@@ -1,0 +1,274 @@
+{
+  "schema": "powerbi-cli.planner-rules.v1",
+  "version": 1,
+  "rules": [
+    {
+      "id": "planner.time-series",
+      "summary": "A profiled time axis and at least one measure support a trend page.",
+      "kind": "visual",
+      "score": 92,
+      "conditions": [
+        {"signal": "hasTimeAxis", "operator": "eq", "value": true},
+        {"signal": "measureCount", "operator": "gte", "value": 1}
+      ],
+      "proposal": {
+        "archetype": "time-series",
+        "template": "trend",
+        "visualFamily": "lineChart",
+        "bindings": [
+          {"role": "Category", "source": "timeAxis"},
+          {"role": "Y", "source": "primaryMeasure"}
+        ],
+        "priority": 92,
+        "sizeClass": "wide",
+        "semanticColor": "emphasis",
+        "page": "trend"
+      }
+    },
+    {
+      "id": "planner.category-ranking",
+      "summary": "A category and a measure support a descending ranking.",
+      "kind": "visual",
+      "score": 84,
+      "conditions": [
+        {"signal": "categoryCount", "operator": "gte", "value": 1},
+        {"signal": "measureCount", "operator": "gte", "value": 1}
+      ],
+      "proposal": {
+        "archetype": "ranking",
+        "template": "breakdown",
+        "visualFamily": "barChart",
+        "bindings": [
+          {"role": "Category", "source": "primaryCategory"},
+          {"role": "Y", "source": "primaryMeasure"}
+        ],
+        "priority": 84,
+        "sizeClass": "wide",
+        "semanticColor": "neutral",
+        "page": "breakdown"
+      }
+    },
+    {
+      "id": "planner.scatter-focus",
+      "summary": "Two measures and a category support a comparison scatter plot.",
+      "kind": "visual",
+      "score": 88,
+      "conditions": [
+        {"signal": "categoryCount", "operator": "gte", "value": 1},
+        {"signal": "measureCount", "operator": "gte", "value": 2}
+      ],
+      "proposal": {
+        "archetype": "comparison",
+        "template": "comparison",
+        "visualFamily": "scatterChart",
+        "bindings": [
+          {"role": "Category", "source": "primaryCategory"},
+          {"role": "X", "source": "primaryMeasure"},
+          {"role": "Y", "source": "secondaryMeasure"}
+        ],
+        "priority": 88,
+        "sizeClass": "wide",
+        "semanticColor": "emphasis",
+        "page": "comparison"
+      }
+    },
+    {
+      "id": "planner.detail-table",
+      "summary": "A wide schema without measures is safest as a detail table.",
+      "kind": "visual",
+      "score": 78,
+      "conditions": [
+        {"signal": "columnCount", "operator": "gte", "value": 5},
+        {"signal": "declaredMeasureCount", "operator": "eq", "value": 0}
+      ],
+      "proposal": {
+        "archetype": "detail-table",
+        "template": "detail",
+        "visualFamily": "tableEx",
+        "bindings": [
+          {"role": "Values", "source": "detailColumns"}
+        ],
+        "priority": 78,
+        "sizeClass": "full",
+        "semanticColor": "neutral",
+        "page": "detail"
+      }
+    },
+    {
+      "id": "planner.measure-target",
+      "summary": "A KPI target requests a compact gauge/KPI presentation.",
+      "kind": "visual",
+      "score": 86,
+      "conditions": [
+        {"signal": "measureCount", "operator": "gte", "value": 1},
+        {"signal": "targetCount", "operator": "gte", "value": 1}
+      ],
+      "proposal": {
+        "archetype": "kpi-overview",
+        "template": "overview",
+        "visualFamily": "gauge",
+        "bindings": [
+          {"role": "Value", "source": "primaryMeasure"}
+        ],
+        "priority": 86,
+        "sizeClass": "compact",
+        "semanticColor": "good",
+        "page": "overview"
+      }
+    },
+    {
+      "id": "planner.measure-total",
+      "summary": "A resolved measure is retained as the primary KPI measure proposal.",
+      "kind": "measure",
+      "score": 74,
+      "conditions": [
+        {"signal": "measureCount", "operator": "gte", "value": 1}
+      ],
+      "proposal": {
+        "archetype": "kpi-measure",
+        "template": "overview",
+        "bindings": [
+          {"role": "Value", "source": "primaryMeasure"}
+        ],
+        "priority": 74,
+        "sizeClass": "compact",
+        "semanticColor": "neutral",
+        "page": "overview"
+      }
+    },
+    {
+      "id": "planner.alert-exception-list",
+      "summary": "Alert rules request an exception list with semantic warning color.",
+      "kind": "visual",
+      "score": 89,
+      "conditions": [
+        {"signal": "alertCount", "operator": "gte", "value": 1},
+        {"signal": "measureCount", "operator": "gte", "value": 1}
+      ],
+      "proposal": {
+        "archetype": "exception-list",
+        "template": "detail",
+        "visualFamily": "tableEx",
+        "bindings": [
+          {"role": "Values", "source": "alertColumns"},
+          {"role": "Y", "source": "primaryMeasure"}
+        ],
+        "priority": 89,
+        "sizeClass": "wide",
+        "semanticColor": "warning",
+        "page": "exceptions"
+      }
+    },
+    {
+      "id": "planner.high-cardinality-drillthrough",
+      "summary": "High-cardinality dimensions belong on a drillthrough detail page.",
+      "kind": "page",
+      "score": 72,
+      "conditions": [
+        {"signal": "highCardinalityCount", "operator": "gte", "value": 1}
+      ],
+      "proposal": {
+        "archetype": "drillthrough-detail",
+        "template": "detail",
+        "visualFamily": "tableEx",
+        "bindings": [
+          {"role": "Values", "source": "detailColumns"}
+        ],
+        "priority": 72,
+        "sizeClass": "full",
+        "semanticColor": "neutral",
+        "page": "detail"
+      }
+    },
+    {
+      "id": "planner.shape-flat-template",
+      "summary": "A single-table verdict uses the flat-model overview template.",
+      "kind": "page",
+      "score": 61,
+      "conditions": [
+        {"signal": "shapeKind", "operator": "eq", "value": "flat"}
+      ],
+      "proposal": {
+        "archetype": "shape-flat",
+        "template": "flat-overview",
+        "bindings": [],
+        "priority": 61,
+        "sizeClass": "full",
+        "semanticColor": "neutral",
+        "page": "overview"
+      }
+    },
+    {
+      "id": "planner.shape-snowflake-template",
+      "summary": "A snowflake verdict uses a relationship-aware overview template.",
+      "kind": "page",
+      "score": 61,
+      "conditions": [
+        {"signal": "shapeKind", "operator": "eq", "value": "snowflake"}
+      ],
+      "proposal": {
+        "archetype": "shape-snowflake",
+        "template": "snowflake-overview",
+        "bindings": [],
+        "priority": 61,
+        "sizeClass": "full",
+        "semanticColor": "neutral",
+        "page": "overview"
+      }
+    },
+    {
+      "id": "planner.shape-multi-fact-template",
+      "summary": "A multi-fact verdict uses a comparison-ready overview template.",
+      "kind": "page",
+      "score": 61,
+      "conditions": [
+        {"signal": "shapeKind", "operator": "eq", "value": "multi-fact"}
+      ],
+      "proposal": {
+        "archetype": "shape-multi-fact",
+        "template": "multi-fact-overview",
+        "bindings": [],
+        "priority": 61,
+        "sizeClass": "full",
+        "semanticColor": "neutral",
+        "page": "overview"
+      }
+    },
+    {
+      "id": "planner.shape-ambiguous-template",
+      "summary": "An ambiguous verdict uses a review-first overview template.",
+      "kind": "page",
+      "score": 61,
+      "conditions": [
+        {"signal": "shapeKind", "operator": "eq", "value": "ambiguous"}
+      ],
+      "proposal": {
+        "archetype": "shape-ambiguous",
+        "template": "review-overview",
+        "bindings": [],
+        "priority": 61,
+        "sizeClass": "full",
+        "semanticColor": "warning",
+        "page": "overview"
+      }
+    },
+    {
+      "id": "planner.overview",
+      "summary": "Every valid plan starts with an overview page and a KPI strip.",
+      "kind": "page",
+      "score": 60,
+      "conditions": [
+        {"signal": "shapeKind", "operator": "exists", "value": true}
+      ],
+      "proposal": {
+        "archetype": "overview",
+        "template": "overview",
+        "bindings": [],
+        "priority": 60,
+        "sizeClass": "full",
+        "semanticColor": "neutral",
+        "page": "overview"
+      }
+    }
+  ]
+}

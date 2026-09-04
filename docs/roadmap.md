@@ -615,6 +615,10 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
+- [x] Planner v2 shape-aware rule catalog (`planner-rules.v1`) now evaluates
+  deterministic scored visual/page proposals with evidence and emits a
+  slot/template/style `specV2` candidate while preserving the build-compatible
+  dashboard.v1 plan output.
 
 Remaining work—such as `report compose`, full v2 compilation, design lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—

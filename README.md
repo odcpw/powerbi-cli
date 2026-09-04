@@ -478,6 +478,22 @@ it returns `ambiguous` with competing hypotheses. Date-like columns without a
 related date dimension produce a date-table proposal, and high-cardinality
 categorical columns are called out as possible noise.
 
+Planner v2 evaluates the embedded, versioned `planner-rules.v1` catalog after
+shape and intent normalization. Pass `--explain-rules` (or use the equivalent
+`report plan explain` form) to make the fired rules, deterministic scores, and
+actual evidence values explicit. The response always carries the same
+`planner.proposals[]` records: each names its rule id, visual family, bindings,
+priority, size class, and semantic color token without coordinates or hex
+values. The build-compatible `spec` remains dashboard.v1; `specV2` is the
+slot/template/style candidate for the layout compiler and is marked
+`desktop-golden-pending` until a Desktop canvas proof exists. Current rule ids are:
+`planner.time-series`, `planner.category-ranking`, `planner.scatter-focus`,
+`planner.detail-table`, `planner.measure-target`,
+`planner.measure-total`, `planner.alert-exception-list`,
+`planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
+`planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
+`planner.shape-ambiguous-template`, and `planner.overview`.
+
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
 artifacts named by that prior manifest (including removed table/page/visual

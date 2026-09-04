@@ -570,6 +570,22 @@ The response's top-level `shape` and `decisions[]` model-shape entry reuse the
 same profile/schema classifier. A date-like column without a related date
 dimension is surfaced as a proposal rather than silently treated as a calendar.
 
+Planner v2 also evaluates the embedded strict `planner-rules.v1` catalog. Add
+`--explain-rules` (or invoke the equivalent `report plan explain` alias) when
+you need the fired rule ids, scores, and actual evidence values in the output.
+Every `planner.proposals[]` entry is slot-agnostic and carries its rule id,
+visual family, bindings, priority, size class, and semantic color token. The
+legacy `spec` remains a build-compatible dashboard.v1 document; `specV2`
+contains the template, 12-column grid token names, semantic style preset, and
+slot-only candidate for the concurrent layout compiler. It remains
+`desktop-golden-pending` until a Desktop canvas proof exists. The catalog currently
+documents `planner.time-series`, `planner.category-ranking`,
+`planner.scatter-focus`, `planner.detail-table`, `planner.measure-target`,
+`planner.measure-total`, `planner.alert-exception-list`,
+`planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
+`planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
+`planner.shape-ambiguous-template`, and `planner.overview`.
+
 When the compiler cannot safely infer a required value, it asks through a
 structured `spec.missing_input` diagnostic instead of silently choosing a
 visual type, binding, TopN order, drillthrough target, slicer column, semantic

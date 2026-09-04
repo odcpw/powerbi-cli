@@ -870,13 +870,14 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["report plan"],
         refusal_code: None,
-        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, classifies the schema/profile model shape with evidence-backed role and relationship signals, normalizes audience/questions/KPIs and planning constraints, resolves KPI names to exact model measures, and returns pointer-rich diagnostics instead of guessing.",
+        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, classifies the schema/profile model shape with evidence-backed role and relationship signals, evaluates the embedded strict planner-rules.v1 catalog into deterministic scored proposals with actual evidence values, and returns pointer-rich diagnostics instead of guessing. Legacy dashboard.v1 output remains build-compatible while specV2 exposes templates, semantic tokens, and slot-only proposals for the concurrent layout compiler.",
         next_proof: &[
             "Compile comparisons, periods, drill paths, alerts, filters, archetypes, page flow, and handoff fields through their owning planner/compiler beads",
         ],
         reference_signals: &[
             "examples/intents/sales.intent.json",
             "examples/intents/sales.intent.md",
+            "testdata/planner-rules/planner-rules.v1.json",
         ],
         tags: &["report", "intent", "planner", "markdown", "json", "agent"],
     },
