@@ -1,0 +1,22 @@
+{
+  "candidates": [],
+  "candidatesCommand": "powerbi-cli report spec fields --schema <schema.json> --json",
+  "code": "plan.missing_input",
+  "example": {
+    "columns": [
+      {
+        "dataType": "date",
+        "name": "Date"
+      }
+    ]
+  },
+  "exitCode": 10,
+  "field": "schema.tables[].columns[].type=date",
+  "hint": "Supply the named schema or intent field and rerun report plan; no default layout is applied.",
+  "message": "required planner input `schema.tables[].columns[].type=date` is missing: no supported date axis is available; declare a date column before choosing a layout",
+  "pointer": "/schema/tables",
+  "reason": "no supported date axis is available; declare a date column before choosing a layout",
+  "suggestedCommands": [
+    "powerbi-cli report spec fields --schema <schema.json> --json"
+  ]
+}

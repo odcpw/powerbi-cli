@@ -1,0 +1,19 @@
+{
+  "candidates": [],
+  "candidatesCommand": "powerbi-cli report plan --schema examples/sales.schema.json --intent <intent.json> --json",
+  "code": "plan.missing_input",
+  "example": {
+    "questions": [
+      "Which categories contribute most to the total?"
+    ]
+  },
+  "exitCode": 10,
+  "field": "intent.questions",
+  "hint": "Supply the named schema or intent field and rerun report plan; no default layout is applied.",
+  "message": "required planner input `intent.questions` is missing: the intent document contains no report question, KPI, comparison, period, alert, or archetype",
+  "pointer": "/intent/questions",
+  "reason": "the intent document contains no report question, KPI, comparison, period, alert, or archetype",
+  "suggestedCommands": [
+    "powerbi-cli report plan --schema examples/sales.schema.json --intent <intent.json> --json"
+  ]
+}

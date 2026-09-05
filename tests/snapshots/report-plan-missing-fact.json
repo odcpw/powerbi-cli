@@ -1,0 +1,27 @@
+{
+  "candidates": [
+    "Events",
+    "OtherEvents"
+  ],
+  "candidatesCommand": "powerbi-cli profile infer --schema <schema.json> --rows <rows.csv|rows.json> --out <profile.json> --json",
+  "code": "plan.missing_input",
+  "example": {
+    "candidates": [
+      "Events",
+      "OtherEvents"
+    ],
+    "model": {
+      "factTable": "Events"
+    }
+  },
+  "exitCode": 10,
+  "field": "intent.model.factTable",
+  "hint": "Supply the named schema or intent field and rerun report plan; no default layout is applied.",
+  "message": "required planner input `intent.model.factTable` is missing: select one schema table in the intent file; candidate tables: Events, OtherEvents",
+  "pointer": "/intent/model/factTable",
+  "reason": "select one schema table in the intent file; candidate tables: Events, OtherEvents",
+  "suggestedCommands": [
+    "powerbi-cli profile infer --schema <schema.json> --rows <rows.csv|rows.json> --out <profile.json> --json",
+    "powerbi-cli report plan --schema <schema.json> --profile <profile.json> --intent <intent.json> --json"
+  ]
+}

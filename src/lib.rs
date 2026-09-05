@@ -52,6 +52,7 @@ mod pbir_interactions;
 mod pbir_slicers;
 mod pbir_themes;
 mod pbir_visual_factory;
+mod planner_evidence;
 mod planner_rules;
 mod profile;
 mod profile_shape;
@@ -246,6 +247,9 @@ pub mod test_support {
         }
         if let Some(example) = error.example() {
             object.insert("example".to_string(), example.clone());
+        }
+        if let Some(candidates) = error.candidates() {
+            object.insert("candidates".to_string(), json!(candidates));
         }
         json!({"error": object})
     }

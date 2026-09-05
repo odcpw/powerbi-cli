@@ -21,7 +21,17 @@ include!(concat!(env!("OUT_DIR"), "/planner_rule_catalog.rs"));
 pub(crate) struct RuleCatalog {
     pub(crate) schema: String,
     pub(crate) version: u32,
+    pub(crate) evidence_thresholds: EvidenceThresholds,
     pub(crate) rules: Vec<PlannerRule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct EvidenceThresholds {
+    pub(crate) minimum_date_columns: usize,
+    pub(crate) minimum_measures: usize,
+    pub(crate) minimum_intent_signals: usize,
+    pub(crate) maximum_fact_candidates: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +101,15 @@ pub(crate) fn parse_catalog(text: &str) -> Result<RuleCatalog, String> {
 }
 
 pub(crate) fn validate_catalog(catalog: &RuleCatalog) -> Result<(), String> {
+    if catalog.evidence_thresholds.minimum_date_columns == 0
+        || catalog.evidence_thresholds.minimum_measures == 0
+        || catalog.evidence_thresholds.minimum_intent_signals == 0
+        || catalog.evidence_thresholds.maximum_fact_candidates != 1
+    {
+        return Err(
+            "evidenceThresholds must require dates, measures, and one unambiguous fact".into(),
+        );
+    }
     if catalog.schema != PLANNER_RULES_SCHEMA {
         return Err(format!(
             "schema must be {PLANNER_RULES_SCHEMA}, got {}",
@@ -465,6 +484,32 @@ mod tests {
         let unique = ids.iter().copied().collect::<BTreeSet<_>>();
         assert_eq!(ids.len(), unique.len());
         assert!(ids.iter().any(|id| id.ends_with("time-series")));
+    }
+
+    #[test]
+    fn evidence_thresholds_are_required_positive_catalog_data() {
+        let mut value: Value = serde_json::from_str(EMBEDDED_PLANNER_RULE_CATALOG).unwrap();
+        for key in [
+            "minimumDateColumns",
+            "minimumMeasures",
+            "minimumIntentSignals",
+            "maximumFactCandidates",
+        ] {
+            let saved = value["evidenceThresholds"][key].clone();
+            value["evidenceThresholds"][key] = json!(0);
+            assert!(
+                parse_catalog(&value.to_string())
+                    .unwrap_err()
+                    .contains("evidenceThresholds")
+            );
+            value["evidenceThresholds"][key] = saved;
+        }
+        value.as_object_mut().unwrap().remove("evidenceThresholds");
+        assert!(
+            parse_catalog(&value.to_string())
+                .unwrap_err()
+                .contains("evidenceThresholds")
+        );
     }
 
     #[test]

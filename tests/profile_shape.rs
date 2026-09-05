@@ -216,7 +216,11 @@ fn report_plan_reuses_shape_and_model_shape_decision_deterministically() {
     let temp = tempfile::tempdir().expect("tempdir");
     let schema_path = temp.path().join("sales.schema.json");
     let profile_path = temp.path().join("sales.profile.json");
-    write_json(&schema_path, &star_schema());
+    let mut schema = star_schema();
+    schema["tables"][0]["measures"] = serde_json::json!([{
+        "name": "Row Count", "expression": "COUNTROWS('FactSales')"
+    }]);
+    write_json(&schema_path, &schema);
     let infer_args = vec![
         "profile".to_string(),
         "infer".to_string(),

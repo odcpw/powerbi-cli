@@ -161,7 +161,7 @@ policies can wait until the object-specific writers and fixtures exist.
   periods, drill paths, alerts, filter dimensions, preferred archetypes, page
   flow, and handoff requirements into one `intent.v1` response before emitting
   an explicit `powerbi-cli.dashboard.v1` spec. KPI names resolve to exact model
-  measures; unresolved names return `spec.missing_input` with pointer and
+  measures; unresolved names return `plan.missing_input` with pointer and
   candidates. Uncompiled intent fields remain visible with an owning-bead
   warning.
 - Profile summaries and report plans classify model shape as flat, star,
@@ -659,6 +659,9 @@ IDs and dependencies; this roadmap records what has already landed:
   deterministic scored visual/page proposals with evidence and emits a
   slot/template/style `specV2` candidate while preserving the build-compatible
   dashboard.v1 plan output.
+- [x] Planner evidence thresholds live in the rule catalog; missing dates,
+  declared measures, or an unambiguous fact return `plan.missing_input` before
+  output writes. JSON intent `model.factTable` resolves fact ambiguity.
 
 Remaining work—such as `report compose`, full v2 compilation, design lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—

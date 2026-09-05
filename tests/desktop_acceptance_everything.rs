@@ -389,6 +389,27 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let weak_schema = h.root.join("weak-planner.schema.json");
+    let mut weak: Value = serde_json::from_slice(&fs::read(&schema).unwrap()).unwrap();
+    for table in weak["tables"].as_array_mut().unwrap() {
+        table.as_object_mut().unwrap().remove("measures");
+    }
+    fs::write(&weak_schema, serde_json::to_vec_pretty(&weak).unwrap()).unwrap();
+    let refusal = h.code(
+        "report plan",
+        10,
+        &svec([
+            "report",
+            "plan",
+            "--schema",
+            &p(&weak_schema),
+            "--objective",
+            "Overview",
+            "--json",
+        ]),
+    );
+    assert_eq!(refusal["error"]["code"], "plan.missing_input");
+    assert_eq!(refusal["error"]["field"], "intent.kpis[0].measure");
     h.ok(
         "report plan",
         &svec([
@@ -398,8 +419,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &p(&schema),
             "--profile",
             &p(&profile),
-            "--objective",
-            "Executive safety dashboard with trend, branch comparison, and cost portfolio views",
+            "--intent",
+            r#"{"questions":["Executive safety dashboard with trend, branch comparison, and cost portfolio views"],"model":{"factTable":"FactIncidents"}}"#,
             "--out",
             &p(&planned_spec),
             "--json",

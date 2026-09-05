@@ -1,11 +1,10 @@
 use crate::input_safety::{InputKind, read_utf8, validate_text};
+use crate::planner_evidence::plan_missing_input;
 use crate::planner_rules::{RulePlan, evaluate as evaluate_planner_rules};
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::profile_shape::classify;
 use crate::project_io::write_json_pretty;
-use crate::report_build::{
-    compile_dashboard_summary, spec_missing_input, spec_missing_input_with_command,
-};
+use crate::report_build::{compile_dashboard_summary, spec_missing_input};
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
@@ -51,6 +50,14 @@ struct Intent {
     preferred_archetypes: Vec<String>,
     page_flow: Vec<String>,
     handoff: Option<IntentHandoff>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<IntentModel>,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct IntentModel {
+    fact_table: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -59,8 +66,6 @@ struct IntentKpi {
     name: String,
     measure: Option<String>,
     target: Option<Value>,
-    #[serde(skip)]
-    pointer: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,7 +126,7 @@ struct PlanModel<'a> {
 pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     let options = parse_plan_args(args)?;
     let schema_path = options.schema.ok_or_else(|| {
-        spec_missing_input_with_command(
+        plan_missing_input(
             "/schema",
             "schema",
             "report plan needs a schema manifest to resolve measures and candidate fields",
@@ -146,7 +151,8 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     let loaded_intent = load_intent(options.intent.as_deref(), options.objective.as_deref())?;
     let shape = classify(&schema_value, profile_value.as_ref()).into_value();
     let shape_for_profile_summary = shape.clone();
-    let model = PlanModel::new(&schema_value, profile_value.as_ref());
+    let mut model = PlanModel::new(&schema_value, profile_value.as_ref());
+    validate_plan_evidence(&mut model, &loaded_intent.intent, &shape, &schema_path)?;
     let (mut planned, intent) = build_dashboard_plan(&schema_value, &model, loaded_intent.intent)?;
     let intent_value = serde_json::to_value(&intent).map_err(|error| {
         CliError::validation_failed(format!("normalized intent cannot be serialized: {error}"))
@@ -226,6 +232,59 @@ struct PlannedDashboard {
     defaults_applied: Vec<Value>,
 }
 
+fn validate_plan_evidence(
+    model: &mut PlanModel<'_>,
+    intent: &Intent,
+    shape: &Value,
+    schema_path: &Path,
+) -> CliResult<()> {
+    // Column names (for example a string named Date) are only hypotheses.
+    // Require a declared temporal type before promising a time axis.
+    model.date_columns = model
+        .all_schema_columns()
+        .into_iter()
+        .filter(|column| {
+            column.data_type.as_deref().is_some_and(|kind| {
+                matches!(
+                    kind.to_ascii_lowercase().as_str(),
+                    "date" | "datetime" | "datetimezone"
+                )
+            })
+        })
+        .collect();
+    let evidence = crate::planner_evidence::Evidence {
+        tables: schema_tables(model.schema)
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect(),
+        date_count: model.date_columns.len(),
+        measure_count: model.existing_measures.len(),
+        intent_signal_count: intent.questions.len()
+            + intent.kpis.len()
+            + intent.comparisons.len()
+            + intent.periods.len()
+            + intent.alerts.len()
+            + intent.preferred_archetypes.len(),
+        fact_override: intent
+            .model
+            .as_ref()
+            .map(|selection| selection.fact_table.clone()),
+    };
+    model.fact_tables = crate::planner_evidence::validate(evidence, shape, schema_path)?;
+    model.existing_measures.sort_by_key(|measure| {
+        !model
+            .fact_tables
+            .iter()
+            .any(|table| measure.reference.starts_with(&format!("{table}[")))
+    });
+    model.numeric_columns = model.profile_or_schema_columns("numericColumns", ColumnRole::Numeric);
+    model.date_columns =
+        prioritize_fact_columns(std::mem::take(&mut model.date_columns), &model.fact_tables);
+    model.category_columns =
+        model.profile_or_schema_columns("categoryColumns", ColumnRole::Category);
+    Ok(())
+}
+
 fn build_dashboard_plan(
     schema: &Value,
     model: &PlanModel<'_>,
@@ -240,14 +299,6 @@ fn build_dashboard_plan(
             "field": "profile",
             "value": "schema metadata",
             "reason": "profile is optional for report plan; schema columns are used when no profile is supplied"
-        }));
-    }
-    if profile_fact_tables(model.profile).is_empty() {
-        defaults_applied.push(json!({
-            "pointer": "/profile/candidates/factTables",
-            "field": "profile.candidates.factTables",
-            "value": model.fact_tables.first(),
-            "reason": "profile did not identify a fact table; the first schema table is used as the documented fallback"
         }));
     }
     if model.fact_tables.is_empty() {
@@ -376,7 +427,7 @@ fn build_dashboard_plan(
         "kind": "fact-table",
         "ruleId": "planner.overview",
         "selected": model.fact_tables.first(),
-        "reason": "first profile fact table, falling back to first schema table"
+        "reason": "fact table resolved from schema/profile shape evidence or explicit intent.model.factTable"
     }));
     decisions.push(json!({
         "kind": "primary-measure",
@@ -1199,7 +1250,7 @@ fn load_intent(intent: Option<&str>, objective: Option<&str>) -> CliResult<Loade
         });
     }
     let Some(intent) = intent.filter(|value| !value.trim().is_empty()) else {
-        return Err(spec_missing_input_with_command(
+        return Err(plan_missing_input(
             "/intent",
             "intent",
             "report plan needs an intent document or objective so it can choose report questions and visuals",
@@ -1245,6 +1296,7 @@ impl Intent {
             preferred_archetypes: Vec::new(),
             page_flow: Vec::new(),
             handoff: None,
+            model: None,
         }
     }
 
@@ -1318,6 +1370,7 @@ fn parse_json_intent(raw: &str, value: Value) -> CliResult<LoadedIntent> {
         "preferredArchetypes",
         "pageFlow",
         "handoff",
+        "model",
     ];
     for key in object.keys() {
         if !known_fields.contains(&key.as_str()) {
@@ -1342,6 +1395,13 @@ fn parse_json_intent(raw: &str, value: Value) -> CliResult<LoadedIntent> {
     let kpis = json_kpis(object, &mut warnings)?;
     let alerts = json_alerts(object, &mut warnings)?;
     let handoff = json_handoff(object)?;
+    let model = object
+        .get("model")
+        .map(|value| {
+            serde_json::from_value::<IntentModel>(value.clone())
+                .map_err(|error| intent_error("/model/factTable", error.to_string()))
+        })
+        .transpose()?;
 
     if let Some(text) = object.get("text")
         && !text.is_null()
@@ -1366,6 +1426,7 @@ fn parse_json_intent(raw: &str, value: Value) -> CliResult<LoadedIntent> {
             preferred_archetypes,
             page_flow,
             handoff,
+            model,
         },
         warnings,
     })
@@ -1466,7 +1527,6 @@ fn json_kpis(object: &Map<String, Value>, warnings: &mut Vec<Value>) -> CliResul
                 name,
                 measure,
                 target,
-                pointer: format!("{pointer}/name"),
             })
         })
         .collect()
@@ -1677,6 +1737,7 @@ fn parse_markdown_intent(raw: &str) -> LoadedIntent {
             preferred_archetypes: markdown_strings(sections.get("preferredArchetypes")),
             page_flow: markdown_strings(sections.get("pageFlow")),
             handoff,
+            model: None,
         },
         warnings,
     }
@@ -1815,7 +1876,6 @@ fn parse_markdown_kpi(entry: &str, line: usize, warnings: &mut Vec<Value>) -> Op
         name,
         measure,
         target,
-        pointer: format!("#/line/{line}"),
     })
 }
 
@@ -2020,13 +2080,11 @@ fn resolve_intent_kpis(
         .iter()
         .flat_map(|measure| [measure.name.clone(), measure.reference.clone()])
         .collect::<Vec<_>>();
-    for kpi in &mut intent.kpis {
+    for (index, kpi) in intent.kpis.iter_mut().enumerate() {
         let requested = kpi.measure.as_deref().unwrap_or(&kpi.name);
         let choice = measures.iter().find(|measure| {
             measure.name.eq_ignore_ascii_case(requested)
                 || measure.reference.eq_ignore_ascii_case(requested)
-                || measure.name.eq_ignore_ascii_case(&kpi.name)
-                || measure.reference.eq_ignore_ascii_case(&kpi.name)
         });
         let Some(choice) = choice else {
             let candidate_text = if candidates.is_empty() {
@@ -2034,18 +2092,15 @@ fn resolve_intent_kpis(
             } else {
                 candidates.join(", ")
             };
-            return Err(spec_missing_input(
-                if kpi.pointer.is_empty() {
-                    "/kpis".to_string()
-                } else {
-                    kpi.pointer.clone()
-                },
-                "intent.kpis[].measure",
+            return Err(plan_missing_input(
+                format!("/intent/kpis/{index}/measure"),
+                format!("intent.kpis[{index}].measure"),
                 format!(
                     "KPI `{}` does not resolve to a model measure; candidates: {candidate_text}",
                     kpi.name
                 ),
-                json!({"measure": candidate_text}),
+                json!({"measure": measures.first().map(|measure| &measure.reference), "candidates": candidates}),
+                "powerbi-cli report spec fields --schema <schema.json> --json",
             ));
         };
         kpi.measure = Some(choice.reference.clone());
@@ -2518,13 +2573,12 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_kpi_returns_spec_missing_input_with_measure_candidates() {
+    fn unresolved_kpi_returns_plan_missing_input_with_measure_candidates() {
         let mut intent = Intent::empty("intent", "json", "{}");
         intent.kpis.push(IntentKpi {
             name: "Missing KPI".to_string(),
             measure: None,
             target: None,
-            pointer: "/kpis/0/name".to_string(),
         });
         let measures = vec![MeasureChoice {
             name: "Revenue".to_string(),
@@ -2534,8 +2588,8 @@ mod tests {
         let mut decisions = Vec::new();
         let error = resolve_intent_kpis(&mut intent, &measures, &mut decisions)
             .expect_err("unknown KPI must not silently use primary measure");
-        assert_eq!(error.code, "spec.missing_input");
-        assert_eq!(error.pointer(), Some("/kpis/0/name"));
+        assert_eq!(error.code, "plan.missing_input");
+        assert_eq!(error.pointer(), Some("/intent/kpis/0/measure"));
         assert!(error.message.contains("Fact[Revenue]"));
     }
 
@@ -2548,5 +2602,24 @@ mod tests {
         let second_bytes = serde_json::to_vec(&second.intent).expect("serialize second");
         assert_eq!(first_bytes, second_bytes);
         assert_eq!(first.warnings, second.warnings);
+    }
+
+    #[test]
+    fn evidence_gate_requires_a_typed_date_and_resolves_the_single_table_without_profile() {
+        let mut schema = json!({"tables": [{"name": "Events", "columns": [
+            {"name": "Date", "dataType": "string"}
+        ], "measures": [{"name": "Count", "expression": "COUNTROWS('Events')"}]}]});
+        let intent = Intent::from_objective("Overview");
+        let shape = classify(&schema, None).into_value();
+        let mut model = PlanModel::new(&schema, None);
+        let error = validate_plan_evidence(&mut model, &intent, &shape, Path::new("schema.json"))
+            .expect_err("a name-based date hypothesis is insufficient");
+        assert_eq!(error.code, "plan.missing_input");
+        assert_eq!(error.field(), Some("schema.tables[].columns[].type=date"));
+        schema["tables"][0]["columns"][0]["dataType"] = json!("date");
+        let mut model = PlanModel::new(&schema, None);
+        validate_plan_evidence(&mut model, &intent, &shape, Path::new("schema.json")).unwrap();
+        assert_eq!(model.fact_tables, vec!["Events"]);
+        assert_eq!(model.date_columns.len(), 1);
     }
 }
