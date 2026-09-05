@@ -1425,7 +1425,7 @@ fn schema_manifest() -> Value {
         "reportObjectFindFields": ["ok", "predicates", "objects[].handle", "objects[].kind", "objects[].path", "counts.matched", "next"],
         "reportObjectCatFields": ["ok", "object.handle", "object.kind", "object.path", "raw", "rawIncluded", "next"],
         "reportObjectQueryFields": ["ok", "selector", "objects[].handle", "objects[].kind", "counts.matched", "next"],
-        "reportAuditFields": ["ok", "profile", "counts.findings", "counts.bySeverity", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].message", "recommendedActions", "unsupportedActions", "next"],
+        "reportAuditFields": ["ok", "profile", "counts.findings", "counts.bySeverity", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].message", "recommendedActions", "unsupportedActions", "evaluatedRules", "deferredRules[].ruleId", "deferredRules[].status", "deferredRules[].reason", "next"],
         "reportSanitizePlanFields": ["ok", "profile", "planFingerprint", "confirmToken", "actions[].kind", "actions[].handles", "actions[].applySupported", "actions[].blockedReason", "actions[].jsonPointers", "next"],
         "reportSanitizeApplyFields": ["ok", "dryRun", "mode", "planFingerprint", "actions[].kind", "actions[].handles", "changes[].path", "changes[].jsonPointer", "postAudit", "validateCommand", "readbackCommand", "next"],
         "reportWireframeFields": ["ok", "format", "dryRun", "mode", "projectDir", "template", "grid", "geometrySource", "gridSource", "counts", "handles", "pages[].slots[]", "pages[].visuals[]", "pages[].lintMarkers[]", "artifacts[]", "warnings", "errors", "next"],
@@ -1782,7 +1782,7 @@ fn response_shapes() -> Value {
             "validation": {"requiredFields": ["ok", "errors", "warnings"]},
             "microsoftValidator": {"status": ["ok", "warnings", "failed", "not-installed", "unsupported-platform"]},
             "lint": {"requiredFields": ["ok", "counts", "findings", "findingsList"], "findingsBySeverity": ["error", "warning", "info"]},
-            "designLint": {"availableRequiredFields": ["status", "proofLevel", "ok", "counts", "ruleIds", "evaluatedRules", "deferredRules", "grid", "findings", "next"], "unavailableRequiredFields": ["status", "proofLevel", "reason", "findings"], "status": ["available", "unavailable"], "proofLevel": "unit-smoke; Desktop compatibility is not implied"},
+            "designLint": {"availableRequiredFields": ["status", "proofLevel", "ok", "counts", "ruleIds", "evaluatedRules", "deferredRules", "grid", "findings", "next"], "unavailableRequiredFields": ["status", "proofLevel", "reason", "findings"], "status": ["available", "unavailable"], "proofLevel": "unit-smoke", "proofLevelMeaning": "Desktop compatibility is not implied."},
             "handoff": {"requiredFields": ["status", "safeForOfflineHandoff"]},
             "proofLevelMeaning": "The highest compatibility level actually established by the local workflow; build and triage default to unit-smoke.",
             "next": "Executable powerbi-cli command templates only."

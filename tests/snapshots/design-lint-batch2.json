@@ -1,0 +1,103 @@
+{
+  "deferredRules": [
+    {
+      "owningBead": "pbi-t5-design-system-mlf.3",
+      "reason": "Resolved typography tokens and their minimum font-size policy are unavailable.",
+      "ruleId": "design.font_below_minimum",
+      "status": "not-evaluated"
+    },
+    {
+      "owningBead": "pbi-t5-design-system-mlf.3",
+      "reason": "Resolved foreground/background tokens, including theme inheritance, are unavailable.",
+      "ruleId": "design.contrast_below_aa",
+      "status": "not-evaluated"
+    },
+    {
+      "owningBead": "pbi-t5-design-system-mlf.3",
+      "reason": "Resolved palette and semantic-color tokens are unavailable.",
+      "ruleId": "design.palette_drift",
+      "status": "not-evaluated"
+    },
+    {
+      "owningBead": "pbi-t5-design-system-mlf.3",
+      "reason": "The active theme cannot resolve a full display-unit policy; offline metadata cannot establish data magnitude.",
+      "ruleId": "design.display_units_missing",
+      "status": "not-evaluated"
+    }
+  ],
+  "evaluatedRules": [
+    "report.visual_outside_page",
+    "design.visual_overlap",
+    "design.title_case_inconsistent",
+    "design.title_missing",
+    "design.title_duplicate",
+    "design.number_format_missing",
+    "design.ranking_not_sorted",
+    "design.visual_off_grid",
+    "design.row_height_inconsistent",
+    "design.column_width_inconsistent",
+    "design.page_overcrowded",
+    "design.page_missing_heading",
+    "design.slicer_too_short",
+    "design.rail_not_synced",
+    "design.drillthrough_no_back_button",
+    "design.slot_family_mismatch"
+  ],
+  "findings": [
+    {
+      "pointer": "/report/pages/0/visuals/0/position",
+      "ruleId": "design.visual_off_grid",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/0/position",
+      "ruleId": "report.visual_outside_page",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/1/position",
+      "ruleId": "design.visual_off_grid",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/2/position",
+      "ruleId": "design.visual_off_grid",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/2/position",
+      "ruleId": "design.visual_overlap",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    }
+  ],
+  "proofLevel": "unit-smoke",
+  "ruleIds": [
+    "design.contrast_below_aa",
+    "report.visual_outside_page",
+    "design.visual_overlap",
+    "design.title_case_inconsistent",
+    "design.title_missing",
+    "design.title_duplicate",
+    "design.font_below_minimum",
+    "design.palette_drift",
+    "design.number_format_missing",
+    "design.display_units_missing",
+    "design.ranking_not_sorted",
+    "design.visual_off_grid",
+    "design.row_height_inconsistent",
+    "design.column_width_inconsistent",
+    "design.page_overcrowded",
+    "design.page_missing_heading",
+    "design.slicer_too_short",
+    "design.rail_not_synced",
+    "design.drillthrough_no_back_button",
+    "design.slot_family_mismatch"
+  ],
+  "schema": "powerbi-cli.design.lint.v1",
+  "status": "available"
+}

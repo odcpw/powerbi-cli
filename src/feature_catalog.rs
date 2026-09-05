@@ -297,18 +297,18 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "quality.design-lint",
-        title: "Deterministic report design geometry lint",
+        title: "Deterministic report design lint",
         category: "validation",
         status: "supported",
-        support: "read-only-grid-and-template-analysis",
+        support: "read-only-design-analysis",
         proof_level: "unit-smoke",
         emits_pbir: false,
-        commands: &["lint", "triage", "report audit"],
+        commands: &["triage", "report audit"],
         refusal_code: None,
-        reason: "The shared lint pipeline evaluates eleven stable design-family geometry rules against the embedded twelve-column grid and named layout templates. Findings include RFC 6901 pointers, evidence, and a sanitize action when remediation can be planned mechanically; report audit --rules design isolates the same findings, while scorecard.designLint exposes them to build and triage.",
+        reason: "Explicit report audit --rules design exposes twenty design rules: sixteen geometry/title/measure-format/ranking checks plus four literal style checks when the active theme exactly matches a built-in token policy. Unresolved style policies are not-evaluated with reasons. Default lint and fixture summaries exclude this family; build and triage expose it separately in scorecard.designLint. Findings include RFC 6901 pointers, evidence, and plan-only sanitize actions where mechanical.",
         next_proof: &[
             "Promote geometry heuristics only after representative generated and Desktop-authored fixtures complete Desktop canvas review",
-            "Add typography, colour, and number-format checks through the separate style-token lint boundary",
+            "Persist full custom token policies before evaluating style checks on overridden themes; dynamic colours and translucent backgrounds require rendering evidence",
         ],
         reference_signals: &[
             "src/design/lint.rs",

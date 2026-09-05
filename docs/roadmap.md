@@ -695,12 +695,17 @@ IDs and dependencies; this roadmap records what has already landed:
   theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
   harvester, with each feature's proof level published by `features list`.
 - [x] Deterministic design-geometry lint now evaluates eleven stable
-  grid/template rules in `lint`, `report audit --rules design`, `triage`, and
+  grid/template rules in `report audit --rules design`, `triage`, and
   the shared scorecard, with pointers and plan-only sanitize actions.
   Sanitize confirmation tokens bind the selected profile, sorted action
   identities, and relative-path project bytes; relocating an identical tree
   preserves the token, while changed project bytes invalidate it. Response
   paths and diagnostic evidence are excluded from the confirmation hash.
+- [x] Design lint batch 2 adds title case/missing/duplicate, measure format,
+  ranking sort, font minimum, literal title contrast, palette drift, and
+  explicit compact-unit override checks (twenty rules total). Four style rules
+  require an exactly resolved built-in token theme; otherwise they are explicitly
+  not evaluated with reasons. Default lint and fixture goldens remain unchanged.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
 - [x] The embedded `design-defaults.v1` catalog resolves per-family visual
