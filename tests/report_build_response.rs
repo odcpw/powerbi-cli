@@ -104,9 +104,13 @@ fn report_build_scorecard_is_shared_with_triage() {
     let triage_json = stdout_json(&triage);
     assert_eq!(build_json["scorecard"], triage_json["scorecard"]);
     assert_eq!(build_json["scorecard"]["schema"], "scorecard.v1");
+    assert_eq!(build_json["scorecard"]["designLint"]["status"], "available");
     assert_eq!(
-        build_json["scorecard"]["designLint"]["status"],
-        "unavailable"
+        build_json["scorecard"]["designLint"]["ruleIds"]
+            .as_array()
+            .expect("design rule ids")
+            .len(),
+        11
     );
     assert!(build_json["scorecard"]["handoff"]["safeForOfflineHandoff"].is_boolean());
 }

@@ -1,0 +1,64 @@
+{
+  "deferredRules": [],
+  "evaluatedRules": [
+    "report.visual_outside_page",
+    "design.visual_overlap",
+    "design.visual_off_grid",
+    "design.row_height_inconsistent",
+    "design.column_width_inconsistent",
+    "design.page_overcrowded",
+    "design.page_missing_heading",
+    "design.slicer_too_short",
+    "design.rail_not_synced",
+    "design.drillthrough_no_back_button",
+    "design.slot_family_mismatch"
+  ],
+  "findings": [
+    {
+      "pointer": "/report/pages/0/visuals/0/position",
+      "ruleId": "design.visual_off_grid",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/0/position",
+      "ruleId": "report.visual_outside_page",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/1/position",
+      "ruleId": "design.visual_off_grid",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/2/position",
+      "ruleId": "design.visual_off_grid",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    },
+    {
+      "pointer": "/report/pages/0/visuals/2/position",
+      "ruleId": "design.visual_overlap",
+      "sanitizeAction": "relayout-template",
+      "severity": "warning"
+    }
+  ],
+  "proofLevel": "unit-smoke",
+  "ruleIds": [
+    "report.visual_outside_page",
+    "design.visual_overlap",
+    "design.visual_off_grid",
+    "design.row_height_inconsistent",
+    "design.column_width_inconsistent",
+    "design.page_overcrowded",
+    "design.page_missing_heading",
+    "design.slicer_too_short",
+    "design.rail_not_synced",
+    "design.drillthrough_no_back_button",
+    "design.slot_family_mismatch"
+  ],
+  "schema": "powerbi-cli.design.lint.v1",
+  "status": "available"
+}

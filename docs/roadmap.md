@@ -652,6 +652,9 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] PBIR page/visual/filter/slicer/interaction/bookmark metadata surfaces,
   theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
   harvester, with each feature's proof level published by `features list`.
+- [x] Deterministic design-geometry lint now evaluates eleven stable
+  grid/template rules in `lint`, `report audit --rules design`, `triage`, and
+  the shared scorecard, with pointers and plan-only sanitize actions.
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
@@ -660,8 +663,8 @@ IDs and dependencies; this roadmap records what has already landed:
   slot/template/style `specV2` candidate while preserving the build-compatible
   dashboard.v1 plan output.
 
-Remaining work—such as `report compose`, full v2 compilation, design lint,
-broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
+Remaining work—such as `report compose`, full v2 compilation, style-token
+lint, broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
 is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
 associated beads. Keep command and feature claims synchronized with the live
 `capabilities --json` and `features list --json` catalogs.

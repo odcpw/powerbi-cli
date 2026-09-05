@@ -1,23 +1,20 @@
 //! Deterministic design-system linting for existing PBIP report trees.
 //!
-//! Design lint is intentionally read-only.  It consumes the embedded grid and
-//! formatting catalogs, reports every finding with a stable rule id and RFC
-//! 6901 pointer, and describes a mechanical action when one is safe to plan.
+//! Design lint is intentionally read-only. It consumes the embedded grid and
+//! template catalog, reports every finding with a stable rule id and RFC 6901
+//! pointer, and describes a mechanical action when one is safe to plan.
 //! Applying those actions belongs to the operation/auto-improve beads; this
 //! module never writes guessed PBIR.
 
 use super::grid::{self, Grid, PageSize, RailSide, Slot, SlotPosition, Template};
-use crate::formatting_catalog::formatting_catalog_entries;
 use crate::rules::{self, RuleFamily};
 use crate::{CliResult, ResolvedProject, canonical_display, read_json_value};
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub(crate) const DESIGN_LINT_SCHEMA: &str = "powerbi-cli.design.lint.v1";
 const GRID_EPSILON: f64 = 0.01;
-const MIN_NORMAL_TEXT_CONTRAST: f64 = 4.5;
-const MIN_FONT_SIZE: f64 = 10.0;
 
 /// Return the ids classified as part of the typed design family.
 pub(crate) fn design_rule_ids() -> Vec<&'static str> {
@@ -34,11 +31,9 @@ pub(crate) fn is_design_rule_id(id: &str) -> bool {
 /// is passed in by the caller so `lint`, `triage`, and the build scorecard do
 /// not each perform another expensive filesystem walk.
 pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult<Value> {
-    // Loading both catalogs here is deliberate: a malformed embedded catalog
-    // is a validation failure, never a reason to silently skip a check.
+    // A malformed embedded grid catalog is a validation failure, never a
+    // reason to silently skip a geometry check.
     let grid_catalog = grid::catalog()?;
-    let formatting_entries = formatting_catalog_entries()?;
-    let theme_palette = report_theme_palette(resolved)?;
     let pages = deep["report"]["pages"]
         .as_array()
         .cloned()
@@ -55,9 +50,6 @@ pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult
             &grid_catalog.templates,
         )?;
         lint_page_geometry(&context, &mut findings)?;
-        lint_page_titles(&context, &mut findings)?;
-        lint_page_visual_styles(&context, formatting_entries, &theme_palette, &mut findings)?;
-        lint_page_model_and_sort(&context, deep, &mut findings)?;
         contexts.push(context);
     }
     lint_rail_sync(&contexts, &mut findings)?;
@@ -65,17 +57,17 @@ pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult
     sort_findings(&mut findings);
     rules::ensure_finding_ids_registered(&findings, "ruleId")?;
     let counts = counts(&findings);
-    let deferred = deferred_rules(&findings);
     let project = canonical_display(&resolved.project_dir);
     Ok(json!({
         "schema": DESIGN_LINT_SCHEMA,
         "status": "available",
+        "proofLevel": "unit-smoke",
         "ok": counts["errors"].as_u64().unwrap_or_default() == 0,
         "projectDir": project,
         "counts": counts,
         "ruleIds": design_rule_ids(),
-        "evaluatedRules": evaluated_rules(&findings, &deferred),
-        "deferredRules": deferred,
+        "evaluatedRules": design_rule_ids(),
+        "deferredRules": [],
         "grid": {
             "schema": grid_catalog.schema,
             "columns": grid_catalog.grid.columns,
@@ -83,10 +75,6 @@ pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult
             "margin": grid_catalog.grid.margin,
             "rowUnit": grid_catalog.grid.row_unit,
             "templates": grid_catalog.templates.iter().map(|template| template.name.clone()).collect::<Vec<_>>()
-        },
-        "formattingCatalog": {
-            "entryCount": formatting_entries.len(),
-            "entries": formatting_entries.iter().map(|entry| format!("{}.{}", entry.object, entry.property)).collect::<Vec<_>>()
         },
         "findings": findings,
         "next": [
@@ -203,7 +191,8 @@ fn infer_template(
     grid: &Grid,
     templates: &[Template],
 ) -> Option<Template> {
-    let mut best: Option<(usize, String, Template)> = None;
+    let mut best: Option<(usize, Template)> = None;
+    let mut best_count = 0_usize;
     for template in templates {
         let Ok(positions) =
             grid::resolve_with_grid(template, PageSize { width, height }, *grid, None)
@@ -222,15 +211,17 @@ fn infer_template(
         if score == 0 {
             continue;
         }
-        let candidate = (score, template.name.clone(), template.clone());
-        let replace = best.as_ref().is_none_or(|current| {
-            score > current.0 || (score == current.0 && candidate.1 < current.1)
-        });
-        if replace {
-            best = Some(candidate);
+        match best.as_ref().map(|current| score.cmp(&current.0)) {
+            None | Some(std::cmp::Ordering::Greater) => {
+                best = Some((score, template.clone()));
+                best_count = 1;
+            }
+            Some(std::cmp::Ordering::Equal) => best_count += 1,
+            Some(std::cmp::Ordering::Less) => {}
         }
     }
-    best.map(|(_, _, template)| template)
+    best.filter(|(score, _)| *score >= 2 && best_count == 1)
+        .map(|(_, template)| template)
 }
 
 fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliResult<()> {
@@ -241,8 +232,8 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
             if rectangles_overlap(left_position, right_position) {
                 findings.push(design_finding(
                     rules::DESIGN_VISUAL_OVERLAP,
-                    visual_handle(left),
-                    visual_path(left),
+                    visual_handle(right),
+                    visual_path(right),
                     format!(
                         "/report/pages/{}/visuals/{}/position",
                         context.page_index, right_index
@@ -281,7 +272,7 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
                 position_summary(visual),
             ));
         }
-        if !aligned_to_grid(position, Grid::default().row_unit) {
+        if !aligned_to_grid(position, context.width, context.height, Grid::default()) {
             findings.push(design_finding(
                 rules::DESIGN_VISUAL_OFF_GRID,
                 visual_handle(visual),
@@ -301,8 +292,12 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
                 }),
             ));
         }
-        let mode = visual_slicer_mode(visual);
-        let minimum_height = if mode == Some("between") { 104.0 } else { 76.0 };
+        let mode = visual_slicer_mode(visual)?;
+        let minimum_height = if mode.as_deref() == Some("between") {
+            104.0
+        } else {
+            76.0
+        };
         if is_slicer(visual) && position.height + GRID_EPSILON < minimum_height {
             findings.push(design_finding(
                 rules::DESIGN_SLICER_TOO_SHORT,
@@ -328,8 +323,9 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
 
     if let Some(template) = context.template.as_ref() {
         if let Some(budget) = template.budget
-            && context.visuals.len() > budget
+            && budgeted_visual_count(context) > budget
         {
+            let visual_count = budgeted_visual_count(context);
             findings.push(design_finding(
                 rules::DESIGN_PAGE_OVERCROWDED,
                 context.handle(),
@@ -338,13 +334,13 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
                 format!(
                     "page {} contains {} visuals but template {} budgets {}",
                     context.display_name(),
-                    context.visuals.len(),
+                    visual_count,
                     template.name,
                     budget
                 ),
                 json!({
                     "template": template.name,
-                    "visualCount": context.visuals.len(),
+                    "visualCount": visual_count,
                     "budget": budget
                 }),
             ));
@@ -371,7 +367,7 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
             ));
         }
 
-        let row_groups = group_visuals_by(&context.visuals, |visual| rect(&visual["position"]).y);
+        let row_groups = group_visuals_by_slot(context, |slot| (slot.row, slot.row_span));
         for group in row_groups.values() {
             let heights = group
                 .iter()
@@ -395,8 +391,7 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
                 ));
             }
         }
-        let column_groups =
-            group_visuals_by(&context.visuals, |visual| rect(&visual["position"]).x);
+        let column_groups = group_visuals_by_slot(context, |slot| (slot.col, slot.col_span));
         for group in column_groups.values() {
             let widths = group
                 .iter()
@@ -456,7 +451,7 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
             rules::DESIGN_DRILLTHROUGH_NO_BACK_BUTTON,
             context.handle(),
             context.page_path.as_deref(),
-            "/pageBinding".to_string(),
+            format!("/report/pages/{}/pageBinding", context.page_index),
             format!(
                 "drillthrough page {} has no back-navigation button",
                 context.display_name()
@@ -467,255 +462,14 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
     Ok(())
 }
 
-fn lint_page_titles(context: &PageContext, findings: &mut Vec<Value>) -> CliResult<()> {
-    let mut title_styles = BTreeMap::<TitleCase, usize>::new();
-    let mut title_values = Vec::new();
-    for (index, visual) in context.visuals.iter().enumerate() {
-        let raw = raw_visual(visual)?;
-        let title = raw
-            .as_ref()
-            .and_then(raw_title)
-            .or_else(|| visual_title(visual));
-        let has_visible_title = raw.as_ref().is_some_and(|value| raw_title(value).is_some());
-        if !has_visible_title {
-            findings.push(design_finding(
-                rules::DESIGN_TITLE_MISSING,
-                visual_handle(visual),
-                visual_path(visual),
-                format!(
-                    "/report/pages/{}/visuals/{}/title",
-                    context.page_index, index
-                ),
-                "visual is missing a visible title".to_string(),
-                json!({"visualType": visual_type(visual)}),
-            ));
-            continue;
-        }
-        let Some(title) = title.filter(|title| !title.trim().is_empty()) else {
-            continue;
-        };
-        let style = title_case(&title);
-        *title_styles.entry(style).or_default() += 1;
-        title_values.push((index, visual, title, style));
-    }
-
-    let duplicate_groups = title_values.iter().fold(
-        BTreeMap::<String, Vec<usize>>::new(),
-        |mut groups, (index, _, title, _)| {
-            groups
-                .entry(normalized_title(title))
-                .or_default()
-                .push(*index);
-            groups
-        },
-    );
-    for indexes in duplicate_groups
-        .values()
-        .filter(|indexes| indexes.len() > 1)
-    {
-        let first = indexes[0];
-        let visual = &context.visuals[first];
-        findings.push(design_finding(
-            rules::DESIGN_TITLE_DUPLICATE,
-            visual_handle(visual),
-            visual_path(visual),
-            format!("/report/pages/{}/visuals/{}/title", context.page_index, first),
-            format!("title is duplicated on page {}", context.display_name()),
-            json!({"visuals": indexes.iter().map(|index| visual_handle(&context.visuals[*index])).collect::<Vec<_>>()}),
-        ));
-    }
-    if title_styles.len() > 1 {
-        let majority = title_styles
-            .iter()
-            .max_by(|(left_style, left_count), (right_style, right_count)| {
-                left_count
-                    .cmp(right_count)
-                    .then_with(|| right_style.cmp(left_style))
-            })
-            .map(|(style, _)| *style)
-            .unwrap_or(TitleCase::Sentence);
-        for (index, visual, title, style) in title_values {
-            if style != majority {
-                findings.push(design_finding(
-                    rules::DESIGN_TITLE_CASE_INCONSISTENT,
-                    visual_handle(visual),
-                    visual_path(visual),
-                    format!("/report/pages/{}/visuals/{}/title", context.page_index, index),
-                    format!("title casing differs from the page convention: {title}"),
-                    json!({"title": title, "style": style.as_str(), "pageStyle": majority.as_str()}),
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn lint_page_visual_styles(
-    context: &PageContext,
-    formatting_entries: &[crate::formatting_catalog::FormattingCatalogEntry],
-    theme_palette: &[String],
-    findings: &mut Vec<Value>,
-) -> CliResult<()> {
-    let catalog_has_font_size = formatting_entries
-        .iter()
-        .filter(|entry| entry.property.eq_ignore_ascii_case("fontSize"))
-        .next()
-        .is_some();
-    for (index, visual) in context.visuals.iter().enumerate() {
-        let raw = raw_visual(visual)?;
-        let Some(raw) = raw else { continue };
-        for (pointer, value) in find_property_literals(&raw, "fontSize") {
-            let Some(size) = literal_number(value) else {
-                continue;
-            };
-            if size < MIN_FONT_SIZE && catalog_has_font_size {
-                findings.push(design_finding(
-                    rules::DESIGN_FONT_BELOW_MINIMUM,
-                    visual_handle(visual),
-                    visual_path(visual),
-                    format!(
-                        "/report/pages/{}/visuals/{}/{}",
-                        context.page_index,
-                        index,
-                        pointer.trim_start_matches('/')
-                    ),
-                    format!(
-                        "font size {} is below the {} px minimum",
-                        trim_number(size),
-                        trim_number(MIN_FONT_SIZE)
-                    ),
-                    json!({"fontSize": size, "minimum": MIN_FONT_SIZE, "source": pointer}),
-                ));
-            }
-        }
-        let colors = find_color_literals(&raw);
-        if let Some((foreground, background, pointer)) = contrast_pair(&colors) {
-            let ratio = contrast_ratio(foreground, background);
-            if ratio + GRID_EPSILON < MIN_NORMAL_TEXT_CONTRAST {
-                findings.push(design_finding(
-                    rules::DESIGN_CONTRAST_BELOW_AA,
-                    visual_handle(visual),
-                    visual_path(visual),
-                    format!("/report/pages/{}/visuals/{}/{}", context.page_index, index, pointer.trim_start_matches('/')),
-                    format!("foreground/background contrast is {:.2}:1, below the 4.5:1 WCAG AA threshold", ratio),
-                    json!({"foreground": foreground, "background": background, "ratio": ratio, "minimum": MIN_NORMAL_TEXT_CONTRAST}),
-                ));
-            }
-        }
-        if has_large_magnitude_marker(&raw) && !has_display_units(&raw) {
-            findings.push(design_finding(
-                rules::DESIGN_DISPLAY_UNITS_MISSING,
-                visual_handle(visual),
-                visual_path(visual),
-                format!(
-                    "/report/pages/{}/visuals/{}/displayUnits",
-                    context.page_index, index
-                ),
-                "large-magnitude visual has no display-units policy".to_string(),
-                json!({"marker": "largeMagnitude", "displayUnits": Value::Null}),
-            ));
-        }
-        for (pointer, color) in find_color_literals_with_pointers(&raw) {
-            if !theme_palette.is_empty()
-                && !theme_palette
-                    .iter()
-                    .any(|candidate| candidate.eq_ignore_ascii_case(&color))
-            {
-                findings.push(design_finding(
-                    rules::DESIGN_PALETTE_DRIFT,
-                    visual_handle(visual),
-                    visual_path(visual),
-                    format!(
-                        "/report/pages/{}/visuals/{}/{}",
-                        context.page_index,
-                        index,
-                        pointer.trim_start_matches('/')
-                    ),
-                    format!("visual color {color} is outside the registered theme palette"),
-                    json!({"color": color, "palette": theme_palette}),
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn lint_page_model_and_sort(
-    context: &PageContext,
-    deep: &Value,
-    findings: &mut Vec<Value>,
-) -> CliResult<()> {
-    if let Some(tables) = deep["model"]["tables"].as_array() {
-        for table in tables {
-            if let Some(measures) = table["measures"].as_array() {
-                for measure in measures {
-                    let format = measure["properties"]["formatString"]
-                        .as_str()
-                        .filter(|value| !value.trim().is_empty());
-                    let dynamic = measure["properties"]["formatStringDefinition"]
-                        .as_object()
-                        .filter(|value| !value.is_empty());
-                    if format.is_none() && dynamic.is_none() {
-                        findings.push(design_finding(
-                            rules::DESIGN_NUMBER_FORMAT_MISSING,
-                            measure["handle"].as_str(),
-                            measure["path"].as_str().map(Path::new),
-                            format!(
-                                "/model/tables/{}/measures/{}/properties/formatString",
-                                table["name"].as_str().unwrap_or("table"),
-                                measure["name"].as_str().unwrap_or("measure")
-                            ),
-                            format!(
-                                "measure {} has no explicit number format",
-                                measure["name"].as_str().unwrap_or("measure")
-                            ),
-                            json!({"table": table["name"], "measure": measure["name"]}),
-                        ));
-                    }
-                }
-            }
-        }
-    }
-    for (index, visual) in context.visuals.iter().enumerate() {
-        let visual_type_name = visual_type(visual).to_ascii_lowercase();
-        let candidate = visual_type_name.contains("bar") || visual_type_name.contains("column");
-        let has_category = visual["bindings"].as_array().is_some_and(|bindings| {
-            bindings.iter().any(|binding| {
-                binding["role"]
-                    .as_str()
-                    .is_some_and(|role| role.eq_ignore_ascii_case("category"))
-            })
-        });
-        let has_measure = visual["bindings"].as_array().is_some_and(|bindings| {
-            bindings
-                .iter()
-                .any(|binding| binding["kind"] == "measure" || binding["measure"].is_string())
-        });
-        let explicit_ranking = raw_visual(visual)?.as_ref().is_some_and(has_ranking_marker);
-        if candidate
-            && has_category
-            && has_measure
-            && (context.template.is_some() || explicit_ranking)
-            && !has_descending_sort(visual)?
-        {
-            findings.push(design_finding(
-                rules::DESIGN_RANKING_NOT_SORTED,
-                visual_handle(visual),
-                visual_path(visual),
-                format!("/report/pages/{}/visuals/{}/bindings", context.page_index, index),
-                "ranking visual has no explicit descending measure sort".to_string(),
-                json!({"visualType": visual_type_name, "hasCategory": has_category, "hasMeasure": has_measure}),
-            ));
-        }
-    }
-    Ok(())
-}
-
 fn lint_rail_sync(contexts: &[PageContext], findings: &mut Vec<Value>) -> CliResult<()> {
-    let mut groups = BTreeMap::<RailSide, Vec<&PageContext>>::new();
+    let mut groups = BTreeMap::<(String, RailSide), Vec<&PageContext>>::new();
     for context in contexts {
-        if let Some(rail) = context.rail {
-            groups.entry(rail).or_default().push(context);
+        if let (Some(template), Some(rail)) = (&context.template, context.rail) {
+            groups
+                .entry((template.name.clone(), rail))
+                .or_default()
+                .push(context);
         }
     }
     for pages in groups.values() {
@@ -786,7 +540,7 @@ fn slot_for_visual<'a>(context: &'a PageContext, visual: &Value) -> Option<&'a S
         context
             .template_positions
             .get(&slot.name)
-            .is_some_and(|expected| position_matches(position, *expected))
+            .is_some_and(|expected| position_origin_matches(position, *expected))
     })
 }
 
@@ -903,47 +657,6 @@ fn raw_has_back_action(raw: &Value) -> bool {
     text.contains("back") || text.contains("backbutton")
 }
 
-fn has_ranking_marker(raw: &Value) -> bool {
-    raw["ranking"].as_bool() == Some(true)
-        || raw["largeMagnitude"].as_bool() == Some(true)
-        || raw["annotations"].as_array().is_some_and(|annotations| {
-            annotations.iter().any(|annotation| {
-                let name = annotation["name"].as_str().unwrap_or_default();
-                let value = annotation["value"].as_str().unwrap_or_default();
-                (name.eq_ignore_ascii_case("powerbi-cli.ranking")
-                    || name.eq_ignore_ascii_case("powerbi-cli.design.ranking"))
-                    && (value.is_empty() || value.eq_ignore_ascii_case("true"))
-            })
-        })
-}
-
-fn has_descending_sort(visual: &Value) -> CliResult<bool> {
-    if visual["bindings"].as_array().is_some_and(|bindings| {
-        bindings.iter().any(|binding| {
-            binding["sortDirection"].as_str().is_some_and(|direction| {
-                direction.eq_ignore_ascii_case("descending")
-                    || direction.eq_ignore_ascii_case("desc")
-            })
-        })
-    }) {
-        return Ok(true);
-    }
-    let Some(raw) = raw_visual(visual)? else {
-        return Ok(false);
-    };
-    Ok(raw
-        .pointer("/visual/query/sortDefinition/sort")
-        .and_then(Value::as_array)
-        .is_some_and(|sorts| {
-            sorts.iter().any(|sort| {
-                sort["direction"].as_str().is_some_and(|direction| {
-                    direction.eq_ignore_ascii_case("descending")
-                        || direction.eq_ignore_ascii_case("desc")
-                })
-            })
-        }))
-}
-
 fn raw_visual(visual: &Value) -> CliResult<Option<Value>> {
     let Some(path) = visual["path"].as_str() else {
         return Ok(None);
@@ -955,66 +668,6 @@ fn raw_visual(visual: &Value) -> CliResult<Option<Value>> {
     Ok(Some(read_json_value(&path)?))
 }
 
-fn report_theme_palette(resolved: &ResolvedProject) -> CliResult<Vec<String>> {
-    let path = resolved.report_dir.join("definition").join("report.json");
-    if !path.is_file() {
-        return Ok(Vec::new());
-    }
-    let report = read_json_value(&path)?;
-    let mut colors = BTreeSet::new();
-    collect_hex_colors(&report["themeCollection"], &mut colors);
-    Ok(colors.into_iter().collect())
-}
-
-fn collect_hex_colors(value: &Value, colors: &mut BTreeSet<String>) {
-    match value {
-        Value::Object(object) => {
-            for child in object.values() {
-                if let Some(text) = child.as_str()
-                    && let Some(color) = normalize_color(text.to_string())
-                {
-                    colors.insert(color);
-                }
-                collect_hex_colors(child, colors);
-            }
-        }
-        Value::Array(items) => {
-            for child in items {
-                collect_hex_colors(child, colors);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn raw_title(raw: &Value) -> Option<String> {
-    for (text_pointer, show_pointer) in [
-        (
-            "/visual/visualContainerObjects/title/0/properties/text/expr/Literal/Value",
-            "/visual/visualContainerObjects/title/0/properties/show/expr/Literal/Value",
-        ),
-        (
-            "/visual/objects/title/0/properties/text/expr/Literal/Value",
-            "/visual/objects/title/0/properties/show/expr/Literal/Value",
-        ),
-        ("/title", ""),
-    ] {
-        let Some(value) = raw.pointer(text_pointer).and_then(Value::as_str) else {
-            continue;
-        };
-        if !show_pointer.is_empty()
-            && raw
-                .pointer(show_pointer)
-                .and_then(Value::as_str)
-                .is_some_and(|show| show.eq_ignore_ascii_case("false"))
-        {
-            continue;
-        }
-        return Some(decode_literal_text(value));
-    }
-    None
-}
-
 fn visual_title(visual: &Value) -> Option<String> {
     visual["title"]
         .as_str()
@@ -1022,75 +675,29 @@ fn visual_title(visual: &Value) -> Option<String> {
         .filter(|value| !value.trim().is_empty())
 }
 
-fn decode_literal_text(value: &str) -> String {
-    let trimmed = value.trim();
-    if trimmed.len() >= 2 && trimmed.starts_with('\'') && trimmed.ends_with('\'') {
-        trimmed[1..trimmed.len() - 1].replace("''", "'")
-    } else {
-        trimmed.to_string()
-    }
+fn budgeted_visual_count(context: &PageContext) -> usize {
+    context
+        .visuals
+        .iter()
+        .filter(|visual| {
+            !slot_for_visual(context, visual).is_some_and(|slot| slot.name == "heading")
+                && !is_heading_visual(visual)
+        })
+        .count()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum TitleCase {
-    Sentence,
-    Title,
-    Upper,
-    Lower,
-    Mixed,
-}
-
-impl TitleCase {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Sentence => "sentence",
-            Self::Title => "title",
-            Self::Upper => "upper",
-            Self::Lower => "lower",
-            Self::Mixed => "mixed",
-        }
-    }
-}
-
-fn title_case(value: &str) -> TitleCase {
-    if value == value.to_ascii_uppercase() && value.chars().any(char::is_alphabetic) {
-        return TitleCase::Upper;
-    }
-    if value == value.to_ascii_lowercase() && value.chars().any(char::is_alphabetic) {
-        return TitleCase::Lower;
-    }
-    let words = value.split_whitespace().collect::<Vec<_>>();
-    if words.iter().all(|word| {
-        word.chars()
-            .next()
-            .is_some_and(|character| character.is_uppercase())
-    }) {
-        return TitleCase::Title;
-    }
-    if value
-        .chars()
-        .next()
-        .is_some_and(|character| character.is_uppercase())
-    {
-        TitleCase::Sentence
-    } else {
-        TitleCase::Mixed
-    }
-}
-
-fn normalized_title(value: &str) -> String {
-    value.trim().to_ascii_lowercase()
-}
-
-fn group_visuals_by<F>(visuals: &[Value], key: F) -> BTreeMap<i64, Vec<(usize, &Value)>>
+fn group_visuals_by_slot<F>(
+    context: &PageContext,
+    key: F,
+) -> BTreeMap<(u32, u32), Vec<(usize, &Value)>>
 where
-    F: Fn(&Value) -> f64,
+    F: Fn(&Slot) -> (u32, u32),
 {
-    let mut groups = BTreeMap::<i64, Vec<(usize, &Value)>>::new();
-    for (index, visual) in visuals.iter().enumerate() {
-        let value = key(visual);
-        let bucket = (value / GRID_EPSILON).round() as i64;
-        groups.entry(bucket).or_default().push((index, visual));
+    let mut groups = BTreeMap::<(u32, u32), Vec<(usize, &Value)>>::new();
+    for (index, visual) in context.visuals.iter().enumerate() {
+        if let Some(slot) = slot_for_visual(context, visual) {
+            groups.entry(key(slot)).or_default().push((index, visual));
+        }
     }
     groups
 }
@@ -1132,10 +739,27 @@ fn outside_page(position: Rect, width: f64, height: f64) -> bool {
         || position.y + position.height > height + GRID_EPSILON
 }
 
-fn aligned_to_grid(position: Rect, row_unit: f64) -> bool {
-    [position.x, position.y, position.width, position.height]
+fn aligned_to_grid(position: Rect, page_width: f64, page_height: f64, grid: Grid) -> bool {
+    let scale_x = page_width / PageSize::STANDARD.width;
+    let scale_y = page_height / PageSize::STANDARD.height;
+    let margin_x = grid.margin * scale_x;
+    let gutter_x = grid.gutter * scale_x;
+    let row_unit = grid.row_unit * scale_y;
+    let column_width = (page_width - margin_x * 2.0 - gutter_x * (grid.columns as f64 - 1.0))
+        / grid.columns as f64;
+    let starts =
+        (0..grid.columns).map(|column| margin_x + column as f64 * (column_width + gutter_x));
+    let mut ends = (0..grid.columns)
+        .map(|column| margin_x + column as f64 * (column_width + gutter_x) + column_width);
+    let x_aligned = starts
+        .clone()
+        .any(|guide| (guide - position.x).abs() <= GRID_EPSILON);
+    let right = position.x + position.width;
+    let right_aligned = ends.any(|guide| (guide - right).abs() <= GRID_EPSILON);
+    let vertical_aligned = [position.y, position.y + position.height]
         .iter()
-        .all(|value| ((*value / row_unit).round() * row_unit - *value).abs() <= GRID_EPSILON)
+        .all(|value| ((*value / row_unit).round() * row_unit - *value).abs() <= GRID_EPSILON);
+    x_aligned && right_aligned && vertical_aligned
 }
 
 fn position_matches(position: &Value, expected: SlotPosition) -> bool {
@@ -1148,6 +772,11 @@ fn position_matches(position: &Value, expected: SlotPosition) -> bool {
     ]
     .iter()
     .all(|(actual, expected)| (actual - expected).abs() <= GRID_EPSILON)
+}
+
+fn position_origin_matches(position: &Value, expected: SlotPosition) -> bool {
+    let actual = rect(position);
+    (actual.x - expected.x).abs() <= GRID_EPSILON && (actual.y - expected.y).abs() <= GRID_EPSILON
 }
 
 fn position_summary(visual: &Value) -> Value {
@@ -1171,10 +800,25 @@ fn is_slicer(visual: &Value) -> bool {
     visual_type(visual).eq_ignore_ascii_case("slicer")
 }
 
-fn visual_slicer_mode(visual: &Value) -> Option<&str> {
-    visual["slicerMode"]
+fn visual_slicer_mode(visual: &Value) -> CliResult<Option<String>> {
+    if let Some(mode) = visual["slicerMode"]
         .as_str()
         .or_else(|| visual["mode"].as_str())
+    {
+        return Ok(Some(mode.to_ascii_lowercase()));
+    }
+
+    Ok(raw_visual(visual)?
+        .as_ref()
+        .and_then(|raw| raw.pointer("/visual/objects/data"))
+        .and_then(Value::as_array)
+        .and_then(|cards| {
+            cards.iter().find_map(|card| {
+                card.pointer("/properties/mode/expr/Literal/Value")
+                    .and_then(Value::as_str)
+            })
+        })
+        .map(|mode| mode.trim_matches('\'').to_ascii_lowercase()))
 }
 
 fn trim_number(value: f64) -> String {
@@ -1208,7 +852,6 @@ fn design_finding(
         "pointer": pointer,
         "hint": rule.remediation,
         "sanitizeAction": rule.sanitize_action,
-        "supportedAction": rule.sanitize_action.is_some(),
         "evidence": evidence,
         "recommendedActions": rule.sanitize_action.map(|action| vec![action]).unwrap_or_default()
     })
@@ -1275,223 +918,120 @@ fn severity_rank(finding: &Value) -> u8 {
     }
 }
 
-fn evaluated_rules(_findings: &[Value], deferred: &[Value]) -> Vec<String> {
-    let deferred_ids = deferred
-        .iter()
-        .filter_map(|item| item["ruleId"].as_str())
-        .collect::<BTreeSet<_>>();
-    design_rule_ids()
-        .into_iter()
-        .filter(|id| !deferred_ids.contains(id))
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>()
-}
-
-fn deferred_rules(findings: &[Value]) -> Vec<Value> {
-    let has_contrast = findings
-        .iter()
-        .any(|finding| finding["ruleId"] == rules::DESIGN_CONTRAST_BELOW_AA);
-    let has_palette = findings
-        .iter()
-        .any(|finding| finding["ruleId"] == rules::DESIGN_PALETTE_DRIFT);
-    let mut deferred = Vec::new();
-    if !has_contrast {
-        deferred.push(json!({
-            "ruleId": rules::DESIGN_CONTRAST_BELOW_AA,
-            "reason": "no explicit foreground/background pair was present in the report visuals"
-        }));
-    }
-    if !has_palette {
-        deferred.push(json!({
-            "ruleId": rules::DESIGN_PALETTE_DRIFT,
-            "reason": "no registered theme palette was present in the report"
-        }));
-    }
-    deferred
-}
-
-fn find_property_literals<'a>(value: &'a Value, property: &str) -> Vec<(String, &'a Value)> {
-    let mut result = Vec::new();
-    walk_property_literals(value, "", property, &mut result);
-    result
-}
-
-fn walk_property_literals<'a>(
-    value: &'a Value,
-    pointer: &str,
-    property: &str,
-    result: &mut Vec<(String, &'a Value)>,
-) {
-    match value {
-        Value::Object(object) => {
-            for (key, child) in object {
-                let child_pointer = format!("{pointer}/{key}");
-                if key.eq_ignore_ascii_case(property) {
-                    result.push((child_pointer.clone(), child));
-                }
-                walk_property_literals(child, &child_pointer, property, result);
-            }
-        }
-        Value::Array(items) => {
-            for (index, child) in items.iter().enumerate() {
-                walk_property_literals(child, &format!("{pointer}/{index}"), property, result);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn literal_number(value: &Value) -> Option<f64> {
-    value
-        .pointer("/expr/Literal/Value")
-        .and_then(Value::as_str)
-        .and_then(|value| value.trim_end_matches('D').parse::<f64>().ok())
-        .or_else(|| value.as_f64())
-}
-
-fn find_color_literals(value: &Value) -> Vec<(String, String)> {
-    find_color_literals_with_pointers(value)
-}
-
-fn find_color_literals_with_pointers(value: &Value) -> Vec<(String, String)> {
-    let mut result = Vec::new();
-    walk_color_literals(value, "", &mut result);
-    result
-}
-
-fn walk_color_literals(value: &Value, pointer: &str, result: &mut Vec<(String, String)>) {
-    match value {
-        Value::Object(object) => {
-            for (key, child) in object {
-                let child_pointer = format!("{pointer}/{key}");
-                let key_color = key.to_ascii_lowercase().contains("color")
-                    || key.eq_ignore_ascii_case("foreground")
-                    || key.eq_ignore_ascii_case("background");
-                if key_color {
-                    if let Some(color) = literal_text(child).and_then(normalize_color) {
-                        result.push((child_pointer.clone(), color));
-                    }
-                }
-                walk_color_literals(child, &child_pointer, result);
-            }
-        }
-        Value::Array(items) => {
-            for (index, child) in items.iter().enumerate() {
-                walk_color_literals(child, &format!("{pointer}/{index}"), result);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn literal_text(value: &Value) -> Option<String> {
-    value
-        .pointer("/expr/Literal/Value")
-        .and_then(Value::as_str)
-        .map(decode_literal_text)
-        .or_else(|| value.as_str().map(ToOwned::to_owned))
-}
-
-fn normalize_color(value: String) -> Option<String> {
-    let value = value.trim().to_ascii_uppercase();
-    let value = value.strip_prefix('#')?;
-    if (value.len() == 6 || value.len() == 8)
-        && value.chars().all(|character| character.is_ascii_hexdigit())
-    {
-        Some(format!("#{value}"))
-    } else {
-        None
-    }
-}
-
-fn contrast_pair(colors: &[(String, String)]) -> Option<([f64; 3], [f64; 3], String)> {
-    let foreground = colors
-        .iter()
-        .find(|(pointer, _)| pointer.to_ascii_lowercase().contains("foreground"))?;
-    let background = colors
-        .iter()
-        .find(|(pointer, _)| pointer.to_ascii_lowercase().contains("background"))?;
-    Some((
-        parse_rgb(&foreground.1)?,
-        parse_rgb(&background.1)?,
-        foreground.0.clone(),
-    ))
-}
-
-fn parse_rgb(color: &str) -> Option<[f64; 3]> {
-    let hex = color.strip_prefix('#')?;
-    let (r, g, b) = if hex.len() == 8 {
-        (&hex[2..4], &hex[4..6], &hex[6..8])
-    } else {
-        (&hex[0..2], &hex[2..4], &hex[4..6])
-    };
-    Some([
-        u8::from_str_radix(r, 16).ok()? as f64 / 255.0,
-        u8::from_str_radix(g, 16).ok()? as f64 / 255.0,
-        u8::from_str_radix(b, 16).ok()? as f64 / 255.0,
-    ])
-}
-
-fn contrast_ratio(foreground: [f64; 3], background: [f64; 3]) -> f64 {
-    let foreground = relative_luminance(foreground);
-    let background = relative_luminance(background);
-    (foreground.max(background) + 0.05) / (foreground.min(background) + 0.05)
-}
-
-fn relative_luminance(rgb: [f64; 3]) -> f64 {
-    let linear = rgb.map(|component| {
-        if component <= 0.03928 {
-            component / 12.92
-        } else {
-            ((component + 0.055) / 1.055).powf(2.4)
-        }
-    });
-    0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
-}
-
-fn has_large_magnitude_marker(raw: &Value) -> bool {
-    raw["largeMagnitude"].as_bool() == Some(true)
-        || raw["annotations"].as_array().is_some_and(|annotations| {
-            annotations.iter().any(|annotation| {
-                let name = annotation["name"].as_str().unwrap_or_default();
-                name.eq_ignore_ascii_case("powerbi-cli.largeMagnitude")
-                    && annotation["value"]
-                        .as_str()
-                        .unwrap_or("true")
-                        .eq_ignore_ascii_case("true")
-            })
-        })
-}
-
-fn has_display_units(raw: &Value) -> bool {
-    find_property_literals(raw, "displayUnits")
-        .iter()
-        .any(|(_, value)| literal_text(value).is_some_and(|value| !value.trim().is_empty()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+
+    fn context(template_name: Option<&str>, visuals: Vec<Value>) -> PageContext {
+        let template = template_name.map(|name| grid::template(name).expect("template"));
+        let template_positions = template
+            .as_ref()
+            .map(|template| {
+                grid::resolve(template, PageSize::STANDARD, None).expect("template positions")
+            })
+            .unwrap_or_default();
+        let rail = template.as_ref().and_then(|template| template.rail);
+        PageContext {
+            page: json!({"handle": "page:Test", "displayName": "Test"}),
+            page_index: 0,
+            page_path: None,
+            raw_page: None,
+            width: PageSize::STANDARD.width,
+            height: PageSize::STANDARD.height,
+            visuals,
+            template,
+            template_positions,
+            rail,
+        }
+    }
+
+    fn visual(name: &str, visual_type: &str, position: SlotPosition) -> Value {
+        json!({
+            "handle": format!("visual:Test:{name}"),
+            "title": name,
+            "visualType": visual_type,
+            "position": position
+        })
+    }
+
+    fn slot_visual(context: &PageContext, slot: &str, visual_type: &str) -> Value {
+        visual(
+            slot,
+            visual_type,
+            *context.template_positions.get(slot).expect("slot position"),
+        )
+    }
+
+    fn lint_context(context: &PageContext) -> BTreeSet<String> {
+        let mut findings = Vec::new();
+        lint_page_geometry(context, &mut findings).expect("lint geometry");
+        findings
+            .iter()
+            .filter_map(|finding| finding["ruleId"].as_str().map(ToOwned::to_owned))
+            .collect()
+    }
+
+    fn assert_planted_rule(rule: &str, clean: PageContext, planted: PageContext) {
+        assert!(
+            !lint_context(&clean).contains(rule),
+            "clean fixture emitted {rule}"
+        );
+        assert!(
+            lint_context(&planted).contains(rule),
+            "planted fixture did not emit {rule}"
+        );
+    }
+
+    #[test]
+    fn every_named_template_is_clean_when_filled_with_preferred_slot_families() {
+        let catalog = grid::catalog().expect("template catalog");
+        for template in catalog.templates {
+            let empty = context(Some(&template.name), Vec::new());
+            let visuals = template
+                .slots
+                .iter()
+                .map(|slot| {
+                    slot_visual(
+                        &empty,
+                        &slot.name,
+                        slot.preferred_families.first().expect("preferred family"),
+                    )
+                })
+                .collect();
+            let filled = context(Some(&template.name), visuals);
+            assert!(
+                lint_context(&filled).is_empty(),
+                "template {} emitted findings: {:?}",
+                template.name,
+                lint_context(&filled)
+            );
+        }
+    }
 
     #[test]
     fn grid_alignment_is_deterministic_and_tolerates_rounding() {
         assert!(aligned_to_grid(
             Rect {
-                x: 32.0,
+                x: 24.0,
                 y: 184.0,
-                width: 600.0,
+                width: 608.0,
                 height: 320.0
             },
-            8.0
+            1280.0,
+            720.0,
+            Grid::default()
         ));
         assert!(!aligned_to_grid(
             Rect {
-                x: 31.0,
+                x: 25.0,
                 y: 184.0,
-                width: 600.0,
+                width: 607.0,
                 height: 320.0
             },
-            8.0
+            1280.0,
+            720.0,
+            Grid::default()
         ));
     }
 
@@ -1538,16 +1078,195 @@ mod tests {
     }
 
     #[test]
-    fn title_case_classification_supports_page_convention_checks() {
-        assert_eq!(title_case("Revenue trend"), TitleCase::Sentence);
-        assert_eq!(title_case("Revenue Trend"), TitleCase::Title);
-        assert_eq!(title_case("REVENUE"), TitleCase::Upper);
+    fn visual_overlap_has_positive_and_negative_fixtures() {
+        let first = SlotPosition {
+            x: 24.0,
+            y: 24.0,
+            width: 88.0,
+            height: 80.0,
+        };
+        let adjacent = SlotPosition { x: 128.0, ..first };
+        let overlapping = SlotPosition { x: 104.0, ..first };
+        assert_planted_rule(
+            rules::DESIGN_VISUAL_OVERLAP,
+            context(
+                None,
+                vec![visual("a", "card", first), visual("b", "card", adjacent)],
+            ),
+            context(
+                None,
+                vec![visual("a", "card", first), visual("b", "card", overlapping)],
+            ),
+        );
     }
 
     #[test]
-    fn contrast_ratio_matches_wcag_reference_pair() {
-        let white = parse_rgb("#FFFFFF").expect("white");
-        let black = parse_rgb("#000000").expect("black");
-        assert!((contrast_ratio(white, black) - 21.0).abs() < 0.01);
+    fn visual_off_grid_has_positive_and_negative_fixtures() {
+        let clean = SlotPosition {
+            x: 24.0,
+            y: 24.0,
+            width: 88.0,
+            height: 80.0,
+        };
+        let planted = SlotPosition { x: 25.0, ..clean };
+        assert_planted_rule(
+            rules::DESIGN_VISUAL_OFF_GRID,
+            context(None, vec![visual("clean", "card", clean)]),
+            context(None, vec![visual("planted", "card", planted)]),
+        );
+    }
+
+    #[test]
+    fn visual_outside_page_has_positive_and_negative_fixtures() {
+        let clean = SlotPosition {
+            x: 24.0,
+            y: 24.0,
+            width: 88.0,
+            height: 80.0,
+        };
+        let planted = SlotPosition { x: -8.0, ..clean };
+        assert_planted_rule(
+            rules::REPORT_VISUAL_OUTSIDE_PAGE,
+            context(None, vec![visual("clean", "card", clean)]),
+            context(None, vec![visual("planted", "card", planted)]),
+        );
+    }
+
+    #[test]
+    fn row_height_inconsistent_has_positive_and_negative_fixtures() {
+        let base = context(Some("overview"), Vec::new());
+        let first = slot_visual(&base, "kpi.1", "card");
+        let second = slot_visual(&base, "kpi.2", "card");
+        let mut changed = second.clone();
+        changed["position"]["height"] =
+            Value::from(changed["position"]["height"].as_f64().expect("height") + 8.0);
+        assert_planted_rule(
+            rules::DESIGN_ROW_HEIGHT_INCONSISTENT,
+            context(Some("overview"), vec![first.clone(), second]),
+            context(Some("overview"), vec![first, changed]),
+        );
+    }
+
+    #[test]
+    fn column_width_inconsistent_has_positive_and_negative_fixtures() {
+        let base = context(Some("overview"), Vec::new());
+        let heading = slot_visual(&base, "heading", "textbox");
+        let detail = slot_visual(&base, "detail", "tableEx");
+        let mut changed = detail.clone();
+        changed["position"]["width"] =
+            Value::from(changed["position"]["width"].as_f64().expect("width") - 8.0);
+        assert_planted_rule(
+            rules::DESIGN_COLUMN_WIDTH_INCONSISTENT,
+            context(Some("overview"), vec![heading.clone(), detail]),
+            context(Some("overview"), vec![heading, changed]),
+        );
+    }
+
+    #[test]
+    fn page_overcrowded_has_positive_and_negative_fixtures() {
+        let base = context(Some("time-series"), Vec::new());
+        let position = *base.template_positions.get("primary").expect("primary");
+        let make = |count| {
+            (0..count)
+                .map(|index| visual(&format!("v{index}"), "lineChart", position))
+                .collect()
+        };
+        assert_planted_rule(
+            rules::DESIGN_PAGE_OVERCROWDED,
+            context(Some("time-series"), make(6)),
+            context(Some("time-series"), make(7)),
+        );
+    }
+
+    #[test]
+    fn page_missing_heading_has_positive_and_negative_fixtures() {
+        let base = context(Some("time-series"), Vec::new());
+        let heading = slot_visual(&base, "heading", "textbox");
+        let primary = slot_visual(&base, "primary", "lineChart");
+        assert_planted_rule(
+            rules::DESIGN_PAGE_MISSING_HEADING,
+            context(Some("time-series"), vec![heading, primary.clone()]),
+            context(Some("time-series"), vec![primary]),
+        );
+    }
+
+    #[test]
+    fn slicer_too_short_has_positive_and_negative_fixtures() {
+        let clean = SlotPosition {
+            x: 24.0,
+            y: 24.0,
+            width: 88.0,
+            height: 104.0,
+        };
+        let planted = SlotPosition {
+            height: 96.0,
+            ..clean
+        };
+        let mut clean_visual = visual("clean", "slicer", clean);
+        clean_visual["slicerMode"] = Value::String("between".to_string());
+        let mut planted_visual = visual("planted", "slicer", planted);
+        planted_visual["slicerMode"] = Value::String("between".to_string());
+        assert_planted_rule(
+            rules::DESIGN_SLICER_TOO_SHORT,
+            context(None, vec![clean_visual]),
+            context(None, vec![planted_visual]),
+        );
+    }
+
+    #[test]
+    fn slot_family_mismatch_has_positive_and_negative_fixtures() {
+        let base = context(Some("time-series"), Vec::new());
+        let clean = slot_visual(&base, "primary", "lineChart");
+        let planted = slot_visual(&base, "primary", "tableEx");
+        assert_planted_rule(
+            rules::DESIGN_SLOT_FAMILY_MISMATCH,
+            context(Some("time-series"), vec![clean]),
+            context(Some("time-series"), vec![planted]),
+        );
+    }
+
+    #[test]
+    fn drillthrough_without_back_button_has_positive_and_negative_fixtures() {
+        let position = SlotPosition {
+            x: 24.0,
+            y: 24.0,
+            width: 88.0,
+            height: 80.0,
+        };
+        let mut clean = context(None, vec![visual("Back", "button", position)]);
+        clean.page["pageBinding"] = json!({"type": "Drillthrough"});
+        let mut planted = context(None, vec![visual("Detail", "tableEx", position)]);
+        planted.page["pageBinding"] = json!({"type": "Drillthrough"});
+        assert_planted_rule(rules::DESIGN_DRILLTHROUGH_NO_BACK_BUTTON, clean, planted);
+    }
+
+    #[test]
+    fn rail_not_synced_has_positive_and_negative_fixtures() {
+        let base = context(Some("overview"), Vec::new());
+        let mut rail = slot_visual(&base, "rail", "slicer");
+        rail["bindings"] = json!([{"role": "Values", "table": "Dim", "column": "Region"}]);
+        let first = context(Some("overview"), vec![rail.clone()]);
+        let matching = context(Some("overview"), vec![rail.clone()]);
+        let mut changed = rail;
+        changed["bindings"][0]["column"] = Value::String("Category".to_string());
+        let differing = context(Some("overview"), vec![changed]);
+        let mut clean_findings = Vec::new();
+        lint_rail_sync(&[first, matching], &mut clean_findings).expect("clean rail lint");
+        assert!(clean_findings.is_empty());
+        let mut planted_findings = Vec::new();
+        lint_rail_sync(
+            &[
+                context(Some("overview"), vec![slot_visual(&base, "rail", "slicer")]),
+                differing,
+            ],
+            &mut planted_findings,
+        )
+        .expect("planted rail lint");
+        assert!(planted_findings.iter().any(|finding| {
+            finding["ruleId"] == rules::DESIGN_RAIL_NOT_SYNCED
+                && finding["pointer"]
+                    .as_str()
+                    .is_some_and(|pointer| pointer.starts_with('/'))
+        }));
     }
 }

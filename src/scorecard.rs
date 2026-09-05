@@ -77,6 +77,7 @@ pub(crate) fn scorecard_from_parts(
     let design_lint = lint.get("designLint").cloned().unwrap_or_else(|| {
         json!({
             "status": "unavailable",
+            "proofLevel": Value::Null,
             "reason": "design lint did not return a report",
             "findings": []
         })
@@ -122,6 +123,7 @@ pub(crate) fn dry_run_scorecard(proof_level: &str, next: Vec<String>) -> Value {
         },
         "designLint": {
             "status": "unavailable",
+            "proofLevel": Value::Null,
             "reason": "dry-run does not create a project tree",
             "findings": []
         },
@@ -156,6 +158,7 @@ fn unavailable_scorecard(validation: Option<Value>, proof_level: &str, reason: S
         },
         "designLint": {
             "status": "unavailable",
+            "proofLevel": Value::Null,
             "reason": "native validation could not inspect the project",
             "findings": []
         },

@@ -278,7 +278,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli profile infer --schema <schema.json> [--rows <rows.csv|rows.json>] [--out <profile.json>] [--include-data-values] [--redact] --json` — Infer an advisory profile from schema metadata and bounded CSV/JSON rows; top values are redacted unless explicitly opted in _(proof: `unit-smoke`)_
 - `powerbi-cli profile summarize <profile.json> --json` — Return a compact summary of a dashboard data profile _(proof: `unit-smoke`)_
 - `powerbi-cli profile validate <profile.json> --json` — Validate a data profile document used by dashboard planning/build flows _(proof: `unit-smoke`)_
-- `powerbi-cli report audit --project <project-dir-or.pbip> [--profile agent-safe|handoff] [--include-raw] --json` — Audit report PBIR state for persisted values, raw-literal risks, stale references, and handoff hygiene issues _(proof: `unit-smoke`)_
+- `powerbi-cli report audit --project <project-dir-or.pbip> [--profile agent-safe|handoff] [--rules design] [--include-raw] --json` — Audit report PBIR state for persisted values, raw-literal risks, stale references, handoff hygiene, or deterministic design-system geometry findings _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks delete --project <project-dir-or.pbip> --handle <bookmark-handle> (--dry-run | --in-place --confirm <bookmark-handle> | --out-dir <dir>) --json` — Delete one bookmark file and remove it from bookmark metadata with guarded output semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks list --project <project-dir-or.pbip> [--include-raw] --json` — List raw PBIR bookmark files with stable handles, bookmark order/group metadata, and data-value safety warnings _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
@@ -505,6 +505,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
 - `profile.data-profile-v2` — **supported**, schema-matched-statistics-with-redacted-values, proof `unit-smoke`: Bounded CSV/JSON data profile inference. Commands: `profile infer`, `profile validate`, `profile summarize`.
+- `quality.design-lint` — **supported**, read-only-grid-and-template-analysis, proof `unit-smoke`: Deterministic report design geometry lint. Commands: `lint`, `triage`, `report audit`.
 - `quality.lint-rule-registry` — **supported**, read-only-contract-catalog, proof `unit-smoke`: Discoverable lint and audit rule registry. Commands: `validate`, `lint`, `model dax lint`, `report audit`.
 - `quality.model-completeness-lint` — **supported**, offline-static-heuristics, proof `unit-smoke`: DAX format and semantic-model completeness lint. Commands: `lint`, `triage`, `model dax lint`.
 - `report.bookmark-mutations` — **planned**, unsupported, proof `unit-smoke`: Bookmark state capture/create/update.
@@ -578,13 +579,22 @@ and `readback` command arrays keyed by stable report/page/visual/table/measure
 handles. When a dashboard spec emits typed operations, `operationOutcomes[]`
 records each kernel's concrete changes, readback commands, warnings, and
 created handles. Its shared `scorecard.v1` contains native validation, Microsoft
-validator availability, lint grouped by severity, the fixed unavailable design
-lint shape, offline handoff status, and the honest proof level. Add `--trace`
+validator availability, lint grouped by severity, the available design-geometry
+lint report, offline handoff status, and the honest proof level. Add `--trace`
 to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
 default response omits that optional field. `triage` embeds the same scorecard
 projection for an existing project. See
 `capabilities.responseShapes.scorecard.v1` and
 `capabilities.responseShapes.reportBuild` for the machine-readable details.
+
+Design geometry checks run through `lint`, `triage`, and
+`scorecard.designLint`. Use `report audit --project <project> --rules design
+--json` to isolate the eleven stable grid/template rules. Each finding carries
+an RFC 6901 pointer, evidence, and a sanitize action when remediation is
+mechanical; applying those actions remains plan-only until the typed
+auto-improve workflow lands. These Linux-safe checks have `unit-smoke` proof
+and do not claim Desktop rendering compatibility. Typography, colour, and
+number-format checks remain in the separate style-token follow-up.
 
 Validation/result families may emit `ok:false` with a nonzero `exitCode` on
 stdout. CLI errors are written to stderr with required `code`, `exitCode`, and

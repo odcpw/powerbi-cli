@@ -106,7 +106,6 @@ macro_rules! define_rules {
 define_rules! {
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     FEATURE_PENDING => ("feature_pending", Report, "warning", "Template section dividers are omitted until a proven shape capability is available.", "Keep the resolved template geometry and follow the shape capability proof status.", None),
-    DESIGN_SLOT_FAMILY_MISMATCH => ("design.slot_family_mismatch", Report, "warning", "A visual uses a slot intended for another visual family.", "Choose a slot whose preferredFamilies includes this visual type, or provide explicit layout coordinates.", None),
     VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
     VALIDATION_WARNING => ("validation.warning", Validation, "warning", "Native project validation reported a non-fatal compatibility warning.", "Review the corresponding validation warning and use Power BI Desktop when compatibility proof is required.", None),
     VALIDATION_MISSING_FILE => ("validation.missing_file", Validation, "error", "A required PBIP/PBIR/TMDL project file is missing.", "Restore the generated project file or regenerate the project before opening it in Desktop.", None),
@@ -209,17 +208,8 @@ define_rules! {
     DESIGN_COLUMN_WIDTH_INCONSISTENT => ("design.column_width_inconsistent", Design, "warning", "Visuals sharing a grid column have inconsistent widths.", "Re-run the named layout template so sibling visuals share the column width.", Some("relayout-template")),
     DESIGN_PAGE_OVERCROWDED => ("design.page_overcrowded", Design, "warning", "A page contains more visuals than its selected template budget.", "Choose a template with a larger budget, remove an unused visual, or split the page.", Some("relayout-template")),
     DESIGN_PAGE_MISSING_HEADING => ("design.page_missing_heading", Design, "warning", "A heading slot is declared but no heading visual is present.", "Add a heading textbox to the declared heading slot or choose a template without a heading band.", Some("add-heading")),
-    DESIGN_TITLE_CASE_INCONSISTENT => ("design.title_case_inconsistent", Design, "warning", "Visual titles on one page use inconsistent sentence/title casing.", "Normalize titles to one casing convention, preferably sentence case.", Some("normalize-title")),
-    DESIGN_TITLE_MISSING => ("design.title_missing", Design, "warning", "A visual has no visible title text.", "Set a sentence-case title with `report visuals formatting set-text`, unless the visual intentionally uses a separate heading.", Some("set-title")),
-    DESIGN_TITLE_DUPLICATE => ("design.title_duplicate", Design, "warning", "Multiple visuals on one page share the same normalized title.", "Rename the visuals so each title states its distinct purpose.", Some("normalize-title")),
-    DESIGN_FONT_BELOW_MINIMUM => ("design.font_below_minimum", Design, "warning", "A visual text style is below the design system minimum font size.", "Apply the visual-family default or set the cataloged font size to at least the minimum.", Some("apply-default")),
-    DESIGN_CONTRAST_BELOW_AA => ("design.contrast_below_aa", Design, "warning", "A foreground/background text pair does not meet WCAG AA contrast.", "Apply a registered theme or semantic color pair with at least 4.5:1 contrast for normal text.", Some("apply-theme")),
-    DESIGN_PALETTE_DRIFT => ("design.palette_drift", Design, "warning", "A visual color is outside the registered report theme palette.", "Use a theme or semantic color from the registered palette instead of a one-off literal.", Some("apply-theme")),
     DESIGN_SLICER_TOO_SHORT => ("design.slicer_too_short", Design, "warning", "A slicer is shorter than the proven minimum height for its mode.", "Resize the slicer to at least 76 pixels (104 pixels for a Between slicer).", Some("resize-slicer")),
     DESIGN_RAIL_NOT_SYNCED => ("design.rail_not_synced", Design, "warning", "Slicer rails on pages using the same template do not expose the same fields.", "Synchronize the rail slicers or explicitly opt a page out of the shared rail.", Some("sync-rail")),
-    DESIGN_NUMBER_FORMAT_MISSING => ("design.number_format_missing", Design, "warning", "A measure used by the report has no explicit number format.", "Set a deliberate measure format string before relying on Desktop display defaults.", Some("apply-format")),
-    DESIGN_DISPLAY_UNITS_MISSING => ("design.display_units_missing", Design, "warning", "A large-magnitude visual has no explicit display-units policy.", "Set a cataloged display-units value or use the documented compact semantic default.", Some("apply-format")),
-    DESIGN_RANKING_NOT_SORTED => ("design.ranking_not_sorted", Design, "warning", "A ranking visual has no explicit descending sort by its measure.", "Set the first measure as the visual sort and choose descending order.", Some("apply-sort")),
     DESIGN_DRILLTHROUGH_NO_BACK_BUTTON => ("design.drillthrough_no_back_button", Design, "warning", "A drillthrough page has no proven back-navigation button.", "Add a Desktop-proven back button before handing the drillthrough page to report authors.", None),
     DESIGN_SLOT_FAMILY_MISMATCH => ("design.slot_family_mismatch", Design, "warning", "A visual family does not match the preferred family for its assigned design slot.", "Choose a visual family listed by the slot or assign the visual to a compatible slot.", Some("relayout-template")),
 }
@@ -304,7 +294,7 @@ mod tests {
 
     #[test]
     fn design_lint_has_a_typed_complete_rule_family() {
-        assert_eq!(rules_for_family(RuleFamily::Design).count(), 20);
+        assert_eq!(rules_for_family(RuleFamily::Design).count(), 11);
         for id in [
             "report.visual_outside_page",
             "design.visual_overlap",
@@ -313,17 +303,8 @@ mod tests {
             "design.column_width_inconsistent",
             "design.page_overcrowded",
             "design.page_missing_heading",
-            "design.title_case_inconsistent",
-            "design.title_missing",
-            "design.title_duplicate",
-            "design.font_below_minimum",
-            "design.contrast_below_aa",
-            "design.palette_drift",
             "design.slicer_too_short",
             "design.rail_not_synced",
-            "design.number_format_missing",
-            "design.display_units_missing",
-            "design.ranking_not_sorted",
             "design.drillthrough_no_back_button",
             "design.slot_family_mismatch",
         ] {

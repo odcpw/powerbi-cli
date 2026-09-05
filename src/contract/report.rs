@@ -256,7 +256,7 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--profile agent-safe|handoff", "--rules design", "--include-raw", "--json", "--format json"],
             "examples": ["powerbi-cli report audit --project build/sales --json", "powerbi-cli report audit --project build/sales --rules design --json", "powerbi-cli report audit --project build/sales --profile handoff --json"],
             "diagnosticCodes": crate::rules::rule_ids(),
-            "followUpFields": ["ok", "profile", "rules", "counts.findings", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].pointer", "findings[].supportedAction", "recommendedActions", "unsupportedActions", "sanitizePlanCommand", "next"]
+            "followUpFields": ["ok", "profile", "rules", "counts.findings", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].pointer", "findings[].jsonPointer", "findings[].sanitizeAction", "recommendedActions", "unsupportedActions", "next"]
         }),
         json!({
             "path": "report sanitize plan",

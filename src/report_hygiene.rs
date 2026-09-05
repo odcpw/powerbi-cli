@@ -542,13 +542,18 @@ fn add_lint_findings(
                 "surface": "lint",
                 "handle": finding["handle"].clone(),
                 "path": finding["path"].clone(),
-                "jsonPointer": Value::Null,
+                "pointer": finding["pointer"].clone(),
+                "jsonPointer": finding["pointer"].clone(),
                 "fingerprint": Value::Null,
                 "mayContainDataValues": false,
                 "literalCount": 0,
                 "message": finding["message"],
                 "evidence": finding,
-                "recommendedActions": ["fix-lint-finding"]
+                "sanitizeAction": finding["sanitizeAction"].clone(),
+                "recommendedActions": finding["sanitizeAction"]
+                    .as_str()
+                    .map(|action| vec![Value::String(action.to_string())])
+                    .unwrap_or_else(|| vec![Value::String("fix-lint-finding".to_string())])
             }));
         }
     }
