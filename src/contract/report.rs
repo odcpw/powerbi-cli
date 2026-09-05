@@ -6,6 +6,23 @@ use serde_json::{Value, json};
 pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
+            "path":"report compose",
+            "aliases":["dashboard new"],
+            "usage":"powerbi-cli report compose --schema <schema.json> [--rows <rows.csv|rows.json> | --profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--style <preset|tokens.json>] [--template-set default] [--variants 1] [--artifacts-dir <dir>] (--dry-run [--project <project-dir>] | --out-dir <dir> | --project <project-dir> --in-place --confirm <token>) --json",
+            "summary":"Compose an offline project through profile inference, narrative planning, compilation, triage, and SVG export; retain sidecars and native stage refusals",
+            "tags":["report","dashboard","compose","agent","offline"],
+            "readOnly":false,"mutates":true,"requiresOutput":true,"writesDataCache":false,
+            "stability":"alpha-output","proofLevel":"unit-smoke",
+            "outputSchema":"powerbi-cli.report.compose.v1",
+            "flags":["--schema <schema.json>","--rows <rows.csv|rows.json>","--profile <profile.json>","--intent <intent.md|intent.json>","--objective <goal>","--style <preset|tokens.json>","--template-set default","--variants 1","--artifacts-dir <dir>","--project <project-dir>","--dry-run","--out-dir <dir>","--in-place","--confirm <token>","--json","--format json"],
+            "examples":["powerbi-cli report compose --schema examples/sales.schema.json --objective 'Sales overview' --out-dir build/composed-sales --json"],
+            "followUpFields":["projectDir","artifactsDir","stages","stages[].name","stages[].ok","stages[].ms","stages[].artifact","decisions","scorecard","proofPlan","wireframes","confirmToken","snapshotDir","artifacts","next"],
+            "diagnosticCodes":["invalid_args","plan.missing_input","spec.missing_input","unsupported_feature","input_safety_violation"],
+            "dryRun":"Runs the pipeline in a temporary project without publishing project or sidecars; stage timings are observational, not deterministic artifacts",
+            "inPlace":"Requires --project and the dry-run confirmToken; uses the existing snapshot transaction and requires a new artifacts directory",
+            "failure":"Native stage errors and ok:false documents propagate unchanged; completed intermediate files remain in the sidecar on write-mode failures"
+        }),
+        json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json",
             "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",

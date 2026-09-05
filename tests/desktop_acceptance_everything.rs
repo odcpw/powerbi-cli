@@ -389,6 +389,19 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    h.ok(
+        "report compose",
+        &svec([
+            "report",
+            "compose",
+            "--schema",
+            &p(&schema),
+            "--intent",
+            r#"{"questions":["Executive overview"],"model":{"factTable":"FactIncidents"}}"#,
+            "--dry-run",
+            "--json",
+        ]),
+    );
     let weak_schema = h.root.join("weak-planner.schema.json");
     let mut weak: Value = serde_json::from_slice(&fs::read(&schema).unwrap()).unwrap();
     for table in weak["tables"].as_array_mut().unwrap() {

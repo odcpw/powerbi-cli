@@ -1,5 +1,11 @@
 # powerbi-cli Roadmap
 
+`report compose` now chains profile inference, narrative planning, strict
+spec validation/explain, build, triage, and SVG export in process. It emits
+sidecars, scorecard and proof plan, supports unpublished dry-runs and confirmed
+snapshot-backed recomposition, and preserves native stage refusals. Desktop
+proof and unsupported compiler sections retain their existing boundaries.
+
 > Current backlog priorities come from real usage: see
 > [pilot-lessons.md](pilot-lessons.md) (2026-08) for the prioritized feature
 > gaps, runtime-parity findings, and authoring patterns discovered while
