@@ -1483,6 +1483,10 @@ properties through one atomic transaction with per-entry readback.
 tableEx, line/area/bar/column families, scatterChart, pieChart, donutChart,
 hundredPercentStackedColumnChart, lineClusteredColumnComboChart, matrix (PBIR
 `pivotTable`), and slicer.
+Stacked bar/column aliases emit `barChart`/`columnChart`. Only the 100% stacked
+column has a pilot-backed fixture; 100% stacked bars and maps return
+`unsupported_feature` naming missing Desktop evidence. Map generation also
+requires proof of offline operation without online geocoding.
 Combo charts require Category columns, Y column measures, and Y2 line measures.
 Use `sort=descending` in binding text or `sortDirection=Descending` in JSON on
 at most one projected measure for explicit category ordering; ascending and

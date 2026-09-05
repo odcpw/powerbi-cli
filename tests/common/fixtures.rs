@@ -11,6 +11,7 @@ const ARCHETYPES: &[&str] = &[
     "flat-ops",
     "regional-sales",
     "scatter-bubble",
+    "slicer-rail",
 ];
 
 /// Paths for one checked-in schema/profile/dashboard/golden fixture family.
@@ -50,7 +51,11 @@ pub fn load_archetype(name: &str) -> ArchetypeFixture {
     };
     let fixture = ArchetypeFixture {
         name: name.to_string(),
-        schema: base.join(format!("{name}.schema.json")),
+        schema: if name == "slicer-rail" {
+            PathBuf::from("examples/sales.schema.json")
+        } else {
+            base.join(format!("{name}.schema.json"))
+        },
         profile: base.join(format!("{name}.profile.json")),
         spec: base.join(format!("{name}.dashboard.json")),
         expected_summary: golden_base.join(if name == "sales" {
