@@ -16,6 +16,7 @@ use crate::{
     canonical_display, command_arg, resolve_project, validate_project,
 };
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,6 +90,22 @@ struct LintMarker {
     message: String,
     page: Option<usize>,
     visual: Option<usize>,
+}
+
+type PreviewGeometry = (BTreeMap<String, SlotPosition>, Vec<f64>, Vec<f64>);
+
+struct SvgRenderParams<'a> {
+    page: &'a Value,
+    template: &'a Template,
+    positions: &'a BTreeMap<String, SlotPosition>,
+    vertical_guides: &'a [f64],
+    horizontal_guides: &'a [f64],
+    visuals: &'a [Value],
+    markers: &'a [LintMarker],
+    scale_x: f64,
+    scale_y: f64,
+    width: f64,
+    height: f64,
 }
 
 /// Dispatch the existing `report wireframe export` path.
@@ -578,18 +595,19 @@ fn render_page(
     } else {
         1.0
     };
-    let svg = render_svg(
+    let svg = render_svg(SvgRenderParams {
         page,
         template,
-        &positions,
-        (&vertical_guides, &horizontal_guides),
-        &visuals,
-        &page_markers,
+        positions: &positions,
+        vertical_guides: &vertical_guides,
+        horizontal_guides: &horizontal_guides,
+        visuals: &visuals,
+        markers: &page_markers,
         scale_x,
         scale_y,
         width,
         height,
-    );
+    });
     let slots = template
         .slots
         .iter()
@@ -638,11 +656,7 @@ fn resolve_preview_geometry(
     template: &Template,
     page_size: PageSize,
     grid: Grid,
-) -> CliResult<(
-    std::collections::BTreeMap<String, SlotPosition>,
-    Vec<f64>,
-    Vec<f64>,
-)> {
+) -> CliResult<PreviewGeometry> {
     match (
         resolve_with_grid(template, page_size, grid, None),
         page_size == PageSize::STANDARD,
@@ -691,18 +705,20 @@ fn resolve_preview_geometry(
     }
 }
 
-fn render_svg(
-    page: &Value,
-    template: &Template,
-    positions: &std::collections::BTreeMap<String, SlotPosition>,
-    guides: (&[f64], &[f64]),
-    visuals: &[Value],
-    markers: &[LintMarker],
-    scale_x: f64,
-    scale_y: f64,
-    width: f64,
-    height: f64,
-) -> String {
+fn render_svg(params: SvgRenderParams<'_>) -> String {
+    let SvgRenderParams {
+        page,
+        template,
+        positions,
+        vertical_guides,
+        horizontal_guides,
+        visuals,
+        markers,
+        scale_x,
+        scale_y,
+        width,
+        height,
+    } = params;
     let page_name = value_string(&page["name"], "Page");
     let page_title = value_string(&page["displayName"], &page_name);
     let id = safe_id(&format!("wireframe-{page_name}"));
@@ -735,7 +751,7 @@ fn render_svg(
     svg.push_str("  <g class=\"grid\" data-template=\"");
     svg.push_str(&xml_escape(&template.name));
     svg.push_str("\">\n");
-    for x in guides.0 {
+    for x in vertical_guides {
         let _ = writeln!(
             svg,
             "    <line x1=\"{}\" y1=\"0.00\" x2=\"{}\" y2=\"{}\"/>",
@@ -744,7 +760,7 @@ fn render_svg(
             fmt_num(height)
         );
     }
-    for y in guides.1 {
+    for y in horizontal_guides {
         let _ = writeln!(
             svg,
             "    <line x1=\"0.00\" y1=\"{}\" x2=\"{}\" y2=\"{}\"/>",
@@ -804,8 +820,7 @@ fn render_svg(
     }
     svg.push_str("  </g>\n");
     svg.push_str("  <g class=\"lint-markers\">\n");
-    let mut marker_offset = 0usize;
-    for marker in markers {
+    for (marker_offset, marker) in markers.iter().enumerate() {
         let (x, y) = if let Some(index) = marker.visual {
             visuals
                 .get(index)
@@ -845,7 +860,6 @@ fn render_svg(
             fmt_num(y + 3.0),
             xml_escape(&marker.code)
         );
-        marker_offset += 1;
     }
     svg.push_str("  </g>\n</svg>\n");
     svg
@@ -942,13 +956,8 @@ fn lint_markers(validation: &crate::ValidationReport) -> Vec<LintMarker> {
     let mut markers = validation
         .errors
         .iter()
-        .map(|finding| marker_from_finding(finding))
-        .chain(
-            validation
-                .warnings
-                .iter()
-                .map(|finding| marker_from_finding(finding)),
-        )
+        .map(marker_from_finding)
+        .chain(validation.warnings.iter().map(marker_from_finding))
         .collect::<Vec<_>>();
     markers.sort_by(|left, right| {
         left.page

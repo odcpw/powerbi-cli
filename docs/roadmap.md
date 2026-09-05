@@ -532,7 +532,10 @@ frozen until proven.
   and SVG-free JSON previews with overlap/minimum-size invariants while
   rewriting only visual `position` blocks; standard and wide page-size presets
   plus explicit grid overrides are supported, and legacy `--preset` values map
-  to the corresponding named templates. `report drilldown set-hierarchy`
+  to the corresponding named templates. The aliases replace the former fixed
+  two-column coordinates when a template reserves heading, rail, KPI, chart, or
+  detail slots; the named-template goldens record those intentional layout
+  improvements. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
 
