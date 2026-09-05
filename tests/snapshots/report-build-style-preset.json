@@ -1,0 +1,7 @@
+{
+  "compiledOps": 2,
+  "styleOperation": {
+    "op": "applyThemePreset",
+    "preset": "risk-dashboard"
+  }
+}

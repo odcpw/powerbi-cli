@@ -1091,13 +1091,35 @@ fn plan_fingerprint(
     let text = serde_json::to_string(&json!({
         "profile": profile.as_str(),
         "projectFingerprint": project_fingerprint,
-        "actions": actions,
-        "unsupportedActions": unsupported_actions
+        "actions": fingerprint_actions(actions),
+        "unsupportedActions": fingerprint_actions(unsupported_actions)
     }))
     .map_err(|err| CliError::unexpected(format!("serialize sanitize plan fingerprint: {err}")))?;
     let mut hash = 0xcbf29ce484222325u64;
     fnv_update(&mut hash, text.as_bytes());
     Ok(format!("fnv64:{hash:016x}"))
+}
+
+/// Hash action semantics, not their presentation. Absolute paths and nested
+/// readback/evidence belong in the response, but change when a transaction
+/// copies an identical project. The tree fingerprint already covers the bytes
+/// underlying those summaries, including every persisted filter value.
+fn fingerprint_actions(actions: &[Value]) -> Vec<Value> {
+    let mut identities = actions
+        .iter()
+        .map(|action| {
+            json!({
+                "actionId": action["actionId"],
+                "kind": action["kind"],
+                "applySupported": action["applySupported"],
+                "handles": action["handles"],
+                "jsonPointers": action["jsonPointers"],
+                "sourceRuleIds": action["sourceRuleIds"]
+            })
+        })
+        .collect::<Vec<_>>();
+    identities.sort_by_cached_key(Value::to_string);
+    identities
 }
 
 fn fnv_update(hash: &mut u64, bytes: &[u8]) {

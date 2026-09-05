@@ -578,13 +578,12 @@ fn report_build_rejects_unknown_key_before_creating_output() {
 }
 
 #[test]
-fn recognized_uncompiled_v1_sections_remain_unsupported_features() {
+fn recognized_v1_style_defaults_compile_successfully() {
     let temp = tempfile::tempdir().expect("tempdir");
     let path = temp.path().join("style.dashboard.json");
     let mut spec = minimal_spec();
-    spec["style"] = json!({"preset": "neutral"});
+    spec["style"] = json!({"defaults": {"labels.show": true}});
     write_spec(&path, &spec);
-
     let output = run_powerbi(&[
         "report",
         "build",
@@ -595,8 +594,7 @@ fn recognized_uncompiled_v1_sections_remain_unsupported_features() {
         "--dry-run",
         "--json",
     ]);
-    assert_eq!(output.code, 2);
-    assert_eq!(stderr_json(&output)["error"]["code"], "unsupported_feature");
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
 }
 
 #[test]
@@ -705,7 +703,10 @@ fn spec_fields_catalog_lists_every_v2_node() {
                 "formatStrings",
             ][..],
         ),
-        ("style", &["preset", "bundle", "tokens", "defaults"][..]),
+        (
+            "style",
+            &["preset", "bundle", "allowLiteralText", "tokens", "defaults"][..],
+        ),
         ("layout", &["grid", "pageSize", "rail"][..]),
         ("layout.rail", &["side", "width", "slicers"][..]),
         (
@@ -828,10 +829,6 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
         (
             json!({"model": {"calculatedColumns": []}}),
             "pbi-t3-compiler-completeness-1qi.5",
-        ),
-        (
-            json!({"style": {"preset": "neutral"}}),
-            "pbi-t3-compiler-completeness-1qi.6",
         ),
         (
             json!({"pages": [{"visuals": [{"format": {"title.show": true}}]}]}),

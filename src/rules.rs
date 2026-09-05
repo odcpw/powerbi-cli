@@ -104,6 +104,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    PLAN_VARIANTS_INSUFFICIENT => ("plan.variants_insufficient", Validation, "error", "Too few distinct compiler-valid template choices exist for the requested variant count.", "Request fewer variants or supply more model and intent evidence for catalog choices.", None),
     PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
     OPS_STAGE_ORDER => ("ops.stage_order", Validation, "error", "Operation stages are out of order.", "Order operations by model, page, visual, behavior, then style stage, keeping declarations before references.", None),
     SPEC_UNCOMPILED_SECTION => ("report.spec.uncompiled_section", Report, "warning", "An explain preview contains a recognized section that is not compiled yet.", "Read the warning's owningBead and unsupportedSections entry; omit the pending section for a supported build or wait for its compiler implementation.", None),

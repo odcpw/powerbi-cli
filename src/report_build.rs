@@ -19,6 +19,7 @@ use crate::pbir_visual_factory::{
     slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::report_build_style::compile_style_operations;
 use crate::report_filter_shapes::{
     FilterSpec, RelativeDateOperator, RelativeDateUnit, ResolvedFilterColumn,
     ResolvedFilterMeasure, TopNDirection, generated_filter_name, parse_field_reference,
@@ -1106,6 +1107,9 @@ fn compile_dashboard(
         crate::report_build_behavior::compile(spec_object, &merged, &model)?;
     typed_operations.extend(behavior_operations);
     operation_pointers.extend(behavior_pointers);
+    let (style_operations, style_pointers) = compile_style_operations(spec_object)?;
+    typed_operations.extend(style_operations);
+    operation_pointers.extend(style_pointers);
     // Keep pointers paired with their operation while honoring the IR stage
     // order (visual mutations must precede filters and drillthrough).
     let mut ordered = typed_operations
@@ -1152,7 +1156,7 @@ fn compile_style_tokens(spec: &Map<String, Value>) -> CliResult<Option<CompiledT
     };
     if !style_is_supported_compiled(&Value::Object(style.clone())) {
         return Err(CliError::unsupported_feature(
-            "style supports tokens and defaults; preset and bundle compilation is pending",
+            "style must use supported preset, bundle, tokens, or defaults fields",
         )
         .with_suggested_command(
             "powerbi-cli report style tokens show --project <project-dir-or.pbip> --json",
