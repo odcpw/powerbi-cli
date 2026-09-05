@@ -72,10 +72,11 @@ pub(crate) fn lint_project(
     add_dax_findings(resolved, &deep, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
     add_desktop_compat_findings(resolved, &mut findings)?;
-    let design_lint = crate::design::lint::lint_report(resolved, &deep)?;
-    if let Some(design_findings) = design_lint["findings"].as_array() {
-        findings.extend(design_findings.iter().cloned());
-    }
+    findings.retain(|finding| {
+        !finding["code"]
+            .as_str()
+            .is_some_and(crate::design::lint::is_design_rule_id)
+    });
     rules::ensure_finding_ids_registered(&findings, "code")?;
 
     let error_count = findings
@@ -102,7 +103,6 @@ pub(crate) fn lint_project(
             "info": info_count,
             "findings": findings.len()
         },
-        "designLint": design_lint,
         "findings": findings,
         "next": [
             format!("powerbi-cli inspect --deep {} --json", command_arg(&resolved.project_dir)),

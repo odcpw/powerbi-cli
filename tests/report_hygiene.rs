@@ -297,6 +297,65 @@ fn report_sanitize_in_place_requires_exact_confirm_token() {
 }
 
 #[test]
+fn sanitize_confirmation_survives_relocation_but_rejects_changed_tree_bytes() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let first = scaffold_sales(&temp.path().join("first"));
+    let second = scaffold_sales(&temp.path().join("second"));
+    for project in [&first, &second] {
+        install_filter_fixtures(project);
+        install_slicer_fixture(project);
+    }
+    assert_tree_equal(&first, &second, "identical sanitize input trees");
+    let plan = |project: &std::path::Path| {
+        let output = run_powerbi(&[
+            "report",
+            "sanitize",
+            "plan",
+            "--project",
+            project.to_str().expect("project path"),
+            "--json",
+        ]);
+        assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+        stdout_json(&output)
+    };
+    let first_plan = plan(&first);
+    let second_plan = plan(&second);
+    assert!(
+        !first_plan["actions"]
+            .as_array()
+            .expect("actions")
+            .is_empty()
+    );
+    assert_eq!(
+        first_plan["projectFingerprint"],
+        second_plan["projectFingerprint"]
+    );
+    assert_eq!(first_plan["confirmToken"], second_plan["confirmToken"]);
+    assert_eq!(first_plan["confirmToken"], plan(&first)["confirmToken"]);
+
+    // A whitespace-only edit changes the bytes without changing the action
+    // list. The old authorization must still be invalidated.
+    let visual = first_visual_json(&second);
+    let mut bytes = fs::read(&visual).expect("visual bytes");
+    bytes.push(b'\n');
+    fs::write(&visual, bytes).expect("edit visual bytes");
+    assert_ne!(first_plan["confirmToken"], plan(&second)["confirmToken"]);
+    let rejected = run_powerbi(&[
+        "report",
+        "sanitize",
+        "apply",
+        "--project",
+        second.to_str().expect("project path"),
+        "--in-place",
+        "--confirm",
+        first_plan["confirmToken"].as_str().expect("token"),
+        "--json",
+    ]);
+    assert_eq!(rejected.code, 2, "stderr: {}", rejected.stderr);
+    assert_eq!(stderr_json(&rejected)["error"]["code"], "invalid_args");
+}
+
+#[test]
 fn validate_rejects_stale_scatter_legend_role_with_series_repair() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = build_scatter_bubble(temp.path());

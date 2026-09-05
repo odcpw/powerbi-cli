@@ -74,14 +74,16 @@ pub(crate) fn scorecard_from_parts(
     });
     let lint_value = lint_scorecard(lint);
     let handoff = handoff_scorecard(resolved);
-    let design_lint = lint.get("designLint").cloned().unwrap_or_else(|| {
-        json!({
-            "status": "unavailable",
-            "proofLevel": Value::Null,
-            "reason": "design lint did not return a report",
-            "findings": []
-        })
-    });
+    let design_lint = crate::inspect::deep_inspect(resolved, validation)
+        .and_then(|deep| crate::design::lint::lint_report(resolved, &deep))
+        .unwrap_or_else(|error| {
+            json!({
+                "status": "unavailable",
+                "proofLevel": Value::Null,
+                "reason": error.message,
+                "findings": []
+            })
+        });
     let all_green = validation.errors.is_empty()
         && lint_value["ok"].as_bool().unwrap_or(false)
         && design_lint["ok"].as_bool().unwrap_or(false)

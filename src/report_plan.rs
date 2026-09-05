@@ -15,6 +15,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 mod narrative;
+pub(crate) use narrative::place_with_rail as place_narrative_rail;
 
 #[derive(Debug, Default)]
 struct PlanOptions {
@@ -24,6 +25,7 @@ struct PlanOptions {
     intent: Option<String>,
     objective: Option<String>,
     out: Option<PathBuf>,
+    variants: Option<usize>,
     force: bool,
     explain_rules: bool,
 }
@@ -174,6 +176,7 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         &planner_context,
     )?;
     planned.decisions.push(narrative_flow.clone());
+    let variant_primary = v2_spec.clone();
     let performance = crate::planner_performance::plan(
         &schema_value,
         profile_value.as_ref(),
@@ -213,7 +216,44 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         defaults_applied.extend(compiled_defaults.iter().cloned());
     }
 
-    if let Some(out) = options.out.as_ref() {
+    let mut variants = Vec::new();
+    if let Some(count) = options.variants {
+        let out = options.out.as_ref().expect("validated --out");
+        let candidates = crate::planner_variants::generate(
+            &schema_value,
+            &variant_primary,
+            &shape,
+            &intent_value,
+            &planner_context,
+            count,
+        )?;
+        let mut files = vec![(out.clone(), planned.spec.clone())];
+        for (offset, candidate) in candidates.into_iter().enumerate() {
+            let index = offset + 1;
+            let path = crate::planner_variant_output::path(out, index);
+            let mut proposed = candidate.spec.clone();
+            let mut guard_decisions = Vec::new();
+            let mut guards = crate::planner_performance::plan(
+                &schema_value,
+                profile_value.as_ref(),
+                &shape,
+                &mut proposed,
+                intent.guards.as_ref(),
+                options.project.as_deref(),
+                &rule_plan.catalog.performance,
+                &mut guard_decisions,
+            )?;
+            guards["target"] = json!(format!("variant:{index}"));
+            variants.push(json!({"index":index, "path":canonical_display(&path),
+                "structureHash":candidate.structure_hash, "score":candidate.score,
+                "decisionDiff":candidate.decision_diff, "validationLevel":"compiled",
+                "performance":guards, "guardDecisions":guard_decisions,
+                "guardApplication":"separate replay proposal; not embedded in the validated spec",
+                "validateCommand":format!("powerbi-cli report spec validate --schema {} --spec {} --json", command_arg(&schema_path), command_arg(&path))}));
+            files.push((path, candidate.spec));
+        }
+        crate::planner_variant_output::write(&files, options.force)?;
+    } else if let Some(out) = options.out.as_ref() {
         if out.exists() && !options.force {
             return Err(CliError::invalid_args(format!(
                 "report plan output already exists: {}",
@@ -242,6 +282,7 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         "spec": planned.spec,
         "specV2": v2_spec,
         "performance": performance,
+        "variants": variants,
         "narrativeFlow": narrative_flow,
         "planner": rule_plan.to_value(),
         "ruleExplanations": rule_plan.explanations,
@@ -1059,6 +1100,14 @@ fn parse_plan_args(args: &[String]) -> CliResult<PlanOptions> {
                 options.force = true;
                 i += 1;
             }
+            "--variants" => {
+                let value = take_value(args, &mut i, "--variants")?;
+                options.variants = Some(value.parse().map_err(|_| {
+                    crate::planner_variants::argument_error(
+                        "--variants requires a positive integer",
+                    )
+                })?);
+            }
             "--explain-rules" | "--explain" => {
                 options.explain_rules = true;
                 i += 1;
@@ -1081,6 +1130,14 @@ fn parse_plan_args(args: &[String]) -> CliResult<PlanOptions> {
                 options.intent = Some(other.to_string());
                 i += 1;
             }
+        }
+    }
+    if let Some(count) = options.variants {
+        let maximum = crate::planner_rules::catalog()?.variants.max_count;
+        if count == 0 || count > maximum || options.out.is_none() {
+            return Err(crate::planner_variants::argument_error(format!(
+                "--variants requires --out and a count between 1 and {maximum}"
+            )));
         }
     }
     Ok(options)

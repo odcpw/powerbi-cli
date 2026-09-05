@@ -715,7 +715,7 @@ fn validate_catalog(value: &Value) -> CliResult<()> {
     Ok(())
 }
 
-fn token_catalog() -> CliResult<Value> {
+pub(crate) fn token_catalog() -> CliResult<Value> {
     let value = serde_json::from_str::<Value>(EMBEDDED_DESIGN_TOKEN_CATALOG).map_err(|error| {
         CliError::unexpected(format!("parse embedded design token catalog: {error}"))
     })?;
@@ -1081,7 +1081,7 @@ fn parse_color(value: &Value, pointer: &str) -> CliResult<[f64; 3]> {
     Ok(rgb)
 }
 
-fn contrast_ratio(foreground: [f64; 3], background: [f64; 3]) -> f64 {
+pub(crate) fn contrast_ratio(foreground: [f64; 3], background: [f64; 3]) -> f64 {
     let foreground = relative_luminance(foreground);
     let background = relative_luminance(background);
     let (lighter, darker) = if foreground > background {

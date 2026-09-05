@@ -142,7 +142,7 @@ fn report_build_scorecard_is_shared_with_triage() {
             .as_array()
             .expect("design rule ids")
             .len(),
-        11
+        20
     );
     assert!(build_json["scorecard"]["handoff"]["safeForOfflineHandoff"].is_boolean());
 }

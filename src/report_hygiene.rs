@@ -57,6 +57,7 @@ struct HygieneOptions {
 
 #[derive(Debug, Clone)]
 struct HygienePlan {
+    design_lint: Option<Value>,
     project_fingerprint: String,
     plan_fingerprint: String,
     profile: HygieneProfile,
@@ -95,7 +96,13 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let resolved = resolve_project(&project)?;
     let validation = validate_project(&resolved)?;
-    let mut plan = build_hygiene_plan(&resolved, &validation, profile, options.include_raw)?;
+    let mut plan = build_hygiene_plan(
+        &resolved,
+        &validation,
+        profile,
+        options.include_raw,
+        options.rules_design,
+    )?;
     if options.rules_design {
         plan.findings.retain(|finding| {
             finding["ruleId"]
@@ -125,7 +132,7 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
     } else {
         EXIT_VALIDATION_FAILED
     };
-    Ok(json!({
+    let mut output = json!({
         "schema": "powerbi-cli.report.audit.v1",
         "ok": ok,
         "exitCode": exit_code,
@@ -145,7 +152,12 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
             format!("powerbi-cli validate --strict {} --json", command_arg(&resolved.project_dir)),
             format!("powerbi-cli handoff check {} --json", command_arg(&resolved.project_dir))
         ]
-    }))
+    });
+    if let Some(design_lint) = plan.design_lint {
+        output["evaluatedRules"] = design_lint["evaluatedRules"].clone();
+        output["deferredRules"] = design_lint["deferredRules"].clone();
+    }
+    Ok(output)
 }
 
 fn sanitize_command(args: &[String]) -> CliResult<Value> {
@@ -177,7 +189,7 @@ fn sanitize_plan_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let resolved = resolve_project(&project)?;
     let validation = validate_project(&resolved)?;
-    let plan = build_hygiene_plan(&resolved, &validation, profile, false)?;
+    let plan = build_hygiene_plan(&resolved, &validation, profile, false, false)?;
     Ok(plan_response(
         &resolved,
         &validation,
@@ -193,7 +205,8 @@ fn sanitize_apply_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let source_resolved = resolve_project(&source_project)?;
     let source_validation = validate_project(&source_resolved)?;
-    let source_plan = build_hygiene_plan(&source_resolved, &source_validation, profile, false)?;
+    let source_plan =
+        build_hygiene_plan(&source_resolved, &source_validation, profile, false, false)?;
     let confirm_token = confirm_token(&source_plan.plan_fingerprint);
 
     if mode == MutationMode::InPlace && options.confirm.as_deref() != Some(&confirm_token) {
@@ -236,7 +249,7 @@ fn sanitize_apply_command(args: &[String]) -> CliResult<Value> {
         Value::Null
     } else {
         let validation = post_validation.as_ref().expect("post validation");
-        let plan = build_hygiene_plan(&target_resolved, validation, profile, false)?;
+        let plan = build_hygiene_plan(&target_resolved, validation, profile, false, false)?;
         json!({
             "ok": validation.errors.is_empty() && !has_error_findings(&plan.findings),
             "counts": counts_json(&plan.findings, &plan.actions, &plan.unsupported_actions),
@@ -377,9 +390,10 @@ fn build_hygiene_plan(
     validation: &crate::ValidationReport,
     profile: HygieneProfile,
     include_raw: bool,
+    design: bool,
 ) -> CliResult<HygienePlan> {
     let mut findings = Vec::new();
-    add_lint_findings(resolved, validation, &mut findings)?;
+    let design_lint = add_lint_findings(resolved, validation, &mut findings, design)?;
     add_handoff_findings(resolved, profile, &mut findings)?;
 
     let (filters, _) = list_report_filters(resolved)?;
@@ -517,6 +531,7 @@ fn build_hygiene_plan(
     )?;
     rules::ensure_finding_ids_registered(&findings, "ruleId")?;
     Ok(HygienePlan {
+        design_lint,
         project_fingerprint,
         plan_fingerprint,
         profile,
@@ -530,8 +545,14 @@ fn add_lint_findings(
     resolved: &ResolvedProject,
     validation: &crate::ValidationReport,
     findings: &mut Vec<Value>,
-) -> CliResult<()> {
-    let lint = lint_project(resolved, validation)?;
+    design: bool,
+) -> CliResult<Option<Value>> {
+    let lint = if design {
+        let deep = crate::inspect::deep_inspect(resolved, validation)?;
+        crate::design::lint::lint_report(resolved, &deep)?
+    } else {
+        lint_project(resolved, validation)?
+    };
     if let Some(items) = lint["findings"].as_array() {
         for (index, finding) in items.iter().enumerate() {
             findings.push(json!({
@@ -557,7 +578,7 @@ fn add_lint_findings(
             }));
         }
     }
-    Ok(())
+    Ok(design.then_some(lint))
 }
 
 fn add_handoff_findings(
@@ -1091,13 +1112,35 @@ fn plan_fingerprint(
     let text = serde_json::to_string(&json!({
         "profile": profile.as_str(),
         "projectFingerprint": project_fingerprint,
-        "actions": actions,
-        "unsupportedActions": unsupported_actions
+        "actions": fingerprint_actions(actions),
+        "unsupportedActions": fingerprint_actions(unsupported_actions)
     }))
     .map_err(|err| CliError::unexpected(format!("serialize sanitize plan fingerprint: {err}")))?;
     let mut hash = 0xcbf29ce484222325u64;
     fnv_update(&mut hash, text.as_bytes());
     Ok(format!("fnv64:{hash:016x}"))
+}
+
+/// Hash action semantics, not their presentation. Absolute paths and nested
+/// readback/evidence belong in the response, but change when a transaction
+/// copies an identical project. The tree fingerprint already covers the bytes
+/// underlying those summaries, including every persisted filter value.
+fn fingerprint_actions(actions: &[Value]) -> Vec<Value> {
+    let mut identities = actions
+        .iter()
+        .map(|action| {
+            json!({
+                "actionId": action["actionId"],
+                "kind": action["kind"],
+                "applySupported": action["applySupported"],
+                "handles": action["handles"],
+                "jsonPointers": action["jsonPointers"],
+                "sourceRuleIds": action["sourceRuleIds"]
+            })
+        })
+        .collect::<Vec<_>>();
+    identities.sort_by_cached_key(Value::to_string);
+    identities
 }
 
 fn fnv_update(hash: &mut u64, bytes: &[u8]) {

@@ -199,7 +199,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, style presets and bundles compile through typed kernels, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
 - `powerbi-cli report design defaults show [--project <project-dir-or.pbip> | --spec <dashboard.json>] [--design-defaults] --json` — Resolve deterministic per-visual design-defaults.v1 entries with catalog evidence and style override precedence _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
@@ -228,7 +228,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--variants <N>] [--explain-rules] --json` — Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -423,7 +423,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
 - `profile.data-profile-v2` — **supported**, schema-matched-statistics-with-redacted-values, proof `unit-smoke`: Bounded CSV/JSON data profile inference. Commands: `profile infer`, `profile validate`, `profile summarize`.
-- `quality.design-lint` — **supported**, read-only-grid-and-template-analysis, proof `unit-smoke`: Deterministic report design geometry lint. Commands: `lint`, `triage`, `report audit`.
+- `quality.design-lint` — **supported**, read-only-design-analysis, proof `unit-smoke`: Deterministic report design lint. Commands: `triage`, `report audit`.
 - `quality.lint-rule-registry` — **supported**, read-only-contract-catalog, proof `unit-smoke`: Discoverable lint and audit rule registry. Commands: `validate`, `lint`, `model dax lint`, `report audit`.
 - `quality.model-completeness-lint` — **supported**, offline-static-heuristics, proof `unit-smoke`: DAX format and semantic-model completeness lint. Commands: `lint`, `triage`, `model dax lint`.
 - `report.bookmark-mutations` — **planned**, unsupported, proof `unit-smoke`: Bookmark state capture/create/update.
@@ -444,7 +444,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers with v2 page and rail compilation. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-clear` — **supported**, read-write-clear-only, proof `unit-smoke`: Slicer inventory and persisted-selection clear. Commands: `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-sync-authoring` — **planned**, unsupported, proof `unit-smoke`: Slicer sync groups.
-- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`, `report style tokens show`, `report style tokens derive`.
+- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report build`, `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`, `report style tokens show`, `report style tokens derive`.
 - `report.tooltip-pages` — **planned**, unsupported, proof `unit-smoke`: Report tooltip pages.
 - `report.visuals.category-share` — **supported**, generated-desktop-golden-pending, proof `desktop-golden-pending`: Generated pie and donut visuals. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
 - `report.visuals.combo-pareto` — **supported**, generated-manual-desktop-canvas-refresh, proof `manual-desktop-canvas-refresh`: Generated line and clustered-column combo visual. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
@@ -990,6 +990,17 @@ The response's top-level `shape` and `decisions[]` model-shape entry reuse the
 same profile/schema classifier. A date-like column without a related date
 dimension is surfaced as a proposal rather than silently treated as a calendar.
 
+Use `report plan --variants 3 --out dashboard.json` to write score-ordered,
+structurally distinct v2 specs as `<out>.variant-<i>.json` (indices start at 1).
+`variants[]` includes structure hashes, decision diffs, compiled-validation
+commands, and separate guard replay recommendations. Diffs use the narrative
+v2 plan before guard annotations as their primary; its overview-first ordering,
+shared rail, and drillthrough targets are preserved.
+Candidates are compiler/schema validated before writing; this is not Desktop
+proof. Counts must be 1–8, require `--out`, and insufficient compatible templates
+return `plan.variants_insufficient` without partial output. `--force` replaces
+regular files only. Guard recommendations are not embedded in candidate specs.
+
 Planner performance guards use catalog defaults of 200 distinct values and
 top 50; JSON intent `guards.threshold` / `guards.top` accept positive integers.
 Above-threshold Category/Rows bindings gain `specV2` topnGuard proposals and
@@ -1068,6 +1079,12 @@ responses stay small. The complete field contract is published at
 `capabilities.responseShapes.scorecard.v1` and
 `capabilities.responseShapes.reportBuild`.
 
+Dashboard-spec `style.preset` and `style.bundle` compile at the final operation
+stage through the same typed kernels as `report themes apply-preset` and
+`report style apply`. Set `style.allowLiteralText: true` only after reviewing
+a bundle that contains display strings. `style.tokens` compile through the
+token catalog; `style.defaults` compile catalog-backed per-visual formatting.
+
 ### Scaffold From A Schema
 
 ```bash
@@ -1139,14 +1156,21 @@ fact-to-dimension relationships, and columns unused by visuals, measures, or
 relationships. Each finding has a stable handle and a remediation hint; use
 model dax lint when only DAX and measure-format diagnostics are needed.
 
-Design geometry checks run through `lint`, `triage`, and
-`scorecard.designLint`. Use `report audit --project <project> --rules design
---json` to isolate the eleven stable grid/template rules. Each finding carries
+Design checks are excluded from default `lint` and fixture summaries.
+Build and triage expose them separately in `scorecard.designLint`.
+Use `report audit --project <project> --rules design
+--json` to isolate twenty stable design rules. Each finding carries
 an RFC 6901 pointer, evidence, and a sanitize action when remediation is
 mechanical; applying those actions remains plan-only until the typed
 auto-improve workflow lands. These Linux-safe checks have `unit-smoke` proof
-and do not claim Desktop rendering compatibility. Typography, colour, and
-number-format checks remain in the separate style-token follow-up.
+and do not claim Desktop rendering compatibility. Sixteen geometry, title,
+measure-format, and ranking-sort checks run without style tokens. Four style
+checks inspect literal font sizes, title/background contrast, palette colours,
+and explicit automatic-unit overrides when the active theme exactly matches
+a built-in token set. Custom or unresolved policies remain explicitly
+`not-evaluated` with reasons in `designLint.deferredRules`; preset names alone
+never establish policy. Offline checks do not infer data magnitude or rendered
+contrast for dynamic colours and translucent backgrounds.
 
 Use `report visuals list/show` handles for every visual mutation. Delete a
 visual only with `report visuals delete --dry-run`, then an output copy or a

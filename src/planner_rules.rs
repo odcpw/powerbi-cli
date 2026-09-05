@@ -24,6 +24,47 @@ pub(crate) struct RuleCatalog {
     pub(crate) evidence_thresholds: EvidenceThresholds,
     pub(crate) rules: Vec<PlannerRule>,
     pub(crate) performance: PerformanceRules,
+    pub(crate) variants: VariantRules,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct VariantRules {
+    pub(crate) max_count: usize,
+    pub(crate) choices: Vec<TemplateChoice>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct TemplateChoice {
+    pub(crate) rule_id: String,
+    pub(crate) template: String,
+    pub(crate) score: i64,
+    pub(crate) reason: String,
+    pub(crate) conditions: Vec<RuleCondition>,
+}
+
+pub(crate) fn variant_choices(
+    shape: &Value,
+    intent: &Value,
+    context: &Value,
+) -> CliResult<Vec<TemplateChoice>> {
+    let mut choices = catalog()?.variants.choices;
+    choices.retain(|choice| {
+        choice.conditions.iter().all(|condition| {
+            condition_matches(
+                &condition.operator,
+                &signal_value(&condition.signal, shape, intent, context),
+                &condition.value,
+            )
+        })
+    });
+    choices.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| a.rule_id.cmp(&b.rule_id))
+    });
+    Ok(choices)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,6 +172,25 @@ pub(crate) fn validate_catalog(catalog: &RuleCatalog) -> Result<(), String> {
         return Err(
             "evidenceThresholds must require dates, measures, and one unambiguous fact".into(),
         );
+    }
+    if !(1..=16).contains(&catalog.variants.max_count) || catalog.variants.choices.is_empty() {
+        return Err("variants requires choices and maxCount between 1 and 16".to_string());
+    }
+    let mut variant_ids = BTreeSet::new();
+    for choice in &catalog.variants.choices {
+        if !valid_identifier(&choice.rule_id)
+            || !variant_ids.insert(&choice.rule_id)
+            || !(0..=100).contains(&choice.score)
+            || choice.reason.trim().is_empty()
+            || choice.conditions.is_empty()
+            || choice.conditions.iter().any(|condition| {
+                !valid_identifier(&condition.signal)
+                    || !matches!(condition.operator.as_str(), "eq" | "gte" | "exists")
+            })
+        {
+            return Err("invalid or duplicate variant template choice".to_string());
+        }
+        crate::design::grid::template(&choice.template).map_err(|error| error.message)?;
     }
     if catalog.performance.threshold == 0
         || catalog.performance.top == 0
