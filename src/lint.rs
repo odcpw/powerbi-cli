@@ -15,6 +15,13 @@ use std::path::PathBuf;
 #[path = "m_lint.rs"]
 mod m_lint;
 
+pub(crate) fn planner_buffer_findings(resolved: &ResolvedProject) -> CliResult<Vec<Value>> {
+    Ok(m_lint::buffer_reuse_findings(resolved)?
+        .into_iter()
+        .filter(|finding| finding["code"] == rules::M_UNBUFFERED_REUSE)
+        .collect())
+}
+
 const DESKTOP_ROUND_TRIP_REPORT_VERSION: &str = "2.0.0";
 
 pub(crate) fn lint_command(args: &[String]) -> CliResult<Value> {

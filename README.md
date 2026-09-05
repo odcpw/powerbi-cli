@@ -312,7 +312,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -354,7 +354,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --dry-run --json` — Inspect one existing visual against the fixture-backed role map and propose the minimal proven set-bindings op for mechanical runtime-parity defects _(proof: `schema-golden`)_
 - `powerbi-cli report visuals set-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file> | --clear-bindings) (--dry-run | --in-place | --out-dir <dir>) --json` — Replace or clear PBIR field-well bindings for an existing visual using canonical TMDL table, column, and measure names _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> [--index <n>] (--display-name <text> | --clear) (--dry-run | --in-place | --out-dir <dir>) --json` — Set or clear displayName on one existing visual queryState projection _(proof: `unit-smoke`)_
-- `powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw> (--dry-run | --in-place | --out-dir <dir>) --json` — Set one curated PBIR visual object property (labels, categoryLabels, categoryAxis, valueAxis, or title) using Desktop literal encoding _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--batch <ops.v1.json> | (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set one curated PBIR visual object property, or atomically apply a bounded SetObject-only ops.v1 batch across many visual handles _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals set-position --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only a PBIR visual position object with guarded output semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals set-topn-guard --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <Table.Column> --order-by <Table.Measure> --top <N> [--direction desc|asc] [--display-name <text>] [--name <filterName>] (--dry-run | --in-place | --out-dir <dir>) --json` — Create or update a visual-level TopN guard filter so a cheap ranking measure bounds the axis before heavy display measures evaluate _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals show --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --json` — Show one PBIR visual with page context, geometry, type, and field bindings _(proof: `unit-smoke`)_
@@ -523,7 +523,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `report.interaction-default-reset` — **supported**, read-write-reset-to-default, proof `unit-smoke`: Interaction Default/reset semantics. Commands: `report interactions reset`.
 - `report.interactions.overrides` — **supported**, read-write-explicit-overrides, proof `unit-smoke`: Explicit visual interaction overrides. Commands: `report build`, `report interactions list`, `report interactions show`, `report interactions set`, `report interactions disable`.
 - `report.pages` — **supported**, read-write, proof `unit-smoke`: Report pages and layout metadata. Commands: `report pages list`, `report pages show`, `report pages add`, `report pages update`, `report pages reorder`, `report pages set-active`, `report pages delete-empty`.
-- `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
+- `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers with v2 page and rail compilation. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-clear` — **supported**, read-write-clear-only, proof `unit-smoke`: Slicer inventory and persisted-selection clear. Commands: `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-sync-authoring` — **planned**, unsupported, proof `unit-smoke`: Slicer sync groups.
 - `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`.
@@ -787,6 +787,7 @@ cargo run --bin powerbi-cli -- report visuals add-slicer --project .\build\sales
 cargo run --bin powerbi-cli -- report visuals add-textbox --project .\build\sales --page page:ReportSectionOverview --title "Reading guide" --paragraphs-file guide.txt --x 40 --y 520 --width 400 --height 120 --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-topn-guard --project .\build\sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by "FactSales[Total Revenue]" --top 28 --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-object --project .\build\sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
+cargo run --bin powerbi-cli -- report visuals set-object --project .\build\sales --batch .\formatting.ops.json --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-display-name --project .\build\sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 cargo run --bin powerbi-cli -- report drilldown set-hierarchy --project .\build\sales --handle <line-chart-handle> --field "DimDate[FiscalYear]" --field "DimDate[Month]" --dry-run --json
 cargo run --bin powerbi-cli -- desktop bridge status --json
@@ -882,6 +883,21 @@ slot/template/style candidate for the layout compiler and is marked
 `planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
 `planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
 `planner.shape-ambiguous-template`, and `planner.overview`.
+
+Profiled Category/Rows groupings above 200 distinct values receive
+`specV2.pages[].visuals[].topnGuard` proposals (default top 50) and matching
+`performance.ops` SetTopNGuard operations. JSON intent can override these
+catalog defaults with `"guards": {"threshold": 200, "top": 50}`.
+Decisions record counts, threshold, cap, shape, and ranking measure; the
+first bound measure is reused, or a cheap COUNTROWS measure is proposed for
+one unambiguous fact table. The legacy `spec` / `--out` remains unchanged;
+these operations target the v2 candidate and do not imply full v2 build support.
+`performance.kernelAvailable` reports typed replay availability, and
+`performance.previewCommands` provides the existing TopN mutation dry-run path.
+Optional `--project <project-dir-or.pbip>` inspects existing partition M with
+the registered `m.unbuffered_reuse` analyzer and recommends reviewing
+Table.Buffer and query folding, without rewriting partitions. Without a
+project, `performance.bufferAnalysis` reports `project-not-supplied`.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
@@ -1118,6 +1134,10 @@ This generated snapshot keeps status and proof claims aligned with
   object/property pairs with their encoding, PBIR container, wildcard visual
   scope, and dated Desktop/pilot reference. The strict catalog is deterministic;
   new entries require a Desktop-authored fixture or dated pilot observation.
+  `report visuals set-object --batch <file>` accepts a bounded
+  `powerbi-cli.ops.v1` document containing only `setObject` entries and commits
+  the complete list through one all-or-nothing transaction with per-entry
+  readback.
   `report visuals formatting list/show` inventories existing PBIR formatting
   object cards and property names with raw payloads omitted unless
   `--include-raw` is passed. `report visuals formatting extract/apply` copies

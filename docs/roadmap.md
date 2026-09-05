@@ -373,6 +373,9 @@ validation, proof, then mutation breadth.
   `report visuals catalog --formatting` additionally exposes the strict,
   embedded eleven-entry formatting catalog consumed by `set-object`, including
   PBIR containers, encoding, wildcard visual scope, and dated evidence.
+  `report visuals set-object --batch <file>` applies a bounded SetObject-only
+  `powerbi-cli.ops.v1` list across many handles through one atomic transaction,
+  returning per-entry outcomes and readback commands in every guarded mode.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
   columnChart, lineClusteredColumnComboChart, and scatterChart containers from
@@ -655,6 +658,8 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Deterministic design-geometry lint now evaluates eleven stable
   grid/template rules in `lint`, `report audit --rules design`, `triage`, and
   the shared scorecard, with pointers and plan-only sanitize actions.
+- [x] Dashboard-spec v2 page slicers and shared layout rails compile to
+  deterministic slicer visuals, including profile-aware mode defaults.
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
@@ -663,8 +668,13 @@ IDs and dependencies; this roadmap records what has already landed:
   slot/template/style `specV2` candidate while preserving the build-compatible
   dashboard.v1 plan output.
 
-Remaining work—such as `report compose`, full v2 compilation, style-token
-lint, broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
+- [x] Planner performance proposals annotate v2 Category/Rows groupings above
+  catalog or intent thresholds with TopN guards and replay operations, explaining
+  counts and ranking measure choices. Optional project inspection reuses
+  `m.unbuffered_reuse` for Table.Buffer recommendations without M rewrites.
+
+Remaining work—such as `report compose`, full v2 compilation, style-token lint,
+broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
 is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
 associated beads. Keep command and feature claims synchronized with the live
 `capabilities --json` and `features list --json` catalogs.

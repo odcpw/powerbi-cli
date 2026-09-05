@@ -4,7 +4,7 @@ use crate::profile::{load_profile_value, profile_summary, validate_profile_value
 use crate::profile_shape::classify;
 use crate::project_io::write_json_pretty;
 use crate::report_build::{
-    compile_dashboard_summary, spec_missing_input, spec_missing_input_with_command,
+    compile_dashboard_summary_with_profile, spec_missing_input, spec_missing_input_with_command,
 };
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{
@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
 struct PlanOptions {
+    project: Option<PathBuf>,
     schema: Option<PathBuf>,
     profile: Option<PathBuf>,
     intent: Option<String>,
@@ -36,6 +37,8 @@ struct PlanOptions {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Intent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    guards: Option<crate::planner_performance::GuardOverrides>,
     schema: String,
     source: String,
     format: String,
@@ -154,7 +157,17 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     let planner_context = planner_context(&model, &planned.spec, &intent, &shape);
     let rule_plan = evaluate_planner_rules(&shape, &intent_value, &planner_context)?;
     append_rule_decisions(&mut planned.decisions, &rule_plan);
-    let v2_spec = build_v2_spec(&planned.spec, &intent, &rule_plan);
+    let mut v2_spec = build_v2_spec(&planned.spec, &intent, &rule_plan);
+    let performance = crate::planner_performance::plan(
+        &schema_value,
+        profile_value.as_ref(),
+        &shape,
+        &mut v2_spec,
+        intent.guards.as_ref(),
+        options.project.as_deref(),
+        &rule_plan.catalog.performance,
+        &mut planned.decisions,
+    )?;
     planned.decisions.insert(
         0,
         json!({
@@ -167,7 +180,11 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     );
     planned.warnings.extend(loaded_intent.warnings);
     sort_intent_warnings(&mut planned.warnings);
-    let compiled = compile_dashboard_summary(&schema_value, &planned.spec)?;
+    let compiled = compile_dashboard_summary_with_profile(
+        &schema_value,
+        &planned.spec,
+        profile_value.as_ref(),
+    )?;
     let mut profile_summary_value = profile_value.as_ref().map(profile_summary);
     if let Some(summary) = profile_summary_value.as_mut() {
         // The planner has the normalized schema and can therefore retain
@@ -208,6 +225,7 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         "shape": planned.decisions[0]["shape"],
         "spec": planned.spec,
         "specV2": v2_spec,
+        "performance": performance,
         "planner": rule_plan.to_value(),
         "ruleExplanations": rule_plan.explanations,
         "explainRules": options.explain_rules,
@@ -1126,6 +1144,9 @@ fn parse_plan_args(args: &[String]) -> CliResult<PlanOptions> {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
+            "--project" => {
+                options.project = Some(PathBuf::from(take_value(args, &mut i, "--project")?))
+            }
             "--schema" => {
                 options.schema = Some(PathBuf::from(take_value(args, &mut i, "--schema")?))
             }
@@ -1230,6 +1251,7 @@ fn load_intent(intent: Option<&str>, objective: Option<&str>) -> CliResult<Loade
 impl Intent {
     fn empty(source: &str, format: &str, text: &str) -> Self {
         Self {
+            guards: None,
             schema: INTENT_SCHEMA.to_string(),
             source: source.to_string(),
             format: format.to_string(),
@@ -1303,6 +1325,7 @@ fn parse_json_intent(raw: &str, value: Value) -> CliResult<LoadedIntent> {
 
     let mut warnings = Vec::new();
     let known_fields = [
+        "guards",
         "schema",
         "source",
         "format",
@@ -1351,6 +1374,7 @@ fn parse_json_intent(raw: &str, value: Value) -> CliResult<LoadedIntent> {
     }
     Ok(LoadedIntent {
         intent: Intent {
+            guards: crate::planner_performance::parse_overrides(object.get("guards"))?,
             schema: INTENT_SCHEMA.to_string(),
             source: "intent".to_string(),
             format: "json".to_string(),
@@ -1662,6 +1686,7 @@ fn parse_markdown_intent(raw: &str) -> LoadedIntent {
     let text = raw.to_string();
     LoadedIntent {
         intent: Intent {
+            guards: None,
             schema: INTENT_SCHEMA.to_string(),
             source: "intent".to_string(),
             format: "markdown".to_string(),

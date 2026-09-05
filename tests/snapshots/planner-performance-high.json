@@ -1,0 +1,96 @@
+{
+  "decisions": [
+    {
+      "distinctCount": 201,
+      "field": "FactSales[DateKey]",
+      "handle": "visual:ReportSectionTrend:VisualContainerPlannerTimeSeries0",
+      "kind": "performance-guard",
+      "orderBy": "FactSales[Total Revenue]",
+      "rankingStrategy": "first-bound-measure",
+      "reason": "Category/Rows distinct count exceeds the configured threshold; rank by the first bound measure or a cheap COUNTROWS measure on the single classified fact table",
+      "ruleId": "planner.cardinality-guard",
+      "shape": "star",
+      "threshold": 200,
+      "top": 50
+    },
+    {
+      "distinctCount": 201,
+      "field": "DimCustomer[CustomerName]",
+      "handle": "visual:ReportSectionComparison:VisualContainerPlannerComparison0",
+      "kind": "performance-guard",
+      "orderBy": "FactSales[Total Revenue]",
+      "rankingStrategy": "first-bound-measure",
+      "reason": "Category/Rows distinct count exceeds the configured threshold; rank by the first bound measure or a cheap COUNTROWS measure on the single classified fact table",
+      "ruleId": "planner.cardinality-guard",
+      "shape": "star",
+      "threshold": 200,
+      "top": 50
+    },
+    {
+      "distinctCount": 201,
+      "field": "DimCustomer[CustomerName]",
+      "handle": "visual:ReportSectionBreakdown:VisualContainerPlannerRanking0",
+      "kind": "performance-guard",
+      "orderBy": "FactSales[Total Revenue]",
+      "rankingStrategy": "first-bound-measure",
+      "reason": "Category/Rows distinct count exceeds the configured threshold; rank by the first bound measure or a cheap COUNTROWS measure on the single classified fact table",
+      "ruleId": "planner.cardinality-guard",
+      "shape": "star",
+      "threshold": 200,
+      "top": 50
+    }
+  ],
+  "guards": [
+    {
+      "orderBy": "FactSales[Total Revenue]",
+      "top": 50
+    },
+    {
+      "orderBy": "FactSales[Total Revenue]",
+      "top": 50
+    },
+    {
+      "orderBy": "FactSales[Total Revenue]",
+      "top": 50
+    }
+  ],
+  "performance": {
+    "bufferAnalysis": "project-not-supplied",
+    "bufferReuseThreshold": 2,
+    "findings": [],
+    "ops": {
+      "ops": [
+        {
+          "field": "FactSales[DateKey]",
+          "handle": "visual:ReportSectionTrend:VisualContainerPlannerTimeSeries0",
+          "op": "setTopNGuard",
+          "orderBy": "FactSales[Total Revenue]",
+          "top": 50
+        },
+        {
+          "field": "DimCustomer[CustomerName]",
+          "handle": "visual:ReportSectionComparison:VisualContainerPlannerComparison0",
+          "op": "setTopNGuard",
+          "orderBy": "FactSales[Total Revenue]",
+          "top": 50
+        },
+        {
+          "field": "DimCustomer[CustomerName]",
+          "handle": "visual:ReportSectionBreakdown:VisualContainerPlannerRanking0",
+          "op": "setTopNGuard",
+          "orderBy": "FactSales[Total Revenue]",
+          "top": 50
+        }
+      ],
+      "schema": "powerbi-cli.ops.v1"
+    },
+    "previewCommands": [
+      "powerbi-cli report visuals set-topn-guard --project <project-dir> --handle visual:ReportSectionTrend:VisualContainerPlannerTimeSeries0 --field 'FactSales[DateKey]' --order-by 'FactSales[Total Revenue]' --top 50 --dry-run --json",
+      "powerbi-cli report visuals set-topn-guard --project <project-dir> --handle visual:ReportSectionComparison:VisualContainerPlannerComparison0 --field 'DimCustomer[CustomerName]' --order-by 'FactSales[Total Revenue]' --top 50 --dry-run --json",
+      "powerbi-cli report visuals set-topn-guard --project <project-dir> --handle visual:ReportSectionBreakdown:VisualContainerPlannerRanking0 --field 'DimCustomer[CustomerName]' --order-by 'FactSales[Total Revenue]' --top 50 --dry-run --json"
+    ],
+    "target": "specV2",
+    "threshold": 200,
+    "top": 50
+  }
+}

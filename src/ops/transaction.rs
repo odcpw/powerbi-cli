@@ -221,10 +221,10 @@ impl Transaction {
                 }
             };
             self.journal.extend(tree_changes(&before, &after));
-            if let Some(handle) = validated.operation.declared_handle() {
+            if let Some(handle) = validated.operation.declared_handle_owned() {
                 if outcome.created_handles.is_empty() {
-                    outcome.created_handles.push(handle.to_string());
-                } else if !outcome.created_handles.iter().any(|item| item == handle) {
+                    outcome.created_handles.push(handle.clone());
+                } else if !outcome.created_handles.iter().any(|item| item == &handle) {
                     self.aborted = true;
                     return Err(PlanFailure::new(
                         validated.index,

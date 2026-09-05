@@ -1,0 +1,18 @@
+{
+  "schema": "powerbi-cli.dataProfile.v1",
+  "tables": [
+    {
+      "name": "DimCustomer",
+      "columns": [
+        {"name": "Segment", "distinctCount": 4},
+        {"name": "CustomerName", "distinctCount": 24}
+      ]
+    },
+    {
+      "name": "DimDate",
+      "columns": [
+        {"name": "Date", "distinctCount": 365}
+      ]
+    }
+  ]
+}

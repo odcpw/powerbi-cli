@@ -1,0 +1,15 @@
+[
+  {
+    "analysisBoundary": "heuristic",
+    "handle": "partition:FactSales:FactSales",
+    "kind": "performance-recommendation",
+    "mutatesProject": false,
+    "reason": "M step `Source` is referenced 2 times by later steps without Table.Buffer",
+    "recommendation": "Review query folding and repeated evaluation before adding Table.Buffer",
+    "referenceCount": 2,
+    "ruleId": "m.unbuffered_reuse",
+    "shape": "star",
+    "step": "Source",
+    "threshold": 2
+  }
+]

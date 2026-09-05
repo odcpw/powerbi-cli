@@ -104,6 +104,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     FEATURE_PENDING => ("feature_pending", Report, "warning", "Template section dividers are omitted until a proven shape capability is available.", "Keep the resolved template geometry and follow the shape capability proof status.", None),
     VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
