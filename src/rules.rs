@@ -105,6 +105,14 @@ macro_rules! define_rules {
 
 define_rules! {
     PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
+    OPS_STAGE_ORDER => ("ops.stage_order", Validation, "error", "Operation stages are out of order.", "Order operations by model, page, visual, behavior, then style stage, keeping declarations before references.", None),
+    SPEC_UNCOMPILED_SECTION => ("report.spec.uncompiled_section", Report, "warning", "An explain preview contains a recognized section that is not compiled yet.", "Read the warning's owningBead and unsupportedSections entry; omit the pending section for a supported build or wait for its compiler implementation.", None),
+    OPS_DUPLICATE_OPERATION => ("ops.duplicate_operation", Validation, "error", "An identical operation occurs more than once.", "Remove the duplicate operation at the reported pointer before retrying the plan.", None),
+    OPS_EMPTY_HANDLE => ("ops.empty_handle", Validation, "error", "An operation declares an empty handle.", "Provide a non-empty stable handle for the object the operation creates.", None),
+    OPS_HANDLE_COLLISION => ("ops.handle_collision", Validation, "error", "An operation declares a handle already present in the project.", "Choose a new handle or update the existing object with a supported mutation.", None),
+    OPS_DUPLICATE_HANDLE => ("ops.duplicate_handle", Validation, "error", "Multiple operations declare the same handle.", "Give each created object a unique handle and update its references consistently.", None),
+    OPS_DANGLING_HANDLE => ("ops.dangling_handle", Validation, "error", "An operation references an unavailable handle.", "Use a handle from the project or an earlier declaration in this plan.", None),
+    OPS_HANDLE_MISMATCH => ("ops.handle_mismatch", Validation, "error", "A kernel created a different handle from its declaration.", "Do not commit this plan; inspect the declared and returned handles and report the kernel mismatch.", None),
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     FEATURE_PENDING => ("feature_pending", Report, "warning", "Template section dividers are omitted until a proven shape capability is available.", "Keep the resolved template geometry and follow the shape capability proof status.", None),
     PLAN_MISSING_INPUT => ("plan.missing_input", Validation, "error", "Required planner evidence is missing or ambiguous.", "Supply the named intent or schema field and rerun the suggested command; no default layout is written.", None),

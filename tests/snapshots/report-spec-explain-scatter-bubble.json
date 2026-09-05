@@ -203,7 +203,7 @@
         "summary": "declare compiled report visual"
       }
     ],
-    "schema": "powerbi-cli.ops.v1",
+    "schema": "powerbi-cli.report.spec.explainPlan.v1",
     "stages": [
       {
         "index": 2,

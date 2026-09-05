@@ -395,9 +395,10 @@ fn read_safe_fragment(path: &Path) -> CliResult<Value> {
     // literal lives below `filter/.../Value`; treat that shape as persisted
     // state here so the archive never carries a selection accidentally.
     if let Some(pointer) = persisted_selection_pointer(&value, "", false) {
-        return Err(safety_refusal(format!(
-            "persisted data values remain at {pointer}"
-        )));
+        return Err(
+            safety_refusal(format!("persisted data values remain at {pointer}"))
+                .with_pointer(pointer),
+        );
     }
     Ok(value)
 }
@@ -695,6 +696,20 @@ fn safety_refusal(detail: impl Into<String>) -> CliError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn persisted_filter_literal_refusal_carries_exact_rfc6901_pointer() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let fragment = temp.path().join("visual.json");
+        let bytes = r#"{"a/b~c":{"filter":{"Literal":{"Value":"'synthetic'"}}}}"#;
+        fs::write(&fragment, bytes).expect("write synthetic fragment");
+        let error = read_safe_fragment(&fragment).expect_err("persisted filter literal");
+        assert_eq!(error.code, INPUT_SAFETY_ERROR_CODE);
+        assert_eq!(error.pointer(), Some("/a~1b~0c/filter/Literal/Value"));
+        assert!(error.hint.is_some());
+        assert!(!error.suggested_commands.is_empty());
+        assert_eq!(fs::read_to_string(&fragment).expect("read fragment"), bytes);
+    }
 
     #[test]
     fn microsoft_reference_fixtures_are_safe_except_persisted_slicer_state() {

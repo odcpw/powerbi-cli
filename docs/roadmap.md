@@ -35,6 +35,12 @@ rebound to real data later.
 
 ## Agent Contract
 
+The 2026-09 scoped compiler-surface ergonomics pass repairs profile/root-losing
+follow-ups, distinguishes annotated explain plans from replay input, registers
+operation-plan errors, and tightens batch/grid/harvest pointers. See
+[audit evidence and unresolved owner handoffs](../agent_ergonomics_audit/compiler-surface-2026-09.md).
+This does not ship compose, general ops replay, or spec extraction/diff.
+
 The CLI should follow the `ooxml-cli` pattern: the binary is the live contract,
 and agents discover capabilities before guessing.
 

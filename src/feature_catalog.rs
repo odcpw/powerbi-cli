@@ -933,6 +933,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         ],
         reference_signals: &[
             "examples/sales.dashboard.v2.json: minimal compiled v2 parity fixture",
+            "tests/report_spec_schema_explain.rs: annotated explainPlan.v1 is distinct from replayable ops.v1; tests/report_build_response.rs: profile-preserving follow-ups",
             "tests/report_build_layout.rs: template/slot coordinates, typography-styled headings, explicit-layout artifact parity, and explain geometry; section dividers remain feature_pending",
             "examples/filter-kinds.dashboard.v2.json: root/page/visual filter compiler coverage",
             "examples/archetypes/regional-sales.dashboard.json: declarative drillthrough compiler and pending back-button warning",
