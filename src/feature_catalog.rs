@@ -929,7 +929,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["report plan"],
         refusal_code: None,
-        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, classifies the schema/profile model shape with evidence-backed role and relationship signals, evaluates the embedded strict planner-rules.v1 catalog into deterministic scored proposals with actual evidence values, and returns pointer-rich diagnostics instead of guessing. Legacy dashboard.v1 output remains build-compatible while specV2 exposes templates, semantic tokens, and slot-only proposals for the concurrent layout compiler.",
+        reason: "report plan reads a bounded intent.v1 JSON document or lightly structured Markdown through the input-safety contract, classifies the schema/profile model shape with evidence-backed role and relationship signals, evaluates the embedded strict planner-rules.v1 catalog into deterministic scored proposals with actual evidence values, and returns pointer-rich diagnostics instead of guessing. Profile cardinalities above catalog or intent.guards thresholds produce specV2 topnGuard proposals and SetTopNGuard operations with numeric decisions; optional --project returns m.unbuffered_reuse buffering recommendations without partition mutation. Legacy dashboard.v1 output remains build-compatible while specV2 exposes templates, semantic tokens, and slot-only proposals for the concurrent layout compiler.",
         next_proof: &[
             "Compile comparisons, periods, drill paths, alerts, filters, archetypes, page flow, and handoff fields through their owning planner/compiler beads",
         ],

@@ -663,6 +663,11 @@ IDs and dependencies; this roadmap records what has already landed:
   slot/template/style `specV2` candidate while preserving the build-compatible
   dashboard.v1 plan output.
 
+- [x] Planner performance proposals annotate v2 Category/Rows groupings above
+  catalog or intent thresholds with TopN guards and replay operations, explaining
+  counts and ranking measure choices. Optional project inspection reuses
+  `m.unbuffered_reuse` for Table.Buffer recommendations without M rewrites.
+
 Remaining work—such as `report compose`, full v2 compilation, design lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
 is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the

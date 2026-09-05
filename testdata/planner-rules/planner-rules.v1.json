@@ -1,6 +1,7 @@
 {
   "schema": "powerbi-cli.planner-rules.v1",
   "version": 1,
+  "performance": {"threshold": 200, "top": 50, "bufferReuseThreshold": 2},
   "rules": [
     {
       "id": "planner.time-series",

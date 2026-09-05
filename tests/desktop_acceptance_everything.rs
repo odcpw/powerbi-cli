@@ -400,6 +400,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &p(&profile),
             "--objective",
             "Executive safety dashboard with trend, branch comparison, and cost portfolio views",
+            "--project",
+            &p(&scaffold_project),
             "--out",
             &p(&planned_spec),
             "--json",
