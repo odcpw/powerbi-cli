@@ -183,7 +183,7 @@ pub(crate) fn validate_candidate(schema: &Value, spec: &Value) -> CliResult<()> 
     // This helper uses the same compiler and schema validation as spec validate
     // with --schema; it does not strip or bypass any unsupported section.
     let (compiled, _) =
-        crate::report_build::compile_dashboard_for_explain_with_profile(schema, spec, None)?;
+        crate::report_build::compile_dashboard_for_explain_with_profile(schema, spec, None, false)?;
     let validation = crate::schema::validate_schema_value(&compiled);
     if !validation.errors.is_empty() {
         return Err(CliError::validation_failed(validation.errors.join("; ")));
