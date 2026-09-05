@@ -253,7 +253,6 @@ fn slot_coordinates_are_metamorphic_with_equivalent_explicit_layout() {
         .as_object_mut()
         .expect("page")
         .remove("subtitle");
-    explicit.as_object_mut().expect("spec").remove("style");
     for visual in explicit["pages"][0]["visuals"]
         .as_array_mut()
         .expect("visuals")
