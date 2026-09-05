@@ -175,6 +175,18 @@
         "kind": "visual",
         "opIndex": 8,
         "pointer": "/pages/2/visuals/1"
+      },
+      {
+        "handle": "filter:visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable:PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+        "kind": "filter",
+        "opIndex": 9,
+        "pointer": "/pages/1/visuals/0/filters/0"
+      },
+      {
+        "handle": "filter:visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable:PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+        "kind": "filter",
+        "opIndex": 10,
+        "pointer": "/pages/2/visuals/0/filters/0"
       }
     ],
     "references": [
@@ -231,6 +243,18 @@
         "handle": "page:ReportSectionSegmentDetail",
         "opIndex": 8,
         "pointer": "/pages/2/visuals/1/page"
+      },
+      {
+        "field": "owner",
+        "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+        "opIndex": 9,
+        "pointer": "/pages/1/visuals/0/filters/0/owner"
+      },
+      {
+        "field": "owner",
+        "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+        "opIndex": 10,
+        "pointer": "/pages/2/visuals/0/filters/0/owner"
       }
     ]
   },
@@ -385,7 +409,7 @@
     "unavailable": null
   },
   "plan": {
-    "operationCount": 9,
+    "operationCount": 11,
     "ops": [
       {
         "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
@@ -673,6 +697,64 @@
         "stage": 2,
         "stageName": "visual",
         "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "filter:visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable:PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+        "index": 9,
+        "op": "addFilter",
+        "operation": {
+          "condition": {
+            "by": {
+              "measure": "Total Revenue",
+              "table": "FactSales"
+            },
+            "count": 3,
+            "direction": "--top"
+          },
+          "filterType": "TopN",
+          "handle": "filter:visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable:PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+          "name": "PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+          "op": "addFilter",
+          "owner": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+          "scope": "visual",
+          "target": {
+            "column": "Customer",
+            "table": "DimCustomer"
+          }
+        },
+        "pointer": "/pages/1/visuals/0/filters/0",
+        "stage": 3,
+        "stageName": "behavior",
+        "summary": "compile visual behavior as addFilter"
+      },
+      {
+        "handle": "filter:visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable:PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+        "index": 10,
+        "op": "addFilter",
+        "operation": {
+          "condition": {
+            "by": {
+              "measure": "Total Revenue",
+              "table": "FactSales"
+            },
+            "count": 2,
+            "direction": "--top"
+          },
+          "filterType": "TopN",
+          "handle": "filter:visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable:PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+          "name": "PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+          "op": "addFilter",
+          "owner": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+          "scope": "visual",
+          "target": {
+            "column": "Segment",
+            "table": "DimCustomer"
+          }
+        },
+        "pointer": "/pages/2/visuals/0/filters/0",
+        "stage": 3,
+        "stageName": "behavior",
+        "summary": "compile visual behavior as addFilter"
       }
     ],
     "schema": "powerbi-cli.report.spec.explainPlan.v1",
@@ -978,6 +1060,74 @@
             "stage": 2,
             "stageName": "visual",
             "summary": "declare compiled report visual"
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "name": "behavior",
+        "operationIndexes": [
+          9,
+          10
+        ],
+        "ops": [
+          {
+            "handle": "filter:visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable:PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+            "index": 9,
+            "op": "addFilter",
+            "operation": {
+              "condition": {
+                "by": {
+                  "measure": "Total Revenue",
+                  "table": "FactSales"
+                },
+                "count": 3,
+                "direction": "--top"
+              },
+              "filterType": "TopN",
+              "handle": "filter:visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable:PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+              "name": "PowerBICliVisualDimCustTopI6040bd44Cb24dee73Filter",
+              "op": "addFilter",
+              "owner": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+              "scope": "visual",
+              "target": {
+                "column": "Customer",
+                "table": "DimCustomer"
+              }
+            },
+            "pointer": "/pages/1/visuals/0/filters/0",
+            "stage": 3,
+            "stageName": "behavior",
+            "summary": "compile visual behavior as addFilter"
+          },
+          {
+            "handle": "filter:visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable:PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+            "index": 10,
+            "op": "addFilter",
+            "operation": {
+              "condition": {
+                "by": {
+                  "measure": "Total Revenue",
+                  "table": "FactSales"
+                },
+                "count": 2,
+                "direction": "--top"
+              },
+              "filterType": "TopN",
+              "handle": "filter:visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable:PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+              "name": "PowerBICliVisualDimSegmTopIbf5436eeCcc4625ffFilter",
+              "op": "addFilter",
+              "owner": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+              "scope": "visual",
+              "target": {
+                "column": "Segment",
+                "table": "DimCustomer"
+              }
+            },
+            "pointer": "/pages/2/visuals/0/filters/0",
+            "stage": 3,
+            "stageName": "behavior",
+            "summary": "compile visual behavior as addFilter"
           }
         ]
       }

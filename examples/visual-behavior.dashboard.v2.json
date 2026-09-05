@@ -1,0 +1,26 @@
+{
+  "schema": "powerbi-cli.dashboard.v2",
+  "report": {"name": "VisualBehavior"},
+  "pages": [{
+    "id": "overview",
+    "visuals": [{
+      "id": "trend",
+      "type": "lineChart",
+      "bindings": [
+        {"role": "Category", "field": "DimCustomer[Segment]"},
+        {"role": "Y", "field": "FactSales[Total Revenue]"}
+      ],
+      "drilldown": {"fields": ["DimCustomer[Segment]", "DimCustomer[CustomerName]"]},
+      "topnGuard": {"orderBy": "FactSales[Total Revenue]", "top": 5},
+      "filters": [{"target": "DimCustomer[Segment]", "kind": "categorical", "values": ["Example"]}]
+    }, {
+      "id": "share",
+      "type": "pieChart",
+      "bindings": [
+        {"role": "Category", "field": "DimCustomer[Segment]"},
+        {"role": "Y", "field": "FactSales[Total Revenue]"}
+      ],
+      "sort": {"field": "FactSales[Total Revenue]", "direction": "Descending"}
+    }]
+  }]
+}

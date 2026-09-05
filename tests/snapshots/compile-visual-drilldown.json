@@ -1,0 +1,8 @@
+{
+  "field": [
+    "DimCustomer[Segment]",
+    "DimCustomer[CustomerName]"
+  ],
+  "handle": "visual:ReportSectionOverview:VisualContainerTrend",
+  "op": "setDrilldownHierarchy"
+}

@@ -74,12 +74,14 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
     let design_defaults = options.design_defaults || style_requests_design_defaults(&spec);
     let unsupported = collect_unsupported_sections(&spec, version, design_defaults)?;
     let sanitized = sanitize_for_compile(&spec, version, design_defaults);
-    let (compiled_schema, compiled_warnings) = compile_dashboard_for_explain_with_profile(
+    let compiled = compile_dashboard_for_explain_with_profile(
         &schema,
         &sanitized,
         profile.as_ref(),
         design_defaults,
     )?;
+    let compiled_schema = compiled.schema;
+    let compiled_warnings = compiled.warnings;
     let compiled_validation = validate_schema_value(&compiled_schema);
     if !compiled_validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
@@ -92,7 +94,18 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
             command_arg(&spec_path)
         )));
     }
-    let (entries, index) = compile_operations(&spec, &compiled_schema, &schema)?;
+    let (mut entries, index) = compile_operations(&spec, &compiled_schema, &schema)?;
+    entries.extend(
+        compiled
+            .operations
+            .into_iter()
+            .map(|(operation, pointer)| OpEntry {
+                summary: format!("compile visual behavior as {}", operation.tag()),
+                operation,
+                pointer,
+            }),
+    );
+    entries.sort_by_key(|entry| entry.operation.stage());
     let plan = build_plan_json(&entries, &index)?;
     let layout = layout_json(&spec, &compiled_schema);
     let defaults = defaults_json(&spec, &compiled_schema, design_defaults)?;
@@ -350,14 +363,7 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion, design_defaults: boo
             sanitize_pages(
                 &mut sanitized,
                 &["filters", "slicers", "drillthrough", "tooltipFor"],
-                &[
-                    "sort",
-                    "drilldown",
-                    "topnGuard",
-                    "filters",
-                    "subtitle",
-                    "conditionalFormatting",
-                ],
+                &["subtitle", "conditionalFormatting"],
             );
             if !design_defaults {
                 sanitize_pages(&mut sanitized, &[], &["format"]);

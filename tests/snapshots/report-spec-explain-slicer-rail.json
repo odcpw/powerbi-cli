@@ -1,0 +1,265 @@
+{
+  "defaults": {
+    "perVisual": [
+      {
+        "defaulted": true,
+        "defaultedFields": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
+        "pointer": "/pages/0/visuals/0",
+        "position": {
+          "height": 184.0,
+          "width": 560.0,
+          "x": 32.0,
+          "y": 32.0
+        },
+        "visualType": "card"
+      },
+      {
+        "defaulted": true,
+        "defaultedFields": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "pointer": "/pages/1/visuals/0",
+        "position": {
+          "height": 184.0,
+          "width": 560.0,
+          "x": 32.0,
+          "y": 32.0
+        },
+        "visualType": "card"
+      }
+    ]
+  },
+  "handles": {
+    "declared": [
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
+        "kind": "visual",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "kind": "visual",
+        "opIndex": 1,
+        "pointer": "/pages/1/visuals/0"
+      }
+    ],
+    "references": [
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 0,
+        "pointer": "/pages/0/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionDetail",
+        "opIndex": 1,
+        "pointer": "/pages/1/visuals/0/page"
+      }
+    ]
+  },
+  "layout": {
+    "available": true,
+    "pages": [
+      {
+        "page": "page:ReportSectionOverview",
+        "pointer": "/pages/0",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 184.0,
+              "width": 560.0,
+              "x": 32.0,
+              "y": 32.0
+            },
+            "height": 184.0,
+            "pointer": "/pages/0/visuals/0",
+            "visual": "visual:ReportSectionOverview:VisualContainerRevenue",
+            "width": 560.0,
+            "x": 32.0,
+            "y": 32.0
+          }
+        ]
+      },
+      {
+        "page": "page:ReportSectionDetail",
+        "pointer": "/pages/1",
+        "slots": [
+          {
+            "coordinates": {
+              "height": 184.0,
+              "width": 560.0,
+              "x": 32.0,
+              "y": 32.0
+            },
+            "height": 184.0,
+            "pointer": "/pages/1/visuals/0",
+            "visual": "visual:ReportSectionDetail:VisualContainerUnits",
+            "width": 560.0,
+            "x": 32.0,
+            "y": 32.0
+          }
+        ]
+      }
+    ],
+    "unavailable": null
+  },
+  "plan": {
+    "operationCount": 2,
+    "ops": [
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
+        "index": 0,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Total Revenue",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
+          "name": "VisualContainerRevenue",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 184.0,
+            "width": 560.0,
+            "x": 32.0,
+            "y": 32.0
+          },
+          "title": "Revenue",
+          "visualType": "card"
+        },
+        "pointer": "/pages/0/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "index": 1,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "measure": "Total Units",
+              "role": "Values",
+              "table": "FactSales"
+            }
+          ],
+          "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+          "name": "VisualContainerUnits",
+          "op": "addVisual",
+          "page": "page:ReportSectionDetail",
+          "position": {
+            "height": 184.0,
+            "width": 560.0,
+            "x": 32.0,
+            "y": 32.0
+          },
+          "title": "Units",
+          "visualType": "card"
+        },
+        "pointer": "/pages/1/visuals/0",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "declare compiled report visual"
+      }
+    ],
+    "schema": "powerbi-cli.report.spec.explainPlan.v1",
+    "stages": [
+      {
+        "index": 2,
+        "name": "visual",
+        "operationIndexes": [
+          0,
+          1
+        ],
+        "ops": [
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
+            "index": 0,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Total Revenue",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
+              "name": "VisualContainerRevenue",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 184.0,
+                "width": 560.0,
+                "x": 32.0,
+                "y": 32.0
+              },
+              "title": "Revenue",
+              "visualType": "card"
+            },
+            "pointer": "/pages/0/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+            "index": 1,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "measure": "Total Units",
+                  "role": "Values",
+                  "table": "FactSales"
+                }
+              ],
+              "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+              "name": "VisualContainerUnits",
+              "op": "addVisual",
+              "page": "page:ReportSectionDetail",
+              "position": {
+                "height": 184.0,
+                "width": 560.0,
+                "x": 32.0,
+                "y": 32.0
+              },
+              "title": "Units",
+              "visualType": "card"
+            },
+            "pointer": "/pages/1/visuals/0",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "declare compiled report visual"
+          }
+        ]
+      }
+    ]
+  },
+  "proofUnavailable": [
+    {
+      "level": "desktop-canvas-refresh",
+      "reason": "Power BI Desktop is the compatibility oracle; explain is a unit-smoke preview and does not launch Desktop."
+    }
+  ],
+  "schema": "powerbi-cli.report.spec.explain.v1",
+  "specVersion": "powerbi-cli.dashboard.v2",
+  "unsupportedSections": []
+}

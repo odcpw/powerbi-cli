@@ -1,0 +1,5 @@
+{
+  "bindingsJson": "[{\"column\":\"Segment\",\"role\":\"Category\",\"table\":\"DimCustomer\"},{\"measure\":\"Total Revenue\",\"role\":\"Y\",\"sortDirection\":\"Descending\",\"table\":\"FactSales\"}]",
+  "handle": "visual:ReportSectionOverview:VisualContainerShare",
+  "op": "setBindings"
+}

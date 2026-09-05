@@ -1,0 +1,20 @@
+{
+  "condition": {
+    "values": [
+      "Example"
+    ]
+  },
+  "filterType": "Categorical",
+  "handle": "filter:visual:ReportSectionOverview:VisualContainerTrend:PowerBICliVisualDimSegmCatI478ed80fC924a2a05Filter",
+  "name": "PowerBICliVisualDimSegmCatI478ed80fC924a2a05Filter",
+  "op": "addFilter",
+  "owner": "visual:ReportSectionOverview:VisualContainerTrend",
+  "scope": "visual",
+  "target": {
+    "column": "Segment",
+    "table": "DimCustomer"
+  },
+  "values": [
+    "Example"
+  ]
+}

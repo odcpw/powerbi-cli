@@ -827,10 +827,6 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
             "pbi-t3-compiler-completeness-1qi.7",
         ),
         (
-            json!({"pages": [{"visuals": [{"sort": {"field": "FactSales[Total Revenue]", "direction": "Descending"}}]}]}),
-            "pbi-t3-compiler-completeness-1qi.4",
-        ),
-        (
             json!({"model": {"calculatedColumns": []}}),
             "pbi-t3-compiler-completeness-1qi.5",
         ),

@@ -1273,7 +1273,6 @@ where
 fn first_uncompiled_v2_section(
     root: &Map<String, Value>,
 ) -> Option<(String, &'static str, &'static str)> {
-    const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
@@ -1361,16 +1360,6 @@ fn first_uncompiled_v2_section(
             .filter_map(Value::as_object)
             .enumerate()
         {
-            if ["sort", "drilldown", "topnGuard"]
-                .iter()
-                .any(|field| visual.contains_key(*field))
-            {
-                return Some((
-                    format!("pages[{page_index}].visuals[{visual_index}].sort|drilldown|topnGuard"),
-                    VISUAL_BEHAVIOR_BEAD,
-                    "powerbi-cli --json capabilities --for report",
-                ));
-            }
             if visual.contains_key("subtitle") {
                 return Some((
                     format!("pages[{page_index}].visuals[{visual_index}].subtitle"),
@@ -1422,7 +1411,6 @@ pub(crate) fn uncompiled_v2_sections(
         return Ok(Vec::new());
     }
 
-    const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
@@ -1520,16 +1508,6 @@ pub(crate) fn uncompiled_v2_sections(
                         continue;
                     };
                     let visual_pointer = format!("{page_pointer}/visuals/{visual_index}");
-                    for field in ["sort", "drilldown", "topnGuard"] {
-                        if visual.contains_key(field) {
-                            push(
-                                format!("pages[{page_index}].visuals[{visual_index}].{field}"),
-                                format!("{visual_pointer}/{field}"),
-                                VISUAL_BEHAVIOR_BEAD,
-                                "powerbi-cli --json capabilities --for report",
-                            );
-                        }
-                    }
                     for field in ["subtitle"] {
                         if visual.contains_key(field) {
                             push(

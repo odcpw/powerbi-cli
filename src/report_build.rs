@@ -225,16 +225,32 @@ pub(crate) fn compile_dashboard_summary_with_profile(
 /// surface. The explain command removes recognized-but-uncompiled sections
 /// before calling this helper, while the normal build path retains its strict
 /// refusal behavior.
+pub(crate) struct ExplainedDashboard {
+    pub(crate) schema: Value,
+    pub(crate) warnings: Vec<Value>,
+    pub(crate) operations: Vec<(Op, String)>,
+}
+
 pub(crate) fn compile_dashboard_for_explain_with_profile(
     schema: &Value,
     spec: &Value,
     profile: Option<&Value>,
     design_defaults: bool,
-) -> CliResult<(Value, Vec<Value>)> {
+) -> CliResult<ExplainedDashboard> {
     let compiled = compile_dashboard(schema, Some(spec), profile, design_defaults)?;
     let mut explain_schema = compiled.schema.clone();
+    crate::report_build_behavior::materialize_scaffold_names(&mut explain_schema);
     materialize_visual_operations_for_explain(&mut explain_schema, &compiled.typed_operations);
-    Ok((explain_schema, compiled.warnings))
+    Ok(ExplainedDashboard {
+        schema: explain_schema,
+        warnings: compiled.warnings,
+        operations: compiled
+            .typed_operations
+            .into_iter()
+            .zip(compiled.operation_pointers)
+            .filter(|(op, _)| !matches!(op, Op::AddVisual(_)))
+            .collect(),
+    })
 }
 
 fn materialize_visual_operations_for_explain(schema: &mut Value, operations: &[Op]) {
@@ -1087,9 +1103,21 @@ fn compile_dashboard(
         compile_drillthrough_operations(spec_object, &model)?;
     typed_operations.extend(drillthrough_operations);
     operation_pointers.extend(drillthrough_pointers);
+    let (behavior_operations, behavior_pointers) =
+        crate::report_build_behavior::compile(spec_object, &merged, &model)?;
+    typed_operations.extend(behavior_operations);
+    operation_pointers.extend(behavior_pointers);
     let (style_operations, style_pointers) = compile_style_operations(spec_object)?;
     typed_operations.extend(style_operations);
     operation_pointers.extend(style_pointers);
+    // Keep pointers paired with their operation while honoring the IR stage
+    // order (visual mutations must precede filters and drillthrough).
+    let mut ordered = typed_operations
+        .into_iter()
+        .zip(operation_pointers)
+        .collect::<Vec<_>>();
+    ordered.sort_by_key(|(op, _)| op.stage());
+    let (typed_operations, operation_pointers): (Vec<_>, Vec<_>) = ordered.into_iter().unzip();
     operations.extend(
         typed_operations
             .iter()
@@ -2735,14 +2763,6 @@ fn compile_visuals(
         {
             out.insert("text".to_string(), Value::String(text.to_string()));
         }
-        if visual.get("drilldown").is_some() {
-            return Err(CliError::unsupported_feature(
-                "report build drilldown from dashboard spec is planned for a later slice; build first, then run report drilldown set-hierarchy"
-            )
-            .with_suggested_command(
-                "powerbi-cli report drilldown set-hierarchy --project <project-dir> --handle <visual-handle> --field <Table[Column]> --field <Table[Column]> --dry-run --json",
-            ));
-        }
         visuals.push(Value::Object(out));
     }
     Ok(visuals)
@@ -3311,26 +3331,26 @@ fn apply_layout(
 }
 
 #[derive(Debug)]
-struct ModelIndex {
+pub(crate) struct ModelIndex {
     columns: BTreeMap<String, BTreeMap<String, String>>,
     measures: BTreeMap<String, BTreeSet<String>>,
 }
 
 #[derive(Debug)]
-struct FieldRef {
-    table: String,
-    name: String,
-    kind: FieldKind,
+pub(crate) struct FieldRef {
+    pub(crate) table: String,
+    pub(crate) name: String,
+    pub(crate) kind: FieldKind,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FieldKind {
+pub(crate) enum FieldKind {
     Column,
     Measure,
 }
 
 impl ModelIndex {
-    fn from_schema(schema: &Value) -> Self {
+    pub(crate) fn from_schema(schema: &Value) -> Self {
         let mut columns = BTreeMap::new();
         let mut measures = BTreeMap::new();
         for table in schema["tables"]
@@ -3377,7 +3397,7 @@ impl ModelIndex {
         Self { columns, measures }
     }
 
-    fn resolve_field(&self, value: &str) -> CliResult<FieldRef> {
+    pub(crate) fn resolve_field(&self, value: &str) -> CliResult<FieldRef> {
         let (table, name) = parse_field(value)?;
         let table_key = table.to_ascii_lowercase();
         let name_key = name.to_ascii_lowercase();
