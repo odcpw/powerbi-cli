@@ -77,10 +77,16 @@ pub(crate) fn rebind_check(args: &[String]) -> CliResult<Value> {
         return Err(CliError::validation_failed(
             "handoff rebind-check selector matched no partitions",
         )
+        .with_pointer(if options.partition.is_some() {
+            "/partition"
+        } else {
+            "/table"
+        })
         .with_hint("Use `model partitions list` to obtain a current table or partition handle.")
-        .with_suggested_command(
-            "powerbi-cli model partitions list --project <project-dir-or.pbip> --json",
-        ));
+        .with_suggested_command(format!(
+            "powerbi-cli model partitions list --project {} --json",
+            command_arg(&resolved.project_dir)
+        )));
     }
 
     let template_path = source_templates_path(&resolved.project_dir);

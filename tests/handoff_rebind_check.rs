@@ -102,6 +102,46 @@ fn unmatched_partition_selector_is_a_structured_validation_failure() {
 }
 
 #[test]
+fn unmatched_selector_points_to_argument_and_recovers_against_the_actual_project() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let spaced_root = temp.path().join("project with spaces");
+    fs::create_dir(&spaced_root).expect("create parent");
+    let project = scaffold_sales(&spaced_root);
+    for (flag, pointer) in [("--partition", "/partition"), ("--table", "/table")] {
+        let output = run_powerbi(&[
+            "handoff",
+            "rebind-check",
+            project_arg(&project),
+            flag,
+            "Missing",
+            "--json",
+        ]);
+        assert_eq!(output.exit, 10, "{}", output.stderr);
+        assert!(output.stdout.trim().is_empty());
+        let error = stderr_json(&output);
+        assert_eq!(error["error"]["code"], "validation_failed");
+        assert_eq!(error["error"]["pointer"], pointer);
+        assert!(error["error"]["hint"].is_string());
+        assert_eq!(
+            error["error"]["suggestedCommands"],
+            serde_json::json!([format!(
+                "powerbi-cli model partitions list --project '{}' --json",
+                project.display()
+            )])
+        );
+        let recovery = run_powerbi(&[
+            "model",
+            "partitions",
+            "list",
+            "--project",
+            project_arg(&project),
+            "--json",
+        ]);
+        assert_eq!(recovery.exit, 0, "{}", recovery.stderr);
+    }
+}
+
+#[test]
 fn generated_dummy_partition_is_reported_as_placeholder() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());

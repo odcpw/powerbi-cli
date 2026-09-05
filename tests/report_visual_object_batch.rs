@@ -58,6 +58,64 @@ fn literal(value: &str) -> Value {
     json!({"expr": {"Literal": {"Value": value}}})
 }
 
+#[test]
+fn batch_field_errors_are_pointer_precise_before_any_output_mode_writes() {
+    let temp = tempfile::tempdir().unwrap();
+    let project = temp.path().join("not-accessed");
+    let batch = temp.path().join("invalid.ops.json");
+    let out = temp.path().join("not-created");
+    let base = set_object("visual:Page:Visual", "title", "show", literal("true"));
+    let mut cases = Vec::new();
+    for field in ["visual", "object", "property", "value"] {
+        let mut invalid = base.clone();
+        invalid.as_object_mut().unwrap().remove(field);
+        cases.push((invalid, format!("/ops/0/{field}")));
+    }
+    let mut unknown = base.clone();
+    unknown["a/b~c"] = json!(true);
+    cases.push((unknown, "/ops/0/a~1b~0c".into()));
+    let mut conflict = base.clone();
+    conflict["kind"] = json!("setPosition");
+    cases.push((conflict, "/ops/0/kind".into()));
+    let mut null = base;
+    null["value"] = Value::Null;
+    cases.push((null, "/ops/0/value".into()));
+    for (invalid, pointer) in cases {
+        write_batch(&batch, vec![invalid]);
+        for mode in [
+            vec!["--dry-run".into()],
+            vec!["--in-place".into()],
+            vec!["--out-dir".into(), out.display().to_string()],
+        ] {
+            let result = run_powerbi_owned(&batch_args(&project, &batch, &mode));
+            assert_eq!(result.exit, 10, "{}", result.stderr);
+            assert!(result.stdout.is_empty());
+            let error = stderr_json(&result);
+            assert_eq!(error["error"]["code"], "input_safety_violation");
+            assert_eq!(error["error"]["pointer"], pointer);
+            assert!(error["error"]["hint"].is_string());
+            assert!(
+                !error["error"]["suggestedCommands"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
+            assert!(!project.exists());
+            assert!(!out.exists());
+        }
+    }
+    fs::write(
+        &batch,
+        br#"{"schema":"powerbi-cli.ops.v1","ops":[],"a/b~c":1}"#,
+    )
+    .unwrap();
+    let result = run_powerbi_owned(&batch_args(&project, &batch, &["--dry-run".into()]));
+    assert_eq!(stderr_json(&result)["error"]["pointer"], "/a~1b~0c");
+    fs::write(&batch, "{").unwrap();
+    let result = run_powerbi_owned(&batch_args(&project, &batch, &["--dry-run".into()]));
+    assert_eq!(stderr_json(&result)["error"]["pointer"], "");
+}
+
 fn snapshot_shape(response: &Value) -> Value {
     json!({
         "schema": response["schema"],

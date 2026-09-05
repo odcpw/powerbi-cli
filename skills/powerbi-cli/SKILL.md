@@ -95,6 +95,16 @@ Inspect `report spec explain` for resolved slots and heading geometry before
 building. Duplicate slots fail; family mismatches and pending section dividers
 produce warnings. Other style tokens remain on their compiler boundary.
 
+The nested explain plan uses `powerbi-cli.report.spec.explainPlan.v1`: its
+annotated entries are not a replayable `powerbi-cli.ops.v1` envelope. For
+`report visuals set-object --batch`, provide canonical typed `setObject` entries
+and already encoded PBIR values; misspelled fields and conflicting tags are
+refused with RFC 6901 pointers. Operation-plan errors can be queried with
+`powerbi-cli lint --explain ops.dangling_handle --json` (or the returned code).
+Build/validation next commands retain `--profile`, and robot-docs next commands
+retain explicit `--root` and render sections. Follow-ups are command templates;
+fill any remaining angle-bracket placeholders before invocation.
+
 <!-- powerbi-cli:commands:start -->
 ### Commands (generated from `capabilities --json`)
 

@@ -7,6 +7,38 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 #[test]
+fn build_and_validation_followups_retain_the_supplied_profile() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let profile = root.path().join("profile with spaces.json");
+    fs::copy("examples/sales.profile.json", &profile).expect("copy synthetic profile");
+    let profile_arg = profile.to_str().expect("profile path");
+    let expected = format!("--profile '{profile_arg}'");
+    for command in [vec!["report", "build"], vec!["report", "spec", "validate"]] {
+        let mut args = command.clone();
+        args.extend([
+            "--schema",
+            "examples/sales.schema.json",
+            "--spec",
+            "examples/sales.dashboard.json",
+            "--profile",
+            profile_arg,
+            "--json",
+        ]);
+        if command == ["report", "build"] {
+            args.push("--dry-run");
+        }
+        let run = run_powerbi(&args);
+        assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+        let value = stdout_json(&run);
+        let next = value["next"][0].as_str().expect("build followup");
+        assert!(next.contains(&expected), "profile lost from {next}");
+        if command == ["report", "build"] {
+            assert_eq!(value["scorecard"]["next"][0], value["next"][0]);
+        }
+    }
+}
+
+#[test]
 fn report_build_response_exposes_aggregate_handles_and_opt_in_trace() {
     let without_trace = run_powerbi(&[
         "report",

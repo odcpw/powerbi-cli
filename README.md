@@ -16,6 +16,12 @@ bring schema/dummy rows home
 -> replace dummy M partitions with corporate sources and refresh
 ```
 
+Agent contract note: `report spec explain` returns an annotated
+`powerbi-cli.report.spec.explainPlan.v1` preview, not a replayable `ops.v1` file.
+Build/validation follow-ups preserve supplied profiles; robot-docs follow-ups
+preserve the selected repository root and sections. The scoped ergonomics audit
+and remaining contract gaps are in [the compiler-surface audit](agent_ergonomics_audit/compiler-surface-2026-09.md).
+
 The deterministic Rust commands need no vendor runtime. To enable Microsoft's
 semantic engine, official report validator, and (on Windows) Desktop Bridge,
 explicitly install the committed exact tool graph into your private user cache:

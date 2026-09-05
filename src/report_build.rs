@@ -380,6 +380,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         "next": next_for_spec_validate(
             &spec_path,
             schema_path.as_deref(),
+            options.profile.as_deref(),
             ok,
             validation_level,
             proof_plan_result
@@ -3486,6 +3487,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
                     response.out_dir,
                     response.dry_run,
                     response.schema_path,
+                    response.profile_path,
                     response.spec_path,
                     response.proof_plan,
                 ),
@@ -3546,6 +3548,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             response.out_dir,
             response.dry_run,
             response.schema_path,
+            response.profile_path,
             response.spec_path,
             response.proof_plan,
         ),
@@ -3790,13 +3793,17 @@ fn next_for_build(
     out_dir: Option<&Path>,
     dry_run: bool,
     schema_path: &Path,
+    profile_path: Option<&Path>,
     spec_path: Option<&Path>,
     proof_plan: Option<&ProofPlan>,
 ) -> Vec<String> {
     if dry_run {
         let mut commands = vec![format!(
-            "powerbi-cli report build --schema {}{} --out-dir <project-dir> --json",
+            "powerbi-cli report build --schema {}{}{} --out-dir <project-dir> --json",
             command_arg(schema_path),
+            profile_path
+                .map(|path| format!(" --profile {}", command_arg(path)))
+                .unwrap_or_default(),
             spec_path
                 .map(|path| format!(" --spec {}", command_arg(path)))
                 .unwrap_or_default()
@@ -3829,6 +3836,7 @@ fn next_for_build(
 fn next_for_spec_validate(
     spec_path: &Path,
     schema_path: Option<&Path>,
+    profile_path: Option<&Path>,
     ok: bool,
     validation_level: &str,
     proof_plan: Option<&ProofPlan>,
@@ -3839,13 +3847,19 @@ fn next_for_spec_validate(
     let mut commands = Vec::new();
     if let Some(schema_path) = schema_path {
         commands.push(format!(
-            "powerbi-cli report build --schema {} --spec {} --dry-run --json",
+            "powerbi-cli report build --schema {}{} --spec {} --dry-run --json",
             command_arg(schema_path),
+            profile_path
+                .map(|path| format!(" --profile {}", command_arg(path)))
+                .unwrap_or_default(),
             command_arg(spec_path)
         ));
     } else if validation_level == "shape-only" {
         commands.push(format!(
-            "powerbi-cli report spec validate --schema <schema.json> --spec {} --json",
+            "powerbi-cli report spec validate --schema <schema.json>{} --spec {} --json",
+            profile_path
+                .map(|path| format!(" --profile {}", command_arg(path)))
+                .unwrap_or_default(),
             command_arg(spec_path)
         ));
     }
@@ -4039,6 +4053,30 @@ fn slug(value: &str) -> String {
         "Generated".to_string()
     } else {
         out
+    }
+}
+
+#[cfg(test)]
+mod ergonomics_tests {
+    use super::*;
+
+    #[test]
+    fn followups_preserve_quoted_profile_input_in_every_preview_mode() {
+        let schema = Path::new("schema manifest.json");
+        let profile = Path::new("profile input.json");
+        let spec = Path::new("dashboard spec.json");
+        assert_eq!(
+            next_for_build(None, true, schema, Some(profile), Some(spec), None)[0],
+            "powerbi-cli report build --schema 'schema manifest.json' --profile 'profile input.json' --spec 'dashboard spec.json' --out-dir <project-dir> --json"
+        );
+        assert_eq!(
+            next_for_spec_validate(spec, Some(schema), Some(profile), true, "compiled", None)[0],
+            "powerbi-cli report build --schema 'schema manifest.json' --profile 'profile input.json' --spec 'dashboard spec.json' --dry-run --json"
+        );
+        assert_eq!(
+            next_for_spec_validate(spec, None, Some(profile), true, "shape-only", None)[0],
+            "powerbi-cli report spec validate --schema <schema.json> --profile 'profile input.json' --spec 'dashboard spec.json' --json"
+        );
     }
 }
 
