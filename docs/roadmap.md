@@ -23,6 +23,11 @@ remain separate and Desktop compatibility proof is still required.
 
 ## Operating Principles
 
+Typed operation replay is public through `ops apply --ops <ops.json>` with
+explicit dry-run, fresh out-dir, and snapshotted in-place modes. Its 37-kernel
+transaction returns aggregate readbacks and a staged-result scorecard; this
+is Linux unit-smoke evidence, not Desktop compatibility proof.
+
 - Agents are the primary users. Humans benefit from the same deterministic
   contract, but command names, JSON output, errors, handles, follow-up commands,
   dry-runs, and proof paths should be optimized for agent retry loops.
@@ -620,12 +625,14 @@ frozen until proven.
 
 ### Phase 8: Agent Batch Operations
 
-- Add `diff` and `apply --ops` once individual commands are stable.
-- The internal `powerbi-cli.ops.v1` spine now provides typed operation JSON,
+- `ops apply --ops <ops.json>` now exposes the 37 registered mutation kernels.
+- The durable `powerbi-cli.ops.v1` envelope provides typed operation JSON,
   pointer-rich plan validation, deterministic handles, and a temporary-tree
-  transaction with dry-run/out-dir/in-place snapshot semantics; wire it to the
-  public `apply --ops` command only after the individual kernels are converted.
+  transaction with dry-run/out-dir/in-place snapshot semantics, aggregate
+  readback commands, and staged-result scorecards.
 - Make operation JSON durable enough for another agent to inspect and replay.
+- Mutation-wide `--emit-op` recording remains outstanding; public replay alone
+  does not complete that acceptance criterion.
 - Include generated proof commands in mutation outputs. `report build` now
   compiles v2 `proof` requirements into a deterministic `proofPlan` and
   `next[]`; Desktop-dependent steps remain explicitly unavailable off Windows

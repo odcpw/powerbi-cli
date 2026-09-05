@@ -196,6 +196,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli model tables list --project <project-dir-or.pbip> --json` — List semantic-model tables with stable table handles and child counts _(proof: `unit-smoke`)_
 - `powerbi-cli model tables rename --project <project-dir-or.pbip> (--handle <table-handle> | --table <table>) --new-name <table> [--rename-references] (--dry-run | --in-place | --out-dir <dir>) --json` — Rename a TMDL table and optionally rewrite relationship, DAX, and variation references _(proof: `unit-smoke`)_
 - `powerbi-cli model tables show --project <project-dir-or.pbip> (--handle <table-handle> | --table <table>) --json` — Show one semantic-model table, child inventory, and raw TMDL block _(proof: `unit-smoke`)_
+- `powerbi-cli ops apply --project <project-dir-or.pbip> --ops <ops.json> (--dry-run | --out-dir <fresh-dir> | --in-place) --json` — Validate and atomically replay a bounded typed operation plan through the registered kernels _(proof: `unit-smoke`)_
 - `powerbi-cli package export-plan --project <project-dir-or.pbip> --json` — Return the Desktop handoff plan for producing PBIX/PBIT because powerbi-cli does not write opaque binary package containers _(proof: `unit-smoke`)_
 - `powerbi-cli package extract <file.pbix|file.pbit|file.zip> --out-dir <dir> [--include-unknown] [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json` — Extract selected source/metadata entries with streaming archive-bomb budgets and clean partial-output rollback _(proof: `unit-smoke`)_
 - `powerbi-cli package import <file.pbix|file.pbit|file.zip> --out-dir <project-dir> [--max-entries <n>] [--max-entry-bytes <n>] [--max-total-bytes <n>] [--max-compression-ratio <n>] --json` — Import PBIP/PBIR/TMDL source entries only when they are actually present inside a package archive _(proof: `unit-smoke`)_
@@ -434,6 +435,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.source-templates` — **supported**, sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m, proof `unit-smoke`: Credential-free source templates and rebind runbooks with live scorecards and proof status. Commands: `source-template list`, `source-template show`, `source-template add`, `source-template apply`, `handoff rebind-plan`, `handoff rebind-check`.
 - `model.static-control-tables` — **supported**, add-bounded-string-table, proof `unit-smoke`: Small static selector and lookup tables. Commands: `model tables add-static`.
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
+- `ops.atomic-replay` — **supported**, typed-plan-transaction, proof `unit-smoke`: Atomic typed operation replay. Commands: `ops apply`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
 - `profile.data-profile-v2` — **supported**, schema-matched-statistics-with-redacted-values, proof `unit-smoke`: Bounded CSV/JSON data profile inference. Commands: `profile infer`, `profile validate`, `profile summarize`.
 - `quality.design-lint` — **supported**, read-only-design-analysis, proof `unit-smoke`: Deterministic report design lint. Commands: `triage`, `report audit`.
@@ -782,11 +784,15 @@ supported.
   `normalizedFrom[]` values are root-relative, sorted, and deterministic;
   traversal, symlink, cycle, depth, count, and fragment-size failures are
   refusals, not best-effort omissions.
-- The internal operation-plan spine is `powerbi-cli.ops.v1`: typed `op` records
+- `ops apply --project <project> --ops <ops.json> --dry-run --json` replays
+  `powerbi-cli.ops.v1`: typed `op` records
   use the same stable page, visual, filter, and percent-encoded semantic-model
   handles as CLI readbacks. Plans validate references and stage order before a
-  temporary-directory transaction is published; no public `apply --ops` command
-  is advertised until the individual mutation kernels are converted.
+  temporary-directory transaction is published. Use `--out-dir <fresh-dir>` or
+  snapshotted `--in-place` to commit. All 37 registered kernels share this
+  boundary; raw patches and embedded transport flags are refused. Readback
+  commands and the staged-result scorecard accompany the aggregate changes.
+  Mutation recording through `--emit-op` is not implemented yet.
 - `package source-pack` refuses every unknown file and every file under a
   dot-directory. Do not rename an extra file to an allowlisted extension to make
   it travel; remove it or carry an independently reviewed artifact separately.

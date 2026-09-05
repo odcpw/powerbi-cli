@@ -228,7 +228,76 @@ fn set_position_op_replays_are_deterministic_and_preserve_cli_contract() {
 
 #[test]
 fn registered_operations_have_cli_and_typed_kernel_equivalence_cases() {
-    let cases = [
+    run_operation_equivalence(&equivalence_cases());
+}
+
+#[test]
+fn every_registered_kernel_replays_through_the_public_bounded_plan_loader() {
+    let mut failures = Vec::new();
+    for case in equivalence_cases() {
+        let fixture = common::load_archetype(case.fixture);
+        let workspace = tempfile::tempdir().unwrap();
+        let execution =
+            match std::panic::catch_unwind(|| (case.execute)(&fixture, workspace.path())) {
+                Ok(execution) => execution,
+                Err(_) => {
+                    failures.push(format!("{}: existing CLI/direct fixture failed", case.name));
+                    continue;
+                }
+            };
+        assert_eq!(
+            execution.cli.exit, 0,
+            "{}: {}",
+            case.name, execution.cli.stderr
+        );
+        let plan = workspace.path().join("public.ops.json");
+        fs::write(
+            &plan,
+            serde_json::to_vec(
+                &json!({"schema":"powerbi-cli.ops.v1", "ops":[execution.operation]}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let source = execution
+            .op
+            .argv
+            .windows(2)
+            .find(|args| args[0] == "--project")
+            .unwrap()[1]
+            .clone();
+        let output = workspace.path().join("public-output");
+        let result = run_powerbi(&[
+            "ops",
+            "apply",
+            "--project",
+            &source,
+            "--ops",
+            plan.to_str().unwrap(),
+            "--out-dir",
+            output.to_str().unwrap(),
+            "--json",
+        ]);
+        if result.exit != 0 {
+            failures.push(format!("{} public replay: {}", case.name, result.stderr));
+            continue;
+        }
+        assert_tree_equal(
+            &execution.cli_tree,
+            &output,
+            &format!("{} public replay", case.name),
+        );
+    }
+    assert!(
+        failures.is_empty(),
+        "{} of 37 replay cases failed:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+fn equivalence_cases() -> [OperationEquivalenceCase; 37] {
+    [
         legacy_case!(add_calculated_column, "addCalculatedColumn"),
         OperationEquivalenceCase {
             name: "addFilter/sales",
@@ -316,8 +385,7 @@ fn registered_operations_have_cli_and_typed_kernel_equivalence_cases() {
         legacy_case!(source_template_apply, "sourceTemplateApply"),
         legacy_case!(update_filter, "updateFilter"),
         legacy_case!(update_page, "updatePage"),
-    ];
-    run_operation_equivalence(&cases);
+    ]
 }
 
 fn legacy_sources(
