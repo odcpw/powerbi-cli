@@ -51,6 +51,25 @@ fn build(project: &Path, profile: bool) -> common::CliRun {
 }
 
 #[test]
+fn registered_slicer_rail_fixture_matches_its_checked_in_summary() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let fixture = common::load_archetype("slicer-rail");
+    let project = temp.path().join("project");
+    let built = fixture.build_into(&project);
+    assert_eq!(built.code, 0, "{}", built.stderr);
+    let verified = run_powerbi(&[
+        "fixture",
+        "verify",
+        project.to_str().unwrap(),
+        "--expected",
+        fixture.expected_summary.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(verified.code, 0, "{}", verified.stderr);
+    assert_eq!(stdout_json(&verified)["verification"]["same"], true);
+}
+
+#[test]
 fn v2_rail_slicers_emit_typed_add_visuals_with_stable_handles_and_coordinates() {
     let temp = tempfile::tempdir().expect("tempdir");
     let first = temp.path().join("first");

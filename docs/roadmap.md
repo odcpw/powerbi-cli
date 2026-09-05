@@ -660,6 +660,9 @@ IDs and dependencies; this roadmap records what has already landed:
   the shared scorecard, with pointers and plan-only sanitize actions.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
+- [x] Stacked visual aliases preserve Desktop-recorded bar/column ids; role
+  maps cite their evidence. Unproven 100% stacked bars and offline maps remain
+  fixture-gated with explicit missing-evidence refusals.
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
