@@ -9,7 +9,7 @@
 use crate::{CliError, CliResult, EXIT_VALIDATION_FAILED};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const PLANNER_RULES_SCHEMA: &str = "powerbi-cli.planner-rules.v1";
 pub(crate) const PLANNER_RULES_VERSION: u32 = 1;
@@ -65,6 +65,8 @@ pub(crate) struct RuleCondition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RuleProposal {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) narrative_flow: Option<NarrativeFlow>,
     pub(crate) archetype: String,
     pub(crate) template: String,
     pub(crate) visual_family: Option<String>,
@@ -73,6 +75,17 @@ pub(crate) struct RuleProposal {
     pub(crate) size_class: String,
     pub(crate) semantic_color: Option<String>,
     pub(crate) page: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct NarrativeFlow {
+    pub(crate) page_order: Vec<String>,
+    pub(crate) templates: BTreeMap<String, String>,
+    pub(crate) overview_templates: BTreeMap<String, String>,
+    pub(crate) detail_templates: BTreeMap<String, String>,
+    pub(crate) max_breakdowns: usize,
+    pub(crate) rail_template: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +217,55 @@ pub(crate) fn validate_catalog(catalog: &RuleCatalog) -> Result<(), String> {
 }
 
 fn validate_proposal(path: &str, kind: &str, proposal: &RuleProposal) -> Result<(), String> {
+    if let Some(flow) = &proposal.narrative_flow {
+        let rail = crate::design::grid::template(&flow.rail_template).map_err(|_| {
+            format!("{path}.proposal.narrativeFlow references unknown rail template")
+        })?;
+        if rail.rail != Some(crate::design::grid::RailSide::Left)
+            || !rail.slots.iter().any(|slot| slot.name == "rail")
+        {
+            return Err(format!(
+                "{path}.proposal.narrativeFlow requires a template with a left rail"
+            ));
+        }
+        if flow.page_order.first().map(String::as_str) != Some("overview")
+            || flow.page_order.len() != 7
+            || flow.page_order.iter().collect::<BTreeSet<_>>().len() != flow.page_order.len()
+            || !(1..=8).contains(&flow.max_breakdowns)
+        {
+            return Err(format!(
+                "{path}.proposal.narrativeFlow requires overview first, unique stages, and maxBreakdowns in 1..=8"
+            ));
+        }
+        for stage in [
+            "overview",
+            "trend",
+            "breakdown",
+            "comparison",
+            "exceptions",
+            "detail",
+            "drillthrough-detail",
+        ] {
+            if !flow.page_order.iter().any(|page| page == stage)
+                || !flow.templates.contains_key(stage)
+            {
+                return Err(format!(
+                    "{path}.proposal.narrativeFlow is missing stage {stage}"
+                ));
+            }
+        }
+        for template in flow
+            .templates
+            .values()
+            .chain(flow.overview_templates.values())
+            .chain(flow.detail_templates.values())
+            .chain(std::iter::once(&flow.rail_template))
+        {
+            crate::design::grid::template(template).map_err(|_| {
+                format!("{path}.proposal.narrativeFlow references unknown template {template}")
+            })?;
+        }
+    }
     for (field, value) in [
         ("archetype", proposal.archetype.as_str()),
         ("template", proposal.template.as_str()),
@@ -421,6 +483,9 @@ fn proposal_value(
     context: &Value,
 ) -> Value {
     let mut proposal = Map::new();
+    if let Some(flow) = &rule.proposal.narrative_flow {
+        proposal.insert("narrativeFlow".to_string(), json!(flow));
+    }
     proposal.insert("kind".to_string(), Value::String(rule.kind.clone()));
     proposal.insert("ruleId".to_string(), Value::String(rule.id.clone()));
     proposal.insert(
@@ -490,6 +555,66 @@ impl RulePlan {
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn narrative_flow_is_catalog_data_with_validated_order_and_templates() {
+        let mut catalog = catalog().expect("catalog");
+        let index = catalog
+            .rules
+            .iter()
+            .position(|rule| rule.id == "planner.narrative-flow")
+            .expect("flow rule");
+        let flow = catalog.rules[index]
+            .proposal
+            .narrative_flow
+            .as_ref()
+            .expect("flow policy");
+        assert_eq!(
+            flow.page_order,
+            [
+                "overview",
+                "trend",
+                "breakdown",
+                "comparison",
+                "exceptions",
+                "detail",
+                "drillthrough-detail"
+            ]
+        );
+        assert_eq!(catalog.rules[index].score, 100);
+        assert_eq!(flow.overview_templates["flat"], "kpi-strip-trend-breakdown");
+        catalog.rules[index]
+            .proposal
+            .narrative_flow
+            .as_mut()
+            .unwrap()
+            .page_order
+            .swap(0, 1);
+        assert!(
+            validate_catalog(&catalog)
+                .unwrap_err()
+                .contains("overview first")
+        );
+        catalog.rules[index]
+            .proposal
+            .narrative_flow
+            .as_mut()
+            .unwrap()
+            .page_order
+            .swap(0, 1);
+        catalog.rules[index]
+            .proposal
+            .narrative_flow
+            .as_mut()
+            .unwrap()
+            .templates
+            .insert("trend".into(), "invented-template".into());
+        assert!(
+            validate_catalog(&catalog)
+                .unwrap_err()
+                .contains("unknown template")
+        );
+    }
 
     #[test]
     fn embedded_catalog_passes_strict_validation_and_has_unique_ids() {
