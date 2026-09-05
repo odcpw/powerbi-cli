@@ -10,6 +10,11 @@ projects. The core product target is not PBIX binary generation; it is reliable
 PBIP/PBIR/TMDL project authoring that can be opened in Power BI Desktop and
 rebound to real data later.
 
+`report plan --variants N` now emits bounded, catalog-ranked v2 template
+alternatives with structural hashes and primary-plan decision diffs. Every
+written candidate passes compiled/schema validation; guard replay proposals
+remain separate and Desktop compatibility proof is still required.
+
 ## Operating Principles
 
 - Agents are the primary users. Humans benefit from the same deterministic

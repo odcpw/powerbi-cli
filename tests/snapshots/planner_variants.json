@@ -1,0 +1,491 @@
+[
+  {
+    "decisionDiff": [
+      {
+        "after": "overview",
+        "before": null,
+        "pointer": "/pages/0/template",
+        "reason": "Keep KPI, trend, breakdown, and detail together with a side rail.",
+        "ruleId": "planner.variant.overview",
+        "score": 100,
+        "visualCount": 5
+      },
+      {
+        "after": {
+          "slot": "kpi.1"
+        },
+        "before": {
+          "layout": {
+            "height": 112,
+            "width": 220,
+            "x": 32,
+            "y": 32
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/0",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "kpi.2"
+        },
+        "before": {
+          "layout": {
+            "height": 112,
+            "width": 220,
+            "x": 276,
+            "y": 32
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/1",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "primary"
+        },
+        "before": {
+          "layout": {
+            "height": 300,
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/2",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "secondary"
+        },
+        "before": {
+          "layout": {
+            "height": 300,
+            "width": 560,
+            "x": 664,
+            "y": 184
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/3",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "detail"
+        },
+        "before": {
+          "layout": {
+            "height": 156,
+            "width": 1192,
+            "x": 32,
+            "y": 516
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/4",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": "overview",
+        "before": null,
+        "pointer": "/pages/1/template",
+        "reason": "Keep KPI, trend, breakdown, and detail together with a side rail.",
+        "ruleId": "planner.variant.overview",
+        "score": 100,
+        "visualCount": 2
+      },
+      {
+        "after": {
+          "slot": "primary"
+        },
+        "before": {
+          "layout": {
+            "height": 420,
+            "width": 620,
+            "x": 32,
+            "y": 64
+          },
+          "slot": null
+        },
+        "pointer": "/pages/1/visuals/0",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "detail"
+        },
+        "before": {
+          "layout": {
+            "height": 420,
+            "width": 536,
+            "x": 688,
+            "y": 64
+          },
+          "slot": null
+        },
+        "pointer": "/pages/1/visuals/1",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      }
+    ],
+    "guardApplication": "separate replay proposal; not embedded in the validated spec",
+    "guardDecisions": [],
+    "index": 1,
+    "path": "<variant-path>",
+    "performance": {
+      "bufferAnalysis": "project-not-supplied",
+      "bufferReuseThreshold": 2,
+      "findings": [],
+      "kernelAvailable": "<registration-dependent>",
+      "ops": {
+        "ops": [],
+        "schema": "powerbi-cli.ops.v1"
+      },
+      "previewCommands": [],
+      "target": "variant:1",
+      "threshold": 200,
+      "top": 50
+    },
+    "score": 200,
+    "structureHash": "sha256:2f7314ad498b8a72d0e552b0e7686657c5cc1d9c7320835031e367742561cff7",
+    "validateCommand": "<compiled-validation-command>",
+    "validationLevel": "compiled"
+  },
+  {
+    "decisionDiff": [
+      {
+        "after": "kpi-strip-trend-breakdown",
+        "before": null,
+        "pointer": "/pages/0/template",
+        "reason": "Use full-width KPI and detail bands with a wider trend area.",
+        "ruleId": "planner.variant.kpi-strip",
+        "score": 95,
+        "visualCount": 5
+      },
+      {
+        "after": {
+          "slot": "kpi.1"
+        },
+        "before": {
+          "layout": {
+            "height": 112,
+            "width": 220,
+            "x": 32,
+            "y": 32
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/0",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      },
+      {
+        "after": {
+          "slot": "kpi.2"
+        },
+        "before": {
+          "layout": {
+            "height": 112,
+            "width": 220,
+            "x": 276,
+            "y": 32
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/1",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      },
+      {
+        "after": {
+          "slot": "primary"
+        },
+        "before": {
+          "layout": {
+            "height": 300,
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/2",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      },
+      {
+        "after": {
+          "slot": "secondary"
+        },
+        "before": {
+          "layout": {
+            "height": 300,
+            "width": 560,
+            "x": 664,
+            "y": 184
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/3",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      },
+      {
+        "after": {
+          "slot": "detail"
+        },
+        "before": {
+          "layout": {
+            "height": 156,
+            "width": 1192,
+            "x": 32,
+            "y": 516
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/4",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      },
+      {
+        "after": "overview",
+        "before": null,
+        "pointer": "/pages/1/template",
+        "reason": "Keep KPI, trend, breakdown, and detail together with a side rail.",
+        "ruleId": "planner.variant.overview",
+        "score": 100,
+        "visualCount": 2
+      },
+      {
+        "after": {
+          "slot": "primary"
+        },
+        "before": {
+          "layout": {
+            "height": 420,
+            "width": 620,
+            "x": 32,
+            "y": 64
+          },
+          "slot": null
+        },
+        "pointer": "/pages/1/visuals/0",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "detail"
+        },
+        "before": {
+          "layout": {
+            "height": 420,
+            "width": 536,
+            "x": 688,
+            "y": 64
+          },
+          "slot": null
+        },
+        "pointer": "/pages/1/visuals/1",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      }
+    ],
+    "guardApplication": "separate replay proposal; not embedded in the validated spec",
+    "guardDecisions": [],
+    "index": 2,
+    "path": "<variant-path>",
+    "performance": {
+      "bufferAnalysis": "project-not-supplied",
+      "bufferReuseThreshold": 2,
+      "findings": [],
+      "kernelAvailable": "<registration-dependent>",
+      "ops": {
+        "ops": [],
+        "schema": "powerbi-cli.ops.v1"
+      },
+      "previewCommands": [],
+      "target": "variant:2",
+      "threshold": 200,
+      "top": 50
+    },
+    "score": 195,
+    "structureHash": "sha256:0f71e38b900008542b44d3e9f0fd29fb05a3d8ff130f7a965493a789f253e26e",
+    "validateCommand": "<compiled-validation-command>",
+    "validationLevel": "compiled"
+  },
+  {
+    "decisionDiff": [
+      {
+        "after": "overview",
+        "before": null,
+        "pointer": "/pages/0/template",
+        "reason": "Keep KPI, trend, breakdown, and detail together with a side rail.",
+        "ruleId": "planner.variant.overview",
+        "score": 100,
+        "visualCount": 5
+      },
+      {
+        "after": {
+          "slot": "kpi.1"
+        },
+        "before": {
+          "layout": {
+            "height": 112,
+            "width": 220,
+            "x": 32,
+            "y": 32
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/0",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "kpi.2"
+        },
+        "before": {
+          "layout": {
+            "height": 112,
+            "width": 220,
+            "x": 276,
+            "y": 32
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/1",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "primary"
+        },
+        "before": {
+          "layout": {
+            "height": 300,
+            "width": 600,
+            "x": 32,
+            "y": 184
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/2",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "secondary"
+        },
+        "before": {
+          "layout": {
+            "height": 300,
+            "width": 560,
+            "x": 664,
+            "y": 184
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/3",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": {
+          "slot": "detail"
+        },
+        "before": {
+          "layout": {
+            "height": 156,
+            "width": 1192,
+            "x": 32,
+            "y": 516
+          },
+          "slot": null
+        },
+        "pointer": "/pages/0/visuals/4",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.overview"
+      },
+      {
+        "after": "kpi-strip-trend-breakdown",
+        "before": null,
+        "pointer": "/pages/1/template",
+        "reason": "Use full-width KPI and detail bands with a wider trend area.",
+        "ruleId": "planner.variant.kpi-strip",
+        "score": 95,
+        "visualCount": 2
+      },
+      {
+        "after": {
+          "slot": "primary"
+        },
+        "before": {
+          "layout": {
+            "height": 420,
+            "width": 620,
+            "x": 32,
+            "y": 64
+          },
+          "slot": null
+        },
+        "pointer": "/pages/1/visuals/0",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      },
+      {
+        "after": {
+          "slot": "detail"
+        },
+        "before": {
+          "layout": {
+            "height": 420,
+            "width": 536,
+            "x": 688,
+            "y": 64
+          },
+          "slot": null
+        },
+        "pointer": "/pages/1/visuals/1",
+        "reason": "Resolve this visual through a compatible named slot in the selected template",
+        "ruleId": "planner.variant.kpi-strip"
+      }
+    ],
+    "guardApplication": "separate replay proposal; not embedded in the validated spec",
+    "guardDecisions": [],
+    "index": 3,
+    "path": "<variant-path>",
+    "performance": {
+      "bufferAnalysis": "project-not-supplied",
+      "bufferReuseThreshold": 2,
+      "findings": [],
+      "kernelAvailable": "<registration-dependent>",
+      "ops": {
+        "ops": [],
+        "schema": "powerbi-cli.ops.v1"
+      },
+      "previewCommands": [],
+      "target": "variant:3",
+      "threshold": 200,
+      "top": 50
+    },
+    "score": 195,
+    "structureHash": "sha256:6fe525f7b02cf8610f0bbae476f152c02ee1e4143683d7d856c0bdcf4afe7a40",
+    "validateCommand": "<compiled-validation-command>",
+    "validationLevel": "compiled"
+  }
+]

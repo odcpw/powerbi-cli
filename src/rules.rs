@@ -104,6 +104,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    PLAN_VARIANTS_INSUFFICIENT => ("plan.variants_insufficient", Validation, "error", "Too few distinct compiler-valid template choices exist for the requested variant count.", "Request fewer variants or supply more model and intent evidence for catalog choices.", None),
     PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     DESIGN_CONTRAST_BELOW_AA => ("design.contrast_below_aa", Design, "warning", "A design-token foreground/background pair is below the WCAG AA contrast threshold.", "Choose a higher-contrast token pair, or explicitly waive the check and review the recorded handoff warning.", None),

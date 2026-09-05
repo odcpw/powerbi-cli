@@ -217,7 +217,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--variants <N>] [--explain-rules] --json` — Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -978,6 +978,15 @@ intent or for Desktop compatibility proof.
 The response's top-level `shape` and `decisions[]` model-shape entry reuse the
 same profile/schema classifier. A date-like column without a related date
 dimension is surfaced as a proposal rather than silently treated as a calendar.
+
+Use `report plan --variants 3 --out dashboard.json` to write score-ordered,
+structurally distinct v2 specs as `<out>.variant-<i>.json` (indices start at 1).
+`variants[]` includes structure hashes, decision diffs against the primary,
+compiled-validation commands, and separate guard replay recommendations.
+Candidates are compiler/schema validated before writing; this is not Desktop
+proof. Counts must be 1–8, require `--out`, and insufficient compatible templates
+return `plan.variants_insufficient` without partial output. `--force` replaces
+regular files only. Guard recommendations are not embedded in candidate specs.
 
 Planner performance guards use catalog defaults of 200 distinct values and
 top 50; JSON intent `guards.threshold` / `guards.top` accept positive integers.

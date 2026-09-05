@@ -957,6 +957,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "examples/intents/sales.intent.json",
             "examples/intents/sales.intent.md",
             "testdata/planner-rules/planner-rules.v1.json",
+            "tests/planner_variants.rs: --variants N writes distinct score-ordered compiler-valid v2 template alternatives with structure hashes, primary-plan decision diffs, and separate guard replay proposals; Linux proof only",
         ],
         tags: &["report", "intent", "planner", "markdown", "json", "agent"],
     },
