@@ -649,6 +649,8 @@ IDs and dependencies; this roadmap records what has already landed:
   report-spec v1/v2 validation/normalize/upgrade, and guarded report build.
 - [x] Offline-safe package inspect/extract/import/source-pack/work-pack and
   Desktop export-plan handoff.
+- [x] Rebind runbooks embed the live build/triage scorecard, design findings,
+  and five proof-level statuses without claiming unexecuted golden or Desktop checks.
 - [x] Semantic-model table/column/measure/calculated-column/relationship
   authoring, static-table controls, partition inspection, grouped-rank
   generation, and advanced metadata readback.

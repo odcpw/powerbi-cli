@@ -216,7 +216,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli guid [--count <1..100>] --json` — Generate lowercase UUIDv4 values for TMDL lineageTag authoring when hand-adding columns or measures _(proof: `unit-smoke`)_
 - `powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json` — Classify an offline/dummy or work-network/live-source PBIP handoff after partition-shape, credential, PII-suspect text, cache, binary, and embedded-data checks _(proof: `unit-smoke`)_
 - `powerbi-cli handoff rebind-check <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--table <table>] [--partition <partition-handle-or-name>] --json` — Verify every selected partition resolves to a materialized credential-free source without opening a connection _(proof: `unit-smoke`)_
-- `powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json` — Generate a redacted work-machine rebind plan and suppress runbook materialization when a template or partition contains credentials _(proof: `unit-smoke`)_
+- `powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json` — Generate a redacted work-machine rebind runbook with a live design scorecard and proof-status ladder; suppress writes when templates or partitions contain credentials _(proof: `unit-smoke`)_
 - `powerbi-cli --json inspect [--deep] <project-dir-or.pbip>` — Summarize a PBIP project and, with --deep, return stable handles for report/model objects _(proof: `unit-smoke`)_
 - `powerbi-cli integrations install --allow-network --json` — Install and atomically activate the committed exact Microsoft Power BI npm graph _(proof: `unit-smoke`)_
 - `powerbi-cli integrations status [--deep] [--component modeling-mcp|report-authoring|desktop-bridge] --json` — Inspect the exact optional Microsoft Power BI toolchain without installation or registry access _(proof: `unit-smoke`)_
@@ -500,7 +500,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.named-expressions` — **supported**, read-write, proof `unit-smoke`: Named M expression authoring. Commands: `model expressions list`, `model expressions show`, `model expressions add`, `model expressions update`, `model expressions delete`.
 - `model.partition-grouped-rank` — **supported**, safe-generated-partition-mutation, proof `schema-golden`: Refresh-time grouped rank partition generator. Commands: `model partitions add-grouped-rank`.
 - `model.relationships` — **supported**, read-write, proof `unit-smoke`: Model relationships. Commands: `model relationships list`, `model relationships show`, `model relationships add`, `model relationships update`, `model relationships delete`.
-- `model.source-templates` — **supported**, sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m, proof `unit-smoke`: Credential-free source templates and rebind runbooks. Commands: `source-template list`, `source-template show`, `source-template add`, `source-template apply`, `handoff rebind-plan`, `handoff rebind-check`.
+- `model.source-templates` — **supported**, sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m, proof `unit-smoke`: Credential-free source templates and rebind runbooks with live scorecards and proof status. Commands: `source-template list`, `source-template show`, `source-template add`, `source-template apply`, `handoff rebind-plan`, `handoff rebind-check`.
 - `model.static-control-tables` — **supported**, add-bounded-string-table, proof `unit-smoke`: Small static selector and lookup tables. Commands: `model tables add-static`.
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
@@ -1273,7 +1273,11 @@ This generated snapshot keeps status and proof claims aligned with
   their TMDL model types, and require an absolute workbook path when applied.
   `handoff rebind-plan` maps
   templates to partitions and can write a self-contained Markdown runbook with
-  `--out <file.md>` (existing files require `--force`). Credential detection
+  `--out <file.md>` (existing files require `--force`).
+  The runbook embeds the live `scorecard.v1`, including design findings and
+  follow-up commands, plus all five proof levels with their verification status.
+  Its local `unit-smoke` result does not certify a golden comparison or Desktop
+  canvas/refresh evidence; re-run triage after project changes. Credential detection
   redacts JSON/Markdown excerpts and suppresses runbook creation. CSV and
   generic M templates are accepted only when their direct connector root and
   transformation calls stay within the workflow/source-profile closed grammar;
