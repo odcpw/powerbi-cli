@@ -822,7 +822,7 @@ fn version_schema(version: SpecVersion) -> Value {
                     ("preset", json!({"type": "string", "minLength": 1})),
                     ("bundle", json!({"type": "string", "minLength": 1})),
                     ("allowLiteralText", json!({"type": "boolean"})),
-                    ("tokens", style_tokens_with_children(nodes, style_tokens)),
+                    ("tokens", style_tokens),
                     ("defaults", json!({"type": "object"})),
                 ],
             );
@@ -896,11 +896,10 @@ fn node_object(nodes: &[NodeSchema], name: &str, overrides: &[(&str, Value)]) ->
         .unwrap_or_else(|| panic!("schema node table is missing {name}"));
     let mut properties = Map::new();
     for field in node.fields {
-        let property = overrides
-            .iter()
-            .find(|(key, _)| key == field)
-            .map(|(_, value)| value.clone())
-            .unwrap_or_else(|| json!({}));
+        let mut property = child_schema(nodes, name, field);
+        if let Some((_, details)) = overrides.iter().find(|(key, _)| key == field) {
+            merge_schema_details(&mut property, details);
+        }
         properties.insert((*field).to_string(), property);
     }
     json!({
@@ -908,6 +907,38 @@ fn node_object(nodes: &[NodeSchema], name: &str, overrides: &[(&str, Value)]) ->
         "properties": properties,
         "additionalProperties": false
     })
+}
+
+fn merge_schema_details(generated: &mut Value, details: &Value) {
+    match (generated, details) {
+        (Value::Object(target), Value::Object(source)) => {
+            for (key, value) in source {
+                merge_schema_details(target.entry(key).or_insert(json!({})), value);
+            }
+        }
+        (target, source) => *target = source.clone(),
+    }
+}
+
+/// Node names encode the walker hierarchy. Discover children here rather than
+/// maintaining a second list of property-to-node links in each section builder.
+/// Explicit overrides only add type/enum details or reuse nodes at alias sites.
+fn child_schema(nodes: &[NodeSchema], parent: &str, field: &str) -> Value {
+    let child = if parent == "root" {
+        field.to_string()
+    } else {
+        format!("{parent}.{field}")
+    };
+    if nodes.iter().any(|node| node.name == child) {
+        node_object(nodes, &child, &[])
+    } else {
+        let item = format!("{child}[]");
+        if nodes.iter().any(|node| node.name == item) {
+            json!({"type":"array", "items":node_object(nodes, &item, &[])})
+        } else {
+            json!({})
+        }
+    }
 }
 
 fn visual_properties(
@@ -959,25 +990,6 @@ fn format_schema(nodes: &[NodeSchema]) -> Value {
         .map(|key| (key.as_str(), json!({})))
         .collect::<Vec<_>>();
     node_object(nodes, "pages[].visuals[].format", &overrides)
-}
-
-fn style_tokens_with_children(nodes: &[NodeSchema], base: Value) -> Value {
-    let semantic = node_object(nodes, "style.tokens.semantic", &[]);
-    let typography = node_object(nodes, "style.tokens.typography", &[]);
-    let surfaces = node_object(nodes, "style.tokens.surfaces", &[]);
-    let spacing = node_object(nodes, "style.tokens.spacing", &[]);
-    let number_formats = node_object(nodes, "style.tokens.numberFormats", &[]);
-    let formatting = node_object(nodes, "style.tokens.formatting", &[]);
-    let mut object = base;
-    if let Some(properties) = object.get_mut("properties").and_then(Value::as_object_mut) {
-        properties.insert("semantic".to_string(), semantic);
-        properties.insert("typography".to_string(), typography);
-        properties.insert("surfaces".to_string(), surfaces);
-        properties.insert("spacing".to_string(), spacing);
-        properties.insert("numberFormats".to_string(), number_formats);
-        properties.insert("formatting".to_string(), formatting);
-    }
-    object
 }
 
 fn layout_schema(nodes: &[NodeSchema]) -> Value {
@@ -1996,6 +2008,36 @@ fn escape_pointer_token(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn new_nested_key_tables_are_attached_without_section_wiring() {
+        let nodes = [
+            super::node("root", "", &["extension"]),
+            super::node("extension", "extension", &["children", "newField"]),
+            super::node("extension.children[]", "extension.children", &["label"]),
+        ];
+        let schema = super::node_object(
+            &nodes,
+            "root",
+            &[("extension", serde_json::json!({"type":"object"}))],
+        );
+        assert!(schema["properties"]["extension"]["properties"]["newField"].is_object());
+        assert_eq!(
+            schema["properties"]["extension"]["properties"]["children"]["items"]["additionalProperties"],
+            false
+        );
+        assert!(schema["properties"]["extension"]["properties"]["children"]["items"]["properties"]["label"].is_object());
+    }
+
+    #[test]
+    fn token_ramps_schema_uses_the_walker_table() {
+        let schema = super::version_schema(super::SpecVersion::V2);
+        let ramps = &schema["properties"]["style"]["properties"]["tokens"]["properties"]["ramps"];
+        assert_eq!(ramps["additionalProperties"], false);
+        assert_eq!(
+            ramps["properties"],
+            serde_json::json!({"sequential":{}, "diverging":{}})
+        );
+    }
     use super::*;
 
     fn assert_unknown(value: Value, pointer: &str) -> CliError {

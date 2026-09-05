@@ -944,7 +944,8 @@ T3 bead id, never silently discarding them. Migrate a validated v1 spec with
   `capabilities.responseShapes.reportSpecValidate` for the machine contract.
 
 `report spec schema --json` emits the draft 2020-12 JSON Schema generated from
-the strict v1/v2 key tables. `report spec explain --schema <schema.json>
+the strict v1/v2 key tables, with nested objects/arrays attached automatically
+from their table hierarchy. `report spec explain --schema <schema.json>
 --spec <dashboard.json> [--profile <profile.json>] --json` previews the staged
 typed operation plan, stable handles, resolved layout/defaults, unsupported
 sections, and proof commands without writing files.
