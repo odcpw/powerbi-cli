@@ -159,7 +159,8 @@ policies can wait until the object-specific writers and fixtures exist.
   guessed visual. Remaining not-yet-compiled sections return
   `unsupported_feature` with their owning T3 bead id.
 - `report spec schema` emits a draft 2020-12 JSON Schema for both strict
-  dashboard-spec versions, while `report spec explain` previews the typed
+  dashboard-spec versions; nested objects/arrays derive from walker table
+  hierarchy rather than separate child lists. `report spec explain` previews the typed
   staged operation plan, handles, layout/defaults, unsupported sections, and
   proof follow-ups without writing a project.
 - Missing required dashboard intent now returns the registered

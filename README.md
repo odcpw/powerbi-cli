@@ -1110,7 +1110,8 @@ This generated snapshot keeps status and proof claims aligned with
   strings. The exact response shape is published at
   `capabilities.responseShapes.reportSpecValidate`.
 - `report spec schema --json` emits a draft 2020-12 JSON Schema for the v1 and
-  v2 key surfaces. `report spec explain --schema <schema.json> --spec
+  v2 key surfaces. Nested object/array schemas are attached automatically from
+  the walker table hierarchy, including token ramps. `report spec explain --schema <schema.json> --spec
   <dashboard.json> [--profile <profile.json>] --json` previews the typed,
   staged operation plan, stable handles, layout coordinates, defaults,
   unsupported sections, and proof commands without writing a project.
