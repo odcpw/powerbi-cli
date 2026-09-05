@@ -929,7 +929,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["report plan"],
         refusal_code: None,
-        reason: "report plan reads bounded intent.v1 JSON or Markdown, classifies schema/profile shape, and evaluates planner-rules.v1 scored proposals. Catalog evidence thresholds require a date column, declared measure, and unambiguous fact; plan.missing_input supplies pointers, candidates, examples, and recovery commands before any output write. JSON intent model.factTable resolves fact ambiguity. Legacy dashboard.v1 output remains build-compatible while specV2 exposes templates, semantic tokens, and slot-only proposals.",
+        reason: "report plan reads bounded intent.v1 JSON or Markdown, classifies schema/profile shape, and evaluates planner-rules.v1 scored proposals. Catalog evidence thresholds require a date column, declared measure, and unambiguous fact; plan.missing_input supplies pointers, candidates, examples, and recovery commands before any output write. JSON intent model.factTable resolves fact ambiguity. Profile cardinalities above catalog or intent.guards thresholds produce specV2 topnGuard proposals and SetTopNGuard operations with numeric decisions; optional --project returns m.unbuffered_reuse buffering recommendations without partition mutation. Legacy dashboard.v1 output remains build-compatible while specV2 exposes templates, semantic tokens, and slot-only proposals.",
         next_proof: &[
             "Compile comparisons, periods, drill paths, alerts, filters, archetypes, page flow, and handoff fields through their owning planner/compiler beads",
         ],
@@ -1019,7 +1019,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report visuals delete",
         ],
         refusal_code: None,
-        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence, and other visual families are refused until fixture-proven.",
+        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence. Set-object can apply a bounded SetObject-only ops.v1 list through one atomic transaction; other visual families and formatting pairs are refused until fixture-proven.",
         next_proof: &[
             "Add Desktop-authored golden fixtures before widening visual families or field wells",
         ],
@@ -1451,7 +1451,7 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "report.slicer-authoring",
-        title: "Generated basic, dropdown, and between slicers",
+        title: "Generated basic, dropdown, and between slicers with v2 page and rail compilation",
         category: "report",
         status: "supported",
         support: "generated-clean-state-desktop-golden-pending",
@@ -1467,7 +1467,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report slicers clear",
         ],
         refusal_code: None,
-        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Between also writes /visual/objects/slider.show=true so the numeric/date range is an explicit draggable band. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
+        reason: "The CLI generates a slicer with exactly one Values column and a Basic, Dropdown, or Between mode under /visual/objects/data. Dashboard-spec v2 pages[].slicers[] and layout.rail.slicers[] compile to deterministic AddVisual(slicer) visuals, with a three-column rail replicated on every opted-in page. Profile distinctCount above twelve selects Dropdown; absent cardinality evidence defaults to Basic with a spec.feature_pending warning naming pbi-t6-planner-v2-szr.1. Between also writes /visual/objects/slider.show=true so the numeric/date range is an explicit draggable band. Generated slicers deliberately contain no general.filter or other persisted selection state and omit validator-rejected general.altText. Local golden, hygiene, and round-trip coverage is complete, and testdata/desktop-proof/canvas-proof.2026-07-10.refresh-session.json proves the clean Basic binding/canvas baseline. Current generated title container bytes await Desktop re-verification.",
         next_proof: &[
             "Automate the manual slicer canvas, refresh, and interaction assertions as the desktop-canvas-refresh proof level",
             "Widen typed slicer formatting and mode coverage with Desktop-authored fixtures and PBIR readback",

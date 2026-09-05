@@ -73,7 +73,33 @@ struct DisplayNameOptions {
 }
 
 pub(crate) fn set_object(args: &[String]) -> CliResult<Value> {
+    if args.iter().any(|arg| arg == "--batch") {
+        return crate::report_visual_object_batch::execute(args);
+    }
     crate::ops::execute_set_object(args)
+}
+
+/// Validate the payload-only portion of a typed SetObject operation before a
+/// transaction is started.  The operation kernel repeats this lookup while
+/// applying the staged edit; keeping this explicit preflight seam lets batch
+/// callers reject every object/property pair up front without touching a
+/// project working copy.
+pub(crate) fn validate_set_object_operation(operation: &SetObject) -> CliResult<()> {
+    if operation.visual.trim().is_empty() {
+        return Err(CliError::invalid_args(
+            "set-object operation requires a non-empty visual handle",
+        )
+        .with_hint(
+            "Use report visuals list to obtain a stable visual:<Page>:<Container> handle.",
+        ));
+    }
+    if operation.value.is_null() {
+        return Err(
+            CliError::invalid_args("set-object operation value must not be null")
+                .with_hint("Encode the catalog property's PBIR literal as the operation value."),
+        );
+    }
+    resolve_object_property(Some(&operation.object), Some(&operation.property)).map(|_| ())
 }
 
 pub(crate) fn parse_set_object_args(args: &[String]) -> CliResult<ParsedSetObject> {

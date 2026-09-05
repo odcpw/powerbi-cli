@@ -104,6 +104,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     FEATURE_PENDING => ("feature_pending", Report, "warning", "Template section dividers are omitted until a proven shape capability is available.", "Keep the resolved template geometry and follow the shape capability proof status.", None),
     DESIGN_SLOT_FAMILY_MISMATCH => ("design.slot_family_mismatch", Report, "warning", "A visual uses a slot intended for another visual family.", "Choose a slot whose preferredFamilies includes this visual type, or provide explicit layout coordinates.", None),

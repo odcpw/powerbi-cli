@@ -707,12 +707,18 @@ fn spec_fields_catalog_lists_every_v2_node() {
         ),
         ("style", &["preset", "bundle", "tokens", "defaults"][..]),
         ("layout", &["grid", "pageSize", "rail"][..]),
+        ("layout.rail", &["side", "width", "slicers"][..]),
+        (
+            "layout.rail.slicers[]",
+            &["field", "mode", "singleSelect", "title"][..],
+        ),
         (
             "pages[]",
             &[
                 "id",
                 "displayName",
                 "size",
+                "rail",
                 "template",
                 "heading",
                 "subtitle",
@@ -816,8 +822,8 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
     let temp = tempfile::tempdir().expect("tempdir");
     let cases = [
         (
-            json!({"layout": {"rail": {"side": "left", "slicers": []}}}),
-            "pbi-t3-compiler-completeness-1qi.2",
+            json!({"layout": {"grid": {"columns": 12}}}),
+            "pbi-t3-compiler-completeness-1qi.7",
         ),
         (
             json!({"pages": [{"visuals": [{"sort": {"field": "FactSales[Total Revenue]", "direction": "Descending"}}]}]}),

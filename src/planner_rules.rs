@@ -23,6 +23,15 @@ pub(crate) struct RuleCatalog {
     pub(crate) version: u32,
     pub(crate) evidence_thresholds: EvidenceThresholds,
     pub(crate) rules: Vec<PlannerRule>,
+    pub(crate) performance: PerformanceRules,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PerformanceRules {
+    pub(crate) threshold: u64,
+    pub(crate) top: u64,
+    pub(crate) buffer_reuse_threshold: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +117,15 @@ pub(crate) fn validate_catalog(catalog: &RuleCatalog) -> Result<(), String> {
     {
         return Err(
             "evidenceThresholds must require dates, measures, and one unambiguous fact".into(),
+        );
+    }
+    if catalog.performance.threshold == 0
+        || catalog.performance.top == 0
+        || catalog.performance.buffer_reuse_threshold < 2
+    {
+        return Err(
+            "performance thresholds must be positive; bufferReuseThreshold must be at least 2"
+                .to_string(),
         );
     }
     if catalog.schema != PLANNER_RULES_SCHEMA {
@@ -461,6 +479,7 @@ impl RulePlan {
         json!({
             "schema": self.catalog.schema,
             "version": self.catalog.version,
+            "performance": self.catalog.performance,
             "rules": self.explanations,
             "proposals": self.proposals
         })

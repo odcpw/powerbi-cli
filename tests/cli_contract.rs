@@ -558,6 +558,100 @@ fn help_json_command_paths_match_capabilities_catalog() {
 }
 
 #[test]
+fn set_object_batch_is_discoverable_and_refusal_commands_are_executable_templates() {
+    let capabilities = run_powerbi(&[
+        "capabilities",
+        "--for",
+        "report visuals set-object",
+        "--json",
+    ]);
+    assert_eq!(capabilities.exit, 0, "stderr: {}", capabilities.stderr);
+    let capability = stdout_json(&capabilities);
+    assert!(
+        capability["commands"][0]["flags"]
+            .as_array()
+            .expect("set-object flags")
+            .contains(&json!("--batch <ops.v1.json>"))
+    );
+    assert!(
+        capability["commands"][0]["outputSchemas"]
+            .as_array()
+            .expect("set-object output schemas")
+            .contains(&json!("powerbi-cli.report.visuals.objectBatchMutation.v1"))
+    );
+
+    let help = run_powerbi(&["report", "visuals", "set-object", "--help", "--json"]);
+    assert_eq!(help.exit, 0, "stderr: {}", help.stderr);
+    assert!(
+        stdout_json(&help)["help"]["usage"]
+            .as_str()
+            .expect("help usage")
+            .contains("--batch <ops.v1.json>")
+    );
+    let features = run_powerbi(&[
+        "features",
+        "list",
+        "--for",
+        "report.visuals.generated",
+        "--json",
+    ]);
+    assert_eq!(features.exit, 0, "stderr: {}", features.stderr);
+    assert!(
+        stdout_json(&features)["features"][0]["reason"]
+            .as_str()
+            .expect("feature reason")
+            .contains("atomic transaction")
+    );
+    assert!(
+        include_str!("../skills/powerbi-cli/SKILL.md")
+            .contains("report visuals set-object --project build/sales --batch")
+    );
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let batch = temp.path().join("mixed.ops.json");
+    fs::write(
+        &batch,
+        serde_json::to_vec(&json!({
+            "schema": "powerbi-cli.ops.v1",
+            "ops": [{"op": "setPosition", "visual": "visual:missing:missing"}]
+        }))
+        .expect("serialize batch"),
+    )
+    .expect("write batch");
+    let refusal = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-object",
+        "--project",
+        "missing-project.pbip",
+        "--batch",
+        batch.to_str().expect("batch path"),
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(refusal.exit, 10);
+    let error = stderr_json(&refusal);
+    assert_eq!(error["error"]["code"], "input_safety_violation");
+    assert_eq!(error["error"]["pointer"], "/ops/0/op");
+    assert!(
+        error["error"]["hint"]
+            .as_str()
+            .is_some_and(|hint| !hint.is_empty())
+    );
+
+    let full = run_powerbi(&["capabilities", "--json"]);
+    assert_eq!(full.exit, 0, "stderr: {}", full.stderr);
+    let full_value = stdout_json(&full);
+    let catalog_commands = full_value["commands"].as_array().expect("commands");
+    for command in error["error"]["suggestedCommands"]
+        .as_array()
+        .expect("suggested commands")
+    {
+        assert_executable_command_template(command.as_str().expect("command"), catalog_commands);
+    }
+}
+
+#[test]
 fn documentation_mentions_only_cataloged_commands_and_every_catalog_path() {
     let capabilities = run_powerbi(&["capabilities", "--json"]);
     assert_eq!(capabilities.code, 0, "stderr: {}", capabilities.stderr);

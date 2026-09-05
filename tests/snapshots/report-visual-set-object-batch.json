@@ -1,0 +1,91 @@
+{
+  "action": "set-object-batch",
+  "batch": {
+    "operationCount": 2,
+    "operationKind": "setObject",
+    "schema": "powerbi-cli.ops.v1"
+  },
+  "changedCount": 2,
+  "count": 2,
+  "dryRun": true,
+  "exitCode": 0,
+  "mode": "dry-run",
+  "ok": true,
+  "operationOutcomes": [
+    {
+      "changed": true,
+      "changes": [
+        {
+          "action": "set-object",
+          "after": {
+            "expr": {
+              "Literal": {
+                "Value": "20D"
+              }
+            }
+          },
+          "before": null,
+          "jsonPointer": "/visual/objects/categoryLabels/0/properties/fontSize",
+          "kind": "pbir.visual.objectProperty",
+          "object": "categoryLabels",
+          "property": "fontSize"
+        }
+      ],
+      "index": 0,
+      "operation": {
+        "object": "categoryLabels",
+        "op": "setObject",
+        "property": "fontSize",
+        "value": {
+          "expr": {
+            "Literal": {
+              "Value": "20D"
+            }
+          }
+        },
+        "visual": "visual:ReportSectionOverview:VisualContainerCustomerDetail6665af72a7"
+      }
+    },
+    {
+      "changed": true,
+      "changes": [
+        {
+          "action": "set-object",
+          "after": {
+            "expr": {
+              "Literal": {
+                "Value": "false"
+              }
+            }
+          },
+          "before": {
+            "expr": {
+              "Literal": {
+                "Value": "true"
+              }
+            }
+          },
+          "jsonPointer": "/visual/visualContainerObjects/title/0/properties/show",
+          "kind": "pbir.visual.objectProperty",
+          "object": "title",
+          "property": "show"
+        }
+      ],
+      "index": 1,
+      "operation": {
+        "object": "title",
+        "op": "setObject",
+        "property": "show",
+        "value": {
+          "expr": {
+            "Literal": {
+              "Value": "false"
+            }
+          }
+        },
+        "visual": "visual:ReportSectionOverview:VisualContainerRevenue83556a914d"
+      }
+    }
+  ],
+  "schema": "powerbi-cli.report.visuals.objectBatchMutation.v1"
+}

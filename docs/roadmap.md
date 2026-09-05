@@ -373,6 +373,9 @@ validation, proof, then mutation breadth.
   `report visuals catalog --formatting` additionally exposes the strict,
   embedded eleven-entry formatting catalog consumed by `set-object`, including
   PBIR containers, encoding, wildcard visual scope, and dated evidence.
+  `report visuals set-object --batch <file>` applies a bounded SetObject-only
+  `powerbi-cli.ops.v1` list across many handles through one atomic transaction,
+  returning per-entry outcomes and readback commands in every guarded mode.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
   columnChart, lineClusteredColumnComboChart, and scatterChart containers from
@@ -652,6 +655,8 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] PBIR page/visual/filter/slicer/interaction/bookmark metadata surfaces,
   theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
   harvester, with each feature's proof level published by `features list`.
+- [x] Dashboard-spec v2 page slicers and shared layout rails compile to
+  deterministic slicer visuals, including profile-aware mode defaults.
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
@@ -662,6 +667,11 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Planner evidence thresholds live in the rule catalog; missing dates,
   declared measures, or an unambiguous fact return `plan.missing_input` before
   output writes. JSON intent `model.factTable` resolves fact ambiguity.
+
+- [x] Planner performance proposals annotate v2 Category/Rows groupings above
+  catalog or intent thresholds with TopN guards and replay operations, explaining
+  counts and ranking measure choices. Optional project inspection reuses
+  `m.unbuffered_reuse` for Table.Buffer recommendations without M rewrites.
 
 Remaining work—such as `report compose`, full v2 compilation, design lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—

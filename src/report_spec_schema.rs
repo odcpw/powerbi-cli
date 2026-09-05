@@ -231,11 +231,11 @@ const LAYOUT_GRID: NodeSchema = node(
 );
 const LAYOUT_PAGE_SIZE: NodeSchema =
     node("layout.pageSize", "layout.pageSize", &["width", "height"]);
-const LAYOUT_RAIL: NodeSchema = node("layout.rail", "layout.rail", &["side", "slicers"]);
+const LAYOUT_RAIL: NodeSchema = node("layout.rail", "layout.rail", &["side", "width", "slicers"]);
 const RAIL_SLICER: NodeSchema = node(
     "layout.rail.slicers[]",
     "layout.rail.slicers",
-    &["field", "mode", "title"],
+    &["field", "mode", "singleSelect", "title"],
 );
 const FILTER: NodeSchema = node(
     "filters[]",
@@ -269,6 +269,7 @@ const PAGE_V2: NodeSchema = node(
         "name",
         "displayName",
         "size",
+        "rail",
         "template",
         "heading",
         "subtitle",
@@ -734,6 +735,7 @@ fn version_schema(version: SpecVersion) -> Value {
                 "pages[]",
                 &[
                     ("size", page_size),
+                    ("rail", json!({"type": "boolean"})),
                     ("slicers", json!({"type": "array", "items": slicer})),
                     ("drillthrough", drillthrough),
                     ("filters", json!({"type": "array", "items": filter})),
@@ -940,7 +942,7 @@ fn layout_schema(nodes: &[NodeSchema]) -> Value {
     let page_size = node_object(
         nodes,
         "layout.pageSize",
-        &[("width", number.clone()), ("height", number)],
+        &[("width", number.clone()), ("height", number.clone())],
     );
     let slicer = node_object(nodes, "layout.rail.slicers[]", &[]);
     let rail = node_object(
@@ -948,6 +950,7 @@ fn layout_schema(nodes: &[NodeSchema]) -> Value {
         "layout.rail",
         &[
             ("side", json!({"type": "string"})),
+            ("width", number.clone()),
             ("slicers", json!({"type": "array", "items": slicer})),
         ],
     );
@@ -1216,7 +1219,6 @@ where
 fn first_uncompiled_v2_section(
     root: &Map<String, Value>,
 ) -> Option<(String, &'static str, &'static str)> {
-    const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
@@ -1270,14 +1272,9 @@ fn first_uncompiled_v2_section(
             "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
         ));
     }
-    if let Some(layout) = root.get("layout").and_then(Value::as_object) {
-        if layout.contains_key("rail") {
-            return Some((
-                "layout.rail".to_string(),
-                SLICER_BEAD,
-                "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
-            ));
-        }
+    if let Some(layout) = root.get("layout").and_then(Value::as_object)
+        && (!layout.contains_key("rail") || layout.keys().any(|key| key != "rail"))
+    {
         return Some((
             "layout".to_string(),
             LAYOUT_BEAD,
@@ -1292,13 +1289,6 @@ fn first_uncompiled_v2_section(
         .filter_map(Value::as_object)
         .enumerate()
     {
-        if page.contains_key("slicers") {
-            return Some((
-                format!("pages[{page_index}].slicers"),
-                SLICER_BEAD,
-                "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
-            ));
-        }
         if page.contains_key("tooltipFor") {
             return Some((
                 format!("pages[{page_index}].tooltipFor"),
@@ -1375,7 +1365,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
         return Ok(Vec::new());
     }
 
-    const SLICER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.2";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
@@ -1444,22 +1433,15 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
             "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
         );
     }
-    if let Some(layout) = root.get("layout").and_then(Value::as_object) {
-        if layout.contains_key("rail") {
-            push(
-                "layout.rail".to_string(),
-                "/layout/rail".to_string(),
-                SLICER_BEAD,
-                "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
-            );
-        } else {
-            push(
-                "layout".to_string(),
-                "/layout".to_string(),
-                LAYOUT_BEAD,
-                "powerbi-cli report layout auto --project <project-dir> --page <page-handle> --preset overview --dry-run --json",
-            );
-        }
+    if let Some(layout) = root.get("layout").and_then(Value::as_object)
+        && (!layout.contains_key("rail") || layout.keys().any(|key| key != "rail"))
+    {
+        push(
+            "layout".to_string(),
+            "/layout".to_string(),
+            LAYOUT_BEAD,
+            "powerbi-cli report layout auto --project <project-dir> --page <page-handle> --preset overview --dry-run --json",
+        );
     }
     if let Some(pages) = root.get("pages").and_then(Value::as_array) {
         for (page_index, page) in pages.iter().enumerate() {
@@ -1467,14 +1449,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                 continue;
             };
             let page_pointer = format!("/pages/{page_index}");
-            if page.contains_key("slicers") {
-                push(
-                    format!("pages[{page_index}].slicers"),
-                    format!("{page_pointer}/slicers"),
-                    SLICER_BEAD,
-                    "powerbi-cli report visuals add --project <project-dir> --page <page-handle> --visual-type slicer --dry-run --json",
-                );
-            }
             if page.contains_key("tooltipFor") {
                 push(
                     format!("pages[{page_index}].tooltipFor"),
@@ -1640,7 +1614,12 @@ value_struct!(SlicerV2 {
     title,
     slot
 });
-value_struct!(RailSlicerV2 { field, mode, title });
+value_struct!(RailSlicerV2 {
+    field,
+    mode,
+    single_select,
+    title
+});
 value_struct!(DrillthroughV2 {
     target,
     hidden,
@@ -1752,6 +1731,7 @@ value_struct!(GridV2 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RailV2 {
     side: Option<Value>,
+    width: Option<Value>,
     slicers: Option<Vec<RailSlicerV2>>,
 }
 
@@ -1782,6 +1762,7 @@ struct PageV2 {
     name: Option<Value>,
     display_name: Option<Value>,
     size: Option<PageSizeV2>,
+    rail: Option<Value>,
     template: Option<Value>,
     heading: Option<Value>,
     subtitle: Option<Value>,
