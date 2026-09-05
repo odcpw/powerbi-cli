@@ -692,6 +692,12 @@ IDs and dependencies; this roadmap records what has already landed:
   the shared scorecard, with pointers and plan-only sanitize actions.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
+- [x] The embedded `design-defaults.v1` catalog resolves per-family visual
+  formatting through Desktop-referenced formatting-catalog keys and the shared
+  SetObject path. Defaults are opt-in, deterministic, inspectable through
+  `report design defaults show`/`report spec explain`, and merge overrides as
+  catalog < `style.tokens` < `style.defaults` < `visuals[].format`; unavailable
+  design properties remain explicitly inert under their owning T4 bead.
 - [x] Stacked visual aliases preserve Desktop-recorded bar/column ids; role
   maps cite their evidence. Unproven 100% stacked bars and offline maps remain
   fixture-gated with explicit missing-evidence refusals.
