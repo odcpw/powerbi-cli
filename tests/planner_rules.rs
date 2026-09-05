@@ -13,7 +13,7 @@ fn explanation<'a>(value: &'a Value, id: &str) -> &'a Value {
 }
 
 #[test]
-fn report_plan_explains_fired_rules_with_evidence_and_slot_only_v2_candidate() {
+fn report_plan_explains_fired_rules_with_evidence_and_buildable_narrative_candidate() {
     let args = [
         "report",
         "plan",
@@ -74,8 +74,16 @@ fn report_plan_explains_fired_rules_with_evidence_and_slot_only_v2_candidate() {
         assert!(proposal["sizeClass"].is_string());
     }
     assert_eq!(value["specV2"]["schema"], "powerbi-cli.dashboard.v2");
-    assert_eq!(value["specV2"]["style"]["preset"], "planner-default");
-    assert_eq!(value["specV2"]["layout"]["grid"]["columns"], 12);
+    assert!(value["specV2"].get("style").is_none());
+    assert_eq!(
+        value["specV2"]["layout"]["rail"]["slicers"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(value["narrativeFlow"]["ruleId"], "planner.narrative-flow");
+    assert_eq!(value["narrativeFlow"]["activePage"], "overview");
     assert_eq!(
         value["specV2"]["proof"]["desktop"]["level"],
         "desktop-golden-pending"
@@ -86,8 +94,10 @@ fn report_plan_explains_fired_rules_with_evidence_and_slot_only_v2_candidate() {
         .iter()
         .flat_map(|page| page["visuals"].as_array().into_iter().flatten())
     {
-        assert!(visual["slot"].is_string());
-        assert!(visual.get("layout").is_none());
+        assert!(
+            visual["slot"].is_string()
+                || (visual["type"] == "slicer" && visual["layout"].is_object())
+        );
         assert!(visual.get("x").is_none());
         assert!(visual.get("y").is_none());
         assert!(visual.get("width").is_none());
@@ -103,8 +113,9 @@ fn planner_catalog_is_discoverable_with_expected_scores() {
     let catalog = &value["schemaManifest"]["plannerRuleCatalog"];
     assert_eq!(catalog["schema"], "powerbi-cli.planner-rules.v1");
     let rules = catalog["rules"].as_array().expect("catalog rules");
-    assert_eq!(rules.len(), 13);
+    assert_eq!(rules.len(), 14);
     let expected = [
+        ("planner.narrative-flow", 100),
         ("planner.time-series", 92),
         ("planner.category-ranking", 84),
         ("planner.scatter-focus", 88),

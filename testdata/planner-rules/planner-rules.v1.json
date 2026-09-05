@@ -10,6 +10,32 @@
   "performance": {"threshold": 200, "top": 50, "bufferReuseThreshold": 2},
   "rules": [
     {
+      "id": "planner.narrative-flow",
+      "summary": "Order available pages from overview through trend and breakdown to detail; replicate the rail and expose high-cardinality drillthrough last.",
+      "kind": "page",
+      "score": 100,
+      "conditions": [{"signal": "shapeKind", "operator": "exists", "value": true}],
+      "proposal": {
+        "archetype": "narrative-flow",
+        "template": "overview",
+        "bindings": [],
+        "priority": 100,
+        "sizeClass": "full",
+        "narrativeFlow": {
+          "pageOrder": ["overview", "trend", "breakdown", "comparison", "exceptions", "detail", "drillthrough-detail"],
+          "templates": {
+            "overview": "overview", "trend": "time-series", "breakdown": "ranking",
+            "comparison": "scatter-focus", "exceptions": "exception-list",
+            "detail": "detail-table", "drillthrough-detail": "drillthrough-detail"
+          },
+          "overviewTemplates": {"flat": "kpi-strip-trend-breakdown"},
+          "detailTemplates": {"ambiguous": "matrix-focus"},
+          "maxBreakdowns": 3,
+          "railTemplate": "overview"
+        }
+      }
+    },
+    {
       "id": "planner.time-series",
       "summary": "A profiled time axis and at least one measure support a trend page.",
       "kind": "visual",

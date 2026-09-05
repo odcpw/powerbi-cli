@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "FlatNarrative",
+    "tables": [{"name":"Events","columns":[
+      {"name":"Date","dataType":"date"},
+      {"name":"Amount","dataType":"decimal"},
+      {"name":"Category","dataType":"string"},
+      {"name":"Ticket","dataType":"string"}
+    ],"measures":[{"name":"Total","expression":"SUM('Events'[Amount])"}]}]
+  },
+  "profile": {
+    "schema":"powerbi-cli.dataProfile.v1",
+    "dataValues":false,
+    "tables":[{"name":"Events","role":"fact","rowCount":1000,"columns":[
+      {"name":"Category","dataType":"string","distinctCount":5},
+      {"name":"Ticket","dataType":"string","distinctCount":900}
+    ]}]
+  }
+}

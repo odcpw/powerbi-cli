@@ -14,6 +14,8 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+mod narrative;
+
 #[derive(Debug, Default)]
 struct PlanOptions {
     project: Option<PathBuf>,
@@ -163,7 +165,15 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     let planner_context = planner_context(&model, &planned.spec, &intent, &shape);
     let rule_plan = evaluate_planner_rules(&shape, &intent_value, &planner_context)?;
     append_rule_decisions(&mut planned.decisions, &rule_plan);
-    let mut v2_spec = build_v2_spec(&planned.spec, &intent, &rule_plan);
+    let (mut v2_spec, narrative_flow) = narrative::build(
+        &planned.spec,
+        &intent,
+        &rule_plan,
+        &model,
+        &shape,
+        &planner_context,
+    )?;
+    planned.decisions.push(narrative_flow.clone());
     let performance = crate::planner_performance::plan(
         &schema_value,
         profile_value.as_ref(),
@@ -232,6 +242,7 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
         "spec": planned.spec,
         "specV2": v2_spec,
         "performance": performance,
+        "narrativeFlow": narrative_flow,
         "planner": rule_plan.to_value(),
         "ruleExplanations": rule_plan.explanations,
         "explainRules": options.explain_rules,
@@ -769,175 +780,6 @@ fn append_rule_decisions(decisions: &mut Vec<Value>, rule_plan: &RulePlan) {
             "proposal": proposal
         }));
     }
-}
-
-#[derive(Debug, Clone)]
-struct ProposalSlot {
-    page: String,
-    template: String,
-    slot: String,
-    proposal: Value,
-}
-
-/// The single placement boundary for planner proposals.  It intentionally
-/// emits only semantic slots today; the concurrent grid engine can replace
-/// this function without changing catalog conditions, scores, or evidence.
-fn assign_proposal_slots(proposals: &[Value]) -> Vec<ProposalSlot> {
-    proposals
-        .iter()
-        .map(|proposal| {
-            let archetype = proposal["archetype"].as_str().unwrap_or("overview");
-            let page = proposal["page"].as_str().unwrap_or("overview").to_string();
-            let slot = match archetype {
-                "overview" | "kpi-overview" => "kpi.1",
-                "time-series" | "ranking" | "comparison" => "primary",
-                "exception-list" | "detail-table" | "drillthrough-detail" => "detail",
-                _ => "secondary",
-            };
-            ProposalSlot {
-                page,
-                template: proposal["template"]
-                    .as_str()
-                    .unwrap_or("overview")
-                    .to_string(),
-                slot: slot.to_string(),
-                proposal: proposal.clone(),
-            }
-        })
-        .collect()
-}
-
-fn build_v2_spec(legacy_spec: &Value, intent: &Intent, rule_plan: &RulePlan) -> Value {
-    let placements = assign_proposal_slots(&rule_plan.proposals);
-    let mut page_ids = vec!["overview".to_string()];
-    for placement in &placements {
-        if !page_ids.contains(&placement.page) {
-            page_ids.push(placement.page.clone());
-        }
-    }
-    let primary_measure = legacy_spec
-        .get("model")
-        .and_then(|model| model.get("measures"))
-        .and_then(Value::as_array)
-        .and_then(|measures| measures.first())
-        .and_then(|measure| {
-            let table = measure.get("table").and_then(Value::as_str)?;
-            let name = measure.get("name").and_then(Value::as_str)?;
-            Some(field_reference(table, name))
-        })
-        .or_else(|| {
-            legacy_spec
-                .get("pages")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .flat_map(|page| page.get("visuals").and_then(Value::as_array))
-                .flatten()
-                .flat_map(|visual| visual.get("bindings").and_then(Value::as_array))
-                .flatten()
-                .find_map(|binding| {
-                    (binding.get("role").and_then(Value::as_str) == Some("Values"))
-                        .then(|| binding.get("field").and_then(Value::as_str))
-                        .flatten()
-                        .map(ToOwned::to_owned)
-                })
-        });
-    let mut pages = Vec::new();
-    for page_id in page_ids {
-        let page_placements = placements
-            .iter()
-            .filter(|placement| placement.page == page_id)
-            .collect::<Vec<_>>();
-        // Shape-specific page proposals are deliberately separate from visual
-        // proposals.  Prefer their template for the overview page so the
-        // model-shape verdict changes the v2 structure without coupling the
-        // rule catalog to layout coordinates or visual counts.
-        let template = if page_id == "overview" {
-            page_placements
-                .iter()
-                .find(|placement| {
-                    placement.proposal["archetype"]
-                        .as_str()
-                        .is_some_and(|archetype| archetype.starts_with("shape-"))
-                })
-                .map(|placement| placement.template.as_str())
-                .or_else(|| {
-                    page_placements
-                        .first()
-                        .map(|placement| placement.template.as_str())
-                })
-                .unwrap_or("overview")
-        } else {
-            page_placements
-                .first()
-                .map(|placement| placement.template.as_str())
-                .unwrap_or("overview")
-        };
-        let mut visuals = page_placements
-            .iter()
-            .enumerate()
-            .filter_map(|(index, placement)| {
-                proposal_visual(&placement.proposal, &placement.slot, index)
-            })
-            .collect::<Vec<_>>();
-        if page_id == "overview"
-            && visuals.is_empty()
-            && let Some(measure) = primary_measure.as_deref()
-        {
-            visuals.push(json!({
-                "id": "planner_overview_kpi",
-                "type": "card",
-                "title": "Primary KPI",
-                "slot": "kpi.1",
-                "bindings": [{"role": "Values", "field": measure}]
-            }));
-        }
-        let display_name = page_display_name(&page_id);
-        pages.push(json!({
-            "id": page_id,
-            "displayName": display_name,
-            "template": template,
-            "heading": display_name,
-            "subtitle": format!("{} plan", one_line(&intent.text)),
-            "visuals": visuals
-        }));
-    }
-    let report = legacy_spec.get("report").cloned().unwrap_or_else(|| {
-        json!({
-            "name": "PowerBIDashboard",
-            "displayName": "Power BI Dashboard",
-            "questions": intent_questions(intent),
-            "audience": intent.audience.as_deref().unwrap_or("agent-authored Power BI users")
-        })
-    });
-    let model = legacy_spec.get("model").cloned();
-    let mut output = json!({
-        "schema": "powerbi-cli.dashboard.v2",
-        "report": report,
-        "layout": {
-            "grid": {"columns": 12, "gutter": "spacing.md", "margin": "spacing.lg"},
-            "pageSize": {"width": 1280, "height": 720},
-            "rail": {"side": "left", "slicers": []}
-        },
-        "style": {
-            "preset": "planner-default",
-            "tokens": {
-                "semantic": {
-                    "good": "semantic.good",
-                    "bad": "semantic.bad",
-                    "neutral": "semantic.neutral",
-                    "warning": "semantic.warning",
-                    "emphasis": "semantic.emphasis"
-                }
-            }
-        },
-        "pages": pages,
-        "proof": {"desktop": {"level": "desktop-golden-pending"}}
-    });
-    if let Some(model) = model {
-        output["model"] = model;
-    }
-    output
 }
 
 fn proposal_visual(proposal: &Value, slot: &str, index: usize) -> Option<Value> {

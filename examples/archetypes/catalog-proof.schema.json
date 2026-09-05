@@ -1,7 +1,7 @@
 {
   "name": "VisualCatalogProof",
   "displayName": "Visual Catalog Proof",
-  "description": "Neutral generated-visual fixture for pie, donut, matrix, slicer, and line-chart control proof.",
+  "description": "Neutral generated-visual fixture for pie, donut, matrix, slicer, and line-chart control proof. YearStart is the annual period boundary, not an observation date, and supplies explicit planner date evidence.",
   "locale": "en-US",
   "tables": [
     {
@@ -9,6 +9,7 @@
       "columns": [
         { "name": "Category", "dataType": "string" },
         { "name": "Year", "dataType": "int64", "formatString": "0" },
+        { "name": "YearStart", "dataType": "date", "formatString": "Short Date" },
         { "name": "Amount", "dataType": "decimal", "formatString": "#,##0.00" }
       ],
       "measures": [
@@ -24,10 +25,10 @@
           }
       ],
       "rows": [
-        { "Category": "Alpha", "Year": 2025, "Amount": 10.0 },
-        { "Category": "Alpha", "Year": 2026, "Amount": 15.0 },
-        { "Category": "Beta", "Year": 2025, "Amount": 20.0 },
-        { "Category": "Beta", "Year": 2026, "Amount": 25.0 }
+        { "Category": "Alpha", "Year": 2025, "YearStart": "2025-01-01", "Amount": 10.0 },
+        { "Category": "Alpha", "Year": 2026, "YearStart": "2026-01-01", "Amount": 15.0 },
+        { "Category": "Beta", "Year": 2025, "YearStart": "2025-01-01", "Amount": 20.0 },
+        { "Category": "Beta", "Year": 2026, "YearStart": "2026-01-01", "Amount": 25.0 }
       ]
     }
   ],

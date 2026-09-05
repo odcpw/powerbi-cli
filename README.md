@@ -16,6 +16,12 @@ bring schema/dummy rows home
 -> replace dummy M partitions with corporate sources and refresh
 ```
 
+Agent contract note: `report spec explain` returns an annotated
+`powerbi-cli.report.spec.explainPlan.v1` preview, not a replayable `ops.v1` file.
+Build/validation follow-ups preserve supplied profiles; robot-docs follow-ups
+preserve the selected repository root and sections. The scoped ergonomics audit
+and remaining contract gaps are in [the compiler-surface audit](agent_ergonomics_audit/compiler-surface-2026-09.md).
+
 The deterministic Rust commands need no vendor runtime. To enable Microsoft's
 semantic engine, official report validator, and (on Windows) Desktop Bridge,
 explicitly install the committed exact tool graph into your private user cache:
@@ -312,7 +318,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -879,20 +885,41 @@ writing any output (including `--force`). Supply `model.factTable` in the JSON
 intent to choose among fact candidates; use `profile infer --rows` for additional
 profile evidence and `report spec fields` to inspect schema fields. Numeric
 columns alone no longer authorize guessed SUM measures or a default layout.
+Archetype planner evidence is explicit: `catalog-proof` uses `YearStart` (the
+January 1 boundary of its synthetic annual totals, not an observation date),
+`flat-ops` uses `WorkDate`, and `slicer-rail` uses the sales schema's `DimDate.Date`.
+The non-temporal `regional-sales` and `scatter-bubble` fixtures deliberately
+refuse planning with `plan.missing_input` for a missing typed date axis; their
+authored dashboard specs remain buildable. A populated profile alone does not
+provide a date axis. See `tests/report_plan_archetypes.rs` for the complete sweep.
+The authored catalog-proof visuals retain their existing Year bindings;
+`YearStart` is used by planner-generated trends, so the authored project's
+golden honestly records its `model.column_unused` warning.
 Rule evaluation follows shape and intent normalization. Pass `--explain-rules` (or use the equivalent
 `report plan explain` form) to make the fired rules, deterministic scores, and
 actual evidence values explicit. The response always carries the same
 `planner.proposals[]` records: each names its rule id, visual family, bindings,
 priority, size class, and semantic color token without coordinates or hex
-values. The build-compatible `spec` remains dashboard.v1; `specV2` is the
-slot/template/style candidate for the layout compiler and is marked
+values. The build-compatible `spec` remains dashboard.v1; `specV2` now compiles
+named templates in narrative order: overview, trend when a date axis exists,
+breakdowns, comparison/exceptions when proposed, detail, and optional hidden
+drillthrough detail. `narrativeFlow` explains order, overview activation,
+replicated rail binding, and the highest-cardinality drillthrough target.
+The catalog selects the flat-table KPI/trend/breakdown overview template
+and an ambiguous-model table-focused detail template while retaining the
+same narrative page order.
+Templates without a rail use one shared-grid placement boundary to reserve
+space. Rails are emitted by the shared slicer compiler. Uncompiled style tokens
+remain proposals; performance `topnGuard` annotations retain their existing
+compiler boundary and must be resolved before building a guarded candidate.
+`specV2` is marked
 `desktop-golden-pending` until a Desktop canvas proof exists. Current rule ids are:
 `planner.time-series`, `planner.category-ranking`, `planner.scatter-focus`,
 `planner.detail-table`, `planner.measure-target`,
 `planner.measure-total`, `planner.alert-exception-list`,
 `planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
 `planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
-`planner.shape-ambiguous-template`, and `planner.overview`.
+`planner.shape-ambiguous-template`, `planner.overview`, and `planner.narrative-flow`.
 
 Profiled Category/Rows groupings above 200 distinct values receive
 `specV2.pages[].visuals[].topnGuard` proposals (default top 50) and matching

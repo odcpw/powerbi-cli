@@ -630,7 +630,7 @@ fn build_plan_json(entries: &[OpEntry], index: &ProjectIndex) -> CliResult<Value
         })
         .collect::<Vec<_>>();
     Ok(json!({
-        "schema": crate::ops::OPS_SCHEMA,
+        "schema": "powerbi-cli.report.spec.explainPlan.v1",
         "ops": operation_json,
         "stages": stages,
         "operationCount": entries.len()

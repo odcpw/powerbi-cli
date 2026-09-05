@@ -8,7 +8,7 @@ use crate::cli_error::EXIT_DOCS_DRIFT;
 use crate::contract::capabilities;
 use crate::feature_catalog::features_command;
 use crate::project_io::write_text_atomic;
-use crate::{CliError, CliResult, EXIT_SUCCESS};
+use crate::{CliError, CliResult, EXIT_SUCCESS, command_arg};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 use std::fs;
@@ -62,6 +62,25 @@ struct Options {
     sections: Vec<Section>,
     check: bool,
     root: PathBuf,
+}
+
+fn render_follow_up(root: &Path, sections: &[Section], check: bool) -> String {
+    let mut command = format!("powerbi-cli robot-docs render --root {}", command_arg(root));
+    for section in sections {
+        command.push_str(&format!(" --section {}", section.as_str()));
+    }
+    if check {
+        command.push_str(" --check");
+    }
+    command.push_str(" --json");
+    command
+}
+
+fn verify_follow_up(root: &Path) -> String {
+    format!(
+        "powerbi-cli robot-docs verify --root {} --json",
+        command_arg(root)
+    )
 }
 
 #[derive(Debug)]
@@ -144,8 +163,8 @@ pub(crate) fn render_robot_docs(args: &[String]) -> CliResult<Value> {
             .with_hint(
                 "Regenerate the marker-delimited regions with `powerbi-cli robot-docs render`.",
             )
-            .with_suggested_command("powerbi-cli robot-docs render --check --json")
-            .with_suggested_command("powerbi-cli robot-docs render --json"));
+            .with_suggested_command(render_follow_up(&options.root, &sections, true))
+            .with_suggested_command(render_follow_up(&options.root, &sections, false)));
         }
     }
 
@@ -172,7 +191,7 @@ pub(crate) fn render_robot_docs(args: &[String]) -> CliResult<Value> {
             "limits": "capabilities.limits",
             "features": "features list --json"
         },
-        "next": ["powerbi-cli robot-docs render --check --json"]
+        "next": [render_follow_up(&options.root, &sections, true)]
     }))
 }
 
@@ -253,8 +272,8 @@ pub(crate) fn verify_robot_docs(args: &[String]) -> CliResult<Value> {
         .with_hint(
             "Run `powerbi-cli robot-docs render` to regenerate docs, then rerun the verifier.",
         )
-        .with_suggested_command("powerbi-cli robot-docs verify --json")
-        .with_suggested_command("powerbi-cli robot-docs render --json"));
+        .with_suggested_command(verify_follow_up(&root))
+        .with_suggested_command(render_follow_up(&root, &[], false)));
     }
 
     Ok(json!({
@@ -270,7 +289,7 @@ pub(crate) fn verify_robot_docs(args: &[String]) -> CliResult<Value> {
             "catalogPathsInDiscovery": true,
             "commandMentionsKnown": true
         },
-        "next": ["powerbi-cli robot-docs verify --json"]
+        "next": [verify_follow_up(&root)]
     }))
 }
 
