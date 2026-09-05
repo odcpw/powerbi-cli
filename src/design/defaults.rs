@@ -362,12 +362,20 @@ fn apply_override_map(
     pointer: &str,
 ) -> CliResult<()> {
     for (key, value) in values {
-        if key == "palette"
+        if key == "preset"
+            || key == "id"
+            || key == "name"
+            || key == "summary"
+            || key == "palette"
             || key == "semantic"
             || key == "typography"
             || key == "surfaces"
             || key == "spacing"
             || key == "numberFormats"
+            || key == "ramps"
+            || key == "textClasses"
+            || key == "visualDefaults"
+            || key == "allowContrastBelowAA"
             || key == "formatting"
         {
             continue;

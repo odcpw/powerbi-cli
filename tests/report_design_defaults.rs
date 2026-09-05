@@ -163,6 +163,52 @@ fn design_defaults_show_and_spec_explain_publish_override_precedence_determinist
     );
 }
 
+#[test]
+fn token_theme_and_design_defaults_compile_together_with_visual_precedence() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let mut spec: Value =
+        serde_json::from_str(include_str!("../examples/sales.dashboard.v2.json")).expect("spec");
+    spec["style"] = json!({
+        "tokens": {"preset": "dark", "formatting": {"labels.show": false}},
+        "defaults": {"labels.show": true}
+    });
+    spec["pages"][0]["visuals"][0]["format"] = json!({"labels.show": false});
+    let path = temp.path().join("combined.json");
+    fs::write(&path, serde_json::to_vec_pretty(&spec).expect("serialize")).expect("write");
+    let project = temp.path().join("project");
+    let run = run_powerbi(&[
+        "report",
+        "build",
+        "--schema",
+        "examples/sales.schema.json",
+        "--spec",
+        path.to_str().expect("path"),
+        "--out-dir",
+        project.to_str().expect("project"),
+        "--json",
+    ]);
+    assert_eq!(run.code, 0, "{}", run.stderr);
+    assert_eq!(stdout_json(&run)["styleTokens"]["id"], "dark");
+    assert!(project.join("SalesOperations.Report/StaticResources/RegisteredResources/powerbi-cli-tokens-dark.json").is_file());
+    let visuals = visual_formatting_golden(&project);
+    let card = visuals
+        .iter()
+        .find(|v| v["visualType"] == "card")
+        .expect("card");
+    let line = visuals
+        .iter()
+        .find(|v| v["visualType"] == "lineChart")
+        .expect("line");
+    assert_eq!(
+        card["objects"]["labels"][0]["properties"]["show"]["expr"]["Literal"]["Value"],
+        "false"
+    );
+    assert_eq!(
+        line["objects"]["labels"][0]["properties"]["show"]["expr"]["Literal"]["Value"],
+        "true"
+    );
+}
+
 fn visual_formatting_golden(project: &Path) -> Vec<Value> {
     let mut visuals = WalkDir::new(project)
         .into_iter()

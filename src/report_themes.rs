@@ -533,6 +533,77 @@ pub(crate) fn apply_theme_preset_operation(
     })
 }
 
+/// Apply an already-compiled theme bundle through the same registered-resource
+/// boundary used by `report themes apply` and `apply-preset`.  Design tokens,
+/// future formatting catalogs, and replayed theme operations all use this
+/// helper so PBIR resource package normalization remains in one place.
+pub(crate) fn apply_theme_bundle_operation(
+    bundle: &Value,
+    project: &crate::ResolvedProject,
+) -> CliResult<OpOutcome> {
+    let report_json_path = report_json_path(project);
+    let mut report_json = read_json_value(&report_json_path)?;
+    let before_theme_collection = report_json["themeCollection"].clone();
+    let after_theme_collection =
+        normalized_theme_collection_for_bundle(&bundle["themeCollection"], bundle, &report_json)?;
+    validate_theme_collection(&after_theme_collection, Path::new("compiled-theme"))?;
+    let resource_changes = bundled_resource_changes(project, bundle)?;
+    let before_resource_packages = report_json["resourcePackages"].clone();
+    upsert_registered_resource_package(&mut report_json, bundle)?;
+    let after_resource_packages = report_json["resourcePackages"].clone();
+    let report_changed = before_theme_collection != after_theme_collection
+        || before_resource_packages != after_resource_packages;
+    let resources_changed = resource_changes
+        .iter()
+        .any(|change| change["before"] != change["after"]);
+    if report_changed {
+        report_json["themeCollection"] = after_theme_collection.clone();
+        write_json_atomic(&report_json_path, &report_json)?;
+    }
+    if resources_changed {
+        for change in &resource_changes {
+            if change["before"] == change["after"] {
+                continue;
+            }
+            let path = PathBuf::from(change["path"].as_str().unwrap_or_default());
+            write_theme_json(&path, &change["after"])?;
+        }
+    }
+
+    let mut changes = vec![
+        json!({
+            "kind": "pbir.report.themeCollection",
+            "action": "replace",
+            "path": canonical_display(&report_json_path),
+            "before": before_theme_collection,
+            "after": after_theme_collection
+        }),
+        json!({
+            "kind": "pbir.report.resourcePackages",
+            "action": "upsert-registered-theme-package",
+            "path": canonical_display(&report_json_path),
+            "before": before_resource_packages,
+            "after": after_resource_packages
+        }),
+    ];
+    changes.extend(resource_changes);
+    let project_arg = command_arg(&project.project_dir);
+    Ok(OpOutcome {
+        changed: report_changed || resources_changed,
+        changes,
+        readback: vec![
+            format!(
+                "powerbi-cli report style tokens show --project {} --json",
+                project_arg
+            ),
+            format!("powerbi-cli validate --strict {} --json", project_arg),
+            format!("powerbi-cli handoff check {} --json", project_arg),
+        ],
+        warnings: Vec::new(),
+        created_handles: vec!["theme:report".to_string()],
+    })
+}
+
 fn report_theme_json(
     report_json_path: &Path,
     theme_collection: &Value,

@@ -1,0 +1,194 @@
+{
+  "schema": "powerbi-cli.tokens.v1",
+  "version": 1,
+  "sets": [
+    {
+      "id": "corporate-neutral",
+      "name": "Corporate neutral",
+      "summary": "A restrained blue/slate system for operational and executive dashboards.",
+      "palette": ["#0B3D5C", "#0F766E", "#B42318", "#A15C00", "#4C1D95", "#155E75", "#334155", "#9F1239"],
+      "semantic": {
+        "good": "#166534",
+        "bad": "#B42318",
+        "neutral": "#475569",
+        "warning": "#92400E",
+        "emphasis": "#5B21B6"
+      },
+      "ramps": {
+        "sequential": ["#E0F2FE", "#7DD3FC", "#0284C7", "#075985"],
+        "diverging": ["#B42318", "#FCA5A5", "#F8FAFC", "#93C5FD", "#0B3D5C"]
+      },
+      "typography": {
+        "family": "Aptos",
+        "scale": {"caption": 10, "label": 11, "body": 12, "title": 18, "callout": 28}
+      },
+      "surfaces": {
+        "page": "#FFFFFF",
+        "card": "#F8FAFC",
+        "border": "#CBD5E1",
+        "alt": "#F1F5F9"
+      },
+      "spacing": {"unit": 8},
+      "numberFormats": {
+        "currency": "$#,##0.00",
+        "percent": "0.0%",
+        "integer": "#,##0",
+        "compactAbove": 1000000
+      },
+      "textClasses": {
+        "title": {"fontSize": 18, "color": "#1F2937"},
+        "label": {"fontSize": 11, "color": "#334155"},
+        "callout": {"fontSize": 28, "color": "#111827"}
+      },
+      "visualDefaults": {
+        "*": {
+          "title": [{"show": true, "fontColor": {"solid": {"color": "#1F2937"}}, "fontSize": 11}],
+          "categoryAxis": [{"labelColor": {"solid": {"color": "#334155"}}}],
+          "valueAxis": [{"labelColor": {"solid": {"color": "#334155"}}}],
+          "labels": [{"color": {"solid": {"color": "#1F2937"}}, "displayUnits": 0}]
+        }
+      }
+    },
+    {
+      "id": "high-contrast",
+      "name": "High contrast",
+      "summary": "A black canvas with bright, unambiguous accents for accessibility-first review.",
+      "palette": ["#FFFFFF", "#FFFF00", "#00FFFF", "#00FF00", "#FF00FF", "#FF8000", "#7FDBFF", "#FF6666"],
+      "semantic": {
+        "good": "#00FF00",
+        "bad": "#FF6666",
+        "neutral": "#FFFFFF",
+        "warning": "#FFFF00",
+        "emphasis": "#00FFFF"
+      },
+      "ramps": {
+        "sequential": ["#D9FFFF", "#7FDBFF", "#00FFFF", "#0080FF"],
+        "diverging": ["#FF6666", "#FFB347", "#FFFFFF", "#7FDBFF", "#0080FF"]
+      },
+      "typography": {
+        "family": "Aptos",
+        "scale": {"caption": 11, "label": 12, "body": 14, "title": 20, "callout": 30}
+      },
+      "surfaces": {
+        "page": "#000000",
+        "card": "#111111",
+        "border": "#FFFFFF",
+        "alt": "#1F1F1F"
+      },
+      "spacing": {"unit": 8},
+      "numberFormats": {
+        "currency": "$#,##0.00",
+        "percent": "0.0%",
+        "integer": "#,##0",
+        "compactAbove": 1000000
+      },
+      "textClasses": {
+        "title": {"fontSize": 20, "color": "#FFFFFF"},
+        "label": {"fontSize": 12, "color": "#FFFF00"},
+        "callout": {"fontSize": 30, "color": "#00FFFF"}
+      },
+      "visualDefaults": {
+        "*": {
+          "title": [{"show": true, "fontColor": {"solid": {"color": "#FFFFFF"}}, "fontSize": 12}],
+          "categoryAxis": [{"labelColor": {"solid": {"color": "#FFFF00"}}}],
+          "valueAxis": [{"labelColor": {"solid": {"color": "#FFFF00"}}}],
+          "labels": [{"color": {"solid": {"color": "#FFFFFF"}}, "displayUnits": 0}]
+        }
+      }
+    },
+    {
+      "id": "dark",
+      "name": "Dark",
+      "summary": "A charcoal surface with luminous accents for low-light use.",
+      "palette": ["#60A5FA", "#F87171", "#4ADE80", "#FBBF24", "#C4B5FD", "#22D3EE", "#CBD5E1", "#F9A8D4"],
+      "semantic": {
+        "good": "#4ADE80",
+        "bad": "#F87171",
+        "neutral": "#CBD5E1",
+        "warning": "#FBBF24",
+        "emphasis": "#C4B5FD"
+      },
+      "ramps": {
+        "sequential": ["#BAE6FD", "#60A5FA", "#2563EB", "#1D4ED8"],
+        "diverging": ["#F87171", "#FCA5A5", "#1F2937", "#93C5FD", "#2563EB"]
+      },
+      "typography": {
+        "family": "Aptos",
+        "scale": {"caption": 10, "label": 11, "body": 12, "title": 18, "callout": 28}
+      },
+      "surfaces": {
+        "page": "#111827",
+        "card": "#1F2937",
+        "border": "#4B5563",
+        "alt": "#1F2937"
+      },
+      "spacing": {"unit": 8},
+      "numberFormats": {
+        "currency": "$#,##0.00",
+        "percent": "0.0%",
+        "integer": "#,##0",
+        "compactAbove": 1000000
+      },
+      "textClasses": {
+        "title": {"fontSize": 18, "color": "#F9FAFB"},
+        "label": {"fontSize": 11, "color": "#CBD5E1"},
+        "callout": {"fontSize": 28, "color": "#FFFFFF"}
+      },
+      "visualDefaults": {
+        "*": {
+          "title": [{"show": true, "fontColor": {"solid": {"color": "#F9FAFB"}}, "fontSize": 11}],
+          "categoryAxis": [{"labelColor": {"solid": {"color": "#CBD5E1"}}}],
+          "valueAxis": [{"labelColor": {"solid": {"color": "#CBD5E1"}}}],
+          "labels": [{"color": {"solid": {"color": "#F9FAFB"}}, "displayUnits": 0}]
+        }
+      }
+    },
+    {
+      "id": "print",
+      "name": "Print-friendly",
+      "summary": "Ink-conscious grayscale with dark text for export and paper review.",
+      "palette": ["#111111", "#333333", "#555555", "#777777", "#999999", "#1F4E79", "#7F0000", "#3F6212"],
+      "semantic": {
+        "good": "#3F6212",
+        "bad": "#7F0000",
+        "neutral": "#333333",
+        "warning": "#7C2D12",
+        "emphasis": "#1E3A8A"
+      },
+      "ramps": {
+        "sequential": ["#E5E5E5", "#B3B3B3", "#666666", "#111111"],
+        "diverging": ["#7F0000", "#CCCCCC", "#FFFFFF", "#B3CDE3", "#1F4E79"]
+      },
+      "typography": {
+        "family": "Aptos",
+        "scale": {"caption": 9, "label": 10, "body": 11, "title": 16, "callout": 24}
+      },
+      "surfaces": {
+        "page": "#FFFFFF",
+        "card": "#FFFFFF",
+        "border": "#777777",
+        "alt": "#F2F2F2"
+      },
+      "spacing": {"unit": 6},
+      "numberFormats": {
+        "currency": "$#,##0.00",
+        "percent": "0.0%",
+        "integer": "#,##0",
+        "compactAbove": 1000000
+      },
+      "textClasses": {
+        "title": {"fontSize": 16, "color": "#111111"},
+        "label": {"fontSize": 10, "color": "#333333"},
+        "callout": {"fontSize": 24, "color": "#111111"}
+      },
+      "visualDefaults": {
+        "*": {
+          "title": [{"show": true, "fontColor": {"solid": {"color": "#111111"}}, "fontSize": 10}],
+          "categoryAxis": [{"labelColor": {"solid": {"color": "#333333"}}}],
+          "valueAxis": [{"labelColor": {"solid": {"color": "#333333"}}}],
+          "labels": [{"color": {"solid": {"color": "#111111"}}, "displayUnits": 0}]
+        }
+      }
+    }
+  ]
+}

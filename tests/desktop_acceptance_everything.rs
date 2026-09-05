@@ -2829,6 +2829,30 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    h.ok(
+        "report style tokens show",
+        &svec([
+            "report",
+            "style",
+            "tokens",
+            "show",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
+    h.ok(
+        "report style tokens derive",
+        &svec([
+            "report",
+            "style",
+            "tokens",
+            "derive",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
 
     h.ok(
         "report filters add",

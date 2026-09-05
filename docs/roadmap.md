@@ -373,6 +373,9 @@ validation, proof, then mutation breadth.
   `report visuals catalog --formatting` additionally exposes the strict,
   embedded eleven-entry formatting catalog consumed by `set-object`, including
   PBIR containers, encoding, wildcard visual scope, and dated evidence.
+  Bubble-size formatting (`bubbles.bubbleSize`, sn2.4) remains blocked: no
+  archived Desktop property fixture proves its shape. It returns
+  `unsupported_feature`; neither a percent range nor default 20 is enabled.
   `report visuals set-object --batch <file>` applies a bounded SetObject-only
   `powerbi-cli.ops.v1` list across many handles through one atomic transaction,
   returning per-entry outcomes and readback commands in every guarded mode.
@@ -547,6 +550,15 @@ frozen until proven.
   improvements. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
+- Implemented the deterministic P0 design-token slice: the embedded
+  `powerbi-cli.tokens.v1` catalog exposes corporate-neutral, high-contrast,
+  dark, and print sets; `report style tokens show` and `report style tokens derive`
+  read or propose
+  semantic palettes, ramps, typography, surfaces, spacing, number formats,
+  text classes, and per-visual defaults. `style.tokens` compiles through the
+  registered-resource theme boundary, writes locale-aware inferred numeric
+  `formatString` values to TMDL, and enforces WCAG AA contrast (or records an explicit
+  `allowContrastBelowAA` warning in the build scorecard and handoff runbook).
 
 ### Phase 7: Filters, Slicers, Bookmarks, Interactions
 
@@ -649,6 +661,8 @@ IDs and dependencies; this roadmap records what has already landed:
   report-spec v1/v2 validation/normalize/upgrade, and guarded report build.
 - [x] Offline-safe package inspect/extract/import/source-pack/work-pack and
   Desktop export-plan handoff.
+- [x] Rebind runbooks embed the live build/triage scorecard, design findings,
+  and five proof-level statuses without claiming unexecuted golden or Desktop checks.
 - [x] Semantic-model table/column/measure/calculated-column/relationship
   authoring, static-table controls, partition inspection, grouped-rank
   generation, and advanced metadata readback.
