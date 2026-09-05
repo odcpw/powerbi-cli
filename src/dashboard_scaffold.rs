@@ -6,7 +6,7 @@ use crate::report_visual_scaffold::{TextboxStyle, textbox_visual_json_styled};
 use crate::scaffold::{DashboardSpec, normalize_data_type, object_name};
 use crate::{CliResult, report_visual_mutations};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +61,8 @@ pub(super) struct VisualSpec {
     pub(super) width: Option<f64>,
     #[serde(default)]
     pub(super) height: Option<f64>,
+    #[serde(default)]
+    pub(super) format: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -125,6 +127,7 @@ impl Clone for VisualSpec {
             y: self.y,
             width: self.width,
             height: self.height,
+            format: self.format.clone(),
         }
     }
 }
@@ -186,10 +189,10 @@ pub(super) fn visual_json(
     report_visual_mutations::validate_binding_cardinality(&visual_type, &bindings)?;
     crate::pbir_bindings::validate_sort_bindings(&bindings)?;
     let slicer_mode = resolve_slicer_mode(&visual_type, visual.mode.as_deref())?;
-    visual_container_json(&VisualBuildSpec {
+    let mut output = visual_container_json(&VisualBuildSpec {
         name,
         title,
-        visual_type,
+        visual_type: visual_type.clone(),
         bindings,
         slicer_mode,
         slicer_single_select: visual.single_select,
@@ -199,7 +202,15 @@ pub(super) fn visual_json(
         height: visual.height.unwrap_or(180.0),
         width: visual.width.unwrap_or(320.0),
         tab_order: visual_index as u64,
-    })
+    })?;
+    crate::design::defaults::apply_visual_defaults(
+        &mut output,
+        &visual_type,
+        dashboard.style.as_ref(),
+        visual.format.as_ref(),
+        dashboard.design_defaults_enabled,
+    )?;
+    Ok(output)
 }
 
 fn scaffold_visual_binding(

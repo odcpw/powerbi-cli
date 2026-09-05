@@ -200,6 +200,24 @@ const STYLE_TOKENS: NodeSchema = node(
         "surfaces",
         "spacing",
         "numberFormats",
+        "formatting",
+    ],
+);
+const STYLE_FORMATTING: NodeSchema = node(
+    "style.tokens.formatting",
+    "style.tokens.formatting",
+    &[
+        "labels.show",
+        "labels.fontSize",
+        "categoryLabels.show",
+        "categoryLabels.fontSize",
+        "categoryLabels.wordWrap",
+        "categoryAxis.show",
+        "categoryAxis.showAxisTitle",
+        "valueAxis.show",
+        "valueAxis.showAxisTitle",
+        "title.show",
+        "title.text",
     ],
 );
 const STYLE_SEMANTIC: NodeSchema = node(
@@ -391,6 +409,7 @@ const V2_NODES: &[NodeSchema] = &[
     FORMAT_STRING,
     STYLE,
     STYLE_TOKENS,
+    STYLE_FORMATTING,
     STYLE_SEMANTIC,
     STYLE_TYPOGRAPHY,
     STYLE_SURFACES,
@@ -917,6 +936,7 @@ fn style_tokens_with_children(nodes: &[NodeSchema], base: Value) -> Value {
     let surfaces = node_object(nodes, "style.tokens.surfaces", &[]);
     let spacing = node_object(nodes, "style.tokens.spacing", &[]);
     let number_formats = node_object(nodes, "style.tokens.numberFormats", &[]);
+    let formatting = node_object(nodes, "style.tokens.formatting", &[]);
     let mut object = base;
     if let Some(properties) = object.get_mut("properties").and_then(Value::as_object_mut) {
         properties.insert("semantic".to_string(), semantic);
@@ -924,6 +944,7 @@ fn style_tokens_with_children(nodes: &[NodeSchema], base: Value) -> Value {
         properties.insert("surfaces".to_string(), surfaces);
         properties.insert("spacing".to_string(), spacing);
         properties.insert("numberFormats".to_string(), number_formats);
+        properties.insert("formatting".to_string(), formatting);
     }
     object
 }
@@ -1045,28 +1066,57 @@ fn spec_version(root: &Map<String, Value>) -> CliResult<SpecVersion> {
     }
 }
 
-/// Return whether a v2 style contains only the typography tokens consumed by
-/// compiler-generated heading/subtitle textboxes.  Other style sections stay
-/// on the style-completeness bead so report build never silently drops them.
-pub(crate) fn style_is_supported_typography(style: &Value) -> bool {
+/// Return whether a v2 style contains only compiler-supported typography and
+/// formatting-default fields. Other style sections stay on the style-
+/// completeness bead so report build never silently drops them.
+pub(crate) fn style_is_supported_compiled(style: &Value) -> bool {
     let Some(style) = style.as_object() else {
         return false;
     };
-    if style.keys().any(|key| key != "tokens") {
-        return false;
-    }
-    let Some(tokens) = style.get("tokens").and_then(Value::as_object) else {
-        return false;
-    };
-    if tokens.keys().any(|key| key != "typography") {
-        return false;
-    }
-    let Some(typography) = tokens.get("typography").and_then(Value::as_object) else {
-        return false;
-    };
-    !typography
+    if style
         .keys()
-        .any(|key| !matches!(key.as_str(), "family" | "scale"))
+        .any(|key| !matches!(key.as_str(), "tokens" | "defaults"))
+    {
+        return false;
+    }
+    if style
+        .get("defaults")
+        .is_some_and(|value| !value.is_object())
+    {
+        return false;
+    }
+    let Some(tokens_value) = style.get("tokens") else {
+        return style.contains_key("defaults");
+    };
+    let Some(tokens) = tokens_value.as_object() else {
+        return false;
+    };
+    if tokens
+        .keys()
+        .any(|key| !matches!(key.as_str(), "typography" | "formatting"))
+    {
+        return false;
+    }
+    if tokens
+        .get("formatting")
+        .is_some_and(|value| !value.is_object())
+    {
+        return false;
+    }
+    if let Some(typography) = tokens.get("typography") {
+        let Some(typography) = typography.as_object() else {
+            return false;
+        };
+        if typography
+            .keys()
+            .any(|key| !matches!(key.as_str(), "family" | "scale"))
+        {
+            return false;
+        }
+    }
+    tokens.contains_key("typography")
+        || tokens.contains_key("formatting")
+        || style.contains_key("defaults")
 }
 
 fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
@@ -1115,6 +1165,7 @@ fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
             STYLE_NUMBER_FORMATS,
             "/style/tokens",
         )?;
+        walk_child_object_at(tokens, "formatting", STYLE_FORMATTING, "/style/tokens")?;
     }
     if let Some(layout) = walk_child_object(root, "layout", LAYOUT_ROOT, "")? {
         walk_child_object_at(layout, "grid", LAYOUT_GRID, "/layout")?;
@@ -1264,7 +1315,7 @@ fn first_uncompiled_v2_section(
     }
     if root
         .get("style")
-        .is_some_and(|style| !style_is_supported_typography(style))
+        .is_some_and(|style| !style_is_supported_compiled(style))
     {
         return Some((
             "style".to_string(),
@@ -1357,7 +1408,10 @@ pub(crate) struct UncompiledSection {
     pub(crate) suggested_command: &'static str,
 }
 
-pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSection>> {
+pub(crate) fn uncompiled_v2_sections(
+    spec: &Value,
+    design_defaults: bool,
+) -> CliResult<Vec<UncompiledSection>> {
     let Some(root) = spec.as_object() else {
         return Ok(Vec::new());
     };
@@ -1424,7 +1478,7 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
     }
     if root
         .get("style")
-        .is_some_and(|style| !style_is_supported_typography(style))
+        .is_some_and(|style| !style_is_supported_compiled(style))
     {
         push(
             "style".to_string(),
@@ -1483,7 +1537,7 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                             );
                         }
                     }
-                    for field in ["format", "conditionalFormatting"] {
+                    for field in ["conditionalFormatting"] {
                         if visual.contains_key(field) {
                             push(
                                 format!("pages[{page_index}].visuals[{visual_index}].{field}"),
@@ -1492,6 +1546,14 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                                 "powerbi-cli report visuals set-object --project <project-dir> --handle <visual-handle> --object <object> --property <property> --value <value> --dry-run --json",
                             );
                         }
+                    }
+                    if visual.contains_key("format") && !design_defaults {
+                        push(
+                            format!("pages[{page_index}].visuals[{visual_index}].format"),
+                            format!("{visual_pointer}/format"),
+                            FORMAT_BEAD,
+                            "powerbi-cli report visuals set-object --project <project-dir> --handle <visual-handle> --object <object> --property <property> --value <value> --dry-run --json",
+                        );
                     }
                 }
             }
@@ -1687,6 +1749,7 @@ struct StyleTokensV2 {
     surfaces: Option<SurfaceTokensV2>,
     spacing: Option<SpacingTokensV2>,
     number_formats: Option<NumberFormatTokensV2>,
+    formatting: Option<BTreeMap<String, Value>>,
 }
 
 value_struct!(SemanticTokensV2 {

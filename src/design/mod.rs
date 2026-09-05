@@ -6,5 +6,6 @@
 //! diagnostic.  Consumers such as `report layout auto` are responsible for
 //! applying those coordinates to a project.
 
+pub(crate) mod defaults;
 pub(crate) mod grid;
 pub(crate) mod lint;

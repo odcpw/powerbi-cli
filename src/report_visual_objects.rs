@@ -153,7 +153,7 @@ pub(crate) fn apply_set_object_operation(
     let before = property_at(&visual_json, spec)
         .cloned()
         .unwrap_or(Value::Null);
-    upsert_object_property(&mut visual_json, spec, operation.value.clone())?;
+    apply_set_object_value_to_visual_json(&mut visual_json, operation)?;
     let after = property_at(&visual_json, spec)
         .cloned()
         .unwrap_or_else(|| operation.value.clone());
@@ -435,6 +435,58 @@ fn encode_property_value(spec: &ObjectProperty, raw: &str) -> CliResult<Value> {
         }
         FormattingEncoding::String => Ok(literal_expression(&encode_text_literal(raw))),
     }
+}
+
+/// Encode a JSON value from a declarative formatting/defaults catalog using
+/// the exact PBIR literal representation accepted by `set-object`.
+///
+/// Catalogs carry typed JSON values rather than command-line strings, but
+/// they must still cross this one encoder boundary. Keeping this function
+/// beside the command parser prevents compiler/default code from inventing a
+/// second PBIR representation.
+pub(crate) fn encode_catalog_value(spec: &ObjectProperty, raw: &Value) -> CliResult<Value> {
+    match spec.encoding {
+        FormattingEncoding::Bool => raw
+            .as_bool()
+            .map(|value| literal_expression(if value { "true" } else { "false" }))
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "value for {}.{} must be a boolean",
+                    spec.object, spec.property
+                ))
+            }),
+        FormattingEncoding::Double => raw
+            .as_f64()
+            .filter(|value| value.is_finite())
+            .map(|value| literal_expression(&encode_double_literal(value)))
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "value for {}.{} must be a finite number",
+                    spec.object, spec.property
+                ))
+            }),
+        FormattingEncoding::String => raw
+            .as_str()
+            .map(|value| literal_expression(&encode_text_literal(value)))
+            .ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "value for {}.{} must be a string",
+                    spec.object, spec.property
+                ))
+            }),
+    }
+}
+
+/// Apply an already encoded SetObject payload to an in-memory visual JSON
+/// value. The operation kernel and design-default compiler both call this
+/// boundary, so object-slot creation and PBIR pointer semantics stay exactly
+/// aligned with the public `set-object` command.
+pub(crate) fn apply_set_object_value_to_visual_json(
+    visual_json: &mut Value,
+    operation: &SetObject,
+) -> CliResult<()> {
+    let spec = resolve_object_property(Some(&operation.object), Some(&operation.property))?;
+    upsert_object_property(visual_json, spec, operation.value.clone())
 }
 
 fn literal_expression(value: &str) -> Value {

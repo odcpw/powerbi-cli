@@ -2080,6 +2080,18 @@ fn everything_acceptance_invokes_every_catalog_command() {
         "report design-plan",
         &svec(["report", "design-plan", "--project", &project_arg, "--json"]),
     );
+    h.ok(
+        "report design defaults show",
+        &svec([
+            "report",
+            "design",
+            "defaults",
+            "show",
+            "--project",
+            &project_arg,
+            "--json",
+        ]),
+    );
 
     let visuals = h.ok(
         "report visuals list",

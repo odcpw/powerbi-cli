@@ -2,7 +2,7 @@ use crate::contract::suggested_command_path;
 use crate::feature_catalog::unsupported_feature_error;
 use crate::report_bookmarks::bookmarks_command;
 use crate::report_build::{build_command, spec_command};
-use crate::report_design::design_plan_command;
+use crate::report_design::{design_defaults_command, design_plan_command};
 use crate::report_drilldown::drilldown_command;
 use crate::report_drillthrough::drillthrough_command;
 use crate::report_filters::filters_command;
@@ -33,8 +33,22 @@ pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
         [family, action, rest @ ..] if family == "design" && action == "plan" => {
             design_plan_command(rest)
         }
+        [family, action, subcommand, rest @ ..]
+            if family == "design" && action == "defaults" && subcommand == "show" =>
+        {
+            design_defaults_command(rest)
+        }
+        [family, action, rest @ ..] if family == "design" && action == "defaults" => {
+            design_defaults_command(rest)
+        }
         [family, rest @ ..] if matches!(family.as_str(), "design-plan" | "designplan") => {
             design_plan_command(rest)
+        }
+        [family, action, rest @ ..]
+            if matches!(family.as_str(), "design-defaults" | "designdefaults")
+                && action == "show" =>
+        {
+            design_defaults_command(rest)
         }
         [family, rest @ ..] if matches!(family.as_str(), "layout" | "layouts") => {
             layout_command(rest)
@@ -90,7 +104,7 @@ pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
             Err(unsupported_feature_error("report.tooltip-pages"))
         }
         [] => Err(CliError::invalid_args(
-            "report requires a subcommand: build, spec fields, spec schema, spec explain, spec validate, spec normalize, spec upgrade, design-plan, wireframe export, pages, bookmarks, filters, slicers, interactions, themes, visuals",
+            "report requires a subcommand: build, spec fields, spec schema, spec explain, spec validate, spec normalize, spec upgrade, design-plan, design defaults show, wireframe export, pages, bookmarks, filters, slicers, interactions, themes, visuals",
         )
         .with_hint("Run `powerbi-cli report spec fields --schema <schema.json> --json`, `powerbi-cli report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir> --json`, or inspect supported report primitives.")
         .with_suggested_command(

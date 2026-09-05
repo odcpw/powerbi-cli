@@ -1010,6 +1010,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: true,
         commands: &[
             "report design-plan",
+            "report design defaults show",
             "report layout auto",
             "report wireframe export",
         ],
