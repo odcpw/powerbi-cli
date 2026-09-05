@@ -4,6 +4,7 @@ use crate::cli_support::{
 use crate::design::grid::{
     self, Grid, PageSize, RailSide, SlotPosition, Template, resolve_rail_position,
 };
+use crate::design::tokens::{CompiledTokens, apply_compiled_theme, compile_tokens};
 
 mod layout;
 use crate::input_safety::{InputKind, read_utf8};
@@ -25,9 +26,7 @@ use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
-use crate::report_spec_schema::{
-    reject_uncompiled_v2_sections, style_is_supported_typography, validate_known_fields,
-};
+use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::scorecard::{dry_run_scorecard, project_scorecard};
@@ -70,6 +69,7 @@ struct BuildResponse<'a> {
     compiled: &'a CompiledDashboard,
     profile: Option<&'a Value>,
     scaffold: Option<Value>,
+    theme_outcome: Option<OpOutcome>,
     proof_plan: Option<&'a ProofPlan>,
     trace: bool,
 }
@@ -133,6 +133,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
             compiled: &compiled,
             profile: profile_value.as_ref(),
             scaffold: None,
+            theme_outcome: None,
             proof_plan: dry_run_proof_plan.as_ref(),
             trace: options.trace,
         }));
@@ -155,6 +156,12 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
     } else {
         build_with_operations(&mut compiled, &schema_path, &out_dir, options.force)?
     };
+    let theme_outcome = if let Some(style_tokens) = compiled.style_tokens.as_ref() {
+        let resolved = crate::resolve_project(&out_dir)?;
+        Some(apply_compiled_theme(style_tokens, &resolved)?)
+    } else {
+        None
+    };
     Ok(build_response(BuildResponse {
         dry_run: false,
         changed: true,
@@ -165,6 +172,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         compiled: &compiled,
         profile: profile_value.as_ref(),
         scaffold: Some(scaffold),
+        theme_outcome,
         proof_plan: proof_plan.as_ref(),
         trace: options.trace,
     }))
@@ -493,13 +501,25 @@ fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> 
         }
     }
 
-    let semantic_tokens = root
+    let raw_semantic_tokens = root
         .get("style")
         .and_then(Value::as_object)
         .and_then(|style| style.get("tokens"))
         .and_then(Value::as_object)
         .and_then(|tokens| tokens.get("semantic"))
         .and_then(Value::as_object);
+    // A style.tokens object inherits the catalog semantic map (the explicit
+    // preset, or corporate-neutral by default) before conditional-formatting
+    // references are checked. An explicitly supplied (even empty) semantic
+    // object remains authoritative so the missing-input diagnostic still
+    // points at the omitted token.
+    let token_catalog_provides_semantics = raw_semantic_tokens.is_none()
+        && root
+            .get("style")
+            .and_then(Value::as_object)
+            .and_then(|style| style.get("tokens"))
+            .and_then(Value::as_object)
+            .is_some();
     let mut referenced_tokens = BTreeSet::new();
     for page in root
         .get("pages")
@@ -522,11 +542,12 @@ fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> 
         }
     }
     for token in referenced_tokens {
-        if !semantic_tokens.is_some_and(|tokens| {
+        if !raw_semantic_tokens.is_some_and(|tokens| {
             tokens.get(&token).is_some_and(|value| {
                 !value.is_null() && value.as_str().is_none_or(|value| !value.trim().is_empty())
             })
-        }) {
+        }) && !token_catalog_provides_semantics
+        {
             return Err(spec_missing_input(
                 format!("/style/tokens/semantic/{}", escape_pointer_token(&token)),
                 "style.tokens.semantic",
@@ -870,6 +891,7 @@ struct CompiledDashboard {
     operation_outcomes: Vec<OpOutcome>,
     warnings: Vec<Value>,
     defaults_applied: Vec<Value>,
+    style_tokens: Option<CompiledTokens>,
 }
 
 #[derive(Debug, Clone)]
@@ -903,6 +925,7 @@ fn compile_dashboard(
                 "value": "schema.pages",
                 "reason": "the optional dashboard spec was omitted; pages embedded in the schema are used"
             })],
+            style_tokens: None,
         });
     };
     validate_known_fields(spec)?;
@@ -922,28 +945,47 @@ fn compile_dashboard(
     };
     reject_uncompiled_v2_sections(&sections_to_check)?;
     let _proof_plan = compile_proof_plan(Some(spec), None)?;
+    let spec_object = spec
+        .as_object()
+        .ok_or_else(|| CliError::invalid_args("dashboard spec root must be an object"))?;
+    let style_tokens = compile_style_tokens(spec_object)?;
     if spec.get("report").is_none() && spec.get("pages").is_some() {
-        let (schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
+        let (mut schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
+        let mut defaults_applied = Vec::new();
+        if let Some(style_tokens) = style_tokens.as_ref() {
+            apply_number_formats(&mut schema, &style_tokens.tokens, &mut defaults_applied)?;
+        }
+        let mut operations = vec![
+            json!({"kind": "legacySpecMerge", "summary": "merged top-level dashboard fields into schema manifest"}),
+        ];
+        if let Some(style_tokens) = style_tokens.as_ref() {
+            operations.push(json!({
+                "kind": "styleTokens",
+                "summary": format!("compiled {} design tokens into a registered Power BI theme", style_tokens.tokens["id"].as_str().unwrap_or("corporate-neutral"))
+            }));
+        }
         return Ok(CompiledDashboard {
             schema,
-            operations: vec![
-                json!({"kind": "legacySpecMerge", "summary": "merged top-level dashboard fields into schema manifest"}),
-            ],
+            operations,
             typed_operations: Vec::new(),
             operation_pointers: Vec::new(),
             operation_outcomes: Vec::new(),
             warnings: notes
                 .into_iter()
                 .map(|message| json!({"code": "report_build.legacy_spec", "message": message}))
+                .chain(
+                    style_tokens
+                        .as_ref()
+                        .into_iter()
+                        .flat_map(|tokens| tokens.warnings.iter().cloned()),
+                )
                 .collect(),
-            defaults_applied: Vec::new(),
+            defaults_applied,
+            style_tokens,
         });
     }
 
     let mut merged = schema.clone();
-    let spec_object = spec
-        .as_object()
-        .ok_or_else(|| CliError::invalid_args("dashboard spec root must be an object"))?;
     let report = spec_object
         .get("report")
         .and_then(Value::as_object)
@@ -974,6 +1016,9 @@ fn compile_dashboard(
             .ok_or_else(|| CliError::invalid_args("schema root must be an object"))?
             .insert("pages".to_string(), Value::Array(pages));
     }
+    if let Some(style_tokens) = style_tokens.as_ref() {
+        apply_number_formats(&mut merged, &style_tokens.tokens, &mut defaults_applied)?;
+    }
     let mut operations = vec![json!({
         "kind": "compileDashboardSpec",
         "summary": "compiled powerbi-cli.dashboard.v1 report/pages/visuals into scaffold-compatible manifest"
@@ -995,16 +1040,12 @@ fn compile_dashboard(
     );
     warnings.extend(drillthrough_warnings);
     warnings.extend(slicer_warnings);
-    if let Some(style) = spec_object.get("style")
-        && (spec_object.get("schema").and_then(Value::as_str) != Some("powerbi-cli.dashboard.v2")
-            || !style_is_supported_typography(style))
-    {
-        return Err(CliError::unsupported_feature(
-            "report build style application from dashboard spec is not implemented yet"
-        )
-        .with_suggested_command(
-            "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
-        ));
+    if let Some(style_tokens) = style_tokens.as_ref() {
+        operations.push(json!({
+            "kind": "styleTokens",
+            "summary": format!("compiled {} design tokens into a registered Power BI theme", style_tokens.tokens["id"].as_str().unwrap_or("corporate-neutral"))
+        }));
+        warnings.extend(style_tokens.warnings.iter().cloned());
     }
     if spec_object.get("proof").is_some() {
         operations.push(json!({
@@ -1020,7 +1061,192 @@ fn compile_dashboard(
         operation_pointers,
         operation_outcomes: Vec::new(),
         defaults_applied,
+        style_tokens,
     })
+}
+
+fn compile_style_tokens(spec: &Map<String, Value>) -> CliResult<Option<CompiledTokens>> {
+    let Some(style) = spec.get("style").and_then(Value::as_object) else {
+        return Ok(None);
+    };
+    let Some(tokens) = style.get("tokens") else {
+        return Err(CliError::unsupported_feature(
+            "dashboard spec style is supported only through style.tokens",
+        )
+        .with_suggested_command(
+            "powerbi-cli report style tokens show --project <project-dir-or.pbip> --json",
+        ));
+    };
+    if style.keys().any(|key| key != "tokens") {
+        return Err(CliError::unsupported_feature(
+            "dashboard spec style.preset, style.bundle, and style.defaults are not compiled; use style.tokens",
+        )
+        .with_suggested_command(
+            "powerbi-cli report style tokens show --project <project-dir-or.pbip> --json",
+        ));
+    }
+    Ok(Some(compile_tokens(tokens)?))
+}
+
+fn apply_number_formats(
+    schema: &mut Value,
+    tokens: &Value,
+    defaults_applied: &mut Vec<Value>,
+) -> CliResult<()> {
+    let locale = schema
+        .get("locale")
+        .and_then(Value::as_str)
+        .unwrap_or("en-US")
+        .to_string();
+    let Some(tables) = schema.get_mut("tables").and_then(Value::as_array_mut) else {
+        return Ok(());
+    };
+    let formats = &tokens["numberFormats"];
+    for (table_index, table) in tables.iter_mut().enumerate() {
+        let Some(table_object) = table.as_object_mut() else {
+            continue;
+        };
+        let table_name = table_object
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("table")
+            .to_string();
+        if let Some(columns) = table_object
+            .get_mut("columns")
+            .and_then(Value::as_array_mut)
+        {
+            for (column_index, column) in columns.iter_mut().enumerate() {
+                let Some(column_object) = column.as_object_mut() else {
+                    continue;
+                };
+                if column_object
+                    .get("formatString")
+                    .is_some_and(|value| !value.is_null())
+                {
+                    continue;
+                }
+                let data_type = column_object
+                    .get("dataType")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let Some(format) = inferred_format(
+                    column_object
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                    data_type,
+                    formats,
+                    &locale,
+                ) else {
+                    continue;
+                };
+                column_object.insert("formatString".to_string(), Value::String(format.clone()));
+                defaults_applied.push(json!({
+                    "pointer": format!("/tables/{table_index}/columns/{column_index}/formatString"),
+                    "field": "style.tokens.numberFormats",
+                    "value": format,
+                    "reason": format!("design token number format inferred for {table_name} column")
+                }));
+            }
+        }
+        if let Some(measures) = table_object
+            .get_mut("measures")
+            .and_then(Value::as_array_mut)
+        {
+            for (measure_index, measure) in measures.iter_mut().enumerate() {
+                let Some(measure_object) = measure.as_object_mut() else {
+                    continue;
+                };
+                if measure_object
+                    .get("formatString")
+                    .is_some_and(|value| !value.is_null())
+                {
+                    continue;
+                }
+                let Some(format) = inferred_format(
+                    measure_object
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                    "decimal",
+                    formats,
+                    &locale,
+                ) else {
+                    continue;
+                };
+                measure_object.insert("formatString".to_string(), Value::String(format.clone()));
+                defaults_applied.push(json!({
+                    "pointer": format!("/tables/{table_index}/measures/{measure_index}/formatString"),
+                    "field": "style.tokens.numberFormats",
+                    "value": format,
+                    "reason": format!("design token number format inferred for {table_name} measure")
+                }));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn inferred_format(name: &str, data_type: &str, formats: &Value, locale: &str) -> Option<String> {
+    let kind = data_type.to_ascii_lowercase();
+    if !matches!(
+        kind.as_str(),
+        "int"
+            | "integer"
+            | "whole"
+            | "whole_number"
+            | "int64"
+            | "double"
+            | "float"
+            | "number"
+            | "decimal"
+            | "fixed_decimal"
+            | "currency"
+    ) {
+        return None;
+    }
+    let lower = name.to_ascii_lowercase();
+    let field = if kind == "currency" {
+        "currency"
+    } else if ["percent", "percentage", "rate", "margin", "ratio", "share"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+    {
+        "percent"
+    } else if [
+        "revenue", "sales", "amount", "price", "cost", "profit", "budget", "value",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+    {
+        "currency"
+    } else {
+        "integer"
+    };
+    formats[field]
+        .as_str()
+        .map(|format| localize_builtin_format(format, field, locale))
+}
+
+fn localize_builtin_format(format: &str, field: &str, locale: &str) -> String {
+    if field != "currency" || format != "$#,##0.00" {
+        return format.to_string();
+    }
+    let locale = locale.to_ascii_lowercase();
+    if locale == "en-gb" {
+        "£#,##0.00".to_string()
+    } else if matches!(locale.as_str(), "de-ch" | "fr-ch" | "it-ch") {
+        "CHF #,##0.00".to_string()
+    } else if locale.starts_with("de-")
+        || locale.starts_with("fr-")
+        || locale.starts_with("it-")
+        || locale.starts_with("es-")
+        || locale.starts_with("nl-")
+    {
+        "#,##0.00 €".to_string()
+    } else {
+        format.to_string()
+    }
 }
 
 /// Apply compiler-generated operations to a scaffolded working copy before it
@@ -3201,7 +3427,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             "createdHandles": outcome.created_handles,
         })
     }));
-    let readback = if typed_execution {
+    let mut readback = if typed_execution {
         let mut grouped = BTreeMap::<String, Vec<String>>::new();
         for outcome in &response.compiled.operation_outcomes {
             for (handle, command) in outcome.created_handles.iter().zip(&outcome.readback) {
@@ -3215,7 +3441,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
     } else {
         execution.readback.clone()
     };
-    let scope = if typed_execution {
+    let mut scope = if typed_execution {
         json!({
             "kind": "report-build",
             "mode": if response.dry_run { "dry-run" } else { "out-dir" },
@@ -3226,11 +3452,31 @@ fn build_response(response: BuildResponse<'_>) -> Value {
     } else {
         execution.scope.clone()
     };
+    if let Some(theme_outcome) = response.theme_outcome {
+        changes.extend(theme_outcome.changes);
+        if let Some(readback) = readback.as_object_mut() {
+            readback.insert(
+                "theme:report".to_string(),
+                Value::Array(
+                    theme_outcome
+                        .readback
+                        .into_iter()
+                        .map(Value::String)
+                        .collect(),
+                ),
+            );
+        }
+        if let Some(handles) = scope["handles"].as_array_mut() {
+            handles.extend(theme_outcome.created_handles.into_iter().map(Value::String));
+            handles.sort_by_key(|handle| handle.as_str().map(str::to_owned));
+            handles.dedup();
+        }
+    }
     let validation = response
         .out_dir
         .and_then(|path| crate::resolve_project(path).ok())
         .and_then(|project| validate_project(&project).ok());
-    let scorecard = response
+    let mut scorecard = response
         .out_dir
         .and_then(|path| crate::resolve_project(path).ok())
         .map(|project| project_scorecard(&project, "unit-smoke"))
@@ -3247,6 +3493,19 @@ fn build_response(response: BuildResponse<'_>) -> Value {
                 ),
             )
         });
+    if let Some(style_tokens) = response.compiled.style_tokens.as_ref() {
+        scorecard["styleTokens"] = json!({
+            "id": style_tokens.tokens["id"],
+            "allowContrastBelowAA": style_tokens.allow_contrast_below_aa,
+            "warningCount": style_tokens.warnings.len()
+        });
+    }
+    if response.changed && response.compiled.style_tokens.is_some() {
+        executed_primitives.push(json!({
+            "command": "report style tokens",
+            "reason": "applied compiled design tokens through the registered-resource theme boundary"
+        }));
+    }
     let mut output = json!({
         "schema": "powerbi-cli.report.build.v1",
         "ok": validation.as_ref().is_none_or(|validation| validation.errors.is_empty()),
@@ -3298,6 +3557,13 @@ fn build_response(response: BuildResponse<'_>) -> Value {
     if response.trace {
         output["trace"] = Value::Array(execution.trace);
     }
+    if let Some(style_tokens) = response.compiled.style_tokens.as_ref() {
+        output["styleTokens"] = json!({
+            "id": style_tokens.tokens["id"],
+            "allowContrastBelowAA": style_tokens.allow_contrast_below_aa,
+            "warningCount": style_tokens.warnings.len()
+        });
+    }
     output
 }
 
@@ -3312,7 +3578,7 @@ fn compiled_summary(compiled: &CompiledDashboard) -> Value {
         })
         .collect::<Vec<_>>();
     let generated_bindings = generated_visuals.len();
-    json!({
+    let mut output = json!({
         "counts": {
             "tables": validation.counts.tables,
             "columns": validation.counts.columns,
@@ -3326,7 +3592,15 @@ fn compiled_summary(compiled: &CompiledDashboard) -> Value {
         "ops": compiled.operations.len(),
         "tables": validation.tables,
         "defaultsApplied": compiled.defaults_applied
-    })
+    });
+    if let Some(style_tokens) = compiled.style_tokens.as_ref() {
+        output["styleTokens"] = json!({
+            "id": style_tokens.tokens["id"],
+            "allowContrastBelowAA": style_tokens.allow_contrast_below_aa,
+            "warningCount": style_tokens.warnings.len()
+        });
+    }
+    output
 }
 
 /// The report compiler still emits a compact legacy operation summary.  Keep
@@ -3386,6 +3660,8 @@ fn legacy_execution_trace(
             handles.push("report:main".to_string());
             handles.extend(generated.iter().cloned());
             handles
+        } else if kind == "styleTokens" {
+            vec!["theme:report".to_string()]
         } else {
             Vec::new()
         };
@@ -3498,6 +3774,11 @@ fn readback_command_for_handle(handle: &str, project_arg: &str) -> Option<String
     if handle.starts_with("measure:") {
         return Some(format!(
             "powerbi-cli model measures show --project {project_arg} --handle {handle_arg} --json"
+        ));
+    }
+    if handle == "theme:report" {
+        return Some(format!(
+            "powerbi-cli report style tokens show --project {project_arg} --json"
         ));
     }
     if handle.starts_with("table:") {
@@ -3795,6 +4076,46 @@ mod ergonomics_tests {
         assert_eq!(
             next_for_spec_validate(spec, None, Some(profile), true, "shape-only", None)[0],
             "powerbi-cli report spec validate --schema <schema.json> --profile 'profile input.json' --spec 'dashboard spec.json' --json"
+        );
+    }
+}
+
+#[cfg(test)]
+mod design_token_number_format_tests {
+    use super::*;
+
+    #[test]
+    fn number_format_mapping_honors_type_name_locale_and_custom_tokens() {
+        let formats = json!({
+            "currency": "$#,##0.00",
+            "percent": "0.0%",
+            "integer": "#,##0"
+        });
+        assert_eq!(
+            inferred_format("Units", "currency", &formats, "de-CH").as_deref(),
+            Some("CHF #,##0.00")
+        );
+        assert_eq!(
+            inferred_format("Margin Rate", "decimal", &formats, "en-US").as_deref(),
+            Some("0.0%")
+        );
+        assert_eq!(
+            inferred_format("Order Count", "int64", &formats, "en-US").as_deref(),
+            Some("#,##0")
+        );
+        assert_eq!(
+            inferred_format("Customer", "string", &formats, "en-US"),
+            None
+        );
+
+        let custom = json!({
+            "currency": "USD #,##0",
+            "percent": "0%",
+            "integer": "0"
+        });
+        assert_eq!(
+            inferred_format("Revenue", "decimal", &custom, "de-DE").as_deref(),
+            Some("USD #,##0")
         );
     }
 }

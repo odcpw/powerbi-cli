@@ -114,6 +114,7 @@ define_rules! {
     OPS_DANGLING_HANDLE => ("ops.dangling_handle", Validation, "error", "An operation references an unavailable handle.", "Use a handle from the project or an earlier declaration in this plan.", None),
     OPS_HANDLE_MISMATCH => ("ops.handle_mismatch", Validation, "error", "A kernel created a different handle from its declaration.", "Do not commit this plan; inspect the declared and returned handles and report the kernel mismatch.", None),
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
+    DESIGN_CONTRAST_BELOW_AA => ("design.contrast_below_aa", Design, "warning", "A design-token foreground/background pair is below the WCAG AA contrast threshold.", "Choose a higher-contrast token pair, or explicitly waive the check and review the recorded handoff warning.", None),
     FEATURE_PENDING => ("feature_pending", Report, "warning", "Template section dividers are omitted until a proven shape capability is available.", "Keep the resolved template geometry and follow the shape capability proof status.", None),
     PLAN_MISSING_INPUT => ("plan.missing_input", Validation, "error", "Required planner evidence is missing or ambiguous.", "Supply the named intent or schema field and rerun the suggested command; no default layout is written.", None),
     VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
@@ -304,8 +305,9 @@ mod tests {
 
     #[test]
     fn design_lint_has_a_typed_complete_rule_family() {
-        assert_eq!(rules_for_family(RuleFamily::Design).count(), 11);
+        assert_eq!(rules_for_family(RuleFamily::Design).count(), 12);
         for id in [
+            "design.contrast_below_aa",
             "report.visual_outside_page",
             "design.visual_overlap",
             "design.visual_off_grid",
@@ -323,6 +325,13 @@ mod tests {
                 Some(RuleFamily::Design)
             );
         }
+    }
+
+    #[test]
+    fn design_family_registers_the_contrast_waiver_diagnostic() {
+        let rule = find_rule(super::DESIGN_CONTRAST_BELOW_AA).expect("registered contrast rule");
+        assert_eq!(rule.family, RuleFamily::Design);
+        assert_eq!(rule.severity, "warning");
     }
 
     #[test]

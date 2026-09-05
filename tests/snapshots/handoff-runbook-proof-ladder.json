@@ -1,0 +1,27 @@
+[
+  {
+    "evidenceRequired": "Native validation and local lint checks; warnings remain in the scorecard.",
+    "level": "unit-smoke",
+    "status": "local-checks-passed"
+  },
+  {
+    "evidenceRequired": "Compare the current project with an approved schema golden.",
+    "level": "schema-golden",
+    "status": "not-verified"
+  },
+  {
+    "evidenceRequired": "Provide a matching Desktop-authored reference; canvas and refresh proof is still pending.",
+    "level": "desktop-golden-pending",
+    "status": "not-verified"
+  },
+  {
+    "evidenceRequired": "Record a manual Desktop canvas and refresh review for the current project.",
+    "level": "manual-desktop-canvas-refresh",
+    "status": "not-verified"
+  },
+  {
+    "evidenceRequired": "Record automated Desktop canvas and refresh evidence for the current project.",
+    "level": "desktop-canvas-refresh",
+    "status": "not-verified"
+  }
+]

@@ -45,7 +45,7 @@ struct DiffOptions {
 pub(crate) fn style_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "report style requires a subcommand: inspect, extract, diff, or apply",
+            "report style requires a subcommand: inspect, extract, diff, apply, or tokens",
         )
         .with_hint("Use style bundles for schema-independent master-format extraction and application.")
         .with_suggested_command(
@@ -57,6 +57,7 @@ pub(crate) fn style_command(args: &[String]) -> CliResult<Value> {
         "extract" | "export" => extract_style(rest),
         "diff" => diff_style(rest),
         "apply" | "import" => apply_style(rest),
+        "tokens" => crate::design::tokens::tokens_command(rest),
         other => Err(CliError::invalid_args(format!(
             "unknown report style command: {other}"
         ))

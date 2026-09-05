@@ -333,7 +333,10 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "outputModes": ["json via --json or --format json; accepted before or after command"],
         "globalFlags": global_flags(),
         "exitCodes": exit_codes(),
-        "diagnosticCodes": diagnostic_codes(),
+        // Keep focused discovery compact: design-token contrast diagnostics
+        // belong to report build/style commands and are still advertised in
+        // the full catalog and on those command entries below.
+        "diagnosticCodes": diagnostic_codes(focused),
         "limits": input_safety::limits_json(),
         "contractNotes": {
             "explainFlagDiscipline": "--explain <id> always takes an identifier. Whole-artifact explanations are subcommands, such as report spec explain and report plan explain."
@@ -1143,7 +1146,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "path": "handoff rebind-plan",
             "aliases": ["handoff rebind", "handoff-rebind-plan"],
             "usage": "powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json",
-            "summary": "Generate a redacted work-machine rebind plan and suppress runbook materialization when a template or partition contains credentials",
+            "summary": "Generate a redacted work-machine rebind runbook with a live design scorecard and proof-status ladder; suppress writes when templates or partitions contain credentials",
             "tags": ["handoff", "offline", "rebind", "source-template", "partition", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1154,7 +1157,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.handoff.rebind-plan.v1",
             "flags": ["--project <project-dir-or.pbip>", "--templates <source-templates.json|->", "--table <table>", "--partition <partition-handle-or-name>", "--allow-unmapped", "--out <file.md>", "--out-file <file.md>", "--force", "--json", "--format json"],
             "examples": ["powerbi-cli handoff rebind-plan build/sales --json", "powerbi-cli handoff rebind-plan build/sales --out work-machine-rebind.md --json", "powerbi-cli handoff rebind-plan build/sales --out work-machine-rebind.md --force --json", "powerbi-cli handoff rebind build/sales --json", "powerbi-cli handoff-rebind-plan build/sales --json"],
-            "followUpFields": ["ok", "complete", "status", "counts", "plans[].partitionHandle", "plans[].template", "instructionsMarkdown", "runbookRequestedPath", "runbookPath", "runbookWritten", "materializationBlocked", "materializationBlockReasons", "handoffCheckCommand", "validateCommand", "next"]
+            "followUpFields": ["ok", "complete", "status", "counts", "plans[].partitionHandle", "plans[].template", "scorecard", "scorecard.designLint", "scorecard.proofLevel", "proofLadder[].level", "proofLadder[].status", "proofLadder[].evidenceRequired", "instructionsMarkdown", "runbookRequestedPath", "runbookPath", "runbookWritten", "materializationBlocked", "materializationBlockReasons", "handoffCheckCommand", "validateCommand", "next"]
         }),
         json!({
             "path": "handoff rebind-check",
@@ -1284,8 +1287,8 @@ fn exit_codes() -> Vec<Value> {
     ]
 }
 
-fn diagnostic_codes() -> Vec<Value> {
-    vec![
+fn diagnostic_codes(focused: bool) -> Vec<Value> {
+    let mut codes = vec![
         json!({"code": "invalid_args", "exitCode": EXIT_INVALID_ARGS}),
         json!({"code": "docs_drift", "exitCode": EXIT_DOCS_DRIFT}),
         json!({"code": "docs.unknown_command", "exitCode": EXIT_DOCS_DRIFT}),
@@ -1305,12 +1308,22 @@ fn diagnostic_codes() -> Vec<Value> {
         json!({"code": "backend_failed", "exitCode": EXIT_ORACLE_FAILED}),
         json!({"code": "protocol_failed", "exitCode": EXIT_ORACLE_FAILED}),
         json!({"code": "unexpected", "exitCode": EXIT_UNEXPECTED}),
-    ]
+    ];
+    // The full contract owns the complete diagnostic vocabulary. Focused
+    // discovery omits the style-token-only code to stay below its compact
+    // response-size budget; report build/style command entries carry it.
+    if !focused {
+        codes.insert(
+            6,
+            json!({"code": "design.contrast_below_aa", "exitCode": EXIT_VALIDATION_FAILED}),
+        );
+    }
+    codes
 }
 
 fn schema_manifest() -> Value {
     let mut manifest = json!({
-        "fields": ["name", "displayName", "locale", "tables", "relationships", "pages"],
+        "fields": ["name", "displayName", "locale", "tables", "relationships", "pages", "designTokens"],
         "tableFields": ["name", "columns", "measures", "rows"],
         "columnFields": ["name", "expression", "dataType", "description", "formatString", "sourceColumn", "isHidden", "isKey", "summarizeBy", "sortByColumn"],
         "calculatedColumnFields": ["name", "expression", "dataType", "description", "formatString", "summarizeBy", "displayFolder", "isHidden"],
@@ -1350,6 +1363,8 @@ fn schema_manifest() -> Value {
         "intentVersions": ["intent.v1"],
         "intentFields": ["schema", "audience", "questions[]", "kpis[].name", "kpis[].measure", "kpis[].target", "comparisons[]", "periods[]", "drillPaths[]", "alerts[].measure", "alerts[].op", "alerts[].threshold", "alerts[].semantic", "filterDimensions[]", "preferredArchetypes[]", "pageFlow[]", "handoff.target", "handoff.sourceKinds[]"],
         "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
+        "designTokenFields": ["preset", "id", "name", "summary", "palette", "semantic", "ramps", "typography", "surfaces", "spacing", "numberFormats", "textClasses", "visualDefaults", "allowContrastBelowAA"],
+        "designTokenCatalog": {"schema": "powerbi-cli.tokens.v1", "version": 1, "builtIns": ["corporate-neutral", "high-contrast", "dark", "print"], "contrast": {"algorithm": "WCAG 2 relative luminance", "minimumRatio": 4.5, "allowFlag": "style.tokens.allowContrastBelowAA"}},
         "plannerRuleCatalog": planner_rule_catalog_json().unwrap_or_else(|error| json!({
             "schema": crate::planner_rules::PLANNER_RULES_SCHEMA,
             "error": error.message
@@ -1358,7 +1373,7 @@ fn schema_manifest() -> Value {
         "reportSpecValidateFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "errors[].field", "errors[].reason", "errors[].candidatesCommand", "errors[].example", "next"],
         "reportSpecUpgradeFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
-        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "profileSummary", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "profileSummary.shape.dimensions[]", "profileSummary.shape.dateTables[]", "profileSummary.shape.keyCandidates[]", "profileSummary.shape.highCardinality[]", "executedPrimitives", "operations", "operations[].op", "operations[].handle", "operations[].visualType", "operations[].mode", "operations[].singleSelect", "operations[].position", "warnings", "warnings[].code", "warnings[].message", "warnings[].feature", "warnings[].field", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "compiled.styleTokens", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.styleTokens.allowContrastBelowAA", "scorecard.next[]", "styleTokens.id", "styleTokens.allowContrastBelowAA", "styleTokens.warningCount", "trace", "trace[].op", "trace[].ms", "profileSummary", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "profileSummary.shape.dimensions[]", "profileSummary.shape.dateTables[]", "profileSummary.shape.keyCandidates[]", "profileSummary.shape.highCardinality[]", "executedPrimitives", "operations", "operations[].op", "operations[].handle", "operations[].visualType", "operations[].mode", "operations[].singleSelect", "operations[].position", "warnings", "warnings[].code", "warnings[].message", "warnings[].feature", "warnings[].field", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
         "lintFindingFields": ["code", "ruleId", "severity", "message", "handle", "path", "pointer", "hint", "sanitizeAction", "stepKind"],
@@ -1733,6 +1748,29 @@ fn response_shapes() -> Value {
             "transformedPointers": "RFC 6901 pointers for fields rewritten or inserted; v1-to-v2 currently reports /schema",
             "normalization": "Object keys are recursively sorted while array order is preserved.",
             "unknownFieldFailure": "Unknown v1 keys return spec.unknown_field on stderr with no output file written."
+        },
+        "designTokens.v1": {
+            "schema": "powerbi-cli.tokens.v1",
+            "version": 1,
+            "requiredFields": ["schema", "version", "sets"],
+            "setFields": ["id", "name", "summary", "palette", "semantic", "ramps", "typography", "surfaces", "spacing", "numberFormats", "textClasses", "visualDefaults", "allowContrastBelowAA"],
+            "semanticFields": ["good", "bad", "neutral", "warning", "emphasis"],
+            "rampFields": ["sequential", "diverging"],
+            "builtIns": ["corporate-neutral", "high-contrast", "dark", "print"],
+            "contrast": {"algorithm": "WCAG 2 relative luminance", "minimumRatio": 4.5, "failureCode": "design.contrast_below_aa", "allowFlag": "style.tokens.allowContrastBelowAA"}
+        },
+        "reportStyleTokensShow": {
+            "schema": "powerbi-cli.report.style.tokens.show.v1",
+            "requiredFields": ["schema", "ok", "projectDir", "catalog", "selected", "validation", "next"],
+            "selectedFields": ["id", "tokens", "theme"],
+            "tokenFields": ["palette", "semantic", "ramps", "typography", "surfaces", "spacing", "numberFormats", "textClasses", "visualDefaults", "allowContrastBelowAA"]
+        },
+        "reportStyleTokensDerive": {
+            "schema": "powerbi-cli.report.style.tokens.derive.v1",
+            "requiredFields": ["schema", "ok", "projectDir", "source", "tokens", "next"],
+            "sourceFields": ["themeHandle", "themeName", "themeFingerprint", "visualCount", "sampledColorCount"],
+            "tokenFields": ["palette", "semantic", "ramps", "typography", "surfaces", "spacing", "numberFormats", "textClasses", "visualDefaults", "allowContrastBelowAA"],
+            "literalTextPolicy": "Only formatting color values are sampled; report titles, names, and other literal text are never copied."
         },
         "scorecard.v1": {
             "schema": "scorecard.v1",
