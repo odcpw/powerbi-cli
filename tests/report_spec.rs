@@ -832,10 +832,6 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
             "pbi-t3-compiler-completeness-1qi.6",
         ),
         (
-            json!({"pages": [{"template": "overview"}]}),
-            "pbi-t3-compiler-completeness-1qi.7",
-        ),
-        (
             json!({"pages": [{"visuals": [{"format": {"title.show": true}}]}]}),
             "pbi-t3-compiler-completeness-1qi.8",
         ),

@@ -23,7 +23,8 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
             "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
-            "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args"]
+            "layoutCompilation": "Dashboard v2 pages[].template and visuals[].slot resolve through the shared grid; explicit layout wins. Heading/subtitle textboxes consume style.tokens.typography.family/scale. Unknown slots return spec.missing_input with available slots; duplicates fail and family mismatches warn. Section dividers are omitted with feature_pending.",
+            "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args", "feature_pending", "design.slot_family_mismatch"]
         }),
         json!({
             "path": "report spec validate",
@@ -102,7 +103,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report spec explain",
             "usage": "powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json",
-            "summary": "Compile a strict dashboard spec to a deterministic staged operation plan without writing a project",
+            "summary": "Compile a strict dashboard spec to a deterministic staged operation plan with resolved template slots and generated heading/subtitle geometry without writing a project",
             "tags": ["report", "dashboard", "spec", "explain", "plan", "dry-run", "agent"],
             "readOnly": true,
             "mutates": false,
@@ -112,7 +113,7 @@ pub(super) fn commands() -> Vec<Value> {
             "outputSchema": "powerbi-cli.report.spec.explain.v1",
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec explain --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --json"],
-            "followUpFields": ["ok", "specVersion", "plan.stages", "plan.ops", "handles.declared", "handles.references", "layout.pages[].slots", "defaults.perVisual", "proofPlan.commands", "proofPlan.unavailable", "unsupportedSections", "warnings", "next"],
+            "followUpFields": ["ok", "specVersion", "plan.stages", "plan.ops", "handles.declared", "handles.references", "layout.pages[].slots", "layout.pages[].template", "layout.pages[].resolvedSlots", "layout.pages[].headings", "defaults.perVisual", "proofPlan.commands", "proofPlan.unavailable", "unsupportedSections", "warnings", "next"],
             "supportedSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"]
         }),
         json!({

@@ -177,6 +177,13 @@ refreshing every changed page in Desktop.
 
 ## No Fake Fallbacks
 
+Dashboard v2 pages can select a named `template`, with visuals assigned by
+`slot`; explicit visual `layout` coordinates take precedence. Page `heading`
+and `subtitle` generate textboxes in the heading band, styled by
+`style.tokens.typography.family` and `scale`. `report spec explain` shows the
+resolved coordinates. Unknown slots report available choices, duplicate slots
+fail, and family mismatches warn. Section dividers remain `feature_pending`.
+
 `powerbi-cli` is agent-first: supported features emit real PBIP/PBIR/TMDL
 metadata, and unproven Power BI features fail with
 `error.code = "unsupported_feature"` instead of writing partial guessed JSON.
@@ -312,7 +319,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report slicers clear --project <project-dir-or.pbip> (--handle <slicer-or-visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--dry-run | --in-place --confirm <confirm-token> | --out-dir <dir>) [--include-raw] --json` — Clear persisted PBIR slicer selection/filter state for one slicer visual without changing bindings, layout, or formatting _(proof: `unit-smoke`)_
 - `powerbi-cli report slicers list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--include-raw] --json` — List PBIR slicer visuals with stable slicer handles, visual handles, bindings, state summaries, and persisted-value safety warnings _(proof: `unit-smoke`)_
 - `powerbi-cli report slicers show --project <project-dir-or.pbip> --handle <slicer-handle> [--no-raw] --json` — Show one PBIR slicer visual by slicer or visual handle, including raw visual state and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json` — Compile a strict dashboard spec to a deterministic staged operation plan without writing a project _(proof: `unit-smoke`)_
+- `powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json` — Compile a strict dashboard spec to a deterministic staged operation plan with resolved template slots and generated heading/subtitle geometry without writing a project _(proof: `unit-smoke`)_
 - `powerbi-cli report spec fields [--schema <schema.json>] [--profile <profile.json>] --json` — List the strict dashboard-spec key catalog and, when a schema is supplied, exact column and measure binding references _(proof: `unit-smoke`)_
 - `powerbi-cli report spec normalize [--spec <dashboard.json> | <dashboard.json>] --out <canonical.json> --json` — Resolve supported dashboard-spec includes and write one deterministic canonical JSON document _(proof: `unit-smoke`)_
 - `powerbi-cli report spec schema [--version v1|v2|all] --json` — Emit the draft 2020-12 JSON Schema generated from the strict v1/v2 dashboard-spec key catalog _(proof: `unit-smoke`)_
@@ -354,6 +361,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report wireframe export <project-dir-or.pbip> [--format json|svg|html] [--template <name>] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--out <path> | --dry-run] --json` — Export report pages, deterministic grid slots, visual geometry, bindings, and lint markers as JSON, SVG, or HTML without Power BI Desktop _(proof: `unit-smoke`)_
 - `powerbi-cli robot-docs guide [--json]` — Print the in-tool agent guide so agents do not need external docs _(proof: `unit-smoke`)_
 - `powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]` — Render marker-delimited README and SKILL sections from the live capabilities and feature catalogs, or check for documentation drift _(proof: `unit-smoke`)_
+- `powerbi-cli robot-docs verify [--root <repo-dir>] --json` — Verify generated documentation, catalog discovery coverage, and command mentions against live catalogs _(proof: `unit-smoke`)_
 - `powerbi-cli robot-triage` — Alias for --robot-triage when an agent expects a normal command token _(proof: `unit-smoke`)_
 - `powerbi-cli --json scaffold --schema <schema.json> --out-dir <project-dir> [--force]` — Create an offline-safe PBIP project from a schema manifest _(proof: `unit-smoke`)_
 - `powerbi-cli schema normalize <schema.json> --out <canonical.json> --json` — Resolve supported schema includes and write a canonical pretty-printed manifest for review and reproducible dashboard builds _(proof: `unit-smoke`)_

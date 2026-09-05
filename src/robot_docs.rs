@@ -71,6 +71,25 @@ struct FileResult {
     drift: Option<String>,
 }
 
+#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
+struct VerifyFinding {
+    code: &'static str,
+    path: String,
+    line: usize,
+    message: String,
+}
+
+impl VerifyFinding {
+    fn display(&self) -> String {
+        let location = if self.line == 0 {
+            self.path.clone()
+        } else {
+            format!("{}:{}", self.path, self.line)
+        };
+        format!("{}: {}: {}", self.code, location, self.message)
+    }
+}
+
 /// Render selected live-catalog sections into the repository documentation.
 ///
 /// Without `--check`, both README and the Power BI CLI skill are updated using
@@ -84,17 +103,14 @@ pub(crate) fn render_robot_docs(args: &[String]) -> CliResult<Value> {
     let mut file_results = Vec::new();
 
     for relative in [README_RELATIVE, SKILL_RELATIVE] {
-        let path = options.root.join(relative);
-        let original = fs::read_to_string(&path).map_err(|err| {
-            CliError::file_not_found(format!("read documentation file {}: {err}", path.display()))
-                .with_hint("Run this command from the repository root or pass --root <repo-dir>.")
-                .with_suggested_command("powerbi-cli robot-docs render --check --json")
-        })?;
-        let mut rendered = original.clone();
-        for section in &sections {
-            let block = render_section(*section, &capabilities_value, &features_value)?;
-            rendered = replace_marked_region(&rendered, &path, *section, &block)?;
-        }
+        let (path, original) = read_document(&options.root, relative, "render")?;
+        let rendered = render_document(
+            &original,
+            &path,
+            &capabilities_value,
+            &features_value,
+            &sections,
+        )?;
         let changed = rendered != original;
         let drift = if options.check && changed {
             Some(render_diff(&path, &original, &rendered, &sections))
@@ -158,6 +174,271 @@ pub(crate) fn render_robot_docs(args: &[String]) -> CliResult<Value> {
         },
         "next": ["powerbi-cli robot-docs render --check --json"]
     }))
+}
+
+/// Verify that repository documentation is synchronized with the live command
+/// catalog and that literal CLI command mentions resolve to known paths.
+///
+/// This is intentionally read-only. It reports the stable top-level
+/// `docs_drift` diagnostic while retaining granular `docs.*` codes and every
+/// offending document path in the diagnostic message.
+pub(crate) fn verify_robot_docs(args: &[String]) -> CliResult<Value> {
+    let root = parse_verify_options(args)?;
+    let capabilities_value = capabilities(&[])?;
+    let features_value = features_command(&["list".to_string()])?;
+    let (catalog_paths, known_paths) = catalog_command_paths(&capabilities_value)?;
+    let sections = [Section::Commands, Section::Limits, Section::Features];
+    let mut findings = Vec::new();
+
+    for relative in [README_RELATIVE, SKILL_RELATIVE] {
+        let (path, original) = read_document(&root, relative, "verify")?;
+        match render_document(
+            &original,
+            &path,
+            &capabilities_value,
+            &features_value,
+            &sections,
+        ) {
+            Ok(rendered) if rendered != original => findings.push(VerifyFinding {
+                code: "docs_drift",
+                path: relative.to_string(),
+                line: 0,
+                message: "generated marker regions differ from live catalogs".to_string(),
+            }),
+            Ok(_) => {}
+            Err(error) => findings.push(VerifyFinding {
+                code: "docs_drift",
+                path: relative.to_string(),
+                line: 0,
+                message: error.message,
+            }),
+        }
+
+        let discovery = marked_region(&original, Section::Commands);
+        for catalog_path in &catalog_paths {
+            if !discovery.is_some_and(|region| region.contains(catalog_path)) {
+                findings.push(VerifyFinding {
+                    code: "docs.undocumented_command",
+                    path: relative.to_string(),
+                    line: 0,
+                    message: format!(
+                        "catalog command path `{catalog_path}` is missing from the generated Discovery region"
+                    ),
+                });
+            }
+        }
+        for (line, candidate) in unknown_command_mentions(&original, &known_paths) {
+            findings.push(VerifyFinding {
+                code: "docs.unknown_command",
+                path: relative.to_string(),
+                line,
+                message: format!("unknown command mention `{candidate}`"),
+            });
+        }
+    }
+
+    findings.sort();
+    findings.dedup();
+    if !findings.is_empty() {
+        let details = findings
+            .iter()
+            .map(VerifyFinding::display)
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::new(
+            "docs_drift",
+            EXIT_DOCS_DRIFT,
+            format!("documentation contract verification failed\n{details}"),
+        )
+        .with_hint(
+            "Run `powerbi-cli robot-docs render` to regenerate docs, then rerun the verifier.",
+        )
+        .with_suggested_command("powerbi-cli robot-docs verify --json")
+        .with_suggested_command("powerbi-cli robot-docs render --json"));
+    }
+
+    Ok(json!({
+        "schema": "powerbi-cli.robot-docs.verify.v1",
+        "ok": true,
+        "exitCode": EXIT_SUCCESS,
+        "root": root.to_string_lossy(),
+        "checkedFiles": [README_RELATIVE, SKILL_RELATIVE],
+        "catalogCommandCount": catalog_paths.len(),
+        "findings": [],
+        "checks": {
+            "generatedRegions": true,
+            "catalogPathsInDiscovery": true,
+            "commandMentionsKnown": true
+        },
+        "next": ["powerbi-cli robot-docs verify --json"]
+    }))
+}
+
+fn parse_verify_options(args: &[String]) -> CliResult<PathBuf> {
+    let mut root = PathBuf::from(".");
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--root" => {
+                let value = args.get(i + 1).ok_or_else(|| {
+                    CliError::invalid_args("robot-docs verify --root requires a directory")
+                        .with_hint(
+                            "Pass the repository root containing README.md and skills/powerbi-cli/SKILL.md.",
+                        )
+                        .with_suggested_command("powerbi-cli robot-docs verify --json")
+                })?;
+                root = PathBuf::from(value);
+                i += 2;
+            }
+            other => {
+                return Err(CliError::invalid_args(format!(
+                    "unknown robot-docs verify flag: {other}"
+                ))
+                .with_hint("Use --root <repo-dir>.")
+                .with_suggested_command("powerbi-cli robot-docs verify --json"));
+            }
+        }
+    }
+    Ok(root)
+}
+
+fn read_document(root: &Path, relative: &str, command: &str) -> CliResult<(PathBuf, String)> {
+    let path = root.join(relative);
+    let contents = fs::read_to_string(&path).map_err(|err| {
+        CliError::file_not_found(format!("read documentation file {}: {err}", path.display()))
+            .with_hint("Run this command from the repository root or pass --root <repo-dir>.")
+            .with_suggested_command(format!(
+                "powerbi-cli robot-docs {command} --root <repo-dir> --json"
+            ))
+    })?;
+    Ok((path, contents))
+}
+
+fn render_document(
+    original: &str,
+    path: &Path,
+    capabilities_value: &Value,
+    features_value: &Value,
+    sections: &[Section],
+) -> CliResult<String> {
+    let mut rendered = original.to_string();
+    for section in sections {
+        let block = render_section(*section, capabilities_value, features_value)?;
+        rendered = replace_marked_region(&rendered, path, *section, &block)?;
+    }
+    Ok(rendered)
+}
+
+fn catalog_command_paths(capabilities_value: &Value) -> CliResult<(Vec<String>, BTreeSet<String>)> {
+    let commands = capabilities_value["commands"]
+        .as_array()
+        .ok_or_else(|| CliError::unexpected("capabilities catalog has no commands array"))?;
+    let mut catalog_paths = BTreeSet::new();
+    let mut known_paths = BTreeSet::new();
+    for command in commands {
+        let path = command["path"]
+            .as_str()
+            .ok_or_else(|| CliError::unexpected("capabilities catalog command has no path"))?;
+        catalog_paths.insert(path.to_string());
+        known_paths.insert(path.to_string());
+        if let Some(aliases) = command["aliases"].as_array() {
+            for alias in aliases.iter().filter_map(Value::as_str) {
+                known_paths.insert(alias.to_string());
+            }
+        }
+    }
+    Ok((catalog_paths.into_iter().collect(), known_paths))
+}
+
+fn unknown_command_mentions(text: &str, known_paths: &BTreeSet<String>) -> Vec<(usize, String)> {
+    let mut findings = Vec::new();
+    let mut in_fence = false;
+    for (line_index, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        let mut offset = 0;
+        while let Some(found) = line[offset..].find("powerbi-cli") {
+            let start = offset + found;
+            let suffix_start = start + "powerbi-cli".len();
+            let inline = line[..start]
+                .chars()
+                .filter(|character| *character == '`')
+                .count()
+                % 2
+                == 1;
+            let embedded_in_path = line[..start].chars().next_back().is_some_and(|character| {
+                character.is_ascii_alphanumeric()
+                    || matches!(character, '.' | '-' | '_' | '/' | '\\')
+            }) || line[suffix_start..].chars().next().is_some_and(
+                |character| {
+                    character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_')
+                },
+            );
+            let command_suffix = if inline {
+                line[suffix_start..]
+                    .split_once('`')
+                    .map(|(inside, _)| inside)
+                    .unwrap_or_default()
+            } else {
+                &line[suffix_start..]
+            };
+            if (in_fence || inline)
+                && !embedded_in_path
+                && let Some(candidate) = command_candidate(command_suffix, known_paths)
+            {
+                findings.push((line_index + 1, candidate));
+            }
+            offset = suffix_start;
+        }
+    }
+    findings.sort();
+    findings.dedup();
+    findings
+}
+
+fn command_candidate(suffix: &str, known_paths: &BTreeSet<String>) -> Option<String> {
+    let mut tokens = suffix
+        .split_whitespace()
+        .map(clean_command_token)
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    while let Some(token) = tokens.first() {
+        if token == "--" || token == "--json" || token == "--format=json" || token == "-f=json" {
+            tokens.remove(0);
+        } else if token == "--format" || token == "-f" {
+            tokens.drain(..tokens.len().min(2));
+        } else {
+            break;
+        }
+    }
+    let first = tokens.first()?.as_str();
+    if first.starts_with('.')
+        || first.starts_with('<')
+        || first.starts_with('#')
+        || first.starts_with("...")
+    {
+        return None;
+    }
+    for length in (1..=tokens.len()).rev() {
+        if known_paths.contains(&tokens[..length].join(" ")) {
+            return None;
+        }
+    }
+    Some(tokens.into_iter().take(3).collect::<Vec<_>>().join(" "))
+}
+
+fn clean_command_token(token: &str) -> String {
+    token
+        .trim_matches(|character: char| {
+            matches!(
+                character,
+                '`' | ',' | ';' | ':' | '(' | ')' | '[' | ']' | '{' | '}' | '"' | '\''
+            )
+        })
+        .to_string()
 }
 
 fn parse_options(args: &[String]) -> CliResult<Options> {
