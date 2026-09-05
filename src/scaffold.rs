@@ -33,6 +33,10 @@ pub(super) struct DashboardSpec {
     #[serde(default)]
     locale: Option<String>,
     #[serde(default)]
+    pub(super) style: Option<Value>,
+    #[serde(default)]
+    pub(super) design_defaults_enabled: bool,
+    #[serde(default)]
     pub(super) tables: Vec<TableSpec>,
     #[serde(default)]
     relationships: Vec<RelationshipSpec>,
@@ -1299,7 +1303,7 @@ fn spec_to_json(spec: &DashboardSpec) -> Value {
             })
         })
         .collect::<Vec<_>>();
-    json!({
+    let mut value = json!({
         "name": spec.name,
         "displayName": spec.display_name,
         "description": spec.description,
@@ -1319,7 +1323,8 @@ fn spec_to_json(spec: &DashboardSpec) -> Value {
             "displayName": page.display_name,
             "width": page.width,
             "height": page.height,
-                "visuals": page.visuals.iter().map(|visual| json!({
+            "visuals": page.visuals.iter().map(|visual| {
+                let mut value = json!({
                     "name": visual.name,
                     "visualType": visual.visual_type,
                     "title": visual.title,
@@ -1337,14 +1342,26 @@ fn spec_to_json(spec: &DashboardSpec) -> Value {
                     "y": visual.y,
                     "width": visual.width,
                     "height": visual.height
-                })).collect::<Vec<_>>(),
-                "interactions": page.interactions.iter().map(|interaction| json!({
-                    "source": interaction.source,
-                    "target": interaction.target,
-                    "type": interaction.interaction_type
-                })).collect::<Vec<_>>()
+                });
+                if let Some(format) = visual.format.as_ref() {
+                    value["format"] = Value::Object(format.clone());
+                }
+                value
+            }).collect::<Vec<_>>(),
+            "interactions": page.interactions.iter().map(|interaction| json!({
+                "source": interaction.source,
+                "target": interaction.target,
+                "type": interaction.interaction_type
+            })).collect::<Vec<_>>()
         })).collect::<Vec<_>>()
-    })
+    });
+    if spec.design_defaults_enabled {
+        if let Some(style) = spec.style.as_ref() {
+            value["style"] = style.clone();
+        }
+        value["designDefaultsEnabled"] = Value::Bool(true);
+    }
+    value
 }
 
 fn write_json_file(path: &Path, value: &Value) -> CliResult<()> {

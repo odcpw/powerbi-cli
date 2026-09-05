@@ -162,8 +162,7 @@ policies can wait until the object-specific writers and fixtures exist.
   compile schema/profile/spec inputs into an offline-safe PBIP project through
   proven scaffold/report primitives. Style presets and style bundles compile
   last through ApplyThemePreset/ApplyStyleBundle; literal-text bundles require
-  explicit opt-in, while defaults remain assigned to
-  `pbi-t3-compiler-completeness-1qi.13`.
+  explicit opt-in, while design defaults compile catalog-backed visual formatting.
 - `report plan --schema <schema> --profile <profile> --intent <intent.md|intent.json>`
   (or the backward-compatible `--objective <goal>`): deterministic starter
   dashboard planner that normalizes audience, questions, KPIs, comparisons,
@@ -699,6 +698,12 @@ IDs and dependencies; this roadmap records what has already landed:
   paths and diagnostic evidence are excluded from the confirmation hash.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
+- [x] The embedded `design-defaults.v1` catalog resolves per-family visual
+  formatting through Desktop-referenced formatting-catalog keys and the shared
+  SetObject path. Defaults are opt-in, deterministic, inspectable through
+  `report design defaults show`/`report spec explain`, and merge overrides as
+  catalog < `style.tokens` < `style.defaults` < `visuals[].format`; unavailable
+  design properties remain explicitly inert under their owning T4 bead.
 - [x] Stacked visual aliases preserve Desktop-recorded bar/column ids; role
   maps cite their evidence. Unproven 100% stacked bars and offline maps remain
   fixture-gated with explicit missing-evidence refusals.

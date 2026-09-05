@@ -15,7 +15,6 @@ pub(crate) fn compile_style_operations(
     let style = style.as_object().ok_or_else(|| {
         CliError::invalid_args("dashboard spec style must be an object").with_pointer("/style")
     })?;
-    refuse_deferred_style(style)?;
     if style.contains_key("preset") && style.contains_key("bundle") {
         return Err(CliError::invalid_args(
             "dashboard spec style must choose either preset or bundle",
@@ -85,25 +84,4 @@ fn compile_bundle(value: &Value, allow_literal_text: bool) -> CliResult<(Vec<Op>
         vec![Op::ApplyStyleBundle(MutationPayload { fields })],
         vec!["/style/bundle".to_string()],
     ))
-}
-
-fn refuse_deferred_style(style: &Map<String, Value>) -> CliResult<()> {
-    if style.contains_key("defaults") {
-        return Err(uncompiled_style_error("style.defaults", "/style/defaults"));
-    }
-    Ok(())
-}
-
-fn uncompiled_style_error(section: &str, pointer: &str) -> CliError {
-    const BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
-    CliError::unsupported_feature(format!(
-        "dashboard spec section `{section}` is recognized but not compiled; owning bead: {BEAD}"
-    ))
-    .with_pointer(pointer)
-    .with_hint(format!(
-        "Keep the section for future compilation or remove it before build. Owning bead: {BEAD}."
-    ))
-    .with_suggested_command(
-        "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
-    )
 }

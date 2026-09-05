@@ -7,8 +7,8 @@ pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
             "path": "report build",
-            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; filters, drillthrough, style presets, and style bundles compile through typed kernels; style.tokens compile to registered themes and number formats, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, style presets and bundles compile through typed kernels, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -17,14 +17,14 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.build.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--design-defaults", "--defaults", "--trace", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
             "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "compiled.styleTokens", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.styleTokens.allowContrastBelowAA", "scorecard.next[]", "styleTokens.id", "styleTokens.allowContrastBelowAA", "styleTokens.warningCount", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "layoutCompilation": "Dashboard v2 pages[].template and visuals[].slot resolve through the shared grid; explicit layout wins. Heading/subtitle textboxes consume style.tokens.typography.family/scale. Unknown slots return spec.missing_input with available slots; duplicates fail and family mismatches warn. Section dividers are omitted with feature_pending.",
-            "styleCompilation": "style.preset compiles to ApplyThemePreset and style.bundle to ApplyStyleBundle at the final operation stage. Literal-text bundles require style.allowLiteralText:true. style.tokens compile to registered themes and number formats; style.defaults remain unsupported under pbi-t3-compiler-completeness-1qi.13.",
+            "styleCompilation": "style.preset compiles to ApplyThemePreset and style.bundle to ApplyStyleBundle at the final operation stage. Literal-text bundles require style.allowLiteralText:true. style.tokens compile to registered themes and number formats; style.defaults compile catalog-backed per-visual formatting.",
             "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "design.contrast_below_aa", "unsupported_feature", "invalid_args", "feature_pending", "design.slot_family_mismatch"]
         }),
         json!({
@@ -180,6 +180,25 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
             "examples": ["powerbi-cli report design-plan --project build/sales --json"],
             "followUpFields": ["profile.counts", "candidates.dateColumns", "candidates.categoryColumns", "candidates.measures", "opportunities[].command", "recommendedWorkflow"]
+        }),
+        json!({
+            "path": "report design defaults show",
+            "aliases": ["report design-defaults show", "report design defaults"],
+            "usage": "powerbi-cli report design defaults show [--project <project-dir-or.pbip> | --spec <dashboard.json>] [--design-defaults] --json",
+            "summary": "Resolve deterministic per-visual design-defaults.v1 entries with catalog evidence and style override precedence",
+            "tags": ["pbir", "report", "design", "defaults", "formatting", "readback", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.design.defaults.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--spec <dashboard.json>", "--design-defaults", "--defaults", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report design defaults show --project build/sales --json",
+                "powerbi-cli report design defaults show --spec examples/sales.dashboard.v2.json --design-defaults --json"
+            ],
+            "followUpFields": ["source", "catalogSchema", "defaultsEnabled", "mergeOrder", "catalog", "visuals[]", "visuals[].handle", "visuals[].visualType", "visuals[].defaults[]", "visuals[].defaults[].operation", "counts", "warnings", "errors", "next"]
         }),
         json!({
             "path": "report tree",

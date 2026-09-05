@@ -578,13 +578,12 @@ fn report_build_rejects_unknown_key_before_creating_output() {
 }
 
 #[test]
-fn recognized_uncompiled_v1_style_defaults_remain_an_unsupported_feature() {
+fn recognized_v1_style_defaults_compile_successfully() {
     let temp = tempfile::tempdir().expect("tempdir");
     let path = temp.path().join("style.dashboard.json");
     let mut spec = minimal_spec();
-    spec["style"] = json!({"defaults": {"card": {"title": true}}});
+    spec["style"] = json!({"defaults": {"labels.show": true}});
     write_spec(&path, &spec);
-
     let output = run_powerbi(&[
         "report",
         "build",
@@ -595,15 +594,7 @@ fn recognized_uncompiled_v1_style_defaults_remain_an_unsupported_feature() {
         "--dry-run",
         "--json",
     ]);
-    assert_eq!(output.code, 2);
-    let error = stderr_json(&output);
-    assert_eq!(error["error"]["code"], "unsupported_feature");
-    assert_eq!(error["error"]["pointer"], "/style/defaults");
-    assert!(
-        error["error"]["hint"]
-            .as_str()
-            .is_some_and(|hint| hint.contains("pbi-t3-compiler-completeness-1qi.13"))
-    );
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
 }
 
 #[test]
@@ -842,10 +833,6 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
         (
             json!({"model": {"calculatedColumns": []}}),
             "pbi-t3-compiler-completeness-1qi.5",
-        ),
-        (
-            json!({"style": {"defaults": {"card": {"title": true}}}}),
-            "pbi-t3-compiler-completeness-1qi.13",
         ),
         (
             json!({"pages": [{"visuals": [{"format": {"title.show": true}}]}]}),

@@ -211,34 +211,46 @@ fn style_bundle_requires_literal_opt_in_and_matches_apply_style_bundle() {
 }
 
 #[test]
-fn style_defaults_refuse_with_the_follow_up_bead() {
+fn style_preset_tokens_and_defaults_compile_together() {
     let temp = tempfile::tempdir().expect("tempdir");
-    for (name, style, pointer) in [(
-        "defaults",
-        json!({"defaults": {"card": {"title": true}}}),
-        "/style/defaults",
-    )] {
-        let mut spec = sales_spec();
-        spec["style"] = style;
-        let path = temp.path().join(format!("{name}.json"));
-        write_spec(&path, &spec);
-        let output = build(&path, &["--dry-run".into()]);
-        assert_eq!(output.code, 2);
-        let error = stderr_json(&output);
-        assert_eq!(error["error"]["code"], "unsupported_feature");
-        assert_eq!(error["error"]["pointer"], pointer);
-        assert!(
-            error["error"]["hint"]
-                .as_str()
-                .is_some_and(|hint| hint.contains("pbi-t3-compiler-completeness-1qi.13"))
-        );
-        assert!(
-            !error["error"]["suggestedCommands"]
-                .as_array()
-                .unwrap()
-                .is_empty()
-        );
-    }
+    let mut spec = sales_spec();
+    spec["style"] = json!({
+        "preset": "neutral-ops",
+        "tokens": {"preset": "dark", "formatting": {"labels.show": false}},
+        "defaults": {"labels.show": true}
+    });
+    let path = temp.path().join("combined-style.json");
+    write_spec(&path, &spec);
+    let output = build(&path, &["--dry-run".into()]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    let output = build(
+        &path,
+        &["--out-dir".into(), path_arg(&temp.path().join("built"))],
+    );
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    assert_eq!(stdout_json(&output)["styleTokens"]["id"], "dark");
+    let explained = run_powerbi_owned(&[
+        "report".into(),
+        "spec".into(),
+        "explain".into(),
+        "--schema".into(),
+        "examples/sales.schema.json".into(),
+        "--spec".into(),
+        path_arg(&path),
+        "--json".into(),
+    ]);
+    assert_eq!(explained.code, 0, "stderr: {}", explained.stderr);
+    let value = stdout_json(&explained);
+    assert!(
+        value["unsupportedSections"]
+            .as_array()
+            .expect("sections")
+            .is_empty()
+    );
+    assert_eq!(
+        value["defaults"]["perVisual"][0]["designDefaultsEnabled"],
+        true
+    );
 }
 
 #[test]
