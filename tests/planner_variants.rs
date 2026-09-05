@@ -52,6 +52,20 @@ fn variants_are_structurally_distinct_score_ordered_deterministic_and_compiled_v
         let data = fs::read(path).unwrap();
         let spec: serde_json::Value = serde_json::from_slice(&data).unwrap();
         assert_eq!(spec["schema"], "powerbi-cli.dashboard.v2");
+        assert_eq!(
+            spec["pages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|page| page["id"].clone())
+                .collect::<Vec<_>>(),
+            value["narrativeFlow"]["pageOrder"]
+                .as_array()
+                .unwrap()
+                .clone()
+        );
+        assert_eq!(spec["pages"][0]["id"], "overview");
+        assert_eq!(spec["layout"]["rail"], value["specV2"]["layout"]["rail"]);
         let validation = run_powerbi(&[
             "report",
             "spec",
@@ -246,4 +260,76 @@ fn variants_refuse_symlink_even_with_force_without_touching_target() {
     assert_eq!(stderr_json(&result)["error"]["code"], "invalid_args");
     assert!(!out.exists());
     assert_eq!(fs::read(&target).unwrap(), b"preserve");
+}
+
+#[test]
+fn variants_preserve_narrative_star_and_flat_drillthrough_and_shared_rails() {
+    for kind in ["star", "flat"] {
+        let root = tempfile::tempdir().unwrap();
+        let fixture: serde_json::Value = serde_json::from_slice(
+            &fs::read(format!("testdata/golden/planner-narrative/{kind}.json")).unwrap(),
+        )
+        .unwrap();
+        let schema = root.path().join("schema.json");
+        let profile = root.path().join("profile.json");
+        let out = root.path().join("plan.json");
+        fs::write(&schema, serde_json::to_vec(&fixture["schema"]).unwrap()).unwrap();
+        fs::write(&profile, serde_json::to_vec(&fixture["profile"]).unwrap()).unwrap();
+        let output = run_powerbi(&[
+            "report",
+            "plan",
+            "--schema",
+            schema.to_str().unwrap(),
+            "--profile",
+            profile.to_str().unwrap(),
+            "--objective",
+            "Narrative flow",
+            "--variants",
+            "3",
+            "--out",
+            out.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_eq!(output.code, 0, "{}", output.stderr);
+        let plan = stdout_json(&output);
+        let primary = plan["specV2"]["pages"].as_array().unwrap();
+        assert_eq!(primary.last().unwrap()["id"], "drillthrough-detail");
+        for variant in plan["variants"].as_array().unwrap() {
+            let path = variant["path"].as_str().unwrap();
+            let spec: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+            let pages = spec["pages"].as_array().unwrap();
+            assert_eq!(pages.len(), primary.len());
+            for (page, expected) in pages.iter().zip(primary) {
+                assert_eq!(page["id"], expected["id"]);
+                assert_eq!(page["drillthrough"], expected["drillthrough"]);
+                assert_eq!(
+                    page["visuals"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|visual| &visual["bindings"])
+                        .collect::<Vec<_>>(),
+                    expected["visuals"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|visual| &visual["bindings"])
+                        .collect::<Vec<_>>()
+                );
+            }
+            assert_eq!(spec["layout"]["rail"], plan["specV2"]["layout"]["rail"]);
+            let validation = run_powerbi(&[
+                "report",
+                "spec",
+                "validate",
+                "--schema",
+                schema.to_str().unwrap(),
+                "--spec",
+                path,
+                "--json",
+            ]);
+            assert_eq!(validation.code, 0, "{}", validation.stderr);
+            assert_eq!(stdout_json(&validation)["ok"], true);
+        }
+    }
 }

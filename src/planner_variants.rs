@@ -21,7 +21,17 @@ pub(crate) fn generate(
     context: &Value,
     count: usize,
 ) -> CliResult<Vec<Candidate>> {
-    let rules = planner_rules::catalog()?.variants;
+    let catalog = planner_rules::catalog()?;
+    let rail_template = catalog
+        .rules
+        .iter()
+        .find_map(|rule| rule.proposal.narrative_flow.as_ref())
+        .map(|flow| flow.rail_template.as_str())
+        .ok_or_else(|| CliError::unexpected("planner catalog has no narrative rail template"))?;
+    let rail = primary
+        .pointer("/layout/rail/slicers/0/field")
+        .and_then(Value::as_str);
+    let rules = catalog.variants;
     if count == 0 || count > rules.max_count {
         return Err(argument_error(format!(
             "--variants must be between 1 and {}",
@@ -38,7 +48,13 @@ pub(crate) fn generate(
         let choices = planner_rules::variant_choices(shape, intent, &page_context)?;
         let mut options = Vec::new();
         for choice in choices {
-            if let Some(placed) = place_page(page, &choice)? {
+            if let Some(mut placed) = place_page(page, &choice)? {
+                crate::report_plan::place_narrative_rail(
+                    &choice.template,
+                    rail_template,
+                    placed["visuals"].as_array_mut().expect("planner visuals"),
+                    rail,
+                )?;
                 options.push((placed, choice));
             }
         }
@@ -64,7 +80,7 @@ pub(crate) fn generate(
                     next_decisions.push(json!({
                         "pointer": format!("/pages/{page_index}/visuals/{index}"),
                         "before": {"layout": page["visuals"][index]["layout"], "slot": page["visuals"][index]["slot"]},
-                        "after": {"slot": visual["slot"]},
+                        "after": {"slot": visual["slot"], "layout": visual["layout"]},
                         "ruleId": choice.rule_id,
                         "reason": "Resolve this visual through a compatible named slot in the selected template"
                     }));

@@ -1022,16 +1022,16 @@ fn compile_dashboard(
         "kind": "compileDashboardSpec",
         "summary": "compiled powerbi-cli.dashboard.v1 report/pages/visuals into scaffold-compatible manifest"
     })];
-    let (mut typed_operations, mut operation_pointers) =
-        compile_filter_operations(spec_object, &model)?;
+    // Rail visuals must exist before behavior-stage filters and drillthrough.
+    let (mut typed_operations, mut operation_pointers, slicer_warnings) =
+        compile_slicer_operations(spec_object, profile)?;
+    let (filter_operations, filter_pointers) = compile_filter_operations(spec_object, &model)?;
+    typed_operations.extend(filter_operations);
+    operation_pointers.extend(filter_pointers);
     let (drillthrough_operations, drillthrough_pointers, drillthrough_warnings) =
         compile_drillthrough_operations(spec_object, &model)?;
     typed_operations.extend(drillthrough_operations);
     operation_pointers.extend(drillthrough_pointers);
-    let (slicer_operations, slicer_pointers, slicer_warnings) =
-        compile_slicer_operations(spec_object, profile)?;
-    typed_operations.extend(slicer_operations);
-    operation_pointers.extend(slicer_pointers);
     operations.extend(
         typed_operations
             .iter()

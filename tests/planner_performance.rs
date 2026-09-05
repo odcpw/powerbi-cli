@@ -168,7 +168,31 @@ fn proposed_guard_payload_writes_real_pbir_in_every_mutation_mode() {
     let temp = tempfile::tempdir().unwrap();
     let value = plan(&profile(temp.path(), 201), &[]);
     let op = &value["performance"]["ops"]["ops"][0];
-    let mut page = value["specV2"]["pages"][1].clone();
+    let page_handle = op["handle"].as_str().unwrap().split(':').nth(1).unwrap();
+    let mut page = value["specV2"]["pages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|page| {
+            let id = page["id"].as_str().unwrap();
+            // Planner IDs use ASCII words separated by '-' or '_'. Resolve the
+            // operation's actual page instead of assuming a fixed page index.
+            let canonical = format!(
+                "ReportSection{}",
+                id.split(['-', '_'])
+                    .map(|part| {
+                        let mut chars = part.chars();
+                        chars
+                            .next()
+                            .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+                            .unwrap_or_default()
+                    })
+                    .collect::<String>()
+            );
+            canonical == page_handle
+        })
+        .unwrap()
+        .clone();
     for key in ["template", "heading", "subtitle"] {
         page.as_object_mut().unwrap().remove(key);
     }

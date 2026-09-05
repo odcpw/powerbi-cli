@@ -497,6 +497,11 @@ frozen until proven.
   equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
   `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
   type-changing updates remain fixture-gated.
+- Implemented the catalog-backed `planner.narrative-flow` rule: v2 plans put
+  overview first and active, followed by available trend/breakdown/detail
+  stages. Slicer rails repeat across pages; highest observed categorical
+  cardinality selects a hidden drillthrough detail target with a matching
+  source breakdown. `narrativeFlow` explains order and binding evidence.
 - Implemented dashboard v2 template compilation: `pages[].template` and
   `visuals[].slot` resolve through the shared grid; explicit layout wins.
   Heading/subtitle textboxes use the heading band and typography family/scale

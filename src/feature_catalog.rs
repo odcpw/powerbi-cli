@@ -949,7 +949,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &["report plan"],
         refusal_code: None,
-        reason: "report plan reads bounded intent.v1 JSON or Markdown, classifies schema/profile shape, and evaluates planner-rules.v1 scored proposals. Catalog evidence thresholds require a date column, declared measure, and unambiguous fact; plan.missing_input supplies pointers, candidates, examples, and recovery commands before any output write. JSON intent model.factTable resolves fact ambiguity. Profile cardinalities above catalog or intent.guards thresholds produce specV2 topnGuard proposals and SetTopNGuard operations with numeric decisions; optional --project returns m.unbuffered_reuse buffering recommendations without partition mutation. Legacy dashboard.v1 output remains build-compatible while specV2 exposes templates, semantic tokens, and slot-only proposals.",
+        reason: "report plan reads bounded intent.v1 JSON or Markdown, classifies schema/profile shape, and evaluates the strict planner-rules.v1 catalog with evidence. Catalog evidence checks refuse missing dates, declared measures, or ambiguous facts with plan.missing_input before output; intent.model.factTable resolves fact ambiguity. Legacy dashboard.v1 output stays build-compatible. The planner.narrative-flow rule materializes specV2 through supported templates in overview/trend/breakdown/detail order, replicates a schema-bound slicer rail through the shared grid, and wires hidden drillthrough detail for the highest observed categorical cardinality. narrativeFlow explains ordering, active overview, and source/target bindings. Profile cardinality guards remain proposed as topnGuard and typed operations; optional --project provides buffering recommendations. Semantic styles and custom intent flows retain their unconsumed-field boundaries.",
         next_proof: &[
             "Compile comparisons, periods, drill paths, alerts, filters, archetypes, page flow, and handoff fields through their owning planner/compiler beads",
         ],
@@ -958,6 +958,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "examples/intents/sales.intent.md",
             "testdata/planner-rules/planner-rules.v1.json",
             "tests/planner_variants.rs: --variants N writes distinct score-ordered compiler-valid v2 template alternatives with structure hashes, primary-plan decision diffs, and separate guard replay proposals; Linux proof only",
+            "testdata/golden/planner-narrative: schema-only star and flat fixtures with synthetic aggregate cardinalities; tests/planner_narrative.rs proves build ordering, replicated rails, drillthrough, and determinism",
         ],
         tags: &["report", "intent", "planner", "markdown", "json", "agent"],
     },
