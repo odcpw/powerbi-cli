@@ -1567,6 +1567,37 @@ fn planner_missing_evidence_suggests_executable_catalog_commands() {
 }
 
 #[test]
+fn bubble_size_missing_fixture_suggests_executable_recovery_commands() {
+    let result = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-object",
+        "--project",
+        "missing.pbip",
+        "--handle",
+        "visual:Page:Scatter",
+        "--object",
+        "bubbles",
+        "--property",
+        "bubbleSize",
+        "--value",
+        "20",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(result.code, 2);
+    let error = stderr_json(&result);
+    assert_eq!(error["error"]["code"], "unsupported_feature");
+    let catalog = stdout_json(&run_powerbi(&["capabilities", "--json"]));
+    for command in error["error"]["suggestedCommands"].as_array().unwrap() {
+        assert_executable_command_template(
+            command.as_str().unwrap(),
+            catalog["commands"].as_array().unwrap(),
+        );
+    }
+}
+
+#[test]
 fn misplaced_nested_commands_suggest_the_exact_live_path() {
     let dax = run_powerbi(&["dax", "lint", "--json"]);
     assert_eq!(dax.code, 2);

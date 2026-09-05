@@ -1475,6 +1475,9 @@ encoding, PBIR container, wildcard visual-type scope, and dated Desktop/pilot
 reference. The catalog is strict and deterministic; an entry is not implied by
 memory, and new properties require a Desktop-authored fixture or dated pilot
 observation. `--formatting` cannot be combined with `--visual-type`.
+`bubbles.bubbleSize` returns `unsupported_feature` until a sanitized
+Desktop-saved property reference with provenance is archived. The scatter Size
+binding and pilot prose do not prove its encoding, range, or proposed default 20.
 Use `report visuals set-object --batch <file>` with a bounded
 `powerbi-cli.ops.v1` SetObject-only list to update many visual handles and
 properties through one atomic transaction with per-entry readback.

@@ -373,6 +373,9 @@ validation, proof, then mutation breadth.
   `report visuals catalog --formatting` additionally exposes the strict,
   embedded eleven-entry formatting catalog consumed by `set-object`, including
   PBIR containers, encoding, wildcard visual scope, and dated evidence.
+  Bubble-size formatting (`bubbles.bubbleSize`, sn2.4) remains blocked: no
+  archived Desktop property fixture proves its shape. It returns
+  `unsupported_feature`; neither a percent range nor default 20 is enabled.
   `report visuals set-object --batch <file>` applies a bounded SetObject-only
   `powerbi-cli.ops.v1` list across many handles through one atomic transaction,
   returning per-entry outcomes and readback commands in every guarded mode.

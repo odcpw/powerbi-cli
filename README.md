@@ -1147,6 +1147,9 @@ This generated snapshot keeps status and proof claims aligned with
   object/property pairs with their encoding, PBIR container, wildcard visual
   scope, and dated Desktop/pilot reference. The strict catalog is deterministic;
   new entries require a Desktop-authored fixture or dated pilot observation.
+  `bubbles.bubbleSize` is explicitly fixture-gated: no archived Desktop property
+  shape exists, so it returns `unsupported_feature`. A scatter Size binding or
+  pilot prose is insufficient; its encoding, range, and default 20 remain disabled.
   `report visuals set-object --batch <file>` accepts a bounded
   `powerbi-cli.ops.v1` document containing only `setObject` entries and commits
   the complete list through one all-or-nothing transaction with per-entry
