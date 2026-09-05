@@ -354,7 +354,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report visuals repair-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --dry-run --json` — Inspect one existing visual against the fixture-backed role map and propose the minimal proven set-bindings op for mechanical runtime-parity defects _(proof: `schema-golden`)_
 - `powerbi-cli report visuals set-bindings --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--binding <key=value,...> | --bindings-json <json> | --bindings-file <file> | --clear-bindings) (--dry-run | --in-place | --out-dir <dir>) --json` — Replace or clear PBIR field-well bindings for an existing visual using canonical TMDL table, column, and measure names _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --role <Values|Category|Series|X|Y|Y2|Size|Rows|Columns|Tooltips> [--index <n>] (--display-name <text> | --clear) (--dry-run | --in-place | --out-dir <dir>) --json` — Set or clear displayName on one existing visual queryState projection _(proof: `unit-smoke`)_
-- `powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw> (--dry-run | --in-place | --out-dir <dir>) --json` — Set one curated PBIR visual object property (labels, categoryLabels, categoryAxis, valueAxis, or title) using Desktop literal encoding _(proof: `unit-smoke`)_
+- `powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--batch <ops.v1.json> | (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set one curated PBIR visual object property, or atomically apply a bounded SetObject-only ops.v1 batch across many visual handles _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals set-position --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) [--x <n>] [--y <n>] [--width <n>] [--height <n>] [--z <n>] [--tab-order <n>] [--allow-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only a PBIR visual position object with guarded output semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals set-topn-guard --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <Table.Column> --order-by <Table.Measure> --top <N> [--direction desc|asc] [--display-name <text>] [--name <filterName>] (--dry-run | --in-place | --out-dir <dir>) --json` — Create or update a visual-level TopN guard filter so a cheap ranking measure bounds the axis before heavy display measures evaluate _(proof: `unit-smoke`)_
 - `powerbi-cli report visuals show --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --json` — Show one PBIR visual with page context, geometry, type, and field bindings _(proof: `unit-smoke`)_
@@ -777,6 +777,7 @@ cargo run --bin powerbi-cli -- report visuals add-slicer --project .\build\sales
 cargo run --bin powerbi-cli -- report visuals add-textbox --project .\build\sales --page page:ReportSectionOverview --title "Reading guide" --paragraphs-file guide.txt --x 40 --y 520 --width 400 --height 120 --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-topn-guard --project .\build\sales --handle <visual-handle> --field DimCustomer.CustomerName --order-by "FactSales[Total Revenue]" --top 28 --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-object --project .\build\sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json
+cargo run --bin powerbi-cli -- report visuals set-object --project .\build\sales --batch .\formatting.ops.json --dry-run --json
 cargo run --bin powerbi-cli -- report visuals set-display-name --project .\build\sales --handle <visual-handle> --role Values --display-name "Rate zuletzt (BU je 1'000 FTE)" --dry-run --json
 cargo run --bin powerbi-cli -- report drilldown set-hierarchy --project .\build\sales --handle <line-chart-handle> --field "DimDate[FiscalYear]" --field "DimDate[Month]" --dry-run --json
 cargo run --bin powerbi-cli -- desktop bridge status --json
@@ -1108,6 +1109,10 @@ This generated snapshot keeps status and proof claims aligned with
   object/property pairs with their encoding, PBIR container, wildcard visual
   scope, and dated Desktop/pilot reference. The strict catalog is deterministic;
   new entries require a Desktop-authored fixture or dated pilot observation.
+  `report visuals set-object --batch <file>` accepts a bounded
+  `powerbi-cli.ops.v1` document containing only `setObject` entries and commits
+  the complete list through one all-or-nothing transaction with per-entry
+  readback.
   `report visuals formatting list/show` inventories existing PBIR formatting
   object cards and property names with raw payloads omitted unless
   `--include-raw` is passed. `report visuals formatting extract/apply` copies

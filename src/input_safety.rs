@@ -405,15 +405,14 @@ pub(crate) fn read_ops(path: &Path, known_kinds: &[&str]) -> CliResult<Value> {
         )
     })?;
     if value.get("schema").and_then(Value::as_str) != Some("powerbi-cli.ops.v1") {
-        return Err(refusal(
-            InputKind::Ops,
-            "ops file schema must be powerbi-cli.ops.v1",
-        ));
+        return Err(
+            refusal(InputKind::Ops, "ops file schema must be powerbi-cli.ops.v1")
+                .with_pointer("/schema"),
+        );
     }
-    let ops = value
-        .get("ops")
-        .and_then(Value::as_array)
-        .ok_or_else(|| refusal(InputKind::Ops, "ops file must contain an ops array"))?;
+    let ops = value.get("ops").and_then(Value::as_array).ok_or_else(|| {
+        refusal(InputKind::Ops, "ops file must contain an ops array").with_pointer("/ops")
+    })?;
     for (index, op) in ops.iter().enumerate() {
         // Durable operation plans use the typed IR's `op` tag. Keep accepting
         // the historical safety-harness spelling `kind` so this boundary can
@@ -427,12 +426,14 @@ pub(crate) fn read_ops(path: &Path, known_kinds: &[&str]) -> CliResult<Value> {
                 InputKind::Ops,
                 format!("ops[{index}].{field} must be a string"),
             )
+            .with_pointer(format!("/ops/{index}/{field}"))
         })?;
         if !known_kinds.contains(&kind) {
             return Err(refusal(
                 InputKind::Ops,
                 format!("ops[{index}] uses unknown op kind `{kind}`"),
-            ));
+            )
+            .with_pointer(format!("/ops/{index}/{field}")));
         }
     }
     Ok(value)

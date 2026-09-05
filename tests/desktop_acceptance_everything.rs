@@ -2231,6 +2231,34 @@ fn everything_acceptance_invokes_every_catalog_command() {
             "--json",
         ]),
     );
+    let set_object_batch = h.root.join("set-object.ops.json");
+    write_json(
+        &set_object_batch,
+        &json!({
+            "schema": "powerbi-cli.ops.v1",
+            "ops": [{
+                "op": "setObject",
+                "visual": total_incidents,
+                "object": "categoryLabels",
+                "property": "fontSize",
+                "value": {"expr": {"Literal": {"Value": "20D"}}}
+            }]
+        }),
+    );
+    h.ok(
+        "report visuals set-object",
+        &svec([
+            "report",
+            "visuals",
+            "set-object",
+            "--project",
+            &project_arg,
+            "--batch",
+            &p(&set_object_batch),
+            "--dry-run",
+            "--json",
+        ]),
+    );
     h.ok(
         "report visuals set-display-name",
         &svec([
