@@ -95,7 +95,13 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let resolved = resolve_project(&project)?;
     let validation = validate_project(&resolved)?;
-    let mut plan = build_hygiene_plan(&resolved, &validation, profile, options.include_raw)?;
+    let mut plan = build_hygiene_plan(
+        &resolved,
+        &validation,
+        profile,
+        options.include_raw,
+        options.rules_design,
+    )?;
     if options.rules_design {
         plan.findings.retain(|finding| {
             finding["ruleId"]
@@ -177,7 +183,7 @@ fn sanitize_plan_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let resolved = resolve_project(&project)?;
     let validation = validate_project(&resolved)?;
-    let plan = build_hygiene_plan(&resolved, &validation, profile, false)?;
+    let plan = build_hygiene_plan(&resolved, &validation, profile, false, false)?;
     Ok(plan_response(
         &resolved,
         &validation,
@@ -193,7 +199,8 @@ fn sanitize_apply_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let source_resolved = resolve_project(&source_project)?;
     let source_validation = validate_project(&source_resolved)?;
-    let source_plan = build_hygiene_plan(&source_resolved, &source_validation, profile, false)?;
+    let source_plan =
+        build_hygiene_plan(&source_resolved, &source_validation, profile, false, false)?;
     let confirm_token = confirm_token(&source_plan.plan_fingerprint);
 
     if mode == MutationMode::InPlace && options.confirm.as_deref() != Some(&confirm_token) {
@@ -236,7 +243,7 @@ fn sanitize_apply_command(args: &[String]) -> CliResult<Value> {
         Value::Null
     } else {
         let validation = post_validation.as_ref().expect("post validation");
-        let plan = build_hygiene_plan(&target_resolved, validation, profile, false)?;
+        let plan = build_hygiene_plan(&target_resolved, validation, profile, false, false)?;
         json!({
             "ok": validation.errors.is_empty() && !has_error_findings(&plan.findings),
             "counts": counts_json(&plan.findings, &plan.actions, &plan.unsupported_actions),
@@ -377,9 +384,10 @@ fn build_hygiene_plan(
     validation: &crate::ValidationReport,
     profile: HygieneProfile,
     include_raw: bool,
+    design: bool,
 ) -> CliResult<HygienePlan> {
     let mut findings = Vec::new();
-    add_lint_findings(resolved, validation, &mut findings)?;
+    add_lint_findings(resolved, validation, &mut findings, design)?;
     add_handoff_findings(resolved, profile, &mut findings)?;
 
     let (filters, _) = list_report_filters(resolved)?;
@@ -530,8 +538,14 @@ fn add_lint_findings(
     resolved: &ResolvedProject,
     validation: &crate::ValidationReport,
     findings: &mut Vec<Value>,
+    design: bool,
 ) -> CliResult<()> {
-    let lint = lint_project(resolved, validation)?;
+    let lint = if design {
+        let deep = crate::inspect::deep_inspect(resolved, validation)?;
+        crate::design::lint::lint_report(resolved, &deep)?
+    } else {
+        lint_project(resolved, validation)?
+    };
     if let Some(items) = lint["findings"].as_array() {
         for (index, finding) in items.iter().enumerate() {
             findings.push(json!({

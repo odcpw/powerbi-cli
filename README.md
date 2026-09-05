@@ -507,7 +507,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
 - `profile.data-profile-v2` — **supported**, schema-matched-statistics-with-redacted-values, proof `unit-smoke`: Bounded CSV/JSON data profile inference. Commands: `profile infer`, `profile validate`, `profile summarize`.
-- `quality.design-lint` — **supported**, read-only-grid-and-template-analysis, proof `unit-smoke`: Deterministic report design geometry lint. Commands: `lint`, `triage`, `report audit`.
+- `quality.design-lint` — **supported**, read-only-grid-and-template-analysis, proof `unit-smoke`: Deterministic report design geometry lint. Commands: `triage`, `report audit`.
 - `quality.lint-rule-registry` — **supported**, read-only-contract-catalog, proof `unit-smoke`: Discoverable lint and audit rule registry. Commands: `validate`, `lint`, `model dax lint`, `report audit`.
 - `quality.model-completeness-lint` — **supported**, offline-static-heuristics, proof `unit-smoke`: DAX format and semantic-model completeness lint. Commands: `lint`, `triage`, `model dax lint`.
 - `report.bookmark-mutations` — **planned**, unsupported, proof `unit-smoke`: Bookmark state capture/create/update.
@@ -589,8 +589,9 @@ projection for an existing project. See
 `capabilities.responseShapes.scorecard.v1` and
 `capabilities.responseShapes.reportBuild` for the machine-readable details.
 
-Design geometry checks run through `lint`, `triage`, and
-`scorecard.designLint`. Use `report audit --project <project> --rules design
+Design geometry checks are excluded from default `lint` and fixture summaries.
+Build and triage expose them separately in `scorecard.designLint`.
+Use `report audit --project <project> --rules design
 --json` to isolate the eleven stable grid/template rules. Each finding carries
 an RFC 6901 pointer, evidence, and a sanitize action when remediation is
 mechanical; applying those actions remains plan-only until the typed

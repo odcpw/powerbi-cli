@@ -303,9 +303,9 @@ const FEATURE_CATALOG: &[Feature] = &[
         support: "read-only-grid-and-template-analysis",
         proof_level: "unit-smoke",
         emits_pbir: false,
-        commands: &["lint", "triage", "report audit"],
+        commands: &["triage", "report audit"],
         refusal_code: None,
-        reason: "The shared lint pipeline evaluates eleven stable design-family geometry rules against the embedded twelve-column grid and named layout templates. Findings include RFC 6901 pointers, evidence, and a sanitize action when remediation can be planned mechanically; report audit --rules design isolates the same findings, while scorecard.designLint exposes them to build and triage.",
+        reason: "Explicit report audit --rules design evaluates eleven stable design-family geometry rules against the embedded grid and templates. Default lint and fixture summaries exclude this family; build and triage expose it separately in scorecard.designLint. Findings include RFC 6901 pointers, evidence, and plan-only sanitize actions.",
         next_proof: &[
             "Promote geometry heuristics only after representative generated and Desktop-authored fixtures complete Desktop canvas review",
             "Add typography, colour, and number-format checks through the separate style-token lint boundary",

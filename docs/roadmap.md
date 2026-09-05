@@ -670,7 +670,7 @@ IDs and dependencies; this roadmap records what has already landed:
   theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
   harvester, with each feature's proof level published by `features list`.
 - [x] Deterministic design-geometry lint now evaluates eleven stable
-  grid/template rules in `lint`, `report audit --rules design`, `triage`, and
+  grid/template rules in `report audit --rules design`, `triage`, and
   the shared scorecard, with pointers and plan-only sanitize actions.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.

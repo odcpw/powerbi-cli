@@ -25,7 +25,7 @@ fn finding_projection(value: &Value) -> Value {
 }
 
 #[test]
-fn design_geometry_findings_flow_through_lint_audit_triage_and_scorecard() {
+fn design_geometry_is_opt_in_for_audit_and_separate_from_default_lint() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());
     let project_arg = project.to_str().expect("project path");
@@ -33,7 +33,7 @@ fn design_geometry_findings_flow_through_lint_audit_triage_and_scorecard() {
     let clean = run_powerbi(&["lint", project_arg, "--json"]);
     assert_eq!(clean.code, 0, "stderr: {}", clean.stderr);
     assert!(
-        !stdout_json(&clean)["designLint"]["findings"]
+        !stdout_json(&clean)["findings"]
             .as_array()
             .expect("clean findings")
             .iter()
@@ -50,7 +50,17 @@ fn design_geometry_findings_flow_through_lint_audit_triage_and_scorecard() {
     assert_eq!(first.stdout.as_bytes(), second.stdout.as_bytes());
     assert_eq!(first.stderr.as_bytes(), second.stderr.as_bytes());
     let lint = stdout_json(&first);
-    let design = &lint["designLint"];
+    assert!(lint.get("designLint").is_none());
+    assert_eq!(lint["counts"], stdout_json(&clean)["counts"]);
+    assert!(lint["findings"].as_array().unwrap().iter().all(|finding| {
+        !finding["code"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("design.")
+    }));
+    let triage_output = run_powerbi(&["triage", project_arg, "--json"]);
+    let scorecard = stdout_json(&triage_output);
+    let design = &scorecard["scorecard"]["designLint"];
     assert_eq!(design["schema"], "powerbi-cli.design.lint.v1");
     assert_eq!(design["status"], "available");
     assert_eq!(design["proofLevel"], "unit-smoke");
