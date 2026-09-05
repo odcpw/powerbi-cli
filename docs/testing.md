@@ -108,6 +108,24 @@ git diff -- tests/snapshots/
 Review every changed value. Snapshot updates are test-contract changes, not a
 way to make unexplained failures pass.
 
+## Documentation contract gate
+
+The live command catalog is the source of truth for the generated Discovery,
+limits, and feature sections in `README.md` and `skills/powerbi-cli/SKILL.md`.
+Run both checks from the repository root when changing a catalog or its docs:
+
+```bash
+cargo run --locked -- robot-docs render --check
+cargo run --locked -- robot-docs verify
+```
+
+The verifier is read-only. It checks that generated marker regions match the
+live catalogs, every catalog command path appears in both Discovery regions,
+and every literal `powerbi-cli` command mention in those documents resolves to
+a catalog path or alias. Failures retain the stable `docs_drift` exit code and
+include one registered `docs.undocumented_command` or `docs.unknown_command`
+line for each offending document path and command.
+
 ## Nightly performance targets
 
 `tests/perf.rs` contains ignored, deterministic Linux performance gates. The

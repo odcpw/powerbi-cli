@@ -5,6 +5,23 @@ use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::fs;
 
+#[test]
+fn binary_entry_point_delegates_to_library_without_declaring_modules() {
+    let source = include_str!("../src/main.rs");
+    let tokens = source
+        .split(|character: char| !character.is_alphanumeric() && character != '_')
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    assert!(
+        !tokens.contains(&"mod"),
+        "declare Rust modules only in src/lib.rs, never in src/main.rs"
+    );
+    assert!(
+        source.contains("powerbi_cli::main_entry();"),
+        "the binary must delegate to the library entry point"
+    );
+}
+
 #[cfg(windows)]
 fn run_powerbi_without_oracle(args: &[&str]) -> RunOutput {
     cli_command(args).env_remove("POWERBI_DESKTOP_ORACLE").run()

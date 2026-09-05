@@ -121,6 +121,9 @@ mod validation;
 mod visual_catalog;
 mod workflow;
 
+#[cfg(test)]
+mod project_resolution_tests;
+
 pub(crate) use cli_error::*;
 pub(crate) use cli_support::command_arg;
 pub(crate) use diagnostics::Finding;
@@ -136,6 +139,11 @@ pub(crate) use validation::{
     ValidationReport, report_schema_major, validate_command, validate_desktop_runtime_project,
     validate_project,
 };
+
+/// Run the command-line entry point from the thin binary wrapper.
+pub fn main_entry() {
+    cli::main_entry();
+}
 
 /// Internal integration-test bridge for exercising the typed operation path.
 ///
