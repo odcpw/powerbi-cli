@@ -72,6 +72,7 @@ mod report;
 mod report_bookmarks;
 mod report_build;
 mod report_build_style;
+mod report_compose;
 mod report_conditional_formatting;
 mod report_design;
 mod report_drilldown;

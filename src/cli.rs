@@ -148,6 +148,10 @@ fn dispatch(flags: &GlobalFlags, args: &[String]) -> CliResult<CliOutput> {
         "ops" => value_output(crate::apply::command(&args[1..])?, flags.json),
         "package" | "packages" => value_output(package_command(&args[1..])?, flags.json),
         "report" => value_output(report_command(&args[1..])?, flags.json),
+        "dashboard" if args.get(1).is_some_and(|action| action == "new") => value_output(
+            crate::report_compose::compose_command(&args[2..])?,
+            flags.json,
+        ),
         "source-template" | "source-templates" | "sourceTemplate" | "sourceTemplates" => {
             value_output(source_template_command(&args[1..])?, flags.json)
         }

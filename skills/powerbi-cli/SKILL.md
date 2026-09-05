@@ -58,6 +58,18 @@ build or resolve powerbi-cli
 
 ## Cold Start
 
+For schema-first authoring, start with `report compose --schema <schema.json>
+--objective <goal> --dry-run --json`, then use `--out-dir <project-dir>`.
+Optional `--rows` performs aggregate-only inference; `--profile` reuses a
+profile, and `--style <preset|tokens.json>` delegates to the strict compiler
+(named styles select token presets such as `corporate-neutral`).
+Read `stages`, `scorecard`, `proofPlan`, and `wireframes`. Intermediates live
+in the sibling `<project-dir>-compose/` directory. Native missing-evidence and
+unsupported-section errors propagate without fallback; completed sidecars
+remain on write-mode failure. For recomposition use a project dry-run, then
+`--in-place --confirm <confirmToken>` with a fresh `--artifacts-dir`.
+The existing transaction emits a recovery snapshot. `dashboard new` is an alias.
+
 Inside the repo, build or run the local Rust binary. Do not rely on a stale
 installed `powerbi-cli` found on `PATH`.
 
@@ -202,6 +214,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
 - `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, style presets and bundles compile through typed kernels, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
+- `powerbi-cli report compose --schema <schema.json> [--rows <rows.csv|rows.json> | --profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--style <preset|tokens.json>] [--template-set default] [--variants 1] [--artifacts-dir <dir>] (--dry-run [--project <project-dir>] | --out-dir <dir> | --project <project-dir> --in-place --confirm <token>) --json` — Compose an offline project through profile inference, narrative planning, compilation, triage, and SVG export; retain sidecars and native stage refusals _(proof: `unit-smoke`)_
 - `powerbi-cli report design defaults show [--project <project-dir-or.pbip> | --spec <dashboard.json>] [--design-defaults] --json` — Resolve deterministic per-visual design-defaults.v1 entries with catalog evidence and style override precedence _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
 - `powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <table[column]> --field <table[column]>... (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Replace a category-axis chart's Category projections with a multi-column hierarchy and enable its Desktop drill controls _(proof: `unit-smoke`)_
@@ -430,6 +443,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `quality.model-completeness-lint` — **supported**, offline-static-heuristics, proof `unit-smoke`: DAX format and semantic-model completeness lint. Commands: `lint`, `triage`, `model dax lint`.
 - `report.bookmark-mutations` — **planned**, unsupported, proof `unit-smoke`: Bookmark state capture/create/update.
 - `report.bookmarks.readback` — **supported**, read-write-metadata-only, proof `unit-smoke`: Bookmark inventory/readback and metadata edits. Commands: `report bookmarks list`, `report bookmarks show`, `report bookmarks set-display-name`, `report bookmarks reorder`, `report bookmarks delete`.
+- `report.compose` — **supported**, in-process-narrative-pipeline, proof `unit-smoke`: One-command report composition. Commands: `report compose`.
 - `report.conditional-formatting` — **supported**, read-only-static-scan, proof `unit-smoke`: Conditional formatting readback. Commands: `report visuals formatting conditional-formatting list`, `report visuals formatting conditional-formatting show`.
 - `report.dashboard-spec-v2` — **supported**, strict-shape-partial-compile, proof `unit-smoke`: Strict dashboard spec v2 shape and compilation boundary. Commands: `report spec fields`, `report spec validate`, `report spec normalize`, `report spec upgrade`, `report build`.
 - `report.design-layout` — **supported**, read-write-layout, proof `unit-smoke`: Report design planning and automatic layout. Commands: `report design-plan`, `report design defaults show`, `report layout auto`, `report wireframe export`.

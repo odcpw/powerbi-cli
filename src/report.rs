@@ -22,6 +22,7 @@ use serde_json::Value;
 
 pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
     match args {
+        [family, rest @ ..] if family == "compose" => crate::report_compose::compose_command(rest),
         [family, rest @ ..] if family == "build" => build_command(rest),
         [family, rest @ ..] if family == "spec" => spec_command(rest),
         [family, action, rest @ ..] if family == "plan" && action == "explain" => {
