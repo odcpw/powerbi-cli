@@ -293,6 +293,11 @@ impl PlanError {
     pub(crate) fn as_cli_error(&self) -> CliError {
         CliError::new(self.code, EXIT_VALIDATION_FAILED, self.message.clone())
             .with_pointer(self.pointer.clone())
+            .with_hint(crate::rules::find_rule(self.code).map_or(
+                "Review the operation at the reported pointer before retrying.",
+                |rule| rule.remediation,
+            ))
+            .with_suggested_command(format!("powerbi-cli lint --explain {} --json", self.code))
     }
 }
 
@@ -312,6 +317,29 @@ impl std::error::Error for PlanError {}
 mod tests {
     use super::super::{AddMeasure, AddVisual, Op};
     use super::*;
+
+    #[test]
+    fn plan_errors_have_registered_remediation_and_executable_explanations() {
+        for code in [
+            "ops.stage_order",
+            "ops.duplicate_operation",
+            "ops.empty_handle",
+            "ops.handle_collision",
+            "ops.duplicate_handle",
+            "ops.dangling_handle",
+        ] {
+            let error = PlanError::new(code, "invalid operation", "/ops/1").as_cli_error();
+            assert_eq!(error.pointer(), Some("/ops/1"));
+            assert_eq!(
+                error.hint.as_deref(),
+                Some(crate::rules::find_rule(code).unwrap().remediation)
+            );
+            assert_eq!(
+                error.suggested_commands,
+                vec![format!("powerbi-cli lint --explain {code} --json")]
+            );
+        }
+    }
 
     fn measure(handle: &str) -> Op {
         Op::AddMeasure(AddMeasure {

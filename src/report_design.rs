@@ -1,14 +1,28 @@
+use crate::design::defaults::{
+    DESIGN_DEFAULTS_SCHEMA, catalog_json, effective_defaults, effective_json,
+};
+use crate::json_composition::normalize_spec_file;
 use crate::pbir::load_report_snapshot;
+use crate::report_build::style_requests_design_defaults;
+use crate::report_spec_schema::validate_known_fields;
 use crate::tmdl::{ColumnRecord, TableDocument, load_table_documents};
 use crate::{
-    CliError, CliResult, canonical_display, command_arg, resolve_project, validate_project,
+    CliError, CliResult, Finding, canonical_display, command_arg, read_json_value, resolve_project,
+    validate_project,
 };
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::path::PathBuf;
 
 #[derive(Debug, Default)]
 struct DesignPlanOptions {
     project: Option<PathBuf>,
+}
+
+#[derive(Debug, Default)]
+struct DesignDefaultsOptions {
+    project: Option<PathBuf>,
+    spec: Option<PathBuf>,
+    force_enabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +86,219 @@ pub(crate) fn design_plan_command(args: &[String]) -> CliResult<Value> {
         "warnings": validation.warnings,
         "errors": validation.errors,
         "next": workflow
+    }))
+}
+
+/// Show the data-driven design defaults that would apply to every visual in a
+/// dashboard spec or existing PBIP project. This is deliberately read-only:
+/// it resolves catalog/style precedence and exposes the SetObject operation
+/// payload without opening a transaction or writing artifacts.
+pub(crate) fn design_defaults_command(args: &[String]) -> CliResult<Value> {
+    let options = parse_defaults_args(args)?;
+    if options.project.is_some() && options.spec.is_some() {
+        return Err(CliError::invalid_args(
+            "report design defaults show accepts either --project or --spec, not both",
+        )
+        .with_suggested_command(
+            "powerbi-cli report design defaults show --project <project-dir-or.pbip> --json",
+        ));
+    }
+    if let Some(project) = options.project {
+        return design_defaults_for_project(&project, options.force_enabled);
+    }
+    if let Some(spec) = options.spec {
+        return design_defaults_for_spec(&spec, options.force_enabled);
+    }
+    Err(CliError::invalid_args(
+        "report design defaults show requires --project <project-dir-or.pbip> or --spec <dashboard.json>",
+    )
+    .with_suggested_command(
+        "powerbi-cli report design defaults show --spec <dashboard.json> --json",
+    ))
+}
+
+fn design_defaults_for_spec(path: &std::path::Path, force_enabled: bool) -> CliResult<Value> {
+    let normalized = normalize_spec_file(path)?;
+    let spec = normalized.value;
+    validate_known_fields(&spec)?;
+    let style = spec.get("style");
+    let defaults_enabled = force_enabled || style_requests_design_defaults(&spec);
+    let mut visuals = Vec::new();
+    for (page_index, page) in spec
+        .get("pages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        let Some(page) = page.as_object() else {
+            continue;
+        };
+        let page_name = page
+            .get("id")
+            .or_else(|| page.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or("page");
+        for (visual_index, visual) in page
+            .get("visuals")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            let Some(visual) = visual.as_object() else {
+                continue;
+            };
+            let requested_type = visual
+                .get("type")
+                .or_else(|| visual.get("visualType"))
+                .and_then(Value::as_str)
+                .unwrap_or("card");
+            let visual_type = crate::visual_catalog::canonical_visual_type(requested_type)?;
+            let visual_id = visual
+                .get("id")
+                .or_else(|| visual.get("name"))
+                .and_then(Value::as_str)
+                .unwrap_or("visual");
+            let defaults = effective_defaults(
+                &visual_type,
+                style,
+                visual.get("format").and_then(Value::as_object),
+            )?;
+            visuals.push(visual_defaults_json(
+                format!("visual:{page_name}:{visual_id}"),
+                format!("/pages/{page_index}/visuals/{visual_index}"),
+                &visual_type,
+                defaults_enabled,
+                &defaults,
+            ));
+        }
+    }
+    let source = json!({
+        "kind": "spec",
+        "specPath": canonical_display(path),
+        "normalizedFrom": normalized.normalized_from
+    });
+    design_defaults_response(source, defaults_enabled, visuals, None)
+}
+
+fn design_defaults_for_project(path: &std::path::Path, force_enabled: bool) -> CliResult<Value> {
+    let resolved = resolve_project(path)?;
+    let validation = validate_project(&resolved)?;
+    let snapshot = load_report_snapshot(&resolved)?;
+    let manifest_path = resolved.project_dir.join("powerbi-cli.manifest.copy.json");
+    let manifest = if manifest_path.is_file() {
+        Some(read_json_value(&manifest_path)?)
+    } else {
+        None
+    };
+    let style = manifest.as_ref().and_then(|value| value.get("style"));
+    let defaults_enabled = force_enabled
+        || manifest
+            .as_ref()
+            .and_then(|value| value.get("designDefaultsEnabled"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        || manifest
+            .as_ref()
+            .is_some_and(style_requests_design_defaults);
+    let mut visuals = Vec::new();
+    for (page_index, page) in snapshot.pages.iter().enumerate() {
+        for (visual_index, visual) in page.visuals.iter().enumerate() {
+            let format = manifest_visual_format(manifest.as_ref(), page_index, visual_index);
+            let defaults = effective_defaults(&visual.visual_type, style, format.as_ref())?;
+            visuals.push(visual_defaults_json(
+                visual.handle.clone(),
+                format!("/pages/{page_index}/visuals/{visual_index}"),
+                &visual.visual_type,
+                defaults_enabled,
+                &defaults,
+            ));
+        }
+    }
+    let source = json!({
+        "kind": "project",
+        "projectDir": canonical_display(&resolved.project_dir),
+        "pbip": canonical_display(&resolved.pbip_path),
+        "manifestPath": manifest.as_ref().map(|_| canonical_display(&manifest_path))
+    });
+    design_defaults_response(
+        source,
+        defaults_enabled,
+        visuals,
+        Some((validation.warnings, validation.errors)),
+    )
+}
+
+fn manifest_visual_format(
+    manifest: Option<&Value>,
+    page_index: usize,
+    visual_index: usize,
+) -> Option<Map<String, Value>> {
+    manifest
+        .and_then(|manifest| manifest.get("pages"))
+        .and_then(Value::as_array)
+        .and_then(|pages| pages.get(page_index))
+        .and_then(|page| page.get("visuals"))
+        .and_then(Value::as_array)
+        .and_then(|visuals| visuals.get(visual_index))
+        .and_then(|visual| visual.get("format"))
+        .and_then(Value::as_object)
+        .cloned()
+}
+
+fn visual_defaults_json(
+    handle: String,
+    pointer: String,
+    visual_type: &str,
+    defaults_enabled: bool,
+    defaults: &[crate::design::defaults::EffectiveDefault],
+) -> Value {
+    json!({
+        "handle": handle,
+        "pointer": pointer,
+        "visualType": visual_type,
+        "defaultsEnabled": defaults_enabled,
+        "defaults": effective_json(defaults)
+    })
+}
+
+fn design_defaults_response(
+    source: Value,
+    defaults_enabled: bool,
+    visuals: Vec<Value>,
+    validation: Option<(Vec<Finding>, Vec<Finding>)>,
+) -> CliResult<Value> {
+    let catalog = catalog_json()?;
+    let active = visuals
+        .iter()
+        .flat_map(|visual| visual["defaults"].as_array())
+        .flatten()
+        .filter(|default| default["inert"] != true)
+        .count();
+    let inert = visuals
+        .iter()
+        .flat_map(|visual| visual["defaults"].as_array())
+        .flatten()
+        .filter(|default| default["inert"] == true)
+        .count();
+    let (warnings, errors) = validation.unwrap_or_default();
+    Ok(json!({
+        "schema": "powerbi-cli.report.design.defaults.v1",
+        "catalogSchema": DESIGN_DEFAULTS_SCHEMA,
+        "source": source,
+        "defaultsEnabled": defaults_enabled,
+        "mergeOrder": ["catalog", "style.tokens", "style.defaults", "visuals[].format"],
+        "catalog": catalog,
+        "visuals": visuals,
+        "counts": {
+            "visuals": visuals.len(),
+            "activeDefaults": active,
+            "inertDefaults": inert
+        },
+        "warnings": warnings,
+        "errors": errors,
+        "next": ["powerbi-cli report spec explain --schema <schema.json> --spec <dashboard.json> --design-defaults --json"]
     }))
 }
 
@@ -466,6 +693,58 @@ fn parse_args(args: &[String]) -> CliResult<DesignPlanOptions> {
                     )
                     .with_suggested_command(
                         "powerbi-cli report design-plan --project <project-dir-or.pbip> --json",
+                    ));
+                }
+                options.project = Some(PathBuf::from(other));
+                i += 1;
+            }
+        }
+    }
+    Ok(options)
+}
+
+fn parse_defaults_args(args: &[String]) -> CliResult<DesignDefaultsOptions> {
+    let mut options = DesignDefaultsOptions::default();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--project" | "-p" => {
+                if options.project.is_some() {
+                    return Err(CliError::invalid_args(
+                        "report design defaults show accepts --project only once",
+                    ));
+                }
+                options.project = Some(PathBuf::from(take_value(args, &mut i, "--project")?));
+            }
+            "--spec" => {
+                if options.spec.is_some() {
+                    return Err(CliError::invalid_args(
+                        "report design defaults show accepts --spec only once",
+                    ));
+                }
+                options.spec = Some(PathBuf::from(take_value(args, &mut i, "--spec")?));
+            }
+            "--design-defaults" | "--defaults" => {
+                if options.force_enabled {
+                    return Err(CliError::invalid_args(
+                        "--design-defaults may be specified only once",
+                    ));
+                }
+                options.force_enabled = true;
+                i += 1;
+            }
+            other if other.starts_with('-') => {
+                return Err(CliError::invalid_args(format!(
+                    "unknown report design defaults show flag: {other}"
+                ))
+                .with_suggested_command(
+                    "powerbi-cli report design defaults show --project <project-dir-or.pbip> --json",
+                ));
+            }
+            other => {
+                if options.project.is_some() || options.spec.is_some() {
+                    return Err(CliError::invalid_args(
+                        "report design defaults show accepts one project/spec path",
                     ));
                 }
                 options.project = Some(PathBuf::from(other));

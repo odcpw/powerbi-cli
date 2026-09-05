@@ -146,6 +146,7 @@ Usage:
   powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind <sql|postgres|odbc|excel|csv|folder|sharepoint|generic-m> [--m-template <M-expression> | --m-file <path-or->] --dry-run --json
   powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json
   powerbi-cli report design-plan --project <project-dir-or.pbip> --json
+  powerbi-cli report design defaults show --project <project-dir-or.pbip> --json
   powerbi-cli report tree --project <project-dir-or.pbip> --json
   powerbi-cli report find --project <project-dir-or.pbip> --kind <kind> --json
   powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> --json
@@ -448,7 +449,7 @@ Rules for agents:
   staged typed operation plan without writing files.
 - Use `report spec upgrade --spec <v1.json> --out <v2.json>` to produce a normalized v2 spec without dropping any validated v1 fields; use `--dry-run` to inspect the result without writing.
 - Use `report plan --schema <schema.json> --profile <profile.json> --intent <intent.md|intent.json> --out <dashboard.json>` (or the backward-compatible `--objective <goal>`) to create a deterministic starter dashboard spec, then `report spec validate --schema <schema.json> --spec <dashboard.json>` before build. Intent v1 accepts audience, questions, KPIs, comparisons, periods, drill paths, alerts, filter dimensions, preferred archetypes, page flow, and handoff requirements; uncompiled fields remain in the response with an owning-bead warning.
-- Use project-only `report design-plan --project <project>` to get visual opportunities from an already scaffolded project.
+  - Use project-only `report design-plan --project <project>` to get visual opportunities from an already scaffolded project; use `report design defaults show --project <project>` (or `--spec <dashboard.json>`) to inspect catalog defaults and style override precedence.
 - Use `report tree/find/cat/query` for stable report-object navigation across pages, visuals, bindings, filters, slicers, bookmarks, and interactions. Use `--include-raw` only when you explicitly need raw PBIR JSON.
 - Use `report audit` and `report sanitize plan/apply` before handoff when a Desktop-authored or template-derived report might contain persisted filter/slicer/bookmark state, literal values, or stale interaction references.
 - Use `report pages list/show/add/clone/update/reorder/set-active/delete-empty`, `report layout auto`, `report drilldown set-hierarchy`, `report drillthrough set/show/clear`, `report bookmarks list/show/set-display-name/reorder/delete`, `report filters list/show/add/update/delete/clear`, `report slicers list/show/clear`, `report interactions list/show/set/disable/reset`, and `report visuals list/show/catalog/formatting list/formatting show/formatting conditional-formatting list/show/formatting extract/formatting apply/formatting set-text/formatting set-color/add/add-card/add-slicer/add-textbox/clone/delete/set-position/set-bindings/set-topn-guard/set-object/set-display-name` for PBIR layout navigation, deterministic visual arrangement, chart hierarchy axes, same-report drillthrough page bindings, bookmark/filter/slicer/interaction inventory and readback, guarded categorical/range/TopN/relative-date filter authoring, type-preserving filter updates, deletion and owner-scoped clear, guarded slicer selection clear, guarded interaction overrides and removal of one explicit row to restore documented defaults, guarded page cloning and metadata/order edits, visual type/role discovery, safe visual formatting inventory and bundle portability, conditional-formatting readback, typed title/static-color formatting and rejected alt-text cleanup, safe visual creation/cloning/deletion, small-visual scaffolding (KPI cards, slicers, reading-guide textboxes), geometry edits, field-well binding replacement, declarative visual TopN guard filters, curated visual object properties, and projection display names.
@@ -542,6 +543,7 @@ pub(crate) fn robot_triage() -> Value {
             "sourceTemplateAddSqlDryRun": "powerbi-cli source-template add --project <project-dir-or.pbip> --table <table> --kind sql --dry-run --json",
             "sourceTemplateApplyDryRun": "powerbi-cli source-template apply --project <project-dir-or.pbip> --handle <source-template-handle> --server <server> --database <database> --dry-run --json",
             "reportDesignPlan": "powerbi-cli report design-plan --project <project-dir-or.pbip> --json",
+            "reportDesignDefaults": "powerbi-cli report design defaults show --project <project-dir-or.pbip> --json",
             "reportTree": "powerbi-cli report tree --project <project-dir-or.pbip> --json",
             "reportFind": "powerbi-cli report find --project <project-dir-or.pbip> --kind visual --json",
             "reportCat": "powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> --json",
@@ -1417,6 +1419,7 @@ fn schema_manifest() -> Value {
         "reportInteractionMutationFields": ["dryRun", "mode", "target", "interactionPlan.before", "interactionPlan.after", "interactionPlan.existed", "interactionPlan.changed", "changes[].kind", "changes[].action", "changes[].path", "changes[].jsonPointer", "changes[].before", "changes[].after", "readbackCommand", "pageReadbackCommand", "sourceVisualReadbackCommand", "targetVisualReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportInteractionResetMutationFields": ["dryRun", "mode", "action", "target.page", "target.source", "target.target", "target.interactionType", "target.rowPresent", "target.defaulted", "interactionPlan.before", "interactionPlan.after", "interactionPlan.existed", "interactionPlan.changed", "interactionPlan.defaulted", "interactionPlan.semantics", "resetSemantics", "changes[].kind", "changes[].action", "changes[].path", "changes[].jsonPointer", "changes[].before", "changes[].after", "readbackCommand", "pageReadbackCommand", "sourceVisualReadbackCommand", "targetVisualReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportDesignPlanFields": ["profile", "candidates.dateColumns", "candidates.categoryColumns", "candidates.numericColumns", "candidates.measures", "opportunities[].kind", "opportunities[].command", "recommendedWorkflow"],
+        "reportDesignDefaultsFields": ["schema", "catalogSchema", "source", "defaultsEnabled", "mergeOrder", "catalog", "visuals[]", "visuals[].handle", "visuals[].pointer", "visuals[].visualType", "visuals[].defaultsEnabled", "visuals[].defaults[]", "visuals[].defaults[].operation", "counts", "warnings", "errors", "next"],
         "reportObjectFields": ["handle", "kind", "name", "title", "visualType", "parentHandle", "path", "jsonPointer", "safety", "raw"],
         "reportObjectTreeFields": ["ok", "projectDir", "counts", "tree.handle", "tree.kind", "tree.children", "objects[].handle", "objects[].kind", "objects[].parentHandle", "objects[].path", "next"],
         "reportObjectFindFields": ["ok", "predicates", "objects[].handle", "objects[].kind", "objects[].path", "counts.matched", "next"],
@@ -1726,6 +1729,19 @@ fn response_shapes() -> Value {
             "requiredFields": ["ok", "exitCode", "specPath", "normalizedOut", "normalizedFrom", "specVersion", "next"],
             "normalizedFrom": "Root-relative included JSON fragments, sorted and de-duplicated for deterministic provenance."
         },
+        "reportSpecExplainPlan": {
+            "schema": "powerbi-cli.report.spec.explainPlan.v1",
+            "transport": "embedded stdout object at plan in report spec explain",
+            "operationFields": ["index", "stage", "stageName", "op", "handle", "summary", "pointer", "operation"],
+            "replay": "Annotated explanation only, not an ops.v1 input file. Each operation field contains its typed IR payload."
+        },
+        "reportVisualObjectBatchMutation": {
+            "schema": "powerbi-cli.report.visuals.objectBatchMutation.v1",
+            "transport": "stdout",
+            "requiredFields": ["schema", "ok", "exitCode", "action", "dryRun", "mode", "batch", "count", "changedCount", "operationOutcomes", "changes", "readbackCommands", "next"],
+            "input": "Bounded powerbi-cli.ops.v1 envelope containing only setObject operations with PBIR-encoded values; unknown fields and conflicting tags are refused with RFC 6901 pointers.",
+            "atomicity": "All entries are preflighted and staged before any output is committed. Dry-run never writes the source or output project."
+        },
         "reportSpecUpgrade": {
             "schema": "powerbi-cli.report.spec.upgrade.v1",
             "transport": "stdout",
@@ -1794,7 +1810,7 @@ fn response_shapes() -> Value {
         },
         "ops.v1": {
             "schema": "powerbi-cli.ops.v1",
-            "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
+            "transport": "UTF-8 JSON plan file; the setObject subset is consumed by report visuals set-object --batch, with general replay reserved for a future ops apply command",
             "requiredFields": ["schema", "ops"],
             "operationTag": "op",
             "operationTags": ["addCalculatedColumn", "addFilter", "addMeasure", "addPage", "addRelationship", "addStaticTable", "addVisual", "applyStyleBundle", "applyThemeBundle", "applyThemePreset", "bookmarkMetadata", "clearFilter", "clonePage", "cloneVisual", "deleteEmptyPage", "deleteFilter", "deleteVisual", "formattingApply", "reorderPages", "resetInteraction", "sanitizeAction", "setActivePage", "setBindings", "setColor", "setDisplayName", "setDrilldownHierarchy", "setDrillthrough", "setInteraction", "setObject", "setPosition", "setSortBy", "setText", "setTopNGuard", "slicerClear", "sourceTemplateApply", "updateFilter", "updatePage"],

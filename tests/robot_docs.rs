@@ -56,6 +56,80 @@ fn root_args(root: &Path, section: &str, check: bool) -> Vec<String> {
 }
 
 #[test]
+fn follow_up_commands_preserve_explicit_root_and_selected_sections() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = temp.path().join("repository with spaces");
+    copy_documentation(&root);
+    let run_elsewhere = |args: &[String]| common::cli_command(args).current_dir(temp.path()).run();
+    let rendered = run_elsewhere(&root_args(&root, "commands", false));
+    assert_eq!(rendered.exit, 0, "{}", rendered.stderr);
+    let check_command = format!(
+        "powerbi-cli robot-docs render --root '{}' --section commands --check --json",
+        root.display()
+    );
+    assert_eq!(stdout_json(&rendered)["next"][0], check_command);
+    let checked = run_elsewhere(&root_args(&root, "commands", true));
+    assert_eq!(checked.exit, 0, "{}", checked.stderr);
+
+    let readme_path = root.join("README.md");
+    let readme = fs::read_to_string(&readme_path).expect("README");
+    let drifted = readme.replacen(
+        "### Commands (generated from `capabilities --json`)",
+        "### Commands (drifted)",
+        1,
+    );
+    assert_ne!(readme, drifted);
+    fs::write(&readme_path, drifted).expect("write drift");
+    let drift = run_elsewhere(&root_args(&root, "commands", true));
+    assert_eq!(drift.exit, 1);
+    assert_eq!(
+        stderr_json(&drift)["error"]["suggestedCommands"],
+        serde_json::json!([
+            check_command,
+            format!(
+                "powerbi-cli robot-docs render --root '{}' --section commands --json",
+                root.display()
+            )
+        ])
+    );
+
+    let verify_args = vec![
+        "robot-docs".to_string(),
+        "verify".to_string(),
+        "--root".to_string(),
+        root.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ];
+    let verify_command = format!(
+        "powerbi-cli robot-docs verify --root '{}' --json",
+        root.display()
+    );
+    let verification = run_elsewhere(&verify_args);
+    assert_eq!(verification.exit, 1);
+    assert_eq!(
+        stderr_json(&verification)["error"]["suggestedCommands"],
+        serde_json::json!([
+            verify_command,
+            format!(
+                "powerbi-cli robot-docs render --root '{}' --json",
+                root.display()
+            )
+        ])
+    );
+    let repaired = run_elsewhere(&[
+        "robot-docs".to_string(),
+        "render".to_string(),
+        "--root".to_string(),
+        root.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ]);
+    assert_eq!(repaired.exit, 0, "{}", repaired.stderr);
+    let verified = run_elsewhere(&verify_args);
+    assert_eq!(verified.exit, 0, "{}", verified.stderr);
+    assert_eq!(stdout_json(&verified)["next"][0], verify_command);
+}
+
+#[test]
 fn render_check_is_deterministic_and_regions_match_between_docs() {
     let first = run_powerbi(&["robot-docs", "render", "--check", "--json"]);
     let second = run_powerbi(&["robot-docs", "render", "--check", "--json"]);

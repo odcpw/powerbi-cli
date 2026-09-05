@@ -1642,6 +1642,78 @@ fn focused_capabilities_omit_large_unrelated_catalogs() {
 }
 
 #[test]
+fn new_surface_focused_capabilities_stay_bounded_and_json_is_position_independent() {
+    for path in [
+        "report spec schema",
+        "report spec explain",
+        "report spec upgrade",
+        "report spec normalize",
+        "report build",
+        "report layout auto",
+        "report wireframe export",
+        "robot-docs guide",
+        "robot-docs render",
+        "robot-docs verify",
+        "desktop harvest-reference",
+        "handoff rebind-check",
+        "report visuals set-object",
+    ] {
+        let trailing = run_powerbi(&["capabilities", "--for", path, "--json"]);
+        let leading = run_powerbi(&["--json", "capabilities", "--for", path]);
+        assert_eq!(trailing.code, 0, "{path}: {}", trailing.stderr);
+        assert!(trailing.stderr.is_empty());
+        assert_eq!(leading.code, 0, "{path}: {}", leading.stderr);
+        assert_eq!(
+            trailing.stdout, leading.stdout,
+            "{path}: JSON placement drift"
+        );
+        assert!(
+            trailing.stdout.len() < 20_000,
+            "{path}: {} bytes",
+            trailing.stdout.len()
+        );
+        let value = stdout_json(&trailing);
+        let command = command_by_path(value["commands"].as_array().unwrap(), path);
+        assert!(command["outputSchema"].is_string(), "{path}");
+        let compact = run_powerbi(&["capabilities", "--for", path, "--compact", "--json"]);
+        assert_eq!(compact.code, 0, "{}", compact.stderr);
+        assert!(
+            compact.stdout.len() < 8_000,
+            "{path}: compact response unbounded"
+        );
+    }
+}
+
+#[test]
+fn operation_plan_codes_are_explainable_and_new_response_shapes_are_registered() {
+    for code in [
+        "ops.stage_order",
+        "ops.duplicate_operation",
+        "ops.empty_handle",
+        "ops.handle_collision",
+        "ops.duplicate_handle",
+        "ops.dangling_handle",
+        "ops.handle_mismatch",
+        "report.spec.uncompiled_section",
+    ] {
+        let result = run_powerbi(&["lint", "--explain", code, "--json"]);
+        assert_eq!(result.code, 0, "{code}: {}", result.stderr);
+        assert!(result.stderr.is_empty());
+        assert!(stdout_json(&result).is_object());
+    }
+    let result = run_powerbi(&["capabilities", "--json"]);
+    let value = stdout_json(&result);
+    assert_eq!(
+        value["responseShapes"]["reportSpecExplainPlan"]["schema"],
+        "powerbi-cli.report.spec.explainPlan.v1"
+    );
+    assert_eq!(
+        value["responseShapes"]["reportVisualObjectBatchMutation"]["schema"],
+        "powerbi-cli.report.visuals.objectBatchMutation.v1"
+    );
+}
+
+#[test]
 fn exact_compact_capabilities_return_only_the_documented_command_fields() {
     let output = run_powerbi(&[
         "capabilities",
@@ -1656,8 +1728,8 @@ fn exact_compact_capabilities_return_only_the_documented_command_fields() {
         value,
         json!({
             "path": "report build",
-            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json",
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--design-defaults", "--defaults", "--trace", "--json", "--format json"],
             "examples": ["powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json", "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"],
             "proofLevel": "unit-smoke",
             "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "compiled.styleTokens", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.styleTokens.allowContrastBelowAA", "scorecard.next[]", "styleTokens.id", "styleTokens.allowContrastBelowAA", "styleTokens.warningCount", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],

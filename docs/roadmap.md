@@ -35,6 +35,12 @@ rebound to real data later.
 
 ## Agent Contract
 
+The 2026-09 scoped compiler-surface ergonomics pass repairs profile/root-losing
+follow-ups, distinguishes annotated explain plans from replay input, registers
+operation-plan errors, and tightens batch/grid/harvest pointers. See
+[audit evidence and unresolved owner handoffs](../agent_ergonomics_audit/compiler-surface-2026-09.md).
+This does not ship compose, general ops replay, or spec extraction/diff.
+
 The CLI should follow the `ooxml-cli` pattern: the binary is the live contract,
 and agents discover capabilities before guessing.
 
@@ -164,6 +170,13 @@ policies can wait until the object-specific writers and fixtures exist.
   measures; unresolved names return `plan.missing_input` with pointer and
   candidates. Uncompiled intent fields remain visible with an owning-bead
   warning.
+- Archetype planner evidence: catalog-proof now declares `YearStart`, the
+  January 1 period boundary of its synthetic annual totals; flat-ops and
+  slicer-rail already have typed dates. Non-temporal regional-sales and
+  scatter-bubble intentionally refuse with `plan.missing_input` for missing
+  date evidence while remaining buildable from their authored specs. The
+  all-profile regression lives in `tests/report_plan_archetypes.rs`; no planner
+  threshold was relaxed to accommodate these fixtures.
 - Profile summaries and report plans classify model shape as flat, star,
   snowflake, or multi-fact only when relationship/cardinality and profile
   column evidence supports it. Ambiguous models remain explicitly ambiguous;
@@ -492,6 +505,11 @@ frozen until proven.
   equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
   `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
   type-changing updates remain fixture-gated.
+- Implemented the catalog-backed `planner.narrative-flow` rule: v2 plans put
+  overview first and active, followed by available trend/breakdown/detail
+  stages. Slicer rails repeat across pages; highest observed categorical
+  cardinality selects a hidden drillthrough detail target with a matching
+  source breakdown. `narrativeFlow` explains order and binding evidence.
 - Implemented dashboard v2 template compilation: `pages[].template` and
   `visuals[].slot` resolve through the shared grid; explicit layout wins.
   Heading/subtitle textboxes use the heading band and typography family/scale
@@ -674,6 +692,12 @@ IDs and dependencies; this roadmap records what has already landed:
   the shared scorecard, with pointers and plan-only sanitize actions.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
+- [x] The embedded `design-defaults.v1` catalog resolves per-family visual
+  formatting through Desktop-referenced formatting-catalog keys and the shared
+  SetObject path. Defaults are opt-in, deterministic, inspectable through
+  `report design defaults show`/`report spec explain`, and merge overrides as
+  catalog < `style.tokens` < `style.defaults` < `visuals[].format`; unavailable
+  design properties remain explicitly inert under their owning T4 bead.
 - [x] Stacked visual aliases preserve Desktop-recorded bar/column ids; role
   maps cite their evidence. Unproven 100% stacked bars and offline maps remain
   fixture-gated with explicit missing-evidence refusals.

@@ -129,7 +129,10 @@ fn explain_is_deterministic_and_does_not_write_files() {
     assert_eq!(first.stdout.as_bytes(), second.stdout.as_bytes());
     let value = stdout_json(&first);
     assert_eq!(value["ok"], true);
-    assert_eq!(value["plan"]["schema"], "powerbi-cli.ops.v1");
+    assert_eq!(
+        value["plan"]["schema"], "powerbi-cli.report.spec.explainPlan.v1",
+        "annotated preview operations must not claim the replayable ops.v1 wire format"
+    );
     assert!(value["plan"]["stages"].as_array().is_some());
     assert!(value["handles"]["declared"].as_array().is_some());
     assert_eq!(value["layout"]["available"], true);

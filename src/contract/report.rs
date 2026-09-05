@@ -7,8 +7,8 @@ pub(super) fn commands() -> Vec<Value> {
     vec![
         json!({
             "path": "report build",
-            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, while filters and drillthrough compile through typed kernels, with operation outcomes, stable-handle readback, scorecard, and proofPlan commands",
+            "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -17,7 +17,7 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.build.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--design-defaults", "--defaults", "--trace", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
@@ -111,6 +111,7 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.spec.explain.v1",
+            "limitations": ["plan.schema is powerbi-cli.report.spec.explainPlan.v1. Its annotated operation entries are an explanation, not a replayable ops.v1 file; operation holds the typed payload."],
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "<dashboard.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report spec explain --schema examples/sales.schema.json --profile examples/sales.profile.json --spec examples/sales.dashboard.json --json"],
             "followUpFields": ["ok", "specVersion", "plan.stages", "plan.ops", "handles.declared", "handles.references", "layout.pages[].slots", "layout.pages[].template", "layout.pages[].resolvedSlots", "layout.pages[].headings", "defaults.perVisual", "proofPlan.commands", "proofPlan.unavailable", "unsupportedSections", "warnings", "next"],
@@ -146,7 +147,7 @@ pub(super) fn commands() -> Vec<Value> {
             "path": "report plan",
             "aliases": ["report plan explain"],
             "usage": "powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json",
-            "summary": "Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands",
+            "summary": "Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input",
             "tags": ["report", "dashboard", "plan", "intent", "spec", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -160,7 +161,8 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.dashboard.json --json",
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"
             ],
-            "followUpFields": ["ok", "performance", "performance.ops", "performance.findings", "intent.guards", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "intent.model.factTable", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "specV2", "planner.schema", "planner.version", "planner.rules[]", "planner.rules[].ruleId", "planner.rules[].score", "planner.rules[].summary", "planner.rules[].evidence[]", "planner.rules[].proposal", "planner.proposals[]", "planner.proposals[].kind", "planner.proposals[].ruleId", "planner.proposals[].ruleIds[]", "planner.proposals[].score", "planner.proposals[].archetype", "planner.proposals[].template", "planner.proposals[].visualFamily", "planner.proposals[].bindings[]", "planner.proposals[].bindings[].role", "planner.proposals[].bindings[].field", "planner.proposals[].bindings[].fields[]", "planner.proposals[].bindings[].source", "planner.proposals[].evidence[]", "planner.proposals[].priority", "planner.proposals[].sizeClass", "planner.proposals[].semanticColor", "planner.proposals[].page", "ruleExplanations[]", "ruleExplanations[].ruleId", "ruleExplanations[].score", "ruleExplanations[].summary", "ruleExplanations[].evidence[]", "ruleExplanations[].proposal", "explainRules", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].ruleId", "decisions[].shape", "decisions[].score", "decisions[].evidence[]", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "followUpFields": ["ok", "narrativeFlow", "performance", "performance.ops", "performance.findings", "intent.guards", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "intent.model.factTable", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "specV2", "planner.schema", "planner.version", "planner.rules[]", "planner.rules[].ruleId", "planner.rules[].score", "planner.rules[].summary", "planner.rules[].evidence[]", "planner.rules[].proposal", "planner.proposals[]", "planner.proposals[].kind", "planner.proposals[].ruleId", "planner.proposals[].ruleIds[]", "planner.proposals[].score", "planner.proposals[].archetype", "planner.proposals[].template", "planner.proposals[].visualFamily", "planner.proposals[].bindings[]", "planner.proposals[].bindings[].role", "planner.proposals[].bindings[].field", "planner.proposals[].bindings[].fields[]", "planner.proposals[].bindings[].source", "planner.proposals[].evidence[]", "planner.proposals[].priority", "planner.proposals[].sizeClass", "planner.proposals[].semanticColor", "planner.proposals[].page", "ruleExplanations[]", "ruleExplanations[].ruleId", "ruleExplanations[].score", "ruleExplanations[].summary", "ruleExplanations[].evidence[]", "ruleExplanations[].proposal", "explainRules", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].ruleId", "decisions[].shape", "decisions[].score", "decisions[].evidence[]", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "narrativeFlowFields": ["ruleId", "score", "reason", "pageOrder", "activePage", "ordering", "rail", "drillthrough", "omittedStages"],
             "diagnosticCodes": ["spec.invalid_intent", "spec.missing_input", "plan.missing_input", "input_safety_violation", "invalid_args"]
         }),
         json!({
@@ -177,6 +179,25 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
             "examples": ["powerbi-cli report design-plan --project build/sales --json"],
             "followUpFields": ["profile.counts", "candidates.dateColumns", "candidates.categoryColumns", "candidates.measures", "opportunities[].command", "recommendedWorkflow"]
+        }),
+        json!({
+            "path": "report design defaults show",
+            "aliases": ["report design-defaults show", "report design defaults"],
+            "usage": "powerbi-cli report design defaults show [--project <project-dir-or.pbip> | --spec <dashboard.json>] [--design-defaults] --json",
+            "summary": "Resolve deterministic per-visual design-defaults.v1 entries with catalog evidence and style override precedence",
+            "tags": ["pbir", "report", "design", "defaults", "formatting", "readback", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.design.defaults.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--spec <dashboard.json>", "--design-defaults", "--defaults", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report design defaults show --project build/sales --json",
+                "powerbi-cli report design defaults show --spec examples/sales.dashboard.v2.json --design-defaults --json"
+            ],
+            "followUpFields": ["source", "catalogSchema", "defaultsEnabled", "mergeOrder", "catalog", "visuals[]", "visuals[].handle", "visuals[].visualType", "visuals[].defaults[]", "visuals[].defaults[].operation", "counts", "warnings", "errors", "next"]
         }),
         json!({
             "path": "report tree",
@@ -304,6 +325,8 @@ pub(super) fn commands() -> Vec<Value> {
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.wireframe.v2",
             "outputSchemas": ["powerbi-cli.report.wireframe.v1", "powerbi-cli.report.wireframe.v2"],
+            "outputSchemaByMode": {"json": "powerbi-cli.report.wireframe.v1", "svg|html": "powerbi-cli.report.wireframe.v2"},
+            "limitations": ["Default JSON mode is a read-only v1 geometry response. SVG/HTML modes return the v2 artifact response and support --out or --dry-run; artifact-only follow-up fields are absent in JSON mode."],
             "flags": ["--format json|svg|html", "--template <name>", "--page-size 1280x720|1920x1080", "--grid <columns=12,gutter=16,margin=24,rowUnit=8>", "--out <path>", "--dry-run", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report wireframe export build/sales --json",
@@ -1411,6 +1434,7 @@ pub(super) fn commands() -> Vec<Value> {
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.visuals.objectMutation.v1",
             "outputSchemas": ["powerbi-cli.report.visuals.objectMutation.v1", "powerbi-cli.report.visuals.objectBatchMutation.v1"],
+            "outputSchemaByMode": {"single": "powerbi-cli.report.visuals.objectMutation.v1", "--batch": "powerbi-cli.report.visuals.objectBatchMutation.v1"},
             "flags": ["--project <project-dir-or.pbip>", "--batch <ops.v1.json>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--object <name>", "--property <name>", "--value <raw>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
             "examples": ["powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --batch formatting.ops.json --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object title --property text --value \"Rate zuletzt (BU je 1'000 FTE)\" --in-place --json"],
             "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature. bubbles.bubbleSize remains fixture-gated: no archived Desktop property shape proves its encoding or range, and default 20 is not enabled. Run report visuals catalog --formatting --json for the versioned catalog, encoding, container, and evidence for each pair.", "--batch accepts a bounded powerbi-cli.ops.v1 file containing only setObject operations with already encoded PBIR literal values. Every handle and catalog pair is preflighted and the complete list commits through one all-or-nothing transaction."],

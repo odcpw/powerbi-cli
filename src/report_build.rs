@@ -1,6 +1,7 @@
 use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes, shell_arg,
 };
+use crate::design::defaults::{effective_defaults, effective_json};
 use crate::design::grid::{
     self, Grid, PageSize, RailSide, SlotPosition, Template, resolve_rail_position,
 };
@@ -26,7 +27,9 @@ use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
-use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
+use crate::report_spec_schema::{
+    reject_uncompiled_v2_sections, style_is_supported_compiled, validate_known_fields,
+};
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::scorecard::{dry_run_scorecard, project_scorecard};
@@ -49,6 +52,7 @@ struct BuildOptions {
     out_dir: Option<PathBuf>,
     force: bool,
     trace: bool,
+    design_defaults: bool,
     mode: Option<MutationMode>,
 }
 
@@ -98,8 +102,12 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         validate_known_fields(spec)?;
     }
     let profile_value = load_optional_profile(options.profile.as_deref())?;
-    let mut compiled =
-        compile_dashboard(&schema_value, spec_value.as_ref(), profile_value.as_ref())?;
+    let mut compiled = compile_dashboard(
+        &schema_value,
+        spec_value.as_ref(),
+        profile_value.as_ref(),
+        options.design_defaults,
+    )?;
     let dry_run_proof_plan = if mode == MutationMode::DryRun {
         compile_proof_plan(spec_value.as_ref(), None)?
     } else {
@@ -208,7 +216,7 @@ pub(crate) fn compile_dashboard_summary_with_profile(
     spec: &Value,
     profile: Option<&Value>,
 ) -> CliResult<Value> {
-    let compiled = compile_dashboard(schema, Some(spec), profile)?;
+    let compiled = compile_dashboard(schema, Some(spec), profile, false)?;
     Ok(compiled_summary(&compiled))
 }
 
@@ -220,8 +228,9 @@ pub(crate) fn compile_dashboard_for_explain_with_profile(
     schema: &Value,
     spec: &Value,
     profile: Option<&Value>,
+    design_defaults: bool,
 ) -> CliResult<(Value, Vec<Value>)> {
-    let compiled = compile_dashboard(schema, Some(spec), profile)?;
+    let compiled = compile_dashboard(schema, Some(spec), profile, design_defaults)?;
     let mut explain_schema = compiled.schema.clone();
     materialize_visual_operations_for_explain(&mut explain_schema, &compiled.typed_operations);
     Ok((explain_schema, compiled.warnings))
@@ -293,7 +302,12 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
     {
         let schema_value = load_schema_value(schema_path)?;
         match known_fields.and_then(|_| {
-            compile_dashboard(&schema_value, Some(&spec_value), profile_value.as_ref())
+            compile_dashboard(
+                &schema_value,
+                Some(&spec_value),
+                profile_value.as_ref(),
+                false,
+            )
         }) {
             Ok(compiled) => {
                 let schema_validation = validate_schema_value(&compiled.schema);
@@ -380,6 +394,7 @@ fn spec_validate(args: &[String]) -> CliResult<Value> {
         "next": next_for_spec_validate(
             &spec_path,
             schema_path.as_deref(),
+            options.profile.as_deref(),
             ok,
             validation_level,
             proof_plan_result
@@ -899,13 +914,26 @@ struct ResolvedPageLayout {
     positions: BTreeMap<String, SlotPosition>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct DesignDefaultsContext<'a> {
+    style: Option<&'a Value>,
+    enabled: bool,
+}
+
 fn compile_dashboard(
     schema: &Value,
     spec: Option<&Value>,
     profile: Option<&Value>,
+    design_defaults_override: bool,
 ) -> CliResult<CompiledDashboard> {
     let Some(spec) = spec else {
-        let (schema, notes) = merge_schema_and_spec(schema.clone(), None)?;
+        let (mut schema, notes) = merge_schema_and_spec(schema.clone(), None)?;
+        if design_defaults_override {
+            schema
+                .as_object_mut()
+                .ok_or_else(|| CliError::invalid_args("schema root must be an object"))?
+                .insert("designDefaultsEnabled".to_string(), Value::Bool(true));
+        }
         return Ok(CompiledDashboard {
             schema,
             operations: vec![
@@ -932,15 +960,28 @@ fn compile_dashboard(
     // `proof` is metadata compiled by the side-effect-free proof planner below.
     // Keep the existing v2 refusal boundary for every other recognized section
     // without changing the shared walker while adjacent spec work lands.
+    let style_requests_defaults = style_requests_design_defaults(spec);
+    let defaults_enabled = design_defaults_override || style_requests_defaults;
     let sections_to_check = if spec.get("proof").is_some() {
         let mut stripped = spec.clone();
-        stripped
+        let stripped_object = stripped
             .as_object_mut()
-            .expect("validated dashboard spec object")
-            .remove("proof");
+            .expect("validated dashboard spec object");
+        stripped_object.remove("proof");
+        if defaults_enabled {
+            strip_supported_format_sections(stripped_object);
+        }
         stripped
     } else {
-        spec.clone()
+        let mut stripped = spec.clone();
+        if defaults_enabled {
+            strip_supported_format_sections(
+                stripped
+                    .as_object_mut()
+                    .expect("validated dashboard spec object"),
+            );
+        }
+        stripped
     };
     reject_uncompiled_v2_sections(&sections_to_check)?;
     let _proof_plan = compile_proof_plan(Some(spec), None)?;
@@ -950,6 +991,12 @@ fn compile_dashboard(
     let style_tokens = compile_style_tokens(spec_object)?;
     if spec.get("report").is_none() && spec.get("pages").is_some() {
         let (mut schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
+        if defaults_enabled {
+            schema
+                .as_object_mut()
+                .ok_or_else(|| CliError::invalid_args("schema root must be an object"))?
+                .insert("designDefaultsEnabled".to_string(), Value::Bool(true));
+        }
         let mut defaults_applied = Vec::new();
         if let Some(style_tokens) = style_tokens.as_ref() {
             apply_number_formats(&mut schema, &style_tokens.tokens, &mut defaults_applied)?;
@@ -998,6 +1045,12 @@ fn compile_dashboard(
         copy_report_field(report, merged_object, "description");
         copy_report_field(report, merged_object, "locale");
         apply_model_extensions(merged_object, spec_object)?;
+        if let Some(style) = spec_object.get("style") {
+            merged_object.insert("style".to_string(), style.clone());
+        }
+        if defaults_enabled {
+            merged_object.insert("designDefaultsEnabled".to_string(), Value::Bool(true));
+        }
     }
     let model = ModelIndex::from_schema(&merged);
     let mut defaults_applied = Vec::new();
@@ -1008,6 +1061,7 @@ fn compile_dashboard(
         spec_object.get("style"),
         &mut defaults_applied,
         &mut warnings,
+        defaults_enabled,
     )?;
     if !pages.is_empty() {
         merged
@@ -1022,16 +1076,16 @@ fn compile_dashboard(
         "kind": "compileDashboardSpec",
         "summary": "compiled powerbi-cli.dashboard.v1 report/pages/visuals into scaffold-compatible manifest"
     })];
-    let (mut typed_operations, mut operation_pointers) =
-        compile_filter_operations(spec_object, &model)?;
+    // Rail visuals must exist before behavior-stage filters and drillthrough.
+    let (mut typed_operations, mut operation_pointers, slicer_warnings) =
+        compile_slicer_operations(spec_object, profile)?;
+    let (filter_operations, filter_pointers) = compile_filter_operations(spec_object, &model)?;
+    typed_operations.extend(filter_operations);
+    operation_pointers.extend(filter_pointers);
     let (drillthrough_operations, drillthrough_pointers, drillthrough_warnings) =
         compile_drillthrough_operations(spec_object, &model)?;
     typed_operations.extend(drillthrough_operations);
     operation_pointers.extend(drillthrough_pointers);
-    let (slicer_operations, slicer_pointers, slicer_warnings) =
-        compile_slicer_operations(spec_object, profile)?;
-    typed_operations.extend(slicer_operations);
-    operation_pointers.extend(slicer_pointers);
     operations.extend(
         typed_operations
             .iter()
@@ -1068,23 +1122,25 @@ fn compile_style_tokens(spec: &Map<String, Value>) -> CliResult<Option<CompiledT
     let Some(style) = spec.get("style").and_then(Value::as_object) else {
         return Ok(None);
     };
-    let Some(tokens) = style.get("tokens") else {
+    if !style_is_supported_compiled(&Value::Object(style.clone())) {
         return Err(CliError::unsupported_feature(
-            "dashboard spec style is supported only through style.tokens",
-        )
-        .with_suggested_command(
-            "powerbi-cli report style tokens show --project <project-dir-or.pbip> --json",
-        ));
-    };
-    if style.keys().any(|key| key != "tokens") {
-        return Err(CliError::unsupported_feature(
-            "dashboard spec style.preset, style.bundle, and style.defaults are not compiled; use style.tokens",
+            "style supports tokens and defaults; preset and bundle compilation is pending",
         )
         .with_suggested_command(
             "powerbi-cli report style tokens show --project <project-dir-or.pbip> --json",
         ));
     }
-    Ok(Some(compile_tokens(tokens)?))
+    let Some(tokens) = style.get("tokens") else {
+        return Ok(None);
+    };
+    let mut theme_tokens = tokens.clone();
+    if let Some(object) = theme_tokens.as_object_mut() {
+        object.remove("formatting");
+        if object.is_empty() {
+            return Ok(None);
+        }
+    }
+    Ok(Some(compile_tokens(&theme_tokens)?))
 }
 
 fn apply_number_formats(
@@ -1445,12 +1501,57 @@ fn add_measure_to_schema(schema: &mut Map<String, Value>, measure: &Value) -> Cl
     Ok(())
 }
 
+pub(crate) fn style_requests_design_defaults(spec: &Value) -> bool {
+    spec.get("style")
+        .and_then(Value::as_object)
+        .is_some_and(|style| {
+            style
+                .get("tokens")
+                .and_then(Value::as_object)
+                .is_some_and(|tokens| {
+                    tokens.get("formatting").is_some()
+                        || tokens.keys().any(|key| {
+                            crate::report_visual_objects::format_catalog_keys()
+                                .iter()
+                                .any(|catalog_key| catalog_key == key)
+                        })
+                })
+                || style
+                    .get("defaults")
+                    .and_then(Value::as_object)
+                    .is_some_and(|defaults| !defaults.is_empty())
+        })
+}
+
+fn strip_supported_format_sections(root: &mut Map<String, Value>) {
+    let Some(pages) = root.get_mut("pages").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for page in pages {
+        let Some(page) = page.as_object_mut() else {
+            continue;
+        };
+        let Some(visuals) = page.get_mut("visuals").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        for visual in visuals {
+            if let Some(visual) = visual.as_object_mut() {
+                // `visuals[].format` is compiled when design defaults are
+                // enabled; conditional formatting remains a separate
+                // fixture-gated section and must still refuse.
+                visual.remove("format");
+            }
+        }
+    }
+}
+
 fn compile_pages(
     spec: &Map<String, Value>,
     model: &ModelIndex,
     style: Option<&Value>,
     defaults_applied: &mut Vec<Value>,
     warnings: &mut Vec<Value>,
+    design_defaults_enabled: bool,
 ) -> CliResult<Vec<Value>> {
     let mut pages = Vec::new();
     for (page_index, page) in spec
@@ -1507,6 +1608,10 @@ fn compile_pages(
             layout.as_ref(),
             defaults_applied,
             warnings,
+            DesignDefaultsContext {
+                style,
+                enabled: design_defaults_enabled,
+            },
         )?;
         append_heading_visuals(page_index, page, layout.as_ref(), style, &mut visuals)?;
         out.insert("visuals".to_string(), Value::Array(visuals));
@@ -2519,6 +2624,7 @@ fn compile_visuals(
     layout: Option<&ResolvedPageLayout>,
     defaults_applied: &mut Vec<Value>,
     warnings: &mut Vec<Value>,
+    design_defaults: DesignDefaultsContext<'_>,
 ) -> CliResult<Vec<Value>> {
     let mut visuals = Vec::new();
     let mut used_slots = BTreeSet::new();
@@ -2607,6 +2713,19 @@ fn compile_visuals(
             validate_between_binding(page_index, visual_index, &bindings, model)?;
         }
         out.insert("bindings".to_string(), Value::Array(bindings));
+        let visual_format = visual.get("format").and_then(Value::as_object);
+        if design_defaults.enabled {
+            let effective = effective_defaults(&visual_type, design_defaults.style, visual_format)?;
+            defaults_applied.push(json!({
+                "pointer": format!("/pages/{page_index}/visuals/{visual_index}/format"),
+                "field": "visuals[].format",
+                "visualType": visual_type,
+                "designDefaults": effective_json(&effective)
+            }));
+            if let Some(format) = visual_format {
+                out.insert("format".to_string(), Value::Object(format.clone()));
+            }
+        }
         if visual_type == "textbox"
             && let Some(text) = visual_text(visual)
         {
@@ -3486,6 +3605,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
                     response.out_dir,
                     response.dry_run,
                     response.schema_path,
+                    response.profile_path,
                     response.spec_path,
                     response.proof_plan,
                 ),
@@ -3546,6 +3666,7 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             response.out_dir,
             response.dry_run,
             response.schema_path,
+            response.profile_path,
             response.spec_path,
             response.proof_plan,
         ),
@@ -3790,13 +3911,17 @@ fn next_for_build(
     out_dir: Option<&Path>,
     dry_run: bool,
     schema_path: &Path,
+    profile_path: Option<&Path>,
     spec_path: Option<&Path>,
     proof_plan: Option<&ProofPlan>,
 ) -> Vec<String> {
     if dry_run {
         let mut commands = vec![format!(
-            "powerbi-cli report build --schema {}{} --out-dir <project-dir> --json",
+            "powerbi-cli report build --schema {}{}{} --out-dir <project-dir> --json",
             command_arg(schema_path),
+            profile_path
+                .map(|path| format!(" --profile {}", command_arg(path)))
+                .unwrap_or_default(),
             spec_path
                 .map(|path| format!(" --spec {}", command_arg(path)))
                 .unwrap_or_default()
@@ -3829,6 +3954,7 @@ fn next_for_build(
 fn next_for_spec_validate(
     spec_path: &Path,
     schema_path: Option<&Path>,
+    profile_path: Option<&Path>,
     ok: bool,
     validation_level: &str,
     proof_plan: Option<&ProofPlan>,
@@ -3839,13 +3965,19 @@ fn next_for_spec_validate(
     let mut commands = Vec::new();
     if let Some(schema_path) = schema_path {
         commands.push(format!(
-            "powerbi-cli report build --schema {} --spec {} --dry-run --json",
+            "powerbi-cli report build --schema {}{} --spec {} --dry-run --json",
             command_arg(schema_path),
+            profile_path
+                .map(|path| format!(" --profile {}", command_arg(path)))
+                .unwrap_or_default(),
             command_arg(spec_path)
         ));
     } else if validation_level == "shape-only" {
         commands.push(format!(
-            "powerbi-cli report spec validate --schema <schema.json> --spec {} --json",
+            "powerbi-cli report spec validate --schema <schema.json>{} --spec {} --json",
+            profile_path
+                .map(|path| format!(" --profile {}", command_arg(path)))
+                .unwrap_or_default(),
             command_arg(spec_path)
         ));
     }
@@ -3924,6 +4056,15 @@ fn parse_build_args(args: &[String]) -> CliResult<BuildOptions> {
                     return Err(CliError::invalid_args("--trace may be specified only once"));
                 }
                 options.trace = true;
+                i += 1;
+            }
+            "--design-defaults" | "--defaults" => {
+                if options.design_defaults {
+                    return Err(CliError::invalid_args(
+                        "--design-defaults may be specified only once",
+                    ));
+                }
+                options.design_defaults = true;
                 i += 1;
             }
             "--dry-run" => {
@@ -4039,6 +4180,30 @@ fn slug(value: &str) -> String {
         "Generated".to_string()
     } else {
         out
+    }
+}
+
+#[cfg(test)]
+mod ergonomics_tests {
+    use super::*;
+
+    #[test]
+    fn followups_preserve_quoted_profile_input_in_every_preview_mode() {
+        let schema = Path::new("schema manifest.json");
+        let profile = Path::new("profile input.json");
+        let spec = Path::new("dashboard spec.json");
+        assert_eq!(
+            next_for_build(None, true, schema, Some(profile), Some(spec), None)[0],
+            "powerbi-cli report build --schema 'schema manifest.json' --profile 'profile input.json' --spec 'dashboard spec.json' --out-dir <project-dir> --json"
+        );
+        assert_eq!(
+            next_for_spec_validate(spec, Some(schema), Some(profile), true, "compiled", None)[0],
+            "powerbi-cli report build --schema 'schema manifest.json' --profile 'profile input.json' --spec 'dashboard spec.json' --dry-run --json"
+        );
+        assert_eq!(
+            next_for_spec_validate(spec, None, Some(profile), true, "shape-only", None)[0],
+            "powerbi-cli report spec validate --schema <schema.json> --profile 'profile input.json' --spec 'dashboard spec.json' --json"
+        );
     }
 }
 
