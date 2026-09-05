@@ -1039,7 +1039,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report visuals delete",
         ],
         refusal_code: None,
-        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence. Set-object can apply a bounded SetObject-only ops.v1 list through one atomic transaction; other visual families and formatting pairs are refused until fixture-proven.",
+        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence. Set-object can apply a bounded SetObject-only ops.v1 list through one atomic transaction; other visual families and formatting pairs are refused until fixture-proven. bubbles.bubbleSize remains unsupported_feature: no archived Desktop-authored property shape proves its encoding or range; the scatter Size binding and pilot prose do not authorize default 20.",
         next_proof: &[
             "Add Desktop-authored golden fixtures before widening visual families or field wells",
         ],

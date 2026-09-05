@@ -383,6 +383,14 @@ fn resolve_object_property(
         .iter()
         .find(|spec| spec.object == object && spec.property == property)
         .ok_or_else(|| {
+            if object == "bubbles" && property == "bubbleSize" {
+                return CliError::unsupported_feature(
+                    "bubbles.bubbleSize is fixture-gated: no checked-in Desktop-authored reference proves its PBIR property shape",
+                )
+                .with_hint("The scatter Size field binding and pilot prose do not prove bubbleSize formatting. Archive a sanitized Desktop-saved scatter reference with provenance before enabling its encoding, range, or default 20.")
+                .with_suggested_command("powerbi-cli desktop harvest-reference --project <saved.pbip> --visual <visual-handle> --out <reference.json> --json")
+                .with_suggested_command("powerbi-cli report visuals catalog --formatting --json");
+            }
             CliError::unsupported_feature(format!(
                 "unsupported visual object/property `{object}.{property}`; supported pairs are: {}",
                 supported_pairs().join(", ")
@@ -864,4 +872,21 @@ fn set_object_usage() -> &'static str {
 
 fn set_display_name_usage() -> &'static str {
     "powerbi-cli report visuals set-display-name --project <project-dir-or.pbip> --handle <visual-handle> --role Values --display-name <text> --dry-run --json"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bubble_size_is_not_promoted_without_a_desktop_property_fixture() {
+        assert!(
+            !supported_pairs()
+                .iter()
+                .any(|pair| pair == "bubbles.bubbleSize")
+        );
+        let error = resolve_object_property(Some("bubbles"), Some("bubbleSize")).unwrap_err();
+        assert!(error.message.contains("Desktop-authored reference"));
+        assert!(resolve_object_property(Some("labels"), Some("show")).is_ok());
+    }
 }
