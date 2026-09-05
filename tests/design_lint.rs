@@ -64,9 +64,16 @@ fn design_geometry_is_opt_in_for_audit_and_separate_from_default_lint() {
     assert_eq!(design["schema"], "powerbi-cli.design.lint.v1");
     assert_eq!(design["status"], "available");
     assert_eq!(design["proofLevel"], "unit-smoke");
-    assert_eq!(design["ruleIds"].as_array().expect("rule ids").len(), 11);
-    assert_eq!(design["evaluatedRules"], design["ruleIds"]);
-    assert_eq!(design["deferredRules"], json!([]));
+    assert_eq!(design["ruleIds"].as_array().expect("rule ids").len(), 20);
+    assert_eq!(design["evaluatedRules"].as_array().unwrap().len(), 16);
+    assert_eq!(design["deferredRules"].as_array().unwrap().len(), 4);
+    assert!(
+        design["deferredRules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|rule| rule["status"] == "not-evaluated" && rule["reason"].is_string())
+    );
     let outside = design["findings"]
         .as_array()
         .expect("findings")
@@ -125,7 +132,7 @@ fn design_geometry_is_opt_in_for_audit_and_separate_from_default_lint() {
     assert_eq!(stdout_json(&triage)["scorecard"]["designLint"], *design);
 
     assert_json_snapshot(
-        "design-lint-geometry",
+        "design-lint-batch2",
         &json!({
             "schema": design["schema"],
             "status": design["status"],
@@ -182,7 +189,7 @@ fn design_rules_are_explainable_and_advertised_by_capabilities_and_features() {
         .iter()
         .filter(|rule| rule["family"] == "design")
         .collect::<Vec<_>>();
-    assert_eq!(design_rules.len(), 11);
+    assert_eq!(design_rules.len(), 20);
     for rule in design_rules {
         let id = rule["id"].as_str().expect("rule id");
         let explained = run_powerbi(&["lint", "--explain", id, "--json"]);
@@ -217,7 +224,7 @@ fn design_rules_are_explainable_and_advertised_by_capabilities_and_features() {
                 })
             })
             .count(),
-        11
+        20
     );
 
     let feature = run_powerbi(&["features", "list", "--for", "quality.design-lint", "--json"]);

@@ -690,6 +690,11 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Deterministic design-geometry lint now evaluates eleven stable
   grid/template rules in `report audit --rules design`, `triage`, and
   the shared scorecard, with pointers and plan-only sanitize actions.
+- [x] Design lint batch 2 adds title case/missing/duplicate, measure format,
+  ranking sort, font minimum, literal title contrast, palette drift, and
+  explicit compact-unit override checks (twenty rules total). Four style rules
+  require an exactly resolved built-in token theme; otherwise they are explicitly
+  not evaluated with reasons. Default lint and fixture goldens remain unchanged.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
 - [x] The embedded `design-defaults.v1` catalog resolves per-family visual

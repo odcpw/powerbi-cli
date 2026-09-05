@@ -57,6 +57,7 @@ struct HygieneOptions {
 
 #[derive(Debug, Clone)]
 struct HygienePlan {
+    design_lint: Option<Value>,
     project_fingerprint: String,
     plan_fingerprint: String,
     profile: HygieneProfile,
@@ -131,7 +132,7 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
     } else {
         EXIT_VALIDATION_FAILED
     };
-    Ok(json!({
+    let mut output = json!({
         "schema": "powerbi-cli.report.audit.v1",
         "ok": ok,
         "exitCode": exit_code,
@@ -151,7 +152,12 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
             format!("powerbi-cli validate --strict {} --json", command_arg(&resolved.project_dir)),
             format!("powerbi-cli handoff check {} --json", command_arg(&resolved.project_dir))
         ]
-    }))
+    });
+    if let Some(design_lint) = plan.design_lint {
+        output["evaluatedRules"] = design_lint["evaluatedRules"].clone();
+        output["deferredRules"] = design_lint["deferredRules"].clone();
+    }
+    Ok(output)
 }
 
 fn sanitize_command(args: &[String]) -> CliResult<Value> {
@@ -387,7 +393,7 @@ fn build_hygiene_plan(
     design: bool,
 ) -> CliResult<HygienePlan> {
     let mut findings = Vec::new();
-    add_lint_findings(resolved, validation, &mut findings, design)?;
+    let design_lint = add_lint_findings(resolved, validation, &mut findings, design)?;
     add_handoff_findings(resolved, profile, &mut findings)?;
 
     let (filters, _) = list_report_filters(resolved)?;
@@ -525,6 +531,7 @@ fn build_hygiene_plan(
     )?;
     rules::ensure_finding_ids_registered(&findings, "ruleId")?;
     Ok(HygienePlan {
+        design_lint,
         project_fingerprint,
         plan_fingerprint,
         profile,
@@ -539,7 +546,7 @@ fn add_lint_findings(
     validation: &crate::ValidationReport,
     findings: &mut Vec<Value>,
     design: bool,
-) -> CliResult<()> {
+) -> CliResult<Option<Value>> {
     let lint = if design {
         let deep = crate::inspect::deep_inspect(resolved, validation)?;
         crate::design::lint::lint_report(resolved, &deep)?
@@ -571,7 +578,7 @@ fn add_lint_findings(
             }));
         }
     }
-    Ok(())
+    Ok(design.then_some(lint))
 }
 
 fn add_handoff_findings(

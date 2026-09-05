@@ -514,7 +514,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
 - `profile.data-profile-v2` — **supported**, schema-matched-statistics-with-redacted-values, proof `unit-smoke`: Bounded CSV/JSON data profile inference. Commands: `profile infer`, `profile validate`, `profile summarize`.
-- `quality.design-lint` — **supported**, read-only-grid-and-template-analysis, proof `unit-smoke`: Deterministic report design geometry lint. Commands: `triage`, `report audit`.
+- `quality.design-lint` — **supported**, read-only-design-analysis, proof `unit-smoke`: Deterministic report design lint. Commands: `triage`, `report audit`.
 - `quality.lint-rule-registry` — **supported**, read-only-contract-catalog, proof `unit-smoke`: Discoverable lint and audit rule registry. Commands: `validate`, `lint`, `model dax lint`, `report audit`.
 - `quality.model-completeness-lint` — **supported**, offline-static-heuristics, proof `unit-smoke`: DAX format and semantic-model completeness lint. Commands: `lint`, `triage`, `model dax lint`.
 - `report.bookmark-mutations` — **planned**, unsupported, proof `unit-smoke`: Bookmark state capture/create/update.
@@ -596,15 +596,21 @@ projection for an existing project. See
 `capabilities.responseShapes.scorecard.v1` and
 `capabilities.responseShapes.reportBuild` for the machine-readable details.
 
-Design geometry checks are excluded from default `lint` and fixture summaries.
+Design checks are excluded from default `lint` and fixture summaries.
 Build and triage expose them separately in `scorecard.designLint`.
 Use `report audit --project <project> --rules design
---json` to isolate the eleven stable grid/template rules. Each finding carries
+--json` to isolate twenty stable design rules. Each finding carries
 an RFC 6901 pointer, evidence, and a sanitize action when remediation is
 mechanical; applying those actions remains plan-only until the typed
 auto-improve workflow lands. These Linux-safe checks have `unit-smoke` proof
-and do not claim Desktop rendering compatibility. Typography, colour, and
-number-format checks remain in the separate style-token follow-up.
+and do not claim Desktop rendering compatibility. Sixteen geometry, title,
+measure-format, and ranking-sort checks run without style tokens. Four style
+checks inspect literal font sizes, title/background contrast, palette colours,
+and explicit automatic-unit overrides when the active theme exactly matches
+a built-in token set. Custom or unresolved policies remain explicitly
+`not-evaluated` with reasons in `designLint.deferredRules`; preset names alone
+never establish policy. Offline checks do not infer data magnitude or rendered
+contrast for dynamic colours and translucent backgrounds.
 
 Validation/result families may emit `ok:false` with a nonzero `exitCode` on
 stdout. CLI errors are written to stderr with required `code`, `exitCode`, and

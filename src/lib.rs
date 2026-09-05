@@ -11,6 +11,8 @@ mod contract;
 mod dashboard_scaffold;
 mod dax_execute;
 mod design;
+mod design_lint_content;
+mod design_lint_style;
 mod desktop;
 mod desktop_proof;
 mod desktop_session;

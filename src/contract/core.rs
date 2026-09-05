@@ -1425,7 +1425,7 @@ fn schema_manifest() -> Value {
         "reportObjectFindFields": ["ok", "predicates", "objects[].handle", "objects[].kind", "objects[].path", "counts.matched", "next"],
         "reportObjectCatFields": ["ok", "object.handle", "object.kind", "object.path", "raw", "rawIncluded", "next"],
         "reportObjectQueryFields": ["ok", "selector", "objects[].handle", "objects[].kind", "counts.matched", "next"],
-        "reportAuditFields": ["ok", "profile", "counts.findings", "counts.bySeverity", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].message", "recommendedActions", "unsupportedActions", "next"],
+        "reportAuditFields": ["ok", "profile", "counts.findings", "counts.bySeverity", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].message", "recommendedActions", "unsupportedActions", "evaluatedRules", "deferredRules[].ruleId", "deferredRules[].status", "deferredRules[].reason", "next"],
         "reportSanitizePlanFields": ["ok", "profile", "planFingerprint", "confirmToken", "actions[].kind", "actions[].handles", "actions[].applySupported", "actions[].blockedReason", "actions[].jsonPointers", "next"],
         "reportSanitizeApplyFields": ["ok", "dryRun", "mode", "planFingerprint", "actions[].kind", "actions[].handles", "changes[].path", "changes[].jsonPointer", "postAudit", "validateCommand", "readbackCommand", "next"],
         "reportWireframeFields": ["ok", "format", "dryRun", "mode", "projectDir", "template", "grid", "geometrySource", "gridSource", "counts", "handles", "pages[].slots[]", "pages[].visuals[]", "pages[].lintMarkers[]", "artifacts[]", "warnings", "errors", "next"],
