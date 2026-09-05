@@ -164,6 +164,13 @@ policies can wait until the object-specific writers and fixtures exist.
   measures; unresolved names return `plan.missing_input` with pointer and
   candidates. Uncompiled intent fields remain visible with an owning-bead
   warning.
+- Archetype planner evidence: catalog-proof now declares `YearStart`, the
+  January 1 period boundary of its synthetic annual totals; flat-ops and
+  slicer-rail already have typed dates. Non-temporal regional-sales and
+  scatter-bubble intentionally refuse with `plan.missing_input` for missing
+  date evidence while remaining buildable from their authored specs. The
+  all-profile regression lives in `tests/report_plan_archetypes.rs`; no planner
+  threshold was relaxed to accommodate these fixtures.
 - Profile summaries and report plans classify model shape as flat, star,
   snowflake, or multi-fact only when relationship/cardinality and profile
   column evidence supports it. Ambiguous models remain explicitly ambiguous;

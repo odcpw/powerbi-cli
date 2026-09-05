@@ -879,6 +879,16 @@ writing any output (including `--force`). Supply `model.factTable` in the JSON
 intent to choose among fact candidates; use `profile infer --rows` for additional
 profile evidence and `report spec fields` to inspect schema fields. Numeric
 columns alone no longer authorize guessed SUM measures or a default layout.
+Archetype planner evidence is explicit: `catalog-proof` uses `YearStart` (the
+January 1 boundary of its synthetic annual totals, not an observation date),
+`flat-ops` uses `WorkDate`, and `slicer-rail` uses the sales schema's `DimDate.Date`.
+The non-temporal `regional-sales` and `scatter-bubble` fixtures deliberately
+refuse planning with `plan.missing_input` for a missing typed date axis; their
+authored dashboard specs remain buildable. A populated profile alone does not
+provide a date axis. See `tests/report_plan_archetypes.rs` for the complete sweep.
+The authored catalog-proof visuals retain their existing Year bindings;
+`YearStart` is used by planner-generated trends, so the authored project's
+golden honestly records its `model.column_unused` warning.
 Rule evaluation follows shape and intent normalization. Pass `--explain-rules` (or use the equivalent
 `report plan explain` form) to make the fired rules, deterministic scores, and
 actual evidence values explicit. The response always carries the same
