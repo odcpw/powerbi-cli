@@ -999,6 +999,11 @@ commands without writing output, even with `--force`. Set `model.factTable`
 in the JSON intent to resolve ambiguous facts; `profile infer --rows` supplies
 profile evidence and `report spec fields` lists schema candidates. Numeric
 columns alone do not authorize generated SUM measures. Add
+date evidence explicitly: `catalog-proof` provides the annual boundary
+`YearStart`, `flat-ops` provides `WorkDate`, and `slicer-rail` uses sales
+`DimDate.Date`. `regional-sales` and `scatter-bubble` intentionally lack a typed
+date and return `plan.missing_input`; build their authored specs directly.
+A populated profile does not by itself supply a date axis. Pass
 `--explain-rules` (or invoke the equivalent `report plan explain` alias) when
 you need the fired rule ids, scores, and actual evidence values in the output.
 Every `planner.proposals[]` entry is slot-agnostic and carries its rule id,

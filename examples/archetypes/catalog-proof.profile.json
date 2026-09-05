@@ -8,7 +8,14 @@
         "table": "CatalogFacts"
       }
     ],
-    "dateColumns": [],
+    "dateColumns": [
+      {
+        "column": "YearStart",
+        "dataType": "date",
+        "field": "CatalogFacts[YearStart]",
+        "table": "CatalogFacts"
+      }
+    ],
     "dimensionTables": [],
     "factTables": [
       "CatalogFacts"
@@ -67,6 +74,19 @@
             "2025",
             "2026"
           ]
+        },
+        {
+          "dataType": "date",
+          "distinctCount": 2,
+          "isKey": false,
+          "name": "YearStart",
+          "nullCount": 0,
+          "roles": {
+            "categorical": false,
+            "dateLike": true,
+            "numeric": false
+          },
+          "sampleValues": ["2025-01-01", "2026-01-01"]
         },
         {
           "dataType": "decimal",

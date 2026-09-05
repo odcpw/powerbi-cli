@@ -1,12 +1,12 @@
 {
   "counts": {
     "boundVisuals": 6,
-    "columns": 3,
+    "columns": 4,
     "explicitInteractions": 0,
     "jsonFilesChecked": 20,
     "lintErrors": 0,
     "lintInfo": 0,
-    "lintWarnings": 0,
+    "lintWarnings": 1,
     "measures": 2,
     "pages": 6,
     "relationships": 0,
@@ -18,15 +18,21 @@
     "visuals": 6
   },
   "exitCode": 0,
-  "fingerprint": "a6dd0e2576421531",
+  "fingerprint": "f35985f0b0e982a2",
   "lint": {
     "counts": {
       "errors": 0,
-      "findings": 0,
+      "findings": 1,
       "info": 0,
-      "warnings": 0
+      "warnings": 1
     },
-    "findings": []
+    "findings": [
+      {
+        "code": "model.column_unused",
+        "handle": "column:CatalogFacts:YearStart",
+        "severity": "warning"
+      }
+    ]
   },
   "model": {
     "relationships": [],
@@ -50,6 +56,15 @@
             "isKey": false,
             "name": "Year",
             "summarizeBy": "sum"
+          },
+          {
+            "dataType": "dateTime",
+            "formatString": "Short Date",
+            "isCalculated": false,
+            "isHidden": false,
+            "isKey": false,
+            "name": "YearStart",
+            "summarizeBy": "none"
           },
           {
             "dataType": "decimal",
