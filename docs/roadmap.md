@@ -661,6 +661,10 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Deterministic design-geometry lint now evaluates eleven stable
   grid/template rules in `lint`, `report audit --rules design`, `triage`, and
   the shared scorecard, with pointers and plan-only sanitize actions.
+  Sanitize confirmation tokens bind the selected profile, sorted action
+  identities, and relative-path project bytes; relocating an identical tree
+  preserves the token, while changed project bytes invalidate it. Response
+  paths and diagnostic evidence are excluded from the confirmation hash.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
 - [x] Stacked visual aliases preserve Desktop-recorded bar/column ids; role
