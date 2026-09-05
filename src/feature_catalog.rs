@@ -844,7 +844,7 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "model.source-templates",
-        title: "Credential-free source templates and rebind runbooks",
+        title: "Credential-free source templates and rebind runbooks with live scorecards and proof status",
         category: "model",
         status: "supported",
         support: "sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m",

@@ -1146,7 +1146,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "path": "handoff rebind-plan",
             "aliases": ["handoff rebind", "handoff-rebind-plan"],
             "usage": "powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json",
-            "summary": "Generate a redacted work-machine rebind plan and suppress runbook materialization when a template or partition contains credentials",
+            "summary": "Generate a redacted work-machine rebind runbook with a live design scorecard and proof-status ladder; suppress writes when templates or partitions contain credentials",
             "tags": ["handoff", "offline", "rebind", "source-template", "partition", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -1157,7 +1157,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "outputSchema": "powerbi-cli.handoff.rebind-plan.v1",
             "flags": ["--project <project-dir-or.pbip>", "--templates <source-templates.json|->", "--table <table>", "--partition <partition-handle-or-name>", "--allow-unmapped", "--out <file.md>", "--out-file <file.md>", "--force", "--json", "--format json"],
             "examples": ["powerbi-cli handoff rebind-plan build/sales --json", "powerbi-cli handoff rebind-plan build/sales --out work-machine-rebind.md --json", "powerbi-cli handoff rebind-plan build/sales --out work-machine-rebind.md --force --json", "powerbi-cli handoff rebind build/sales --json", "powerbi-cli handoff-rebind-plan build/sales --json"],
-            "followUpFields": ["ok", "complete", "status", "counts", "plans[].partitionHandle", "plans[].template", "instructionsMarkdown", "runbookRequestedPath", "runbookPath", "runbookWritten", "materializationBlocked", "materializationBlockReasons", "handoffCheckCommand", "validateCommand", "next"]
+            "followUpFields": ["ok", "complete", "status", "counts", "plans[].partitionHandle", "plans[].template", "scorecard", "scorecard.designLint", "scorecard.proofLevel", "proofLadder[].level", "proofLadder[].status", "proofLadder[].evidenceRequired", "instructionsMarkdown", "runbookRequestedPath", "runbookPath", "runbookWritten", "materializationBlocked", "materializationBlockReasons", "handoffCheckCommand", "validateCommand", "next"]
         }),
         json!({
             "path": "handoff rebind-check",
