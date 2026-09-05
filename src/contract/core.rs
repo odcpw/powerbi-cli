@@ -1766,7 +1766,7 @@ fn response_shapes() -> Value {
             "validation": {"requiredFields": ["ok", "errors", "warnings"]},
             "microsoftValidator": {"status": ["ok", "warnings", "failed", "not-installed", "unsupported-platform"]},
             "lint": {"requiredFields": ["ok", "counts", "findings", "findingsList"], "findingsBySeverity": ["error", "warning", "info"]},
-            "designLint": {"availableRequiredFields": ["status", "proofLevel", "ok", "counts", "ruleIds", "evaluatedRules", "deferredRules", "grid", "findings", "next"], "unavailableRequiredFields": ["status", "proofLevel", "reason", "findings"], "status": ["available", "unavailable"], "proofLevel": "unit-smoke; Desktop compatibility is not implied"},
+            "designLint": {"availableRequiredFields": ["status", "proofLevel", "ok", "counts", "ruleIds", "evaluatedRules", "deferredRules", "grid", "findings", "next"], "unavailableRequiredFields": ["status", "proofLevel", "reason", "findings"], "status": ["available", "unavailable"], "proofLevel": "unit-smoke", "proofLevelMeaning": "Desktop compatibility is not implied."},
             "handoff": {"requiredFields": ["status", "safeForOfflineHandoff"]},
             "proofLevelMeaning": "The highest compatibility level actually established by the local workflow; build and triage default to unit-smoke.",
             "next": "Executable powerbi-cli command templates only."
