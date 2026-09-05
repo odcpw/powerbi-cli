@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name":"StarNarrative",
+    "tables":[
+      {"name":"Fact","columns":[{"name":"CustomerKey","dataType":"int64"},{"name":"DateKey","dataType":"int64"},{"name":"Amount","dataType":"decimal"}],"measures":[{"name":"Total","expression":"SUM('Fact'[Amount])"}]},
+      {"name":"DimCustomer","columns":[{"name":"CustomerKey","dataType":"int64","isKey":true},{"name":"Customer","dataType":"string"},{"name":"Region","dataType":"string"}]},
+      {"name":"DimDate","columns":[{"name":"DateKey","dataType":"int64","isKey":true},{"name":"Date","dataType":"date"}]}
+    ],
+    "relationships":[
+      {"fromTable":"Fact","fromColumn":"CustomerKey","toTable":"DimCustomer","toColumn":"CustomerKey","cardinality":"manyToOne"},
+      {"fromTable":"Fact","fromColumn":"DateKey","toTable":"DimDate","toColumn":"DateKey","cardinality":"manyToOne"}
+    ]
+  },
+  "profile": {
+    "schema":"powerbi-cli.dataProfile.v1",
+    "dataValues":false,
+    "tables":[{"name":"Fact","role":"fact","rowCount":10000,"columns":[]},{"name":"DimCustomer","role":"dimension","rowCount":1000,"columns":[
+      {"name":"Customer","dataType":"string","distinctCount":900},
+      {"name":"Region","dataType":"string","distinctCount":70}
+    ]},{"name":"DimDate","role":"dimension","rowCount":365,"columns":[]}]
+  }
+}

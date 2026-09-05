@@ -1,0 +1,75 @@
+{
+  "activePage": "overview",
+  "drillthrough": {
+    "distinct": 900,
+    "reason": "highest observed categorical cardinality; source breakdown binds the same column",
+    "sourcePage": "breakdown_2",
+    "target": "Events[Ticket]",
+    "targetPage": "drillthrough-detail"
+  },
+  "kind": "narrative-flow",
+  "omittedStages": [
+    "comparison",
+    "exceptions"
+  ],
+  "ordering": [
+    {
+      "page": "overview",
+      "position": 0,
+      "ruleId": "planner.narrative-flow",
+      "stage": "overview",
+      "template": "kpi-strip-trend-breakdown"
+    },
+    {
+      "page": "trend",
+      "position": 1,
+      "ruleId": "planner.narrative-flow",
+      "stage": "trend",
+      "template": "time-series"
+    },
+    {
+      "page": "breakdown_1",
+      "position": 2,
+      "ruleId": "planner.narrative-flow",
+      "stage": "breakdown",
+      "template": "ranking"
+    },
+    {
+      "page": "breakdown_2",
+      "position": 3,
+      "ruleId": "planner.narrative-flow",
+      "stage": "breakdown",
+      "template": "ranking"
+    },
+    {
+      "page": "detail",
+      "position": 4,
+      "ruleId": "planner.narrative-flow",
+      "stage": "detail",
+      "template": "detail-table"
+    },
+    {
+      "page": "drillthrough-detail",
+      "position": 5,
+      "ruleId": "planner.narrative-flow",
+      "stage": "drillthrough-detail",
+      "template": "drillthrough-detail"
+    }
+  ],
+  "pageOrder": [
+    "overview",
+    "trend",
+    "breakdown_1",
+    "breakdown_2",
+    "detail",
+    "drillthrough-detail"
+  ],
+  "rail": {
+    "field": "Events[Category]",
+    "placement": "compiled-shared-rail",
+    "replicatedOn": 6
+  },
+  "reason": "Order available pages from overview through trend and breakdown to detail; replicate the rail and expose high-cardinality drillthrough last.",
+  "ruleId": "planner.narrative-flow",
+  "score": 100
+}
