@@ -63,6 +63,24 @@ visual-container schema 2.11.0 and is covered by
 - Generated shared literal titles belong in `visual.visualContainerObjects`, not root-level `objects`; visual-specific formatting remains under `visual.objects`. `powerbi-cli` emits title `show: true` and omits `general.altText` because Microsoft powerbi-report-authoring-cli v0.1.4 rejects both known placements.
 
 ## Implications for powerbi-cli catalog work (WO-5/WO-6)
+
+### Missing scatter bubble-size evidence (sn2.4)
+
+`bubbles.bubbleSize` remains refused with `unsupported_feature`. The archived
+references here contain no scatter bubble-size property. The schema-golden
+`testdata/golden/visual-authoring/scatterChart.visual.json` proves a `Size`
+field binding, not a `bubbles` formatting object. The historical scatter
+Desktop proof records rendered bubbles, not the saved property shape;
+`docs/pilot-lessons.md` mentions `-50L` only in prose.
+
+Before adding a formatting-catalog entry, harvest a sanitized Desktop-saved
+scatter visual with the property explicitly set and record Desktop version,
+date, and provenance. Confirm the literal encoding and supported range against
+that reference and Desktop: the bead design proposes [-100, 100], while its
+acceptance text specifies -50..50. Neither range nor the proposed default 20
+is enabled. This missing evidence blocks the positive capability, not scatter
+generation or its existing Size binding.
+
 1. Pie/donut slot into the existing visual factory with a new binding family (Category + Y, no Series);
    reuse `visual_query_json` unchanged.
 2. Matrix = new family Rows/Columns/Values mapping onto the same projection builder; visualType string "pivotTable",

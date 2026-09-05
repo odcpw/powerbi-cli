@@ -1567,6 +1567,37 @@ fn planner_missing_evidence_suggests_executable_catalog_commands() {
 }
 
 #[test]
+fn bubble_size_missing_fixture_suggests_executable_recovery_commands() {
+    let result = run_powerbi(&[
+        "report",
+        "visuals",
+        "set-object",
+        "--project",
+        "missing.pbip",
+        "--handle",
+        "visual:Page:Scatter",
+        "--object",
+        "bubbles",
+        "--property",
+        "bubbleSize",
+        "--value",
+        "20",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(result.code, 2);
+    let error = stderr_json(&result);
+    assert_eq!(error["error"]["code"], "unsupported_feature");
+    let catalog = stdout_json(&run_powerbi(&["capabilities", "--json"]));
+    for command in error["error"]["suggestedCommands"].as_array().unwrap() {
+        assert_executable_command_template(
+            command.as_str().unwrap(),
+            catalog["commands"].as_array().unwrap(),
+        );
+    }
+}
+
+#[test]
 fn misplaced_nested_commands_suggest_the_exact_live_path() {
     let dax = run_powerbi(&["dax", "lint", "--json"]);
     assert_eq!(dax.code, 2);
@@ -1629,7 +1660,7 @@ fn exact_compact_capabilities_return_only_the_documented_command_fields() {
             "flags": ["--schema <schema.json>", "--profile <profile.json>", "--spec <dashboard.json>", "--dry-run", "--out-dir <project-dir>", "--out <project-dir>", "--force", "--trace", "--json", "--format json"],
             "examples": ["powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json", "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"],
             "proofLevel": "unit-smoke",
-            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "compiled.styleTokens", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.styleTokens.allowContrastBelowAA", "scorecard.next[]", "styleTokens.id", "styleTokens.allowContrastBelowAA", "styleTokens.warningCount", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "outputSchema": "powerbi-cli.report.build.v1"
         })
     );

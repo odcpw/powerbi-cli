@@ -1,16 +1,27 @@
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=testdata/desktop-proof");
+    println!("cargo:rerun-if-changed=src/design/tokens.v1.json");
     println!("cargo:rerun-if-changed=testdata/formatting-catalog.v1.json");
     println!("cargo:rerun-if-changed=testdata/planner-rules/planner-rules.v1.json");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
 
     generate_desktop_proof_records();
+    generate_design_token_catalog();
     generate_formatting_catalog();
     generate_planner_rule_catalog();
 
     println!("cargo:rustc-env=POWERBI_CLI_GIT_SHA={}", git_sha());
     println!("cargo:rustc-env=POWERBI_CLI_BUILD_EPOCH={}", build_epoch());
+}
+
+fn generate_design_token_catalog() {
+    let out_dir =
+        std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR is set by Cargo"));
+    let generated = r#"const EMBEDDED_DESIGN_TOKEN_CATALOG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/design/tokens.v1.json"));
+"#;
+    std::fs::write(out_dir.join("design_tokens.rs"), generated)
+        .expect("write generated design token catalog");
 }
 
 fn generate_planner_rule_catalog() {

@@ -121,7 +121,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli guid [--count <1..100>] --json` — Generate lowercase UUIDv4 values for TMDL lineageTag authoring when hand-adding columns or measures _(proof: `unit-smoke`)_
 - `powerbi-cli handoff check <project-dir-or.pbip> [--target offline|work] --json` — Classify an offline/dummy or work-network/live-source PBIP handoff after partition-shape, credential, PII-suspect text, cache, binary, and embedded-data checks _(proof: `unit-smoke`)_
 - `powerbi-cli handoff rebind-check <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--table <table>] [--partition <partition-handle-or-name>] --json` — Verify every selected partition resolves to a materialized credential-free source without opening a connection _(proof: `unit-smoke`)_
-- `powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json` — Generate a redacted work-machine rebind plan and suppress runbook materialization when a template or partition contains credentials _(proof: `unit-smoke`)_
+- `powerbi-cli handoff rebind-plan <project-dir-or.pbip> [--project <project-dir-or.pbip>] [--templates <source-templates.json|->] [--table <table>] [--partition <partition-handle>] [--allow-unmapped] [--out <file.md>] [--force] --json` — Generate a redacted work-machine rebind runbook with a live design scorecard and proof-status ladder; suppress writes when templates or partitions contain credentials _(proof: `unit-smoke`)_
 - `powerbi-cli --json inspect [--deep] <project-dir-or.pbip>` — Summarize a PBIP project and, with --deep, return stable handles for report/model objects _(proof: `unit-smoke`)_
 - `powerbi-cli integrations install --allow-network --json` — Install and atomically activate the committed exact Microsoft Power BI npm graph _(proof: `unit-smoke`)_
 - `powerbi-cli integrations status [--deep] [--component modeling-mcp|report-authoring|desktop-bridge] --json` — Inspect the exact optional Microsoft Power BI toolchain without installation or registry access _(proof: `unit-smoke`)_
@@ -189,7 +189,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; filters, drillthrough, style presets, and style bundles compile through typed kernels, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; filters, drillthrough, style presets, and style bundles compile through typed kernels; style.tokens compile to registered themes and number formats, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
 - `powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <table[column]> --field <table[column]>... (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Replace a category-axis chart's Category projections with a multi-column hierarchy and enable its Desktop drill controls _(proof: `unit-smoke`)_
@@ -234,6 +234,8 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report style diff <before-style.json> <after-style.json> --json` — Compare two extracted report style bundles by fingerprint, themeCollection, and visual-style counts _(proof: `unit-smoke`)_
 - `powerbi-cli report style extract --project <project-dir-or.pbip> [--out <style-bundle.json>] [--include-literal-text] --json` — Extract a portable master-style bundle containing report themeCollection and per-visual formatting payloads _(proof: `unit-smoke`)_
 - `powerbi-cli report style inspect --project <project-dir-or.pbip> --json` — Inspect a combined report style bundle: report themeCollection plus per-visual formatting payload summaries _(proof: `unit-smoke`)_
+- `powerbi-cli report style tokens derive --project <project-dir-or.pbip> --json` — Derive deterministic style tokens from a report theme and visual formatting without copying literal report text _(proof: `unit-smoke`)_
+- `powerbi-cli report style tokens show --project <project-dir-or.pbip> [--preset <corporate-neutral|high-contrast|dark|print>] --json` — Show the embedded versioned design-token catalog and the selected built-in token set for a report project _(proof: `unit-smoke`)_
 - `powerbi-cli report themes apply --project <target-project-or.pbip> --bundle <theme-bundle.json> (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a raw report theme bundle by replacing themeCollection and copied registered theme JSON resources; does not copy per-visual formatting _(proof: `unit-smoke`)_
 - `powerbi-cli report themes apply-preset --project <target-project-or.pbip> [--preset risk-dashboard|neutral-ops] (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a built-in registered-resource theme preset to a report with guarded output semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report themes extract --project <source-project-or.pbip> [--out <theme-bundle.json>] --json` — Extract a deterministic raw report theme bundle from themeCollection and already-present registered theme JSON resources _(proof: `unit-smoke`)_
@@ -405,7 +407,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `model.named-expressions` — **supported**, read-write, proof `unit-smoke`: Named M expression authoring. Commands: `model expressions list`, `model expressions show`, `model expressions add`, `model expressions update`, `model expressions delete`.
 - `model.partition-grouped-rank` — **supported**, safe-generated-partition-mutation, proof `schema-golden`: Refresh-time grouped rank partition generator. Commands: `model partitions add-grouped-rank`.
 - `model.relationships` — **supported**, read-write, proof `unit-smoke`: Model relationships. Commands: `model relationships list`, `model relationships show`, `model relationships add`, `model relationships update`, `model relationships delete`.
-- `model.source-templates` — **supported**, sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m, proof `unit-smoke`: Credential-free source templates and rebind runbooks. Commands: `source-template list`, `source-template show`, `source-template add`, `source-template apply`, `handoff rebind-plan`, `handoff rebind-check`.
+- `model.source-templates` — **supported**, sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m, proof `unit-smoke`: Credential-free source templates and rebind runbooks with live scorecards and proof status. Commands: `source-template list`, `source-template show`, `source-template add`, `source-template apply`, `handoff rebind-plan`, `handoff rebind-check`.
 - `model.static-control-tables` — **supported**, add-bounded-string-table, proof `unit-smoke`: Small static selector and lookup tables. Commands: `model tables add-static`.
 - `model.tables` — **supported**, read-write, proof `unit-smoke`: Semantic-model table inventory and CRUD. Commands: `model tables list`, `model tables show`, `model tables add`, `model tables rename`, `model tables delete`.
 - `package.pbix-pbit-boundary` — **supported**, inspect-safe-metadata-source-pack-work-pack-export-plan, proof `unit-smoke`: PBIX/PBIT package boundary. Commands: `package inspect`, `package extract`, `package import`, `package source-pack`, `package work-pack`, `package export-plan`.
@@ -431,7 +433,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers with v2 page and rail compilation. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-clear` — **supported**, read-write-clear-only, proof `unit-smoke`: Slicer inventory and persisted-selection clear. Commands: `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-sync-authoring` — **planned**, unsupported, proof `unit-smoke`: Slicer sync groups.
-- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report build`, `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`.
+- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report build`, `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`, `report style tokens show`, `report style tokens derive`.
 - `report.tooltip-pages` — **planned**, unsupported, proof `unit-smoke`: Report tooltip pages.
 - `report.visuals.category-share` — **supported**, generated-desktop-golden-pending, proof `desktop-golden-pending`: Generated pie and donut visuals. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
 - `report.visuals.combo-pareto` — **supported**, generated-manual-desktop-canvas-refresh, proof `manual-desktop-canvas-refresh`: Generated line and clustered-column combo visual. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
@@ -643,6 +645,14 @@ formatting list/show/extract/apply bundles, visual formatting set-text for
 title/legacy-alt-text cleanup, conditional-formatting readback list/show, handoff
 check, lint plus registry list/explain, strict validate, doctor, version, robot docs, robot triage,
 capabilities, and `features list`.
+The report design-system surface also exposes the exact command paths
+`report style tokens show` and `report style tokens derive`. The embedded
+`powerbi-cli.tokens.v1` catalog has
+corporate-neutral, high-contrast, dark, and print sets; `style.tokens` builds a
+registered theme with semantic colors, ramps, text classes, and visual defaults,
+maps locale-aware numeric formats and label display units into TMDL/theme metadata, and refuses foreground/page pairs below WCAG AA
+unless `allowContrastBelowAA: true` records a warning and handoff note. Derive
+samples formatting colors from a report and never copies literal titles or names.
 Treat filter sort and arbitrary expression updates, bookmark state capture/create/update/grouping,
 slicer selection/sync mutation, unsupported
 slicer modes, style
@@ -1037,8 +1047,9 @@ responses stay small. The complete field contract is published at
 Dashboard-spec `style.preset` and `style.bundle` compile at the final operation
 stage through the same typed kernels as `report themes apply-preset` and
 `report style apply`. Set `style.allowLiteralText: true` only after reviewing
-a bundle that contains display strings. `style.defaults` and non-typography
-tokens remain explicitly gated by `pbi-t3-compiler-completeness-1qi.13`.
+a bundle that contains display strings. `style.tokens` compile through the
+token catalog; `style.defaults` remain explicitly gated by
+`pbi-t3-compiler-completeness-1qi.13`.
 
 ### Scaffold From A Schema
 
@@ -1339,6 +1350,11 @@ checks. `--out` refuses to overwrite an existing runbook unless `--force` is
 passed, and credential detection redacts response content and suppresses the
 runbook write entirely.
 
+The runbook and JSON response include the live `scorecard.v1` (validation,
+design findings with pointers/actions, lint, and handoff safety) and a five-level
+`proofLadder`. Higher levels remain `not-verified`: generating a runbook provides
+local `unit-smoke` checks only. Re-run triage after rebinding or editing the project.
+
 After `source-template apply` on the work machine, run
 `pbi --json handoff rebind-check build/sales-live`. This offline gate checks
 every selected partition for a concrete non-placeholder source, validates
@@ -1481,6 +1497,9 @@ encoding, PBIR container, wildcard visual-type scope, and dated Desktop/pilot
 reference. The catalog is strict and deterministic; an entry is not implied by
 memory, and new properties require a Desktop-authored fixture or dated pilot
 observation. `--formatting` cannot be combined with `--visual-type`.
+`bubbles.bubbleSize` returns `unsupported_feature` until a sanitized
+Desktop-saved property reference with provenance is archived. The scatter Size
+binding and pilot prose do not prove its encoding, range, or proposed default 20.
 Use `report visuals set-object --batch <file>` with a bounded
 `powerbi-cli.ops.v1` SetObject-only list to update many visual handles and
 properties through one atomic transaction with per-entry readback.

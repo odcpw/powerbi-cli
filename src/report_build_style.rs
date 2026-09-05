@@ -91,15 +91,6 @@ fn refuse_deferred_style(style: &Map<String, Value>) -> CliResult<()> {
     if style.contains_key("defaults") {
         return Err(uncompiled_style_error("style.defaults", "/style/defaults"));
     }
-    if style
-        .get("tokens")
-        .and_then(Value::as_object)
-        .is_some_and(|tokens| {
-            !tokens.contains_key("typography") || tokens.keys().any(|key| key != "typography")
-        })
-    {
-        return Err(uncompiled_style_error("style.tokens", "/style/tokens"));
-    }
     Ok(())
 }
 

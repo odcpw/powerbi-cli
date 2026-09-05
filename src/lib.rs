@@ -24,6 +24,7 @@ mod formatting_catalog;
 mod guid_util;
 mod handoff;
 mod handoff_rebind_check;
+mod handoff_runbook;
 mod help;
 mod input_safety;
 mod inspect;

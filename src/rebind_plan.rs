@@ -176,7 +176,9 @@ pub(crate) fn rebind_plan(args: &[String]) -> CliResult<Value> {
         "powerbi-cli model partitions list --project {} --json",
         project_arg
     );
-    let markdown = rebind_plan_markdown(&resolved, &plans, &findings);
+    let scorecard = crate::scorecard::project_scorecard(&resolved, "unit-smoke");
+    let proof_ladder = crate::handoff_runbook::proof_ladder(&scorecard);
+    let markdown = rebind_plan_markdown(&resolved, &plans, &findings, &scorecard, &proof_ladder);
     let runbook_written = if let Some(out) = options.out.as_ref()
         && !materialization_blocked
     {
@@ -212,6 +214,8 @@ pub(crate) fn rebind_plan(args: &[String]) -> CliResult<Value> {
         "plans": plans,
         "templates": store.templates.iter().map(|template| source_template_json(template, &template_path)).collect::<Vec<_>>(),
         "findings": findings,
+        "scorecard": scorecard,
+        "proofLadder": proof_ladder,
         "instructionsMarkdown": markdown,
         "runbookPath": runbook_path,
         "runbookRequestedPath": options.out.as_ref().map(|path| canonical_display(path)),
@@ -348,6 +352,8 @@ fn rebind_plan_markdown(
     resolved: &crate::ResolvedProject,
     plans: &[Value],
     findings: &[Value],
+    scorecard: &Value,
+    proof_ladder: &Value,
 ) -> String {
     let mut out = String::new();
     out.push_str("# Power BI Rebind Plan\n\n");
@@ -368,6 +374,7 @@ fn rebind_plan_markdown(
         out.push_str("Status: ready for work-machine review.\n\n");
     }
 
+    out.push_str(&crate::handoff_runbook::markdown(scorecard, proof_ladder));
     out.push_str("## Prerequisites\n\n");
     out.push_str("- Power BI Desktop is installed on the work machine.\n");
     if plans.iter().any(|plan| {

@@ -211,20 +211,13 @@ fn style_bundle_requires_literal_opt_in_and_matches_apply_style_bundle() {
 }
 
 #[test]
-fn style_tokens_and_defaults_refuse_with_the_follow_up_bead() {
+fn style_defaults_refuse_with_the_follow_up_bead() {
     let temp = tempfile::tempdir().expect("tempdir");
-    for (name, style, pointer) in [
-        (
-            "tokens",
-            json!({"tokens": {"semantic": {"good": "#2E7D32"}}}),
-            "/style/tokens",
-        ),
-        (
-            "defaults",
-            json!({"defaults": {"card": {"title": true}}}),
-            "/style/defaults",
-        ),
-    ] {
+    for (name, style, pointer) in [(
+        "defaults",
+        json!({"defaults": {"card": {"title": true}}}),
+        "/style/defaults",
+    )] {
         let mut spec = sales_spec();
         spec["style"] = style;
         let path = temp.path().join(format!("{name}.json"));

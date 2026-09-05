@@ -194,18 +194,31 @@ const STYLE_TOKENS: NodeSchema = node(
     "style.tokens",
     "style.tokens",
     &[
+        "preset",
+        "id",
+        "name",
+        "summary",
         "palette",
         "semantic",
+        "ramps",
         "typography",
         "surfaces",
         "spacing",
         "numberFormats",
+        "textClasses",
+        "visualDefaults",
+        "allowContrastBelowAA",
     ],
 );
 const STYLE_SEMANTIC: NodeSchema = node(
     "style.tokens.semantic",
     "style.tokens.semantic",
     &["good", "bad", "neutral", "warning", "emphasis"],
+);
+const STYLE_RAMPS: NodeSchema = node(
+    "style.tokens.ramps",
+    "style.tokens.ramps",
+    &["sequential", "diverging"],
 );
 const STYLE_TYPOGRAPHY: NodeSchema = node(
     "style.tokens.typography",
@@ -392,6 +405,7 @@ const V2_NODES: &[NodeSchema] = &[
     STYLE,
     STYLE_TOKENS,
     STYLE_SEMANTIC,
+    STYLE_RAMPS,
     STYLE_TYPOGRAPHY,
     STYLE_SURFACES,
     STYLE_SPACING,
@@ -439,6 +453,13 @@ pub(crate) fn validate_known_fields(spec: &Value) -> CliResult<SpecVersion> {
             CliError::invalid_args(format!("invalid {DASHBOARD_V2} shape: {error}"))
                 .with_suggested_command("powerbi-cli report spec fields --json")
         })?;
+        if let Some(tokens) = root
+            .get("style")
+            .and_then(Value::as_object)
+            .and_then(|style| style.get("tokens"))
+        {
+            crate::design::tokens::validate_style_tokens_shape(tokens)?;
+        }
         return Ok(version);
     }
     walk_object(root, ROOT_V1, "")?;
@@ -463,6 +484,13 @@ pub(crate) fn validate_known_fields(spec: &Value) -> CliResult<SpecVersion> {
             |_| Ok(()),
         )
     })?;
+    if let Some(tokens) = root
+        .get("style")
+        .and_then(Value::as_object)
+        .and_then(|style| style.get("tokens"))
+    {
+        crate::design::tokens::validate_style_tokens_shape(tokens)?;
+    }
     Ok(version)
 }
 
@@ -1051,7 +1079,7 @@ fn spec_version(root: &Map<String, Value>) -> CliResult<SpecVersion> {
 
 /// Return whether every style field is compiled by the current report-build
 /// pipeline. Presets and bundles become typed style-stage operations; the
-/// typography-only token subset remains consumed by generated headings.
+/// token catalog compiles themes and number formats, including heading typography.
 pub(crate) fn style_is_compilable(style: &Value) -> bool {
     let Some(style) = style.as_object() else {
         return false;
@@ -1066,28 +1094,13 @@ pub(crate) fn style_is_compilable(style: &Value) -> bool {
     {
         return false;
     }
-    style.get("tokens").is_none_or(|tokens| {
-        tokens.as_object().is_some_and(|tokens| {
-            !tokens.keys().any(|key| key != "typography")
-                && tokens.get("typography").is_some_and(|typography| {
-                    typography.as_object().is_some_and(|typography| {
-                        !typography
-                            .keys()
-                            .any(|key| !matches!(key.as_str(), "family" | "scale"))
-                    })
-                })
-        })
-    })
+    style.get("tokens").is_none_or(Value::is_object)
 }
 
 fn uncompiled_style_section(style: &Value) -> Option<(&'static str, &'static str)> {
     let style = style.as_object()?;
     if style.contains_key("defaults") {
         return Some(("style.defaults", "/style/defaults"));
-    }
-    let tokens = style.get("tokens")?.as_object()?;
-    if !tokens.contains_key("typography") || tokens.keys().any(|key| key != "typography") {
-        return Some(("style.tokens", "/style/tokens"));
     }
     None
 }
@@ -1129,6 +1142,7 @@ fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
         && let Some(tokens) = walk_child_object_at(style, "tokens", STYLE_TOKENS, "/style")?
     {
         walk_child_object_at(tokens, "semantic", STYLE_SEMANTIC, "/style/tokens")?;
+        walk_child_object_at(tokens, "ramps", STYLE_RAMPS, "/style/tokens")?;
         walk_child_object_at(tokens, "typography", STYLE_TYPOGRAPHY, "/style/tokens")?;
         walk_child_object_at(tokens, "surfaces", STYLE_SURFACES, "/style/tokens")?;
         walk_child_object_at(tokens, "spacing", STYLE_SPACING, "/style/tokens")?;
@@ -1699,12 +1713,21 @@ struct StyleV2 {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StyleTokensV2 {
+    preset: Option<Value>,
+    id: Option<Value>,
+    name: Option<Value>,
+    summary: Option<Value>,
     palette: Option<Vec<Value>>,
     semantic: Option<SemanticTokensV2>,
+    ramps: Option<RampsTokensV2>,
     typography: Option<TypographyTokensV2>,
     surfaces: Option<SurfaceTokensV2>,
     spacing: Option<SpacingTokensV2>,
     number_formats: Option<NumberFormatTokensV2>,
+    text_classes: Option<BTreeMap<String, Value>>,
+    visual_defaults: Option<BTreeMap<String, Value>>,
+    #[serde(rename = "allowContrastBelowAA")]
+    allow_contrast_below_aa: Option<bool>,
 }
 
 value_struct!(SemanticTokensV2 {
@@ -1713,6 +1736,10 @@ value_struct!(SemanticTokensV2 {
     neutral,
     warning,
     emphasis
+});
+value_struct!(RampsTokensV2 {
+    sequential,
+    diverging
 });
 value_struct!(TypographyTokensV2 { family, scale });
 value_struct!(SurfaceTokensV2 {

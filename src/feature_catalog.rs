@@ -844,7 +844,7 @@ const FEATURE_CATALOG: &[Feature] = &[
     },
     Feature {
         id: "model.source-templates",
-        title: "Credential-free source templates and rebind runbooks",
+        title: "Credential-free source templates and rebind runbooks with live scorecards and proof status",
         category: "model",
         status: "supported",
         support: "sidecar-sql-postgres-odbc-excel-csv-folder-sharepoint-generic-m",
@@ -926,7 +926,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. `report spec normalize` flattens model, page, and style fragments deterministically; `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. Root, page, and visual `filters[]` compile through the typed AddFilter kernel with model/type validation for categorical, numeric-range, relative-date, and visual TopN shapes; page `drillthrough` blocks compile through SetDrillthrough with an existing-column target and hidden-by-default page, while backButton requests return a spec.feature_pending warning for pbi-t4-pbir-catalog-expansion-sn2.8 until the action-button kernel is proven. Page templates and named visual slots resolve through the shared grid with explicit-layout precedence; generated heading/subtitle textboxes consume typography family/scale tokens, and explain exposes resolved coordinates. style.preset and style.bundle compile last through ApplyThemePreset and ApplyStyleBundle; literal text requires allowLiteralText, while defaults and non-typography tokens point to pbi-t3-compiler-completeness-1qi.13. Unknown slots report available choices, duplicate slots fail, family mismatches warn, and section dividers remain feature_pending. Build responses expose per-operation outcomes and readback. The compiled subset remains artifact-identical to v1 where features overlap; proof is compiled into a side-effect-free proofPlan and exact next commands, while every other recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. `report spec normalize` flattens model, page, and style fragments deterministically; `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. Root, page, and visual `filters[]` compile through the typed AddFilter kernel with model/type validation for categorical, numeric-range, relative-date, and visual TopN shapes; page `drillthrough` blocks compile through SetDrillthrough with an existing-column target and hidden-by-default page, while backButton requests return a spec.feature_pending warning for pbi-t4-pbir-catalog-expansion-sn2.8 until the action-button kernel is proven. Page templates and named visual slots resolve through the shared grid with explicit-layout precedence; generated heading/subtitle textboxes consume typography family/scale tokens, and explain exposes resolved coordinates. style.preset and style.bundle compile last through ApplyThemePreset and ApplyStyleBundle; literal text requires allowLiteralText, while tokens compile through the token catalog and defaults point to pbi-t3-compiler-completeness-1qi.13. Unknown slots report available choices, duplicate slots fail, family mismatches warn, and section dividers remain feature_pending. Build responses expose per-operation outcomes and readback. The compiled subset remains artifact-identical to v1 where features overlap; proof is compiled into a side-effect-free proofPlan and exact next commands, while every other recognized future section stops with unsupported_feature and its owning T3 bead id.",
         next_proof: &[
             "Land the named T3 compiler bead for each remaining refused v2 section",
             "Promote generated v2 archetypes through the existing Desktop proof ladder",
@@ -1039,7 +1039,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report visuals delete",
         ],
         refusal_code: None,
-        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence. Set-object can apply a bounded SetObject-only ops.v1 list through one atomic transaction; other visual families and formatting pairs are refused until fixture-proven.",
+        reason: "Only cataloged core visual families emit generated PBIR; report visuals catalog --formatting exposes the strict eleven-entry set-object property surface with per-entry evidence. Set-object can apply a bounded SetObject-only ops.v1 list through one atomic transaction; other visual families and formatting pairs are refused until fixture-proven. bubbles.bubbleSize remains unsupported_feature: no archived Desktop-authored property shape proves its encoding or range; the scatter Size binding and pilot prose do not authorize default 20.",
         next_proof: &[
             "Add Desktop-authored golden fixtures before widening visual families or field wells",
         ],
@@ -1374,12 +1374,14 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report style extract",
             "report style apply",
             "report style diff",
+            "report style tokens show",
+            "report style tokens derive",
         ],
         refusal_code: None,
-        reason: "Theme, visual formatting, and master-style bundle operations preserve raw PBIR cards while guarding literal text and typed color/text patches; report build compiles style.preset and style.bundle through the same kernels at the final operation stage.",
+        reason: "Theme, visual formatting, and master-style bundle operations preserve raw PBIR cards while guarding literal text and typed color/text patches; report build compiles style.preset and style.bundle through the same kernels at the final operation stage, alongside the versioned design-token catalog and contrast checks.",
         next_proof: &["Desktop-authored conditional formatting fixture before CF authoring"],
         reference_signals: &[],
-        tags: &["pbir", "themes", "formatting"],
+        tags: &["pbir", "themes", "formatting", "design", "tokens"],
     },
     Feature {
         id: "report.drillthrough",
