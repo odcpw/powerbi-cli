@@ -10,6 +10,7 @@ use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, ResolvedProject, canonical_display,
     command_arg, resolve_project, validate_project,
 };
+use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::fs;
 use std::io;
@@ -20,6 +21,21 @@ const REQUIRE_MODE_HINT: &str =
     "Start with `--dry-run`; use `--out-dir` or `--in-place` only after review.";
 const SET_MODE_HINT: &str =
     "Start with `--dry-run`; rerun with `--in-place` or `--out-dir` after review.";
+
+/// Typography carried by compiler-generated textboxes.  This is an internal
+/// manifest field (not a standalone dashboard-spec surface); it lets report
+/// build turn style.tokens.typography into the same paragraph textStyle shape
+/// emitted by the explicit add-textbox command.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TextboxStyle {
+    #[serde(default)]
+    pub(crate) font_family: Option<String>,
+    #[serde(default)]
+    pub(crate) font_size: Option<f64>,
+    #[serde(default)]
+    pub(crate) font_weight: Option<String>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScaffoldKind {
@@ -806,30 +822,53 @@ fn slicer_visual_json(
 }
 
 fn textbox_visual_json(name: &str, title: &str, position: &Value, paragraphs: &[String]) -> Value {
+    textbox_visual_json_styled(name, title, position, paragraphs, None)
+}
+
+pub(crate) fn textbox_visual_json_styled(
+    name: &str,
+    title: &str,
+    position: &Value,
+    paragraphs: &[String],
+    style: Option<&TextboxStyle>,
+) -> Value {
     let paragraph_values = paragraphs
         .iter()
         .enumerate()
         .map(|(index, line)| {
-            if index == 0 {
-                json!({
-                    "textRuns": [{
-                        "value": line,
-                        "textStyle": {
-                            "fontWeight": "bold",
-                            "fontSize": "12pt"
-                        }
-                    }]
-                })
-            } else {
-                json!({
-                    "textRuns": [{
-                        "value": line,
-                        "textStyle": {
-                            "fontSize": "10pt"
-                        }
-                    }]
-                })
+            let mut text_style = Map::new();
+            if let Some(style) = style {
+                if let Some(family) = style.font_family.as_deref() {
+                    text_style.insert("fontFamily".to_string(), Value::String(family.to_string()));
+                }
+                if let Some(size) = style
+                    .font_size
+                    .filter(|size| size.is_finite() && *size > 0.0)
+                {
+                    text_style.insert(
+                        "fontSize".to_string(),
+                        Value::String(format_font_size(size)),
+                    );
+                }
+                if let Some(weight) = style.font_weight.as_deref() {
+                    text_style.insert("fontWeight".to_string(), Value::String(weight.to_string()));
+                }
             }
+            if text_style.get("fontWeight").is_none() && index == 0 {
+                text_style.insert("fontWeight".to_string(), Value::String("bold".to_string()));
+            }
+            if text_style.get("fontSize").is_none() {
+                text_style.insert(
+                    "fontSize".to_string(),
+                    Value::String(if index == 0 { "12pt" } else { "10pt" }.to_string()),
+                );
+            }
+            json!({
+                "textRuns": [{
+                    "value": line,
+                    "textStyle": Value::Object(text_style)
+                }]
+            })
         })
         .collect::<Vec<_>>();
     let visual = json!({
@@ -844,6 +883,17 @@ fn textbox_visual_json(name: &str, title: &str, position: &Value, paragraphs: &[
         "visualType": "textbox"
     });
     scaffold_container(name, title, position, ScaffoldKind::Textbox, visual)
+}
+
+fn format_font_size(size: f64) -> String {
+    let mut value = format!("{size:.2}");
+    while value.ends_with('0') {
+        value.pop();
+    }
+    if value.ends_with('.') {
+        value.pop();
+    }
+    format!("{value}pt")
 }
 
 fn scaffold_container(
