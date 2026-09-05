@@ -4,7 +4,7 @@ use crate::cli_support::{
     take_report_interaction_value as take_value, target_project,
 };
 use crate::feature_catalog::unsupported_feature_error;
-use crate::ops::{OpOutcome, SetInteraction};
+use crate::ops::{OpOutcome, ResetInteraction, SetInteraction};
 use crate::pbir::{PageRecord, PageSelector, VisualRecord, find_page, load_report_snapshot};
 use crate::pbir_interactions::{
     interaction_matches_handle, interaction_record_from_raw, interaction_record_json,
@@ -90,6 +90,24 @@ pub(crate) fn disable_interaction(args: &[String]) -> CliResult<Value> {
     mutate_interaction("disable", &mut options)
 }
 
+/// Remove one explicit interaction row so Power BI can apply its target
+/// visual's default interaction behavior.
+pub(crate) fn reset_interaction(args: &[String]) -> CliResult<Value> {
+    let mut options = parse_mutate_args(args, "report interactions reset")?;
+    require_reset_selector(&options)?;
+    if options.interaction_type.is_some() {
+        return Err(CliError::invalid_args(
+            "report interactions reset does not accept --type",
+        )
+        .with_hint("Reset removes the explicit row; omit --type to restore the target default.")
+        .with_suggested_command(
+            "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json",
+        ));
+    }
+    crate::cli_support::preflight_out_dir(args, reset_interaction)?;
+    mutate_reset_interaction(&mut options)
+}
+
 /// Parse the endpoint form of `report interactions set` into the operation IR.
 ///
 /// The operation intentionally carries selectors rather than a project path:
@@ -132,6 +150,38 @@ pub(crate) fn parse_set_interaction_operation(
         interaction_type: options
             .interaction_type
             .expect("interaction type was checked above"),
+    };
+    Ok((operation, mode))
+}
+
+/// Parse endpoint selectors for `report interactions reset` into the
+/// operation IR. Reset deliberately has no interaction type: absence of the
+/// row is the PBIR representation of the target's default behavior.
+pub(crate) fn parse_reset_interaction_operation(
+    args: &[String],
+) -> CliResult<(ResetInteraction, MutationMode)> {
+    let options = parse_mutate_args(args, "report interactions reset")?;
+    require_reset_selector(&options)?;
+    if options.interaction_type.is_some() {
+        return Err(CliError::invalid_args(
+            "operation resetInteraction does not accept --type",
+        )
+        .with_hint("Reset removes the explicit row; omit --type to restore the target default.")
+        .with_suggested_command(
+            "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json",
+        ));
+    }
+    let mode = require_mode(options.mode, "report interactions reset")?;
+    let operation = ResetInteraction {
+        page: options
+            .page
+            .expect("reset selector validation requires page"),
+        source: options
+            .source
+            .expect("reset selector validation requires source"),
+        target: options
+            .target
+            .expect("reset selector validation requires target"),
     };
     Ok((operation, mode))
 }
@@ -202,6 +252,57 @@ pub(crate) fn apply_set_interaction_operation(
     })
 }
 
+/// Apply a typed ResetInteraction against a resolved staged project.
+pub(crate) fn apply_reset_interaction_operation(
+    operation: &ResetInteraction,
+    project: &ResolvedProject,
+) -> CliResult<OpOutcome> {
+    let options = MutateOptions {
+        project: Some(project.project_dir.clone()),
+        page: Some(operation.page.clone()),
+        source: Some(operation.source.clone()),
+        target: Some(operation.target.clone()),
+        // `resolve_mutation_target` uses this field only to carry the target
+        // metadata. Reset never writes an explicit Default row.
+        interaction_type: Some("Default".to_string()),
+        mode: Some(MutationMode::InPlace),
+        out_dir: None,
+        handle: None,
+    };
+    require_reset_selector(&options)?;
+    let resolved = resolve_mutation_target(project, &options, "reset")?;
+    let mutation = remove_page_interaction(
+        &resolved.page_path,
+        &resolved.source.name,
+        &resolved.target.name,
+    )?;
+    if mutation.changed {
+        write_json_atomic(&resolved.page_path, &mutation.page_json)?;
+    }
+    let project_arg = command_arg(&project.project_dir);
+    let action = if mutation.existed { "remove" } else { "noop" };
+    Ok(OpOutcome {
+        changed: mutation.changed,
+        changes: vec![json!({
+            "kind": "pbir.page.visualInteractions",
+            "action": action,
+            "path": canonical_display(&resolved.page_path),
+            "jsonPointer": format!("/visualInteractions/{}", mutation.ordinal),
+            "before": mutation.before,
+            "after": Value::Null
+        })],
+        readback: vec![format!(
+            "powerbi-cli report interactions list --project {} --page {} --source {} --target {} --json",
+            project_arg,
+            shell_arg(&resolved.page.handle),
+            shell_arg(&resolved.source.handle),
+            shell_arg(&resolved.target.handle)
+        )],
+        warnings: Vec::new(),
+        created_handles: Vec::new(),
+    })
+}
+
 fn mutate_interaction(action: &'static str, options: &mut MutateOptions) -> CliResult<Value> {
     require_mutation_selector(options, action)?;
     let mode = require_mode(options.mode, &format!("report interactions {action}"))?;
@@ -235,6 +336,27 @@ fn mutate_interaction(action: &'static str, options: &mut MutateOptions) -> CliR
         &mutation,
         interaction_record_json(&after_record, true),
     )
+}
+
+fn mutate_reset_interaction(options: &mut MutateOptions) -> CliResult<Value> {
+    let mode = require_mode(options.mode, "report interactions reset")?;
+    let source_project = required_project(options.project.clone(), "report interactions reset")?;
+    let source_resolved = resolve_project(&source_project)?;
+    let target_resolved = target_project(&source_resolved, mode, options.out_dir.as_deref())?;
+    // The resolver returns the endpoint metadata shared by set/disable and
+    // expects an interaction type. Reset uses Default only as a response
+    // classification; the row-removal helper never writes that value.
+    options.interaction_type = Some("Default".to_string());
+    let resolved = resolve_mutation_target(&target_resolved, options, "reset")?;
+    let mutation = remove_page_interaction(
+        &resolved.page_path,
+        &resolved.source.name,
+        &resolved.target.name,
+    )?;
+    if !matches!(mode, MutationMode::DryRun) && mutation.changed {
+        write_json_atomic(&resolved.page_path, &mutation.page_json)?;
+    }
+    reset_interaction_response(&target_resolved, mode, &resolved, &mutation)
 }
 
 fn parse_mutate_args(args: &[String], command: &str) -> CliResult<MutateOptions> {
@@ -476,6 +598,71 @@ fn upsert_page_interaction(
     })
 }
 
+fn remove_page_interaction(
+    page_path: &Path,
+    source_name: &str,
+    target_name: &str,
+) -> CliResult<InteractionPageMutation> {
+    let mut page_json = read_json_value(page_path)?;
+    let page_object = page_json.as_object_mut().ok_or_else(|| {
+        CliError::validation_failed(format!("{} is not a JSON object", page_path.display()))
+    })?;
+    let Some(interactions_value) = page_object.get_mut("visualInteractions") else {
+        return Ok(InteractionPageMutation {
+            page_json,
+            before: Value::Null,
+            after: Value::Null,
+            ordinal: 0,
+            existed: false,
+            changed: false,
+        });
+    };
+    let interactions = interactions_value.as_array_mut().ok_or_else(|| {
+        CliError::validation_failed(format!(
+            "{} visualInteractions is not an array",
+            page_path.display()
+        ))
+    })?;
+    let matches = interactions
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| {
+            item["source"].as_str() == Some(source_name)
+                && item["target"].as_str() == Some(target_name)
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    if matches.len() > 1 {
+        return Err(CliError::validation_failed(format!(
+            "{} contains duplicate visualInteractions for source {source_name} and target {target_name}",
+            page_path.display()
+        ))
+        .with_hint("Open the page JSON or Power BI Desktop to remove duplicate interaction rows first.")
+        .with_suggested_command(
+            "powerbi-cli report interactions list --project <project-dir-or.pbip> --include-raw --json",
+        ));
+    }
+    let Some(index) = matches.first().copied() else {
+        return Ok(InteractionPageMutation {
+            page_json,
+            before: Value::Null,
+            after: Value::Null,
+            ordinal: 0,
+            existed: false,
+            changed: false,
+        });
+    };
+    let before = interactions.remove(index);
+    Ok(InteractionPageMutation {
+        page_json,
+        before,
+        after: Value::Null,
+        ordinal: index,
+        existed: true,
+        changed: true,
+    })
+}
+
 fn interaction_mutation_response(
     target_resolved: &ResolvedProject,
     mode: MutationMode,
@@ -585,6 +772,143 @@ fn interaction_mutation_response(
     }))
 }
 
+fn reset_interaction_response(
+    target_resolved: &ResolvedProject,
+    mode: MutationMode,
+    resolved: &ResolvedInteractionMutation,
+    mutation: &InteractionPageMutation,
+) -> CliResult<Value> {
+    let dry_run = matches!(mode, MutationMode::DryRun);
+    let validation = if dry_run {
+        None
+    } else {
+        Some(validate_project(target_resolved)?)
+    };
+    let validation_ok = validation
+        .as_ref()
+        .map(|report| report.errors.is_empty())
+        .unwrap_or(true);
+    let exit_code = if validation_ok {
+        EXIT_SUCCESS
+    } else {
+        EXIT_VALIDATION_FAILED
+    };
+    let project_arg = command_arg(&target_resolved.project_dir);
+    let readback = format!(
+        "powerbi-cli report interactions list --project {} --page {} --source {} --target {} --json",
+        project_arg,
+        shell_arg(&resolved.page.handle),
+        shell_arg(&resolved.source.handle),
+        shell_arg(&resolved.target.handle)
+    );
+    let page_readback = format!(
+        "powerbi-cli report pages show --project {} --handle {} --json",
+        project_arg,
+        shell_arg(&resolved.page.handle)
+    );
+    let source_visual = format!(
+        "powerbi-cli report visuals show --project {} --handle {} --json",
+        project_arg,
+        shell_arg(&resolved.source.handle)
+    );
+    let target_visual = format!(
+        "powerbi-cli report visuals show --project {} --handle {} --json",
+        project_arg,
+        shell_arg(&resolved.target.handle)
+    );
+    let wireframe = format!(
+        "powerbi-cli report wireframe export {} --json",
+        command_arg(&target_resolved.project_dir)
+    );
+    let inspect = format!(
+        "powerbi-cli inspect --deep {} --json",
+        command_arg(&target_resolved.project_dir)
+    );
+    let validate = format!(
+        "powerbi-cli validate --strict {} --json",
+        command_arg(&target_resolved.project_dir)
+    );
+    let action = if mutation.existed { "remove" } else { "noop" };
+    let target = reset_target_json(resolved);
+    let changes = json!([{
+        "kind": "pbir.page.visualInteractions",
+        "action": action,
+        "path": canonical_display(&resolved.page_path),
+        "jsonPointer": format!("/visualInteractions/{}", mutation.ordinal),
+        "before": mutation.before,
+        "after": Value::Null
+    }]);
+
+    Ok(json!({
+        "schema": "powerbi-cli.report.interactions.resetMutation.v1",
+        "ok": validation_ok,
+        "exitCode": exit_code,
+        "action": "reset",
+        "dryRun": dry_run,
+        "mode": mode_name(mode),
+        "projectDir": canonical_display(&target_resolved.project_dir),
+        "pbip": canonical_display(&target_resolved.pbip_path),
+        "reportDir": canonical_display(&target_resolved.report_dir),
+        "target": target,
+        "interactionPlan": {
+            "before": mutation.before,
+            "after": Value::Null,
+            "existed": mutation.existed,
+            "changed": mutation.changed,
+            "defaulted": true,
+            "semantics": interaction_semantics()
+        },
+        "resetSemantics": "The explicit visualInteractions row is absent after reset; Power BI applies the target visual's default interaction behavior.",
+        "changes": changes,
+        "validation": validation.map(|report| json!({
+            "ok": report.errors.is_empty(),
+            "warnings": report.warnings,
+            "errors": report.errors,
+            "counts": {
+                "tables": report.tables,
+                "relationships": report.relationships,
+                "measures": report.measures,
+                "pages": report.pages,
+                "visuals": report.visuals,
+                "boundVisuals": report.bound_visuals
+            }
+        })),
+        "readbackCommand": readback,
+        "pageReadbackCommand": page_readback,
+        "sourceVisualReadbackCommand": source_visual,
+        "targetVisualReadbackCommand": target_visual,
+        "wireframeCommand": wireframe,
+        "inspectCommand": inspect,
+        "validateCommand": validate,
+        "next": [readback, page_readback, source_visual, target_visual, wireframe, inspect, validate]
+    }))
+}
+
+fn reset_target_json(resolved: &ResolvedInteractionMutation) -> Value {
+    json!({
+        "page": {
+            "handle": resolved.page.handle,
+            "name": resolved.page.name,
+            "displayName": resolved.page.display_name
+        },
+        "source": {
+            "handle": resolved.source.handle,
+            "name": resolved.source.name,
+            "title": resolved.source.title,
+            "visualType": resolved.source.visual_type
+        },
+        "target": {
+            "handle": resolved.target.handle,
+            "name": resolved.target.name,
+            "title": resolved.target.title,
+            "visualType": resolved.target.visual_type
+        },
+        "interactionType": "Default",
+        "rowPresent": false,
+        "defaulted": true
+    })
+}
+
 fn require_mutation_selector(options: &MutateOptions, action: &str) -> CliResult<()> {
     if options.handle.is_some()
         && (options.page.is_some() || options.source.is_some() || options.target.is_some())
@@ -603,6 +927,28 @@ fn require_mutation_selector(options: &MutateOptions, action: &str) -> CliResult
         return Ok(());
     }
     Err(missing_mutation_selector(action))
+}
+
+fn require_reset_selector(options: &MutateOptions) -> CliResult<()> {
+    if options.handle.is_some() {
+        return Err(CliError::invalid_args(
+            "report interactions reset requires --page plus --source and --target; --handle is not supported",
+        )
+        .with_hint("Reset an explicit row by naming its page, source visual, and target visual endpoints.")
+        .with_suggested_command(
+            "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json",
+        ));
+    }
+    if options.page.is_some() && options.source.is_some() && options.target.is_some() {
+        return Ok(());
+    }
+    Err(CliError::invalid_args(
+        "report interactions reset requires --page plus --source and --target",
+    )
+    .with_hint("Use `report interactions list` and `report visuals list` to get stable endpoint handles.")
+    .with_suggested_command(
+        "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json",
+    ))
 }
 
 fn missing_mutation_selector(action: &str) -> CliError {

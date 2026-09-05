@@ -152,7 +152,12 @@ fn explain_previews_uncompiled_v2_sections_with_owning_beads() {
     )
     .expect("parse sales v2 spec");
     spec["style"] = serde_json::json!({"preset": "neutral"});
-    spec["filters"] = serde_json::json!([]);
+    spec["filters"] = serde_json::json!([{
+        "scope": "report",
+        "target": "DimCustomer[Segment]",
+        "kind": "categorical",
+        "values": ["Enterprise"]
+    }]);
     fs::write(
         &spec_path,
         serde_json::to_vec_pretty(&spec).expect("serialize unsupported spec"),
@@ -174,9 +179,7 @@ fn explain_previews_uncompiled_v2_sections_with_owning_beads() {
     let unsupported = value["unsupportedSections"]
         .as_array()
         .expect("unsupported");
-    assert!(unsupported.iter().any(|item| {
-        item["pointer"] == "/filters" && item["owningBead"] == "pbi-t3-compiler-completeness-1qi.1"
-    }));
+    assert!(unsupported.iter().all(|item| item["pointer"] != "/filters"));
     assert!(unsupported.iter().any(|item| {
         item["pointer"] == "/style" && item["owningBead"] == "pbi-t3-compiler-completeness-1qi.6"
     }));

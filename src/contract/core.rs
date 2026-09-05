@@ -3,6 +3,9 @@
 use super::{desktop, integrations, model, report, workflow_pkg};
 use crate::feature_catalog::{feature_catalog_schema_fields, feature_policy_json};
 use crate::input_safety;
+use crate::planner_rules::{
+    catalog_json as planner_rule_catalog_json, rule_ids as planner_rule_ids,
+};
 use crate::visual_catalog::{
     schema_golden_visual_type_names, supported_visual_type_names, visual_type_contracts,
     visual_type_role_rules,
@@ -149,7 +152,7 @@ Usage:
   powerbi-cli report audit --project <project-dir-or.pbip> --json
   powerbi-cli report sanitize plan --project <project-dir-or.pbip> --json
   powerbi-cli report sanitize apply --project <project-dir-or.pbip> --dry-run --json
-  powerbi-cli report wireframe export <project-dir-or.pbip> --json
+  powerbi-cli report wireframe export <project-dir-or.pbip> --format svg --out <preview-dir> --json
   powerbi-cli report layout auto --project <project-dir-or.pbip> --page <page-handle> --template overview --dry-run --json
   powerbi-cli report pages list --project <project-dir-or.pbip> --json
   powerbi-cli report pages show --project <project-dir-or.pbip> --handle <page-handle> --json
@@ -181,6 +184,7 @@ Usage:
   powerbi-cli report interactions show --project <project-dir-or.pbip> --handle <interaction-handle> --json
   powerbi-cli report interactions set --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --type <mode> --dry-run --json
   powerbi-cli report interactions disable --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json
+  powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json
   powerbi-cli report themes show --project <project-dir-or.pbip> --json
   powerbi-cli report themes extract --project <project-dir-or.pbip> --out <theme-bundle.json> --json
   powerbi-cli report themes apply --project <project-dir-or.pbip> --bundle <theme-bundle.json> --dry-run --json
@@ -214,7 +218,7 @@ Usage:
   powerbi-cli report spec fields --schema <schema.json> --json
   powerbi-cli report spec schema --json
   powerbi-cli report spec upgrade --spec <v1.json> --out <v2.json> --json
-  powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) --out <dashboard.json> --json
+  powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) --out <dashboard.json> [--explain-rules] --json
   powerbi-cli report spec validate --schema <schema.json> --spec <dashboard.json> --json
   powerbi-cli report spec explain --schema <schema.json> --spec <dashboard.json> --json
   powerbi-cli report spec normalize <dashboard.json> --out <canonical.json> --json
@@ -430,7 +434,7 @@ Rules for agents:
 - Use `handoff rebind-plan` to map dummy partitions to source templates and generate a self-contained work-machine runbook; `--out <file.md>` refuses an existing file unless `--force` is passed.
 - Use `fixture normalize` and `fixture verify` to create deterministic golden summaries for generated or Desktop-authored PBIP fixtures.
 - Use `desktop open` for one interactive CLI-owned Power BI Desktop session for a PBIP or PBIX document and always finish with idempotent `desktop close`; opening another managed session closes the prior owned session first. PBIP preflight defaults to `strict`; use `--preflight normal` for structural validation without lint or explicit `--preflight skip` when a known lint defect must not block a Desktop proof loop. PBIX gets bounded native archive preflight and delegates rendering to Desktop. Use `desktop open-check` and `desktop screenshot` for one-shot evidence; they always attempt bounded identity-checked cleanup and report unresolved ownership. Launch/capture commands require an opt-in Windows oracle machine with `POWERBI_DESKTOP_ORACLE=1` or `--enable-oracle`; `desktop close` intentionally does not, so cleanup remains available. Default CI should treat oracle-unavailable as expected. `desktop-launch` and `desktop-window` are observation stages, not members of the closed proof-level ladder. Window/title signals and screenshots still do not prove canvas render or refresh.
-- Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features, turns v2 `proof` into a deterministic `proofPlan`, and returns proof/handoff follow-up commands without executing them.
+- Use `report build --schema <schema.json> --spec <dashboard.json> --out-dir <project-dir>` as the macro surface for generic dashboard generation; it compiles only supported spec features (including root/page/visual `filters[]` through AddFilter and page `drillthrough` through SetDrillthrough), turns v2 `proof` into a deterministic `proofPlan`, and returns proof/handoff follow-up commands without executing them. A v2 `backButton:true` request returns a `spec.feature_pending` warning for `pbi-t4-pbir-catalog-expansion-sn2.8` until a proven action-button kernel exists.
 - Use `report spec fields --schema <schema.json> [--profile <profile.json>]` to get exact column/measure binding references before writing a dashboard spec.
 - Use `report spec schema --json` to retrieve the draft 2020-12 JSON Schema for
   both dashboard-spec versions, and `report spec explain --schema <schema.json>
@@ -441,7 +445,7 @@ Rules for agents:
 - Use project-only `report design-plan --project <project>` to get visual opportunities from an already scaffolded project.
 - Use `report tree/find/cat/query` for stable report-object navigation across pages, visuals, bindings, filters, slicers, bookmarks, and interactions. Use `--include-raw` only when you explicitly need raw PBIR JSON.
 - Use `report audit` and `report sanitize plan/apply` before handoff when a Desktop-authored or template-derived report might contain persisted filter/slicer/bookmark state, literal values, or stale interaction references.
-- Use `report pages list/show/add/clone/update/reorder/set-active/delete-empty`, `report layout auto`, `report drilldown set-hierarchy`, `report drillthrough set/show/clear`, `report bookmarks list/show/set-display-name/reorder/delete`, `report filters list/show/add/update/delete/clear`, `report slicers list/show/clear`, `report interactions list/show/set/disable`, and `report visuals list/show/catalog/formatting list/formatting show/formatting conditional-formatting list/show/formatting extract/formatting apply/formatting set-text/formatting set-color/add/add-card/add-slicer/add-textbox/clone/delete/set-position/set-bindings/set-topn-guard/set-object/set-display-name` for PBIR layout navigation, deterministic visual arrangement, chart hierarchy axes, same-report drillthrough page bindings, bookmark/filter/slicer/interaction inventory and readback, guarded categorical/range/TopN/relative-date filter authoring, type-preserving filter updates, deletion and owner-scoped clear, guarded slicer selection clear, guarded interaction overrides, guarded page cloning and metadata/order edits, visual type/role discovery, safe visual formatting inventory and bundle portability, conditional-formatting readback, typed title/static-color formatting and rejected alt-text cleanup, safe visual creation/cloning/deletion, small-visual scaffolding (KPI cards, slicers, reading-guide textboxes), geometry edits, field-well binding replacement, declarative visual TopN guard filters, curated visual object properties, and projection display names.
+- Use `report pages list/show/add/clone/update/reorder/set-active/delete-empty`, `report layout auto`, `report drilldown set-hierarchy`, `report drillthrough set/show/clear`, `report bookmarks list/show/set-display-name/reorder/delete`, `report filters list/show/add/update/delete/clear`, `report slicers list/show/clear`, `report interactions list/show/set/disable/reset`, and `report visuals list/show/catalog/formatting list/formatting show/formatting conditional-formatting list/show/formatting extract/formatting apply/formatting set-text/formatting set-color/add/add-card/add-slicer/add-textbox/clone/delete/set-position/set-bindings/set-topn-guard/set-object/set-display-name` for PBIR layout navigation, deterministic visual arrangement, chart hierarchy axes, same-report drillthrough page bindings, bookmark/filter/slicer/interaction inventory and readback, guarded categorical/range/TopN/relative-date filter authoring, type-preserving filter updates, deletion and owner-scoped clear, guarded slicer selection clear, guarded interaction overrides and removal of one explicit row to restore documented defaults, guarded page cloning and metadata/order edits, visual type/role discovery, safe visual formatting inventory and bundle portability, conditional-formatting readback, typed title/static-color formatting and rejected alt-text cleanup, safe visual creation/cloning/deletion, small-visual scaffolding (KPI cards, slicers, reading-guide textboxes), geometry edits, field-well binding replacement, declarative visual TopN guard filters, curated visual object properties, and projection display names.
 - Use `report style inspect/extract/apply/diff` for master-style bundles that combine report themeCollection and per-visual formatting payloads. Review literal text before applying a style bundle with `--allow-literal-text`.
 - Use `report themes show/extract/apply`, `report themes presets list/show`, and `report themes apply-preset` for report-level theme bundles and built-in registered-resource theme presets. Theme copy is not per-visual formatting copy.
 - Run `handoff check <project>` for an offline/dummy project. For a canonical live-source PBIP going to its work network, use `handoff check <project> --target work`; recognized connectors and unknown M explicitly trusted with the table annotation `PowerBICli_SourceKind = ModelDerived` are then accepted, while credentials, caches, binaries, embedded data, and unannotated unknown sources still fail.
@@ -562,6 +566,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportInteractionsShow": "powerbi-cli report interactions show --project <project-dir-or.pbip> --handle <interaction-handle> --json",
             "reportInteractionSetDryRun": "powerbi-cli report interactions set --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --type DataFilter --dry-run --json",
             "reportInteractionDisableDryRun": "powerbi-cli report interactions disable --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json",
+            "reportInteractionResetDryRun": "powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-handle> --source <visual-handle> --target <visual-handle> --dry-run --json",
             "reportThemesShow": "powerbi-cli report themes show --project <project-dir-or.pbip> --json",
             "reportThemesExtract": "powerbi-cli report themes extract --project <source-project-or.pbip> --out theme-bundle.json --json",
             "reportThemesApplyDryRun": "powerbi-cli report themes apply --project <target-project-or.pbip> --bundle theme-bundle.json --dry-run --json",
@@ -569,6 +574,7 @@ pub(crate) fn robot_triage() -> Value {
             "reportThemesApplyPresetDryRun": "powerbi-cli report themes apply-preset --project <target-project-or.pbip> --preset risk-dashboard --dry-run --json",
             "reportVisualsList": "powerbi-cli report visuals list --project <project-dir-or.pbip> --json",
             "reportVisualsCatalog": "powerbi-cli report visuals catalog --json",
+            "reportVisualsFormattingCatalog": "powerbi-cli report visuals catalog --formatting --json",
             "reportVisualFormattingList": "powerbi-cli report visuals formatting list --project <project-dir-or.pbip> --json",
             "reportVisualFormattingShow": "powerbi-cli report visuals formatting show --project <project-dir-or.pbip> --handle <visual-handle> --json",
             "reportVisualFormattingExtract": "powerbi-cli report visuals formatting extract --project <source-project-or.pbip> --handle <source-visual-handle> --out visual-formatting-bundle.json --json",
@@ -1250,14 +1256,19 @@ fn schema_manifest() -> Value {
         "profileFields": ["schema", "dataValues", "source", "source.kind", "source.format", "source.schemaPath", "source.rowsPath", "source.table", "source.rowCount", "source.columnCount", "tables", "tables[].name", "tables[].role", "tables[].rowCount", "tables[].grainConflicts", "tables[].columns", "tables[].columns[].name", "tables[].columns[].dataType", "tables[].columns[].isKey", "tables[].columns[].nullCount", "tables[].columns[].nullRate", "tables[].columns[].distinctCount", "tables[].columns[].min", "tables[].columns[].max", "tables[].columns[].timeCoverage", "tables[].columns[].topValues", "tables[].columns[].topValueCounts", "tables[].columns[].valuesRedacted", "tables[].columns[].typeCoercion", "tables[].columns[].coercionDiagnostics", "tables[].columns[].roles", "relationships", "relationships[].fromTable", "relationships[].fromColumn", "relationships[].toTable", "relationships[].toColumn", "relationships[].fromCardinality", "relationships[].toCardinality", "relationships[].cardinality", "candidates.factTables", "candidates.dimensionTables", "candidates.dateColumns", "candidates.numericColumns", "candidates.categoryColumns", "grainConflicts", "diagnostics", "warnings"],
         "profileSummaryFields": ["schema", "dataValues", "tables", "columns", "tableRoles", "candidateFactTables", "candidateDateColumns", "candidateNumericColumns", "candidateCategoryColumns", "grainConflicts", "diagnostics", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]"],
         "dashboardSpecVersions": ["powerbi-cli.dashboard.v1", "powerbi-cli.dashboard.v2"],
-        "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "layout.rail", "layout.rail.side", "layout.rail.width", "layout.rail.slicers", "layout.rail.slicers[].field", "layout.rail.slicers[].mode", "layout.rail.slicers[].singleSelect", "layout.rail.slicers[].title", "pages[].id", "pages[].displayName", "pages[].size", "pages[].rail", "pages[].slicers", "pages[].slicers[].field", "pages[].slicers[].mode", "pages[].slicers[].singleSelect", "pages[].slicers[].title", "pages[].slicers[].slot", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].text", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field"],
+        "dashboardSpecFields": ["schema", "report.name", "report.displayName", "report.audience", "report.questions", "model.measures", "filters[]", "filters[].target", "filters[].kind", "filters[].values", "filters[].min", "filters[].max", "filters[].relative", "layout.rail", "layout.rail.side", "layout.rail.width", "layout.rail.slicers", "layout.rail.slicers[].field", "layout.rail.slicers[].mode", "layout.rail.slicers[].singleSelect", "layout.rail.slicers[].title", "pages[].id", "pages[].displayName", "pages[].size", "pages[].rail", "pages[].slicers", "pages[].slicers[].field", "pages[].slicers[].mode", "pages[].slicers[].singleSelect", "pages[].slicers[].title", "pages[].slicers[].slot", "pages[].filters[]", "pages[].drillthrough", "pages[].drillthrough.target", "pages[].drillthrough.hidden", "pages[].drillthrough.backButton", "pages[].visuals", "pages[].visuals[].type", "pages[].visuals[].text", "pages[].visuals[].mode", "pages[].visuals[].singleSelect", "pages[].visuals[].bindings", "pages[].visuals[].bindings[].field", "pages[].visuals[].filters[]"],
         "intentVersions": ["intent.v1"],
         "intentFields": ["schema", "audience", "questions[]", "kpis[].name", "kpis[].measure", "kpis[].target", "comparisons[]", "periods[]", "drillPaths[]", "alerts[].measure", "alerts[].op", "alerts[].threshold", "alerts[].semantic", "filterDimensions[]", "preferredArchetypes[]", "pageFlow[]", "handoff.target", "handoff.sourceKinds[]"],
         "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
+        "plannerRuleCatalog": planner_rule_catalog_json().unwrap_or_else(|error| json!({
+            "schema": crate::planner_rules::PLANNER_RULES_SCHEMA,
+            "error": error.message
+        })),
+        "plannerRuleIds": planner_rule_ids().unwrap_or_default(),
         "reportSpecValidateFields": ["ok", "exitCode", "validationLevel", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "warnings", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "errors[].field", "errors[].reason", "errors[].candidatesCommand", "errors[].example", "next"],
         "reportSpecUpgradeFields": ["ok", "exitCode", "changed", "dryRun", "specPath", "outPath", "sourceVersion", "targetVersion", "transformed", "transformedPointers", "changes", "spec", "next"],
         "reportSpecFieldsInventoryFields": ["ok", "exitCode", "supportedSpecVersions", "allowedFields[].node", "allowedFields[].fields", "versionedAllowedFields[].schema", "versionedAllowedFields[].allowedFields", "supportedVisualTypes", "tables[].name", "tables[].profileRole", "tables[].rowCount", "tables[].columns[].reference", "tables[].columns[].roles", "tables[].columns[].structuredBinding", "tables[].measures[].reference", "tables[].measures[].structuredBinding", "fields[].reference", "examples", "next"],
-        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "profileSummary", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "profileSummary.shape.dimensions[]", "profileSummary.shape.dateTables[]", "profileSummary.shape.keyCandidates[]", "profileSummary.shape.highCardinality[]", "executedPrimitives", "operations", "operations[].kind", "operations[].handle", "operations[].visualType", "operations[].mode", "operations[].singleSelect", "operations[].position", "warnings", "warnings[].code", "warnings[].feature", "warnings[].field", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+        "reportBuildFields": ["ok", "changed", "dryRun", "projectDir", "inputs", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "profileSummary", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "profileSummary.shape.dimensions[]", "profileSummary.shape.dateTables[]", "profileSummary.shape.keyCandidates[]", "profileSummary.shape.highCardinality[]", "executedPrimitives", "operations", "operations[].op", "operations[].handle", "operations[].visualType", "operations[].mode", "operations[].singleSelect", "operations[].position", "warnings", "warnings[].code", "warnings[].message", "warnings[].feature", "warnings[].field", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
         "modelColumnSortByMutationFields": ["ok", "exitCode", "dryRun", "mode", "projectModified", "target.handle", "target.table", "target.column", "target.sortByColumn", "target.previousSortByColumn", "changes", "validation", "readbackCommand", "inspectCommand", "validateCommand"],
         "lintRuleFields": ["id", "family", "severity", "summary", "remediation", "sanitizeAction", "since"],
         "lintFindingFields": ["code", "severity", "message", "handle", "path", "hint", "stepKind"],
@@ -1299,6 +1310,7 @@ fn schema_manifest() -> Value {
         "reportInteractionSourceTargetFields": ["found", "handle", "name", "title", "visualType", "path"],
         "reportInteractionSemanticsFields": ["mode", "missingRowsMean", "supportedTypes"],
         "reportInteractionMutationFields": ["dryRun", "mode", "target", "interactionPlan.before", "interactionPlan.after", "interactionPlan.existed", "interactionPlan.changed", "changes[].kind", "changes[].action", "changes[].path", "changes[].jsonPointer", "changes[].before", "changes[].after", "readbackCommand", "pageReadbackCommand", "sourceVisualReadbackCommand", "targetVisualReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
+        "reportInteractionResetMutationFields": ["dryRun", "mode", "action", "target.page", "target.source", "target.target", "target.interactionType", "target.rowPresent", "target.defaulted", "interactionPlan.before", "interactionPlan.after", "interactionPlan.existed", "interactionPlan.changed", "interactionPlan.defaulted", "interactionPlan.semantics", "resetSemantics", "changes[].kind", "changes[].action", "changes[].path", "changes[].jsonPointer", "changes[].before", "changes[].after", "readbackCommand", "pageReadbackCommand", "sourceVisualReadbackCommand", "targetVisualReadbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportDesignPlanFields": ["profile", "candidates.dateColumns", "candidates.categoryColumns", "candidates.numericColumns", "candidates.measures", "opportunities[].kind", "opportunities[].command", "recommendedWorkflow"],
         "reportObjectFields": ["handle", "kind", "name", "title", "visualType", "parentHandle", "path", "jsonPointer", "safety", "raw"],
         "reportObjectTreeFields": ["ok", "projectDir", "counts", "tree.handle", "tree.kind", "tree.children", "objects[].handle", "objects[].kind", "objects[].parentHandle", "objects[].path", "next"],
@@ -1308,6 +1320,7 @@ fn schema_manifest() -> Value {
         "reportAuditFields": ["ok", "profile", "counts.findings", "counts.bySeverity", "findings[].ruleId", "findings[].severity", "findings[].handle", "findings[].message", "recommendedActions", "unsupportedActions", "next"],
         "reportSanitizePlanFields": ["ok", "profile", "planFingerprint", "confirmToken", "actions[].kind", "actions[].handles", "actions[].applySupported", "actions[].blockedReason", "actions[].jsonPointers", "next"],
         "reportSanitizeApplyFields": ["ok", "dryRun", "mode", "planFingerprint", "actions[].kind", "actions[].handles", "changes[].path", "changes[].jsonPointer", "postAudit", "validateCommand", "readbackCommand", "next"],
+        "reportWireframeFields": ["ok", "format", "dryRun", "mode", "projectDir", "template", "grid", "geometrySource", "gridSource", "counts", "handles", "pages[].slots[]", "pages[].visuals[]", "pages[].lintMarkers[]", "artifacts[]", "warnings", "errors", "next"],
         "reportLayoutAutoMutationFields": ["dryRun", "mode", "layoutPlan.template", "layoutPlan.grid", "layoutPlan.pages", "layoutPlan.changedVisuals", "preview.pages[].template", "preview.pages[].slots[]", "preview.pages[].assignments[]", "preview.pages[].invariants", "warnings[].code", "changes[].path", "changes[].visual", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportDrilldownHierarchyMutationFields": ["dryRun", "mode", "target.handle", "hierarchyPlan.fields", "hierarchyPlan.before", "hierarchyPlan.after", "changes[].jsonPointer", "changes[].before", "changes[].after", "readbackCommand", "wireframeCommand", "inspectCommand", "validateCommand"],
         "reportThemeFields": ["handle", "state", "name", "fingerprint", "reportJsonPath", "themeCollection", "registeredThemes", "safety"],
@@ -1316,6 +1329,7 @@ fn schema_manifest() -> Value {
         "visualFields": ["name", "visualType", "title", "mode", "bindings", "x", "y", "z", "width", "height", "tabOrder"],
         "visualBindingFields": ["role", "table", "column", "measure", "displayName", "formatString", "sortDirection"],
         "visualCatalogFields": ["supportedVisualTypes", "visualTypes[].visualType", "visualTypes[].aliases", "visualTypes[].proofLevel", "visualTypes[].roles", "rules[].required", "rules[].optional", "rules[].measureOnly", "rules[].maxProjections", "rules[].mutuallyExclusive", "rules[].runtimeParity", "rules[].proofLevel", "rules[].fixtureKind", "rules[].evidence", "templateOnlyVisualTypes", "plannedVisualTypes", "next"],
+        "visualFormattingCatalogFields": ["schema", "catalogSchema", "source", "entryCount", "entries[].object", "entries[].property", "entries[].encoding", "entries[].visualTypes", "entries[].container", "entries[].reference", "notes", "next"],
         "visualFormattingFields": ["rawIncluded", "formatObjectContainerCount", "formatCardCount", "formatPropertyCount", "unsupportedContainerCount", "literalValueCount", "sources", "objectNames", "containers", "safety"],
         "visualFormattingContainerFields": ["source", "objectName", "shape", "unsupportedShape", "cardCount", "propertyCount", "selectorCount", "literalValueCount", "propertyNames", "cards", "raw"],
         "visualFormattingBundleFields": ["schema", "bundleVersion", "sourceFingerprint", "source.visual", "formatting.visualObjects", "formatting.topLevelObjects", "summary", "safety"],
@@ -1411,6 +1425,40 @@ fn schema_manifest() -> Value {
         "shape.hypotheses[]",
         "shape.relationships[]",
         "spec",
+        "specV2",
+        "planner.schema",
+        "planner.version",
+        "planner.rules[]",
+        "planner.rules[].ruleId",
+        "planner.rules[].score",
+        "planner.rules[].summary",
+        "planner.rules[].evidence[]",
+        "planner.rules[].proposal",
+        "planner.proposals[]",
+        "planner.proposals[].kind",
+        "planner.proposals[].ruleId",
+        "planner.proposals[].ruleIds[]",
+        "planner.proposals[].score",
+        "planner.proposals[].archetype",
+        "planner.proposals[].template",
+        "planner.proposals[].visualFamily",
+        "planner.proposals[].bindings[]",
+        "planner.proposals[].bindings[].role",
+        "planner.proposals[].bindings[].field",
+        "planner.proposals[].bindings[].fields[]",
+        "planner.proposals[].bindings[].source",
+        "planner.proposals[].evidence[]",
+        "planner.proposals[].priority",
+        "planner.proposals[].sizeClass",
+        "planner.proposals[].semanticColor",
+        "planner.proposals[].page",
+        "ruleExplanations[]",
+        "ruleExplanations[].ruleId",
+        "ruleExplanations[].score",
+        "ruleExplanations[].summary",
+        "ruleExplanations[].evidence[]",
+        "ruleExplanations[].proposal",
+        "explainRules",
         "compiled.counts",
         "compiled.defaultsApplied",
         "defaultsApplied",
@@ -1598,7 +1646,8 @@ fn response_shapes() -> Value {
         "reportBuild": {
             "schema": "powerbi-cli.report.build.v1",
             "trace": "Optional top-level trace[] appears only when report build receives --trace; legacy paths use deterministic zero-millisecond planning buckets.",
-            "changes": "Flat aggregation of operation changes; dry-run describes planned before/after states without writing files.",
+            "changes": "Flat aggregation of operation changes; typed filter builds include concrete AddFilter kernel changes and dry-run describes planned before/after states without writing files.",
+            "operationOutcomes": "Out-dir builds that compile typed operations expose one kernel outcome per operation, including changed, changes, readback, warnings, and createdHandles.",
             "readback": "Object keyed by stable handles (report:, page:, visual:, table:, measure:) whose values are executable command arrays.",
             "scope": "The report-build mode, project target, operation count, and stable handles covered by the response.",
             "compiledOps": "compiled.ops is the count of operation summaries that the response adapter will replace with OpPlan outcomes."
@@ -1607,12 +1656,20 @@ fn response_shapes() -> Value {
             "schema": "triageResult.v1",
             "scorecard": "The embedded scorecard uses scorecard.v1 and the same projection as report build for the inspected project."
         },
+        "visualFormattingCatalog": {
+            "schema": "powerbi-cli.report.visuals.formattingCatalog.v1",
+            "catalogSchema": "powerbi-cli.formatting-catalog.v1",
+            "transport": "stdout",
+            "requiredFields": ["schema", "catalogSchema", "source", "entryCount", "entries", "notes", "next"],
+            "entryFields": ["object", "property", "encoding", "visualTypes", "container", "reference"],
+            "determinism": "Entries are embedded at build time, validated with deny_unknown_fields, duplicate-key checks, and stable source order."
+        },
         "ops.v1": {
             "schema": "powerbi-cli.ops.v1",
             "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
             "requiredFields": ["schema", "ops"],
             "operationTag": "op",
-            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "applyThemePreset", "setObject"],
+            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "resetInteraction", "applyThemePreset", "setObject", "setPosition"],
             "validation": ["dangling handles must resolve in the project or an earlier declaration", "declared handles are unique", "identical operations are rejected", "model, page, visual, behavior, and style stages are ordered"],
             "validatedPlanFields": ["ops[].index", "ops[].stage", "ops[].operation", "stages[].stage", "stages[].name", "stages[].operations"],
             "transactionModes": ["dry-run", "out-dir", "in-place with sibling snapshot"],

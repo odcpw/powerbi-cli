@@ -135,8 +135,12 @@ policies can wait until the object-specific writers and fixtures exist.
   validation also checks the visual catalog before writing files. `report spec
   fields` publishes the same versioned allowed-key
   tables. `powerbi-cli.dashboard.v2` is accepted as a strict superset of v1;
-  its not-yet-compiled sections return `unsupported_feature` with their owning
-  T3 bead id.
+  root/page/visual `filters[]` compile through the typed AddFilter kernel with
+  model/type checks, and page `drillthrough` blocks compile through
+  SetDrillthrough with target-column validation and a hidden-by-default page;
+  `backButton:true` reports the pending action-button bead without emitting a
+  guessed visual. Remaining not-yet-compiled sections return
+  `unsupported_feature` with their owning T3 bead id.
 - `report spec schema` emits a draft 2020-12 JSON Schema for both strict
   dashboard-spec versions, while `report spec explain` previews the typed
   staged operation plan, handles, layout/defaults, unsupported sections, and
@@ -174,10 +178,10 @@ policies can wait until the object-specific writers and fixtures exist.
   Category/Y charts with two or more resolved model columns.
 - `report visuals format`: set title, labels, legend, colors, display units,
   sort, and interactions.
-- `report filters list/show/add/delete/clear` (`list/show/add/delete/clear`
-  implemented first as raw readback, categorical authoring, exact-handle
-  deletion, and owner-scoped clear with data-value safety warnings;
-  advanced/range/TopN filters, update, and sort remain planned)
+- `report filters list/show/add/update/delete/clear` (raw readback,
+  categorical/numeric-range/relative-date authoring, visual TopN, type-preserving
+  updates, exact-handle deletion, and owner-scoped clear with data-value safety
+  warnings)
 - `report slicers list/show/clear/add/update` (`list/show/clear` implemented
   first as slicer visual readback plus guarded persisted-selection clear with
   data-value safety warnings; add/update/richer state authoring remain planned)
@@ -185,8 +189,10 @@ policies can wait until the object-specific writers and fixtures exist.
   (`list/show` plus metadata-only display-name edits, flat reorder, and guarded
   delete are implemented; captured-state create/update and grouped reorder
   remain planned)
-- `report interactions list/show/set/disable` (`list/show` and first guarded
-  set/disable slice implemented; Default/reset semantics remain planned)
+- `report interactions list/show/set/disable/reset` (`list/show` and guarded
+  set/disable/reset slices implemented; reset removes one explicit
+  `visualInteractions` row and documents that absence restores the target
+  visual's default interaction behavior)
 - `report themes show/extract/apply/presets/apply-preset`
 - `report style inspect/extract/diff/apply`
 - `report visuals formatting conditional-formatting list/show/add/update/delete`
@@ -261,7 +267,8 @@ validation, proof, then mutation breadth.
   partitions, pages, visuals, bindings, filters, themes, proof state, and
   offline hazards.
 - Return stable handles from every inspected object.
-- Add `report wireframe export` as JSON first, HTML/SVG later if useful.
+- Add `report wireframe export` as deterministic JSON plus offline HTML/SVG
+  previews with grid slots, visual geometry, and lint markers.
 - Add `diff` over normalized `inspect --deep` summaries early; semantic diffs
   are how agents verify mutations.
 
@@ -363,6 +370,9 @@ validation, proof, then mutation breadth.
 - Implemented visual catalog and first visual creation slices:
   `report visuals catalog` exposes generated visual types, aliases, binding
   roles, template-only visual types, and planned visual families.
+  `report visuals catalog --formatting` additionally exposes the strict,
+  embedded eleven-entry formatting catalog consumed by `set-object`, including
+  PBIR containers, encoding, wildcard visual scope, and dated evidence.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
   columnChart, lineClusteredColumnComboChart, and scatterChart containers from
@@ -467,17 +477,21 @@ frozen until proven.
   passes them to shared M generator functions, so the same seed is
   byte-deterministic while multiple scales reproduce Desktop refresh cost
   without live data or credentials.
-- Implemented first filter slice: `report filters list/show` inventories raw
-  report/page/visual PBIR filter containers, returns stable filter handles, and
-  warns when filter metadata may contain selected semantic-model values.
-- Implemented guarded filter add, deletion, and clear slices: `report filters
-  add` writes one categorical filter to report/page/visual
-  `/filterConfig/filters` after TMDL column validation; `report filters delete`
-  removes one explicit report/page/visual filter by stable handle; `report
-  filters clear` removes filters by exact filter handle, report scope, one page
-  owner, one visual owner, or explicit `--all`. Mutations require `--dry-run`,
-  `--out-dir`, or guarded `--in-place`; broader advanced/range/TopN filters,
-  update/sort, and expression-level edits remain fixture-gated.
+- Implemented filter authoring and compiler parity: `report filters
+  list/show/add/update/delete/clear` inventories raw report/page/visual PBIR
+  filter containers, writes categorical, numeric-range, relative-date, and
+  visual TopN shapes after TMDL validation, and returns stable handles with
+  data-value safety warnings. Dashboard v2 root/page/visual `filters[]` use
+  the same typed AddFilter kernel during `report build`; spec builds and the
+  equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
+  `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
+  type-changing updates remain fixture-gated.
+- Implemented dashboard-spec drillthrough compiler parity: v2
+  `pages[].drillthrough` uses the SetDrillthrough kernel, validates a model
+  column target, defaults pages to hidden, and matches the two regional-sales
+  CLI drillthrough mutations byte-for-byte. `backButton:true` emits a
+  `spec.feature_pending` warning for `pbi-t4-pbir-catalog-expansion-sn2.8`
+  until the proven action-button kernel lands.
 - Implemented first bookmark slice: `report bookmarks list/show` inventories
   raw PBIR bookmark files plus bookmark order/group metadata, returns stable
   bookmark handles, and warns when captured bookmark state may contain selected
@@ -500,7 +514,10 @@ frozen until proven.
   set/disable` upserts explicit `visualInteractions` rows for live source/target
   visual pairs with `--dry-run`, `--out-dir`, or `--in-place`, refuses duplicate
   rows and stale endpoints, returns readback/wireframe/inspect/validate
-  commands, and leaves `Default`/reset behavior fixture-gated.
+  commands. `report interactions reset` removes one matching explicit row with
+  the same guarded output modes and returns a deterministic readback explaining
+  that the absent row restores the target visual's default behavior. The local
+  proof level is `unit-smoke`; Desktop canvas confirmation remains open.
 - Implemented typed formatting mutation slices: `report visuals formatting
   set-text` patches title text/visibility and clears rejected alt-text metadata,
   while `set-color` patches static literal
@@ -515,7 +532,10 @@ frozen until proven.
   and SVG-free JSON previews with overlap/minimum-size invariants while
   rewriting only visual `position` blocks; standard and wide page-size presets
   plus explicit grid overrides are supported, and legacy `--preset` values map
-  to the corresponding named templates. `report drilldown set-hierarchy`
+  to the corresponding named templates. The aliases replace the former fixed
+  two-column coordinates when a template reserves heading, rail, KPI, chart, or
+  detail slots; the named-template goldens record those intentional layout
+  improvements. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
 
@@ -530,17 +550,19 @@ frozen until proven.
 - Add bookmark captured-state create/update and grouped reorder validation
   against pages and visuals on top of the implemented readback and metadata
   mutation handles.
-- Add visual interaction reset/default controls and Desktop-authored
-  round-trip fixtures on top of the implemented set/disable handles.
+- Keep the implemented visual interaction reset/default control aligned with
+  Desktop-authored round-trip fixtures and promote its proof level when a
+  Windows canvas check confirms that removing a row restores the default.
 - Build on the implemented same-report `report drillthrough set/show/clear`
-  linked `pageBinding` + Drillthrough filter slice with Desktop re-verification,
+  linked `pageBinding` + Drillthrough filter slice and declarative v2 compiler
+  with Desktop re-verification,
   then add Desktop-authored goldens for visual drillthrough action links,
   multi-field drillthrough, and cross-report drillthrough.
 - Build on the implemented `report drilldown set-hierarchy` slice with
   Desktop-authored goldens for chart-family coverage and transient UI
   expand/collapse state. Keep tooltip pages, bookmark captured-state mutation,
-  slicer authoring/sync, interaction reset/default semantics, non-catalog visual
-  generation, and conditional-formatting authoring behind
+  slicer authoring/sync, non-catalog visual generation, and conditional-formatting
+  authoring behind
   `unsupported_feature` until Desktop-authored goldens exist.
 
 ### Phase 8: Agent Batch Operations
@@ -627,6 +649,10 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.
+- [x] Planner v2 shape-aware rule catalog (`planner-rules.v1`) now evaluates
+  deterministic scored visual/page proposals with evidence and emits a
+  slot/template/style `specV2` candidate while preserving the build-compatible
+  dashboard.v1 plan output.
 
 Remaining work—such as `report compose`, full v2 compilation, design lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—

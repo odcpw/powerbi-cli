@@ -990,6 +990,6 @@
     }
   ],
   "schema": "powerbi-cli.report.spec.explain.v1",
-  "specVersion": "powerbi-cli.dashboard.v1",
+  "specVersion": "powerbi-cli.dashboard.v2",
   "unsupportedSections": []
 }

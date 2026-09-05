@@ -1,0 +1,868 @@
+{
+  "artifacts": [
+    {
+      "bytes": 10392,
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-labelledby=\"wireframe-ReportSectionOverview-title\" width=\"1280.00\" height=\"720.00\" viewBox=\"0 0 1280.00 720.00\">\n  <title id=\"wireframe-ReportSectionOverview-title\">Overview</title>\n  <style>\n    .canvas{fill:#ffffff;stroke:#cbd5e1;stroke-width:1}.grid{stroke:#dbe4ef;stroke-width:1;stroke-dasharray:2 4}.slot{fill:#f8fafc;stroke:#94a3b8;stroke-width:1;stroke-dasharray:6 3}.slot-label{fill:#64748b;font:10px sans-serif}.visual{fill:#e0f2fe;fill-opacity:.72;stroke:#0369a1;stroke-width:2}.visual-label{fill:#0c4a6e;font:bold 12px sans-serif}.visual-binding{fill:#164e63;font:10px sans-serif}.lint-marker{fill:#dc2626;stroke:#ffffff;stroke-width:1}.lint-label{fill:#991b1b;font:bold 9px sans-serif}.lint-marker.warning{fill:#d97706}.lint-label.warning{fill:#92400e}\n  </style>\n  <rect class=\"canvas\" x=\"0.00\" y=\"0.00\" width=\"1280.00\" height=\"720.00\"/>\n  <g class=\"grid\" data-template=\"overview\">\n    <line x1=\"24.00\" y1=\"0.00\" x2=\"24.00\" y2=\"720.00\"/>\n    <line x1=\"128.00\" y1=\"0.00\" x2=\"128.00\" y2=\"720.00\"/>\n    <line x1=\"232.00\" y1=\"0.00\" x2=\"232.00\" y2=\"720.00\"/>\n    <line x1=\"336.00\" y1=\"0.00\" x2=\"336.00\" y2=\"720.00\"/>\n    <line x1=\"440.00\" y1=\"0.00\" x2=\"440.00\" y2=\"720.00\"/>\n    <line x1=\"544.00\" y1=\"0.00\" x2=\"544.00\" y2=\"720.00\"/>\n    <line x1=\"648.00\" y1=\"0.00\" x2=\"648.00\" y2=\"720.00\"/>\n    <line x1=\"752.00\" y1=\"0.00\" x2=\"752.00\" y2=\"720.00\"/>\n    <line x1=\"856.00\" y1=\"0.00\" x2=\"856.00\" y2=\"720.00\"/>\n    <line x1=\"960.00\" y1=\"0.00\" x2=\"960.00\" y2=\"720.00\"/>\n    <line x1=\"1064.00\" y1=\"0.00\" x2=\"1064.00\" y2=\"720.00\"/>\n    <line x1=\"1168.00\" y1=\"0.00\" x2=\"1168.00\" y2=\"720.00\"/>\n    <line x1=\"1256.00\" y1=\"0.00\" x2=\"1256.00\" y2=\"720.00\"/>\n    <line x1=\"0.00\" y1=\"24.00\" x2=\"1280.00\" y2=\"24.00\"/>\n    <line x1=\"0.00\" y1=\"32.00\" x2=\"1280.00\" y2=\"32.00\"/>\n    <line x1=\"0.00\" y1=\"40.00\" x2=\"1280.00\" y2=\"40.00\"/>\n    <line x1=\"0.00\" y1=\"48.00\" x2=\"1280.00\" y2=\"48.00\"/>\n    <line x1=\"0.00\" y1=\"56.00\" x2=\"1280.00\" y2=\"56.00\"/>\n    <line x1=\"0.00\" y1=\"64.00\" x2=\"1280.00\" y2=\"64.00\"/>\n    <line x1=\"0.00\" y1=\"72.00\" x2=\"1280.00\" y2=\"72.00\"/>\n    <line x1=\"0.00\" y1=\"80.00\" x2=\"1280.00\" y2=\"80.00\"/>\n    <line x1=\"0.00\" y1=\"88.00\" x2=\"1280.00\" y2=\"88.00\"/>\n    <line x1=\"0.00\" y1=\"96.00\" x2=\"1280.00\" y2=\"96.00\"/>\n    <line x1=\"0.00\" y1=\"104.00\" x2=\"1280.00\" y2=\"104.00\"/>\n    <line x1=\"0.00\" y1=\"112.00\" x2=\"1280.00\" y2=\"112.00\"/>\n    <line x1=\"0.00\" y1=\"120.00\" x2=\"1280.00\" y2=\"120.00\"/>\n    <line x1=\"0.00\" y1=\"128.00\" x2=\"1280.00\" y2=\"128.00\"/>\n    <line x1=\"0.00\" y1=\"136.00\" x2=\"1280.00\" y2=\"136.00\"/>\n    <line x1=\"0.00\" y1=\"144.00\" x2=\"1280.00\" y2=\"144.00\"/>\n    <line x1=\"0.00\" y1=\"152.00\" x2=\"1280.00\" y2=\"152.00\"/>\n    <line x1=\"0.00\" y1=\"160.00\" x2=\"1280.00\" y2=\"160.00\"/>\n    <line x1=\"0.00\" y1=\"168.00\" x2=\"1280.00\" y2=\"168.00\"/>\n    <line x1=\"0.00\" y1=\"176.00\" x2=\"1280.00\" y2=\"176.00\"/>\n    <line x1=\"0.00\" y1=\"184.00\" x2=\"1280.00\" y2=\"184.00\"/>\n    <line x1=\"0.00\" y1=\"192.00\" x2=\"1280.00\" y2=\"192.00\"/>\n    <line x1=\"0.00\" y1=\"200.00\" x2=\"1280.00\" y2=\"200.00\"/>\n    <line x1=\"0.00\" y1=\"208.00\" x2=\"1280.00\" y2=\"208.00\"/>\n    <line x1=\"0.00\" y1=\"216.00\" x2=\"1280.00\" y2=\"216.00\"/>\n    <line x1=\"0.00\" y1=\"224.00\" x2=\"1280.00\" y2=\"224.00\"/>\n    <line x1=\"0.00\" y1=\"232.00\" x2=\"1280.00\" y2=\"232.00\"/>\n    <line x1=\"0.00\" y1=\"240.00\" x2=\"1280.00\" y2=\"240.00\"/>\n    <line x1=\"0.00\" y1=\"248.00\" x2=\"1280.00\" y2=\"248.00\"/>\n    <line x1=\"0.00\" y1=\"256.00\" x2=\"1280.00\" y2=\"256.00\"/>\n    <line x1=\"0.00\" y1=\"264.00\" x2=\"1280.00\" y2=\"264.00\"/>\n    <line x1=\"0.00\" y1=\"272.00\" x2=\"1280.00\" y2=\"272.00\"/>\n    <line x1=\"0.00\" y1=\"280.00\" x2=\"1280.00\" y2=\"280.00\"/>\n    <line x1=\"0.00\" y1=\"288.00\" x2=\"1280.00\" y2=\"288.00\"/>\n    <line x1=\"0.00\" y1=\"296.00\" x2=\"1280.00\" y2=\"296.00\"/>\n    <line x1=\"0.00\" y1=\"304.00\" x2=\"1280.00\" y2=\"304.00\"/>\n    <line x1=\"0.00\" y1=\"312.00\" x2=\"1280.00\" y2=\"312.00\"/>\n    <line x1=\"0.00\" y1=\"320.00\" x2=\"1280.00\" y2=\"320.00\"/>\n    <line x1=\"0.00\" y1=\"328.00\" x2=\"1280.00\" y2=\"328.00\"/>\n    <line x1=\"0.00\" y1=\"336.00\" x2=\"1280.00\" y2=\"336.00\"/>\n    <line x1=\"0.00\" y1=\"344.00\" x2=\"1280.00\" y2=\"344.00\"/>\n    <line x1=\"0.00\" y1=\"352.00\" x2=\"1280.00\" y2=\"352.00\"/>\n    <line x1=\"0.00\" y1=\"360.00\" x2=\"1280.00\" y2=\"360.00\"/>\n    <line x1=\"0.00\" y1=\"368.00\" x2=\"1280.00\" y2=\"368.00\"/>\n    <line x1=\"0.00\" y1=\"376.00\" x2=\"1280.00\" y2=\"376.00\"/>\n    <line x1=\"0.00\" y1=\"384.00\" x2=\"1280.00\" y2=\"384.00\"/>\n    <line x1=\"0.00\" y1=\"392.00\" x2=\"1280.00\" y2=\"392.00\"/>\n    <line x1=\"0.00\" y1=\"400.00\" x2=\"1280.00\" y2=\"400.00\"/>\n    <line x1=\"0.00\" y1=\"408.00\" x2=\"1280.00\" y2=\"408.00\"/>\n    <line x1=\"0.00\" y1=\"416.00\" x2=\"1280.00\" y2=\"416.00\"/>\n    <line x1=\"0.00\" y1=\"424.00\" x2=\"1280.00\" y2=\"424.00\"/>\n    <line x1=\"0.00\" y1=\"432.00\" x2=\"1280.00\" y2=\"432.00\"/>\n    <line x1=\"0.00\" y1=\"440.00\" x2=\"1280.00\" y2=\"440.00\"/>\n    <line x1=\"0.00\" y1=\"448.00\" x2=\"1280.00\" y2=\"448.00\"/>\n    <line x1=\"0.00\" y1=\"456.00\" x2=\"1280.00\" y2=\"456.00\"/>\n    <line x1=\"0.00\" y1=\"464.00\" x2=\"1280.00\" y2=\"464.00\"/>\n    <line x1=\"0.00\" y1=\"472.00\" x2=\"1280.00\" y2=\"472.00\"/>\n    <line x1=\"0.00\" y1=\"480.00\" x2=\"1280.00\" y2=\"480.00\"/>\n    <line x1=\"0.00\" y1=\"488.00\" x2=\"1280.00\" y2=\"488.00\"/>\n    <line x1=\"0.00\" y1=\"496.00\" x2=\"1280.00\" y2=\"496.00\"/>\n    <line x1=\"0.00\" y1=\"504.00\" x2=\"1280.00\" y2=\"504.00\"/>\n    <line x1=\"0.00\" y1=\"512.00\" x2=\"1280.00\" y2=\"512.00\"/>\n    <line x1=\"0.00\" y1=\"520.00\" x2=\"1280.00\" y2=\"520.00\"/>\n    <line x1=\"0.00\" y1=\"528.00\" x2=\"1280.00\" y2=\"528.00\"/>\n    <line x1=\"0.00\" y1=\"536.00\" x2=\"1280.00\" y2=\"536.00\"/>\n    <line x1=\"0.00\" y1=\"544.00\" x2=\"1280.00\" y2=\"544.00\"/>\n    <line x1=\"0.00\" y1=\"552.00\" x2=\"1280.00\" y2=\"552.00\"/>\n    <line x1=\"0.00\" y1=\"560.00\" x2=\"1280.00\" y2=\"560.00\"/>\n    <line x1=\"0.00\" y1=\"568.00\" x2=\"1280.00\" y2=\"568.00\"/>\n    <line x1=\"0.00\" y1=\"576.00\" x2=\"1280.00\" y2=\"576.00\"/>\n    <line x1=\"0.00\" y1=\"584.00\" x2=\"1280.00\" y2=\"584.00\"/>\n    <line x1=\"0.00\" y1=\"592.00\" x2=\"1280.00\" y2=\"592.00\"/>\n    <line x1=\"0.00\" y1=\"600.00\" x2=\"1280.00\" y2=\"600.00\"/>\n    <line x1=\"0.00\" y1=\"608.00\" x2=\"1280.00\" y2=\"608.00\"/>\n    <line x1=\"0.00\" y1=\"616.00\" x2=\"1280.00\" y2=\"616.00\"/>\n    <line x1=\"0.00\" y1=\"624.00\" x2=\"1280.00\" y2=\"624.00\"/>\n    <line x1=\"0.00\" y1=\"632.00\" x2=\"1280.00\" y2=\"632.00\"/>\n    <line x1=\"0.00\" y1=\"640.00\" x2=\"1280.00\" y2=\"640.00\"/>\n    <line x1=\"0.00\" y1=\"648.00\" x2=\"1280.00\" y2=\"648.00\"/>\n    <line x1=\"0.00\" y1=\"656.00\" x2=\"1280.00\" y2=\"656.00\"/>\n    <line x1=\"0.00\" y1=\"664.00\" x2=\"1280.00\" y2=\"664.00\"/>\n    <line x1=\"0.00\" y1=\"672.00\" x2=\"1280.00\" y2=\"672.00\"/>\n    <line x1=\"0.00\" y1=\"680.00\" x2=\"1280.00\" y2=\"680.00\"/>\n  </g>\n  <g class=\"slots\">\n    <g class=\"slot\" data-slot=\"heading\" data-col-span=\"10\" data-row-span=\"7\"><rect x=\"232.00\" y=\"24.00\" width=\"1024.00\" height=\"56.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"37.00\">heading (10x7)</text></g>\n    <g class=\"slot\" data-slot=\"rail\" data-col-span=\"2\" data-row-span=\"75\"><rect x=\"24.00\" y=\"80.00\" width=\"192.00\" height=\"600.00\"/><text class=\"slot-label\" x=\"28.00\" y=\"93.00\">rail (2x75)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.1\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"232.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"109.00\">kpi.1 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.2\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"440.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"444.00\" y=\"109.00\">kpi.2 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.3\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"648.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"652.00\" y=\"109.00\">kpi.3 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.4\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"856.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"860.00\" y=\"109.00\">kpi.4 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"primary\" data-col-span=\"5\" data-row-span=\"30\"><rect x=\"232.00\" y=\"208.00\" width=\"504.00\" height=\"240.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"221.00\">primary (5x30)</text></g>\n    <g class=\"slot\" data-slot=\"secondary\" data-col-span=\"5\" data-row-span=\"30\"><rect x=\"752.00\" y=\"208.00\" width=\"504.00\" height=\"240.00\"/><text class=\"slot-label\" x=\"756.00\" y=\"221.00\">secondary (5x30)</text></g>\n    <g class=\"slot\" data-slot=\"detail\" data-col-span=\"10\" data-row-span=\"27\"><rect x=\"232.00\" y=\"464.00\" width=\"1024.00\" height=\"216.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"477.00\">detail (10x27)</text></g>\n  </g>\n  <g class=\"visuals\">\n    <g class=\"visual\" data-handle=\"visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer\" data-visual-type=\"slicer\"><rect x=\"664.00\" y=\"184.00\" width=\"280.00\" height=\"240.00\"/><text class=\"visual-label\" x=\"670.00\" y=\"201.00\">slicer — Größenklasse</text><text class=\"visual-binding\" x=\"670.00\" y=\"215.00\">Values: DimCustomer.Größenklasse</text></g>\n    <g class=\"visual\" data-handle=\"visual:ReportSectionOverview:VisualContainerRevenueByYearLine\" data-visual-type=\"lineChart\"><rect x=\"32.00\" y=\"184.00\" width=\"600.00\" height=\"320.00\"/><text class=\"visual-label\" x=\"38.00\" y=\"201.00\">lineChart — Revenue by Year</text><text class=\"visual-binding\" x=\"38.00\" y=\"215.00\">Category: FactSales.Year · Y: FactSales.Total Revenue</text></g>\n    <g class=\"visual\" data-handle=\"visual:ReportSectionOverview:VisualContainerTotalRevenueCard\" data-visual-type=\"card\"><rect x=\"32.00\" y=\"32.00\" width=\"220.00\" height=\"120.00\"/><text class=\"visual-label\" x=\"38.00\" y=\"49.00\">card — Total Revenue</text><text class=\"visual-binding\" x=\"38.00\" y=\"63.00\">Values: FactSales.Total Revenue</text></g>\n    <g class=\"visual\" data-handle=\"visual:ReportSectionOverview:VisualContainerTotalUnitsCard\" data-visual-type=\"card\"><rect x=\"276.00\" y=\"32.00\" width=\"220.00\" height=\"120.00\"/><text class=\"visual-label\" x=\"282.00\" y=\"49.00\">card — Total Units</text><text class=\"visual-binding\" x=\"282.00\" y=\"63.00\">Values: FactSales.Total Units</text></g>\n    <g class=\"visual\" data-handle=\"visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard\" data-visual-type=\"card\"><rect x=\"520.00\" y=\"32.00\" width=\"220.00\" height=\"120.00\"/><text class=\"visual-label\" x=\"526.00\" y=\"49.00\">card — Umsatz Übersicht</text><text class=\"visual-binding\" x=\"526.00\" y=\"63.00\">Values: FactSales.Umsatz Übersicht</text></g>\n  </g>\n  <g class=\"lint-markers\">\n  </g>\n</svg>\n",
+      "fileName": "ReportSectionOverview.svg",
+      "kind": "svg",
+      "page": "page:ReportSectionOverview"
+    },
+    {
+      "bytes": 9350,
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-labelledby=\"wireframe-ReportSectionCustomerDetail-title\" width=\"1280.00\" height=\"720.00\" viewBox=\"0 0 1280.00 720.00\">\n  <title id=\"wireframe-ReportSectionCustomerDetail-title\">Customer Detail</title>\n  <style>\n    .canvas{fill:#ffffff;stroke:#cbd5e1;stroke-width:1}.grid{stroke:#dbe4ef;stroke-width:1;stroke-dasharray:2 4}.slot{fill:#f8fafc;stroke:#94a3b8;stroke-width:1;stroke-dasharray:6 3}.slot-label{fill:#64748b;font:10px sans-serif}.visual{fill:#e0f2fe;fill-opacity:.72;stroke:#0369a1;stroke-width:2}.visual-label{fill:#0c4a6e;font:bold 12px sans-serif}.visual-binding{fill:#164e63;font:10px sans-serif}.lint-marker{fill:#dc2626;stroke:#ffffff;stroke-width:1}.lint-label{fill:#991b1b;font:bold 9px sans-serif}.lint-marker.warning{fill:#d97706}.lint-label.warning{fill:#92400e}\n  </style>\n  <rect class=\"canvas\" x=\"0.00\" y=\"0.00\" width=\"1280.00\" height=\"720.00\"/>\n  <g class=\"grid\" data-template=\"overview\">\n    <line x1=\"24.00\" y1=\"0.00\" x2=\"24.00\" y2=\"720.00\"/>\n    <line x1=\"128.00\" y1=\"0.00\" x2=\"128.00\" y2=\"720.00\"/>\n    <line x1=\"232.00\" y1=\"0.00\" x2=\"232.00\" y2=\"720.00\"/>\n    <line x1=\"336.00\" y1=\"0.00\" x2=\"336.00\" y2=\"720.00\"/>\n    <line x1=\"440.00\" y1=\"0.00\" x2=\"440.00\" y2=\"720.00\"/>\n    <line x1=\"544.00\" y1=\"0.00\" x2=\"544.00\" y2=\"720.00\"/>\n    <line x1=\"648.00\" y1=\"0.00\" x2=\"648.00\" y2=\"720.00\"/>\n    <line x1=\"752.00\" y1=\"0.00\" x2=\"752.00\" y2=\"720.00\"/>\n    <line x1=\"856.00\" y1=\"0.00\" x2=\"856.00\" y2=\"720.00\"/>\n    <line x1=\"960.00\" y1=\"0.00\" x2=\"960.00\" y2=\"720.00\"/>\n    <line x1=\"1064.00\" y1=\"0.00\" x2=\"1064.00\" y2=\"720.00\"/>\n    <line x1=\"1168.00\" y1=\"0.00\" x2=\"1168.00\" y2=\"720.00\"/>\n    <line x1=\"1256.00\" y1=\"0.00\" x2=\"1256.00\" y2=\"720.00\"/>\n    <line x1=\"0.00\" y1=\"24.00\" x2=\"1280.00\" y2=\"24.00\"/>\n    <line x1=\"0.00\" y1=\"32.00\" x2=\"1280.00\" y2=\"32.00\"/>\n    <line x1=\"0.00\" y1=\"40.00\" x2=\"1280.00\" y2=\"40.00\"/>\n    <line x1=\"0.00\" y1=\"48.00\" x2=\"1280.00\" y2=\"48.00\"/>\n    <line x1=\"0.00\" y1=\"56.00\" x2=\"1280.00\" y2=\"56.00\"/>\n    <line x1=\"0.00\" y1=\"64.00\" x2=\"1280.00\" y2=\"64.00\"/>\n    <line x1=\"0.00\" y1=\"72.00\" x2=\"1280.00\" y2=\"72.00\"/>\n    <line x1=\"0.00\" y1=\"80.00\" x2=\"1280.00\" y2=\"80.00\"/>\n    <line x1=\"0.00\" y1=\"88.00\" x2=\"1280.00\" y2=\"88.00\"/>\n    <line x1=\"0.00\" y1=\"96.00\" x2=\"1280.00\" y2=\"96.00\"/>\n    <line x1=\"0.00\" y1=\"104.00\" x2=\"1280.00\" y2=\"104.00\"/>\n    <line x1=\"0.00\" y1=\"112.00\" x2=\"1280.00\" y2=\"112.00\"/>\n    <line x1=\"0.00\" y1=\"120.00\" x2=\"1280.00\" y2=\"120.00\"/>\n    <line x1=\"0.00\" y1=\"128.00\" x2=\"1280.00\" y2=\"128.00\"/>\n    <line x1=\"0.00\" y1=\"136.00\" x2=\"1280.00\" y2=\"136.00\"/>\n    <line x1=\"0.00\" y1=\"144.00\" x2=\"1280.00\" y2=\"144.00\"/>\n    <line x1=\"0.00\" y1=\"152.00\" x2=\"1280.00\" y2=\"152.00\"/>\n    <line x1=\"0.00\" y1=\"160.00\" x2=\"1280.00\" y2=\"160.00\"/>\n    <line x1=\"0.00\" y1=\"168.00\" x2=\"1280.00\" y2=\"168.00\"/>\n    <line x1=\"0.00\" y1=\"176.00\" x2=\"1280.00\" y2=\"176.00\"/>\n    <line x1=\"0.00\" y1=\"184.00\" x2=\"1280.00\" y2=\"184.00\"/>\n    <line x1=\"0.00\" y1=\"192.00\" x2=\"1280.00\" y2=\"192.00\"/>\n    <line x1=\"0.00\" y1=\"200.00\" x2=\"1280.00\" y2=\"200.00\"/>\n    <line x1=\"0.00\" y1=\"208.00\" x2=\"1280.00\" y2=\"208.00\"/>\n    <line x1=\"0.00\" y1=\"216.00\" x2=\"1280.00\" y2=\"216.00\"/>\n    <line x1=\"0.00\" y1=\"224.00\" x2=\"1280.00\" y2=\"224.00\"/>\n    <line x1=\"0.00\" y1=\"232.00\" x2=\"1280.00\" y2=\"232.00\"/>\n    <line x1=\"0.00\" y1=\"240.00\" x2=\"1280.00\" y2=\"240.00\"/>\n    <line x1=\"0.00\" y1=\"248.00\" x2=\"1280.00\" y2=\"248.00\"/>\n    <line x1=\"0.00\" y1=\"256.00\" x2=\"1280.00\" y2=\"256.00\"/>\n    <line x1=\"0.00\" y1=\"264.00\" x2=\"1280.00\" y2=\"264.00\"/>\n    <line x1=\"0.00\" y1=\"272.00\" x2=\"1280.00\" y2=\"272.00\"/>\n    <line x1=\"0.00\" y1=\"280.00\" x2=\"1280.00\" y2=\"280.00\"/>\n    <line x1=\"0.00\" y1=\"288.00\" x2=\"1280.00\" y2=\"288.00\"/>\n    <line x1=\"0.00\" y1=\"296.00\" x2=\"1280.00\" y2=\"296.00\"/>\n    <line x1=\"0.00\" y1=\"304.00\" x2=\"1280.00\" y2=\"304.00\"/>\n    <line x1=\"0.00\" y1=\"312.00\" x2=\"1280.00\" y2=\"312.00\"/>\n    <line x1=\"0.00\" y1=\"320.00\" x2=\"1280.00\" y2=\"320.00\"/>\n    <line x1=\"0.00\" y1=\"328.00\" x2=\"1280.00\" y2=\"328.00\"/>\n    <line x1=\"0.00\" y1=\"336.00\" x2=\"1280.00\" y2=\"336.00\"/>\n    <line x1=\"0.00\" y1=\"344.00\" x2=\"1280.00\" y2=\"344.00\"/>\n    <line x1=\"0.00\" y1=\"352.00\" x2=\"1280.00\" y2=\"352.00\"/>\n    <line x1=\"0.00\" y1=\"360.00\" x2=\"1280.00\" y2=\"360.00\"/>\n    <line x1=\"0.00\" y1=\"368.00\" x2=\"1280.00\" y2=\"368.00\"/>\n    <line x1=\"0.00\" y1=\"376.00\" x2=\"1280.00\" y2=\"376.00\"/>\n    <line x1=\"0.00\" y1=\"384.00\" x2=\"1280.00\" y2=\"384.00\"/>\n    <line x1=\"0.00\" y1=\"392.00\" x2=\"1280.00\" y2=\"392.00\"/>\n    <line x1=\"0.00\" y1=\"400.00\" x2=\"1280.00\" y2=\"400.00\"/>\n    <line x1=\"0.00\" y1=\"408.00\" x2=\"1280.00\" y2=\"408.00\"/>\n    <line x1=\"0.00\" y1=\"416.00\" x2=\"1280.00\" y2=\"416.00\"/>\n    <line x1=\"0.00\" y1=\"424.00\" x2=\"1280.00\" y2=\"424.00\"/>\n    <line x1=\"0.00\" y1=\"432.00\" x2=\"1280.00\" y2=\"432.00\"/>\n    <line x1=\"0.00\" y1=\"440.00\" x2=\"1280.00\" y2=\"440.00\"/>\n    <line x1=\"0.00\" y1=\"448.00\" x2=\"1280.00\" y2=\"448.00\"/>\n    <line x1=\"0.00\" y1=\"456.00\" x2=\"1280.00\" y2=\"456.00\"/>\n    <line x1=\"0.00\" y1=\"464.00\" x2=\"1280.00\" y2=\"464.00\"/>\n    <line x1=\"0.00\" y1=\"472.00\" x2=\"1280.00\" y2=\"472.00\"/>\n    <line x1=\"0.00\" y1=\"480.00\" x2=\"1280.00\" y2=\"480.00\"/>\n    <line x1=\"0.00\" y1=\"488.00\" x2=\"1280.00\" y2=\"488.00\"/>\n    <line x1=\"0.00\" y1=\"496.00\" x2=\"1280.00\" y2=\"496.00\"/>\n    <line x1=\"0.00\" y1=\"504.00\" x2=\"1280.00\" y2=\"504.00\"/>\n    <line x1=\"0.00\" y1=\"512.00\" x2=\"1280.00\" y2=\"512.00\"/>\n    <line x1=\"0.00\" y1=\"520.00\" x2=\"1280.00\" y2=\"520.00\"/>\n    <line x1=\"0.00\" y1=\"528.00\" x2=\"1280.00\" y2=\"528.00\"/>\n    <line x1=\"0.00\" y1=\"536.00\" x2=\"1280.00\" y2=\"536.00\"/>\n    <line x1=\"0.00\" y1=\"544.00\" x2=\"1280.00\" y2=\"544.00\"/>\n    <line x1=\"0.00\" y1=\"552.00\" x2=\"1280.00\" y2=\"552.00\"/>\n    <line x1=\"0.00\" y1=\"560.00\" x2=\"1280.00\" y2=\"560.00\"/>\n    <line x1=\"0.00\" y1=\"568.00\" x2=\"1280.00\" y2=\"568.00\"/>\n    <line x1=\"0.00\" y1=\"576.00\" x2=\"1280.00\" y2=\"576.00\"/>\n    <line x1=\"0.00\" y1=\"584.00\" x2=\"1280.00\" y2=\"584.00\"/>\n    <line x1=\"0.00\" y1=\"592.00\" x2=\"1280.00\" y2=\"592.00\"/>\n    <line x1=\"0.00\" y1=\"600.00\" x2=\"1280.00\" y2=\"600.00\"/>\n    <line x1=\"0.00\" y1=\"608.00\" x2=\"1280.00\" y2=\"608.00\"/>\n    <line x1=\"0.00\" y1=\"616.00\" x2=\"1280.00\" y2=\"616.00\"/>\n    <line x1=\"0.00\" y1=\"624.00\" x2=\"1280.00\" y2=\"624.00\"/>\n    <line x1=\"0.00\" y1=\"632.00\" x2=\"1280.00\" y2=\"632.00\"/>\n    <line x1=\"0.00\" y1=\"640.00\" x2=\"1280.00\" y2=\"640.00\"/>\n    <line x1=\"0.00\" y1=\"648.00\" x2=\"1280.00\" y2=\"648.00\"/>\n    <line x1=\"0.00\" y1=\"656.00\" x2=\"1280.00\" y2=\"656.00\"/>\n    <line x1=\"0.00\" y1=\"664.00\" x2=\"1280.00\" y2=\"664.00\"/>\n    <line x1=\"0.00\" y1=\"672.00\" x2=\"1280.00\" y2=\"672.00\"/>\n    <line x1=\"0.00\" y1=\"680.00\" x2=\"1280.00\" y2=\"680.00\"/>\n  </g>\n  <g class=\"slots\">\n    <g class=\"slot\" data-slot=\"heading\" data-col-span=\"10\" data-row-span=\"7\"><rect x=\"232.00\" y=\"24.00\" width=\"1024.00\" height=\"56.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"37.00\">heading (10x7)</text></g>\n    <g class=\"slot\" data-slot=\"rail\" data-col-span=\"2\" data-row-span=\"75\"><rect x=\"24.00\" y=\"80.00\" width=\"192.00\" height=\"600.00\"/><text class=\"slot-label\" x=\"28.00\" y=\"93.00\">rail (2x75)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.1\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"232.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"109.00\">kpi.1 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.2\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"440.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"444.00\" y=\"109.00\">kpi.2 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.3\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"648.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"652.00\" y=\"109.00\">kpi.3 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.4\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"856.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"860.00\" y=\"109.00\">kpi.4 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"primary\" data-col-span=\"5\" data-row-span=\"30\"><rect x=\"232.00\" y=\"208.00\" width=\"504.00\" height=\"240.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"221.00\">primary (5x30)</text></g>\n    <g class=\"slot\" data-slot=\"secondary\" data-col-span=\"5\" data-row-span=\"30\"><rect x=\"752.00\" y=\"208.00\" width=\"504.00\" height=\"240.00\"/><text class=\"slot-label\" x=\"756.00\" y=\"221.00\">secondary (5x30)</text></g>\n    <g class=\"slot\" data-slot=\"detail\" data-col-span=\"10\" data-row-span=\"27\"><rect x=\"232.00\" y=\"464.00\" width=\"1024.00\" height=\"216.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"477.00\">detail (10x27)</text></g>\n  </g>\n  <g class=\"visuals\">\n    <g class=\"visual\" data-handle=\"visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable\" data-visual-type=\"tableEx\"><rect x=\"32.00\" y=\"32.00\" width=\"700.00\" height=\"400.00\"/><text class=\"visual-label\" x=\"38.00\" y=\"49.00\">tableEx — Customer Detail</text><text class=\"visual-binding\" x=\"38.00\" y=\"63.00\">Values: DimCustomer.Customer · Values: FactSales.Total Revenue</text></g>\n    <g class=\"visual\" data-handle=\"visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer\" data-visual-type=\"slicer\"><rect x=\"764.00\" y=\"32.00\" width=\"280.00\" height=\"240.00\"/><text class=\"visual-label\" x=\"770.00\" y=\"49.00\">slicer — Segment</text><text class=\"visual-binding\" x=\"770.00\" y=\"63.00\">Values: DimCustomer.Segment</text></g>\n  </g>\n  <g class=\"lint-markers\">\n  </g>\n</svg>\n",
+      "fileName": "ReportSectionCustomerDetail.svg",
+      "kind": "svg",
+      "page": "page:ReportSectionCustomerDetail"
+    },
+    {
+      "bytes": 9351,
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-labelledby=\"wireframe-ReportSectionSegmentDetail-title\" width=\"1280.00\" height=\"720.00\" viewBox=\"0 0 1280.00 720.00\">\n  <title id=\"wireframe-ReportSectionSegmentDetail-title\">Segment Detail</title>\n  <style>\n    .canvas{fill:#ffffff;stroke:#cbd5e1;stroke-width:1}.grid{stroke:#dbe4ef;stroke-width:1;stroke-dasharray:2 4}.slot{fill:#f8fafc;stroke:#94a3b8;stroke-width:1;stroke-dasharray:6 3}.slot-label{fill:#64748b;font:10px sans-serif}.visual{fill:#e0f2fe;fill-opacity:.72;stroke:#0369a1;stroke-width:2}.visual-label{fill:#0c4a6e;font:bold 12px sans-serif}.visual-binding{fill:#164e63;font:10px sans-serif}.lint-marker{fill:#dc2626;stroke:#ffffff;stroke-width:1}.lint-label{fill:#991b1b;font:bold 9px sans-serif}.lint-marker.warning{fill:#d97706}.lint-label.warning{fill:#92400e}\n  </style>\n  <rect class=\"canvas\" x=\"0.00\" y=\"0.00\" width=\"1280.00\" height=\"720.00\"/>\n  <g class=\"grid\" data-template=\"overview\">\n    <line x1=\"24.00\" y1=\"0.00\" x2=\"24.00\" y2=\"720.00\"/>\n    <line x1=\"128.00\" y1=\"0.00\" x2=\"128.00\" y2=\"720.00\"/>\n    <line x1=\"232.00\" y1=\"0.00\" x2=\"232.00\" y2=\"720.00\"/>\n    <line x1=\"336.00\" y1=\"0.00\" x2=\"336.00\" y2=\"720.00\"/>\n    <line x1=\"440.00\" y1=\"0.00\" x2=\"440.00\" y2=\"720.00\"/>\n    <line x1=\"544.00\" y1=\"0.00\" x2=\"544.00\" y2=\"720.00\"/>\n    <line x1=\"648.00\" y1=\"0.00\" x2=\"648.00\" y2=\"720.00\"/>\n    <line x1=\"752.00\" y1=\"0.00\" x2=\"752.00\" y2=\"720.00\"/>\n    <line x1=\"856.00\" y1=\"0.00\" x2=\"856.00\" y2=\"720.00\"/>\n    <line x1=\"960.00\" y1=\"0.00\" x2=\"960.00\" y2=\"720.00\"/>\n    <line x1=\"1064.00\" y1=\"0.00\" x2=\"1064.00\" y2=\"720.00\"/>\n    <line x1=\"1168.00\" y1=\"0.00\" x2=\"1168.00\" y2=\"720.00\"/>\n    <line x1=\"1256.00\" y1=\"0.00\" x2=\"1256.00\" y2=\"720.00\"/>\n    <line x1=\"0.00\" y1=\"24.00\" x2=\"1280.00\" y2=\"24.00\"/>\n    <line x1=\"0.00\" y1=\"32.00\" x2=\"1280.00\" y2=\"32.00\"/>\n    <line x1=\"0.00\" y1=\"40.00\" x2=\"1280.00\" y2=\"40.00\"/>\n    <line x1=\"0.00\" y1=\"48.00\" x2=\"1280.00\" y2=\"48.00\"/>\n    <line x1=\"0.00\" y1=\"56.00\" x2=\"1280.00\" y2=\"56.00\"/>\n    <line x1=\"0.00\" y1=\"64.00\" x2=\"1280.00\" y2=\"64.00\"/>\n    <line x1=\"0.00\" y1=\"72.00\" x2=\"1280.00\" y2=\"72.00\"/>\n    <line x1=\"0.00\" y1=\"80.00\" x2=\"1280.00\" y2=\"80.00\"/>\n    <line x1=\"0.00\" y1=\"88.00\" x2=\"1280.00\" y2=\"88.00\"/>\n    <line x1=\"0.00\" y1=\"96.00\" x2=\"1280.00\" y2=\"96.00\"/>\n    <line x1=\"0.00\" y1=\"104.00\" x2=\"1280.00\" y2=\"104.00\"/>\n    <line x1=\"0.00\" y1=\"112.00\" x2=\"1280.00\" y2=\"112.00\"/>\n    <line x1=\"0.00\" y1=\"120.00\" x2=\"1280.00\" y2=\"120.00\"/>\n    <line x1=\"0.00\" y1=\"128.00\" x2=\"1280.00\" y2=\"128.00\"/>\n    <line x1=\"0.00\" y1=\"136.00\" x2=\"1280.00\" y2=\"136.00\"/>\n    <line x1=\"0.00\" y1=\"144.00\" x2=\"1280.00\" y2=\"144.00\"/>\n    <line x1=\"0.00\" y1=\"152.00\" x2=\"1280.00\" y2=\"152.00\"/>\n    <line x1=\"0.00\" y1=\"160.00\" x2=\"1280.00\" y2=\"160.00\"/>\n    <line x1=\"0.00\" y1=\"168.00\" x2=\"1280.00\" y2=\"168.00\"/>\n    <line x1=\"0.00\" y1=\"176.00\" x2=\"1280.00\" y2=\"176.00\"/>\n    <line x1=\"0.00\" y1=\"184.00\" x2=\"1280.00\" y2=\"184.00\"/>\n    <line x1=\"0.00\" y1=\"192.00\" x2=\"1280.00\" y2=\"192.00\"/>\n    <line x1=\"0.00\" y1=\"200.00\" x2=\"1280.00\" y2=\"200.00\"/>\n    <line x1=\"0.00\" y1=\"208.00\" x2=\"1280.00\" y2=\"208.00\"/>\n    <line x1=\"0.00\" y1=\"216.00\" x2=\"1280.00\" y2=\"216.00\"/>\n    <line x1=\"0.00\" y1=\"224.00\" x2=\"1280.00\" y2=\"224.00\"/>\n    <line x1=\"0.00\" y1=\"232.00\" x2=\"1280.00\" y2=\"232.00\"/>\n    <line x1=\"0.00\" y1=\"240.00\" x2=\"1280.00\" y2=\"240.00\"/>\n    <line x1=\"0.00\" y1=\"248.00\" x2=\"1280.00\" y2=\"248.00\"/>\n    <line x1=\"0.00\" y1=\"256.00\" x2=\"1280.00\" y2=\"256.00\"/>\n    <line x1=\"0.00\" y1=\"264.00\" x2=\"1280.00\" y2=\"264.00\"/>\n    <line x1=\"0.00\" y1=\"272.00\" x2=\"1280.00\" y2=\"272.00\"/>\n    <line x1=\"0.00\" y1=\"280.00\" x2=\"1280.00\" y2=\"280.00\"/>\n    <line x1=\"0.00\" y1=\"288.00\" x2=\"1280.00\" y2=\"288.00\"/>\n    <line x1=\"0.00\" y1=\"296.00\" x2=\"1280.00\" y2=\"296.00\"/>\n    <line x1=\"0.00\" y1=\"304.00\" x2=\"1280.00\" y2=\"304.00\"/>\n    <line x1=\"0.00\" y1=\"312.00\" x2=\"1280.00\" y2=\"312.00\"/>\n    <line x1=\"0.00\" y1=\"320.00\" x2=\"1280.00\" y2=\"320.00\"/>\n    <line x1=\"0.00\" y1=\"328.00\" x2=\"1280.00\" y2=\"328.00\"/>\n    <line x1=\"0.00\" y1=\"336.00\" x2=\"1280.00\" y2=\"336.00\"/>\n    <line x1=\"0.00\" y1=\"344.00\" x2=\"1280.00\" y2=\"344.00\"/>\n    <line x1=\"0.00\" y1=\"352.00\" x2=\"1280.00\" y2=\"352.00\"/>\n    <line x1=\"0.00\" y1=\"360.00\" x2=\"1280.00\" y2=\"360.00\"/>\n    <line x1=\"0.00\" y1=\"368.00\" x2=\"1280.00\" y2=\"368.00\"/>\n    <line x1=\"0.00\" y1=\"376.00\" x2=\"1280.00\" y2=\"376.00\"/>\n    <line x1=\"0.00\" y1=\"384.00\" x2=\"1280.00\" y2=\"384.00\"/>\n    <line x1=\"0.00\" y1=\"392.00\" x2=\"1280.00\" y2=\"392.00\"/>\n    <line x1=\"0.00\" y1=\"400.00\" x2=\"1280.00\" y2=\"400.00\"/>\n    <line x1=\"0.00\" y1=\"408.00\" x2=\"1280.00\" y2=\"408.00\"/>\n    <line x1=\"0.00\" y1=\"416.00\" x2=\"1280.00\" y2=\"416.00\"/>\n    <line x1=\"0.00\" y1=\"424.00\" x2=\"1280.00\" y2=\"424.00\"/>\n    <line x1=\"0.00\" y1=\"432.00\" x2=\"1280.00\" y2=\"432.00\"/>\n    <line x1=\"0.00\" y1=\"440.00\" x2=\"1280.00\" y2=\"440.00\"/>\n    <line x1=\"0.00\" y1=\"448.00\" x2=\"1280.00\" y2=\"448.00\"/>\n    <line x1=\"0.00\" y1=\"456.00\" x2=\"1280.00\" y2=\"456.00\"/>\n    <line x1=\"0.00\" y1=\"464.00\" x2=\"1280.00\" y2=\"464.00\"/>\n    <line x1=\"0.00\" y1=\"472.00\" x2=\"1280.00\" y2=\"472.00\"/>\n    <line x1=\"0.00\" y1=\"480.00\" x2=\"1280.00\" y2=\"480.00\"/>\n    <line x1=\"0.00\" y1=\"488.00\" x2=\"1280.00\" y2=\"488.00\"/>\n    <line x1=\"0.00\" y1=\"496.00\" x2=\"1280.00\" y2=\"496.00\"/>\n    <line x1=\"0.00\" y1=\"504.00\" x2=\"1280.00\" y2=\"504.00\"/>\n    <line x1=\"0.00\" y1=\"512.00\" x2=\"1280.00\" y2=\"512.00\"/>\n    <line x1=\"0.00\" y1=\"520.00\" x2=\"1280.00\" y2=\"520.00\"/>\n    <line x1=\"0.00\" y1=\"528.00\" x2=\"1280.00\" y2=\"528.00\"/>\n    <line x1=\"0.00\" y1=\"536.00\" x2=\"1280.00\" y2=\"536.00\"/>\n    <line x1=\"0.00\" y1=\"544.00\" x2=\"1280.00\" y2=\"544.00\"/>\n    <line x1=\"0.00\" y1=\"552.00\" x2=\"1280.00\" y2=\"552.00\"/>\n    <line x1=\"0.00\" y1=\"560.00\" x2=\"1280.00\" y2=\"560.00\"/>\n    <line x1=\"0.00\" y1=\"568.00\" x2=\"1280.00\" y2=\"568.00\"/>\n    <line x1=\"0.00\" y1=\"576.00\" x2=\"1280.00\" y2=\"576.00\"/>\n    <line x1=\"0.00\" y1=\"584.00\" x2=\"1280.00\" y2=\"584.00\"/>\n    <line x1=\"0.00\" y1=\"592.00\" x2=\"1280.00\" y2=\"592.00\"/>\n    <line x1=\"0.00\" y1=\"600.00\" x2=\"1280.00\" y2=\"600.00\"/>\n    <line x1=\"0.00\" y1=\"608.00\" x2=\"1280.00\" y2=\"608.00\"/>\n    <line x1=\"0.00\" y1=\"616.00\" x2=\"1280.00\" y2=\"616.00\"/>\n    <line x1=\"0.00\" y1=\"624.00\" x2=\"1280.00\" y2=\"624.00\"/>\n    <line x1=\"0.00\" y1=\"632.00\" x2=\"1280.00\" y2=\"632.00\"/>\n    <line x1=\"0.00\" y1=\"640.00\" x2=\"1280.00\" y2=\"640.00\"/>\n    <line x1=\"0.00\" y1=\"648.00\" x2=\"1280.00\" y2=\"648.00\"/>\n    <line x1=\"0.00\" y1=\"656.00\" x2=\"1280.00\" y2=\"656.00\"/>\n    <line x1=\"0.00\" y1=\"664.00\" x2=\"1280.00\" y2=\"664.00\"/>\n    <line x1=\"0.00\" y1=\"672.00\" x2=\"1280.00\" y2=\"672.00\"/>\n    <line x1=\"0.00\" y1=\"680.00\" x2=\"1280.00\" y2=\"680.00\"/>\n  </g>\n  <g class=\"slots\">\n    <g class=\"slot\" data-slot=\"heading\" data-col-span=\"10\" data-row-span=\"7\"><rect x=\"232.00\" y=\"24.00\" width=\"1024.00\" height=\"56.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"37.00\">heading (10x7)</text></g>\n    <g class=\"slot\" data-slot=\"rail\" data-col-span=\"2\" data-row-span=\"75\"><rect x=\"24.00\" y=\"80.00\" width=\"192.00\" height=\"600.00\"/><text class=\"slot-label\" x=\"28.00\" y=\"93.00\">rail (2x75)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.1\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"232.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"109.00\">kpi.1 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.2\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"440.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"444.00\" y=\"109.00\">kpi.2 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.3\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"648.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"652.00\" y=\"109.00\">kpi.3 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"kpi.4\" data-col-span=\"2\" data-row-span=\"12\"><rect x=\"856.00\" y=\"96.00\" width=\"192.00\" height=\"96.00\"/><text class=\"slot-label\" x=\"860.00\" y=\"109.00\">kpi.4 (2x12)</text></g>\n    <g class=\"slot\" data-slot=\"primary\" data-col-span=\"5\" data-row-span=\"30\"><rect x=\"232.00\" y=\"208.00\" width=\"504.00\" height=\"240.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"221.00\">primary (5x30)</text></g>\n    <g class=\"slot\" data-slot=\"secondary\" data-col-span=\"5\" data-row-span=\"30\"><rect x=\"752.00\" y=\"208.00\" width=\"504.00\" height=\"240.00\"/><text class=\"slot-label\" x=\"756.00\" y=\"221.00\">secondary (5x30)</text></g>\n    <g class=\"slot\" data-slot=\"detail\" data-col-span=\"10\" data-row-span=\"27\"><rect x=\"232.00\" y=\"464.00\" width=\"1024.00\" height=\"216.00\"/><text class=\"slot-label\" x=\"236.00\" y=\"477.00\">detail (10x27)</text></g>\n  </g>\n  <g class=\"visuals\">\n    <g class=\"visual\" data-handle=\"visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable\" data-visual-type=\"tableEx\"><rect x=\"32.00\" y=\"32.00\" width=\"700.00\" height=\"400.00\"/><text class=\"visual-label\" x=\"38.00\" y=\"49.00\">tableEx — Segment Detail</text><text class=\"visual-binding\" x=\"38.00\" y=\"63.00\">Values: DimCustomer.Segment · Values: FactSales.Total Revenue</text></g>\n    <g class=\"visual\" data-handle=\"visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard\" data-visual-type=\"card\"><rect x=\"764.00\" y=\"32.00\" width=\"220.00\" height=\"120.00\"/><text class=\"visual-label\" x=\"770.00\" y=\"49.00\">card — Total Revenue</text><text class=\"visual-binding\" x=\"770.00\" y=\"63.00\">Values: FactSales.Total Revenue</text></g>\n  </g>\n  <g class=\"lint-markers\">\n  </g>\n</svg>\n",
+      "fileName": "ReportSectionSegmentDetail.svg",
+      "kind": "svg",
+      "page": "page:ReportSectionSegmentDetail"
+    }
+  ],
+  "counts": {
+    "boundVisuals": 9,
+    "lintMarkers": 0,
+    "pages": 3,
+    "slots": 27,
+    "visuals": 9
+  },
+  "format": "svg",
+  "grid": {
+    "columns": 12,
+    "gutter": 16.0,
+    "margin": 24.0,
+    "rowUnit": 8.0
+  },
+  "pages": [
+    {
+      "artifact": "ReportSectionOverview.svg",
+      "displayName": "Overview",
+      "handle": "page:ReportSectionOverview",
+      "height": 720.0,
+      "lintMarkers": [],
+      "name": "ReportSectionOverview",
+      "ordinal": 0,
+      "slotCount": 9,
+      "slots": [
+        {
+          "col": 2,
+          "colSpan": 10,
+          "minFamily": "textbox",
+          "name": "heading",
+          "position": {
+            "height": 56.0,
+            "width": 1024.0,
+            "x": 232.0,
+            "y": 24.0
+          },
+          "preferredFamilies": [
+            "textbox"
+          ],
+          "row": 0,
+          "rowSpan": 7
+        },
+        {
+          "col": 0,
+          "colSpan": 2,
+          "minFamily": "slicer",
+          "name": "rail",
+          "position": {
+            "height": 600.0,
+            "width": 192.0,
+            "x": 24.0,
+            "y": 80.0
+          },
+          "preferredFamilies": [
+            "slicer"
+          ],
+          "row": 7,
+          "rowSpan": 75
+        },
+        {
+          "col": 2,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.1",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 232.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 4,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.2",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 440.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 6,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.3",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 648.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 8,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.4",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 856.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 2,
+          "colSpan": 5,
+          "minFamily": "chart",
+          "name": "primary",
+          "position": {
+            "height": 240.0,
+            "width": 504.0,
+            "x": 232.0,
+            "y": 208.0
+          },
+          "preferredFamilies": [
+            "lineChart",
+            "columnChart"
+          ],
+          "row": 23,
+          "rowSpan": 30
+        },
+        {
+          "col": 7,
+          "colSpan": 5,
+          "minFamily": "chart",
+          "name": "secondary",
+          "position": {
+            "height": 240.0,
+            "width": 504.0,
+            "x": 752.0,
+            "y": 208.0
+          },
+          "preferredFamilies": [
+            "barChart",
+            "areaChart"
+          ],
+          "row": 23,
+          "rowSpan": 30
+        },
+        {
+          "col": 2,
+          "colSpan": 10,
+          "minFamily": "table",
+          "name": "detail",
+          "position": {
+            "height": 216.0,
+            "width": 1024.0,
+            "x": 232.0,
+            "y": 464.0
+          },
+          "preferredFamilies": [
+            "tableEx",
+            "matrix"
+          ],
+          "row": 55,
+          "rowSpan": 27
+        }
+      ],
+      "visualCount": 5,
+      "visuals": [
+        {
+          "bindings": [
+            {
+              "column": "Größenklasse",
+              "displayName": null,
+              "field": "Größenklasse",
+              "format": null,
+              "kind": "column",
+              "measure": null,
+              "nativeQueryRef": "Größenklasse",
+              "queryRef": "DimCustomer.Größenklasse",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "DimCustomer"
+            }
+          ],
+          "bindingsSummary": "Values: DimCustomer.Größenklasse",
+          "handle": "visual:ReportSectionOverview:VisualContainerGroessenklasseSlicer",
+          "index": 0,
+          "position": {
+            "height": 240.0,
+            "tabOrder": 4,
+            "width": 280.0,
+            "x": 664.0,
+            "y": 184.0,
+            "z": 4
+          },
+          "title": "Größenklasse",
+          "visualType": "slicer"
+        },
+        {
+          "bindings": [
+            {
+              "column": "Year",
+              "displayName": null,
+              "field": "Year",
+              "format": null,
+              "kind": "column",
+              "measure": null,
+              "nativeQueryRef": "Year",
+              "queryRef": "FactSales.Year",
+              "role": "Category",
+              "sortDirection": null,
+              "table": "FactSales"
+            },
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Total Revenue",
+              "format": null,
+              "kind": "measure",
+              "measure": "Total Revenue",
+              "nativeQueryRef": "Total Revenue",
+              "queryRef": "FactSales.Total Revenue",
+              "role": "Y",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Category: FactSales.Year · Y: FactSales.Total Revenue",
+          "handle": "visual:ReportSectionOverview:VisualContainerRevenueByYearLine",
+          "index": 1,
+          "position": {
+            "height": 320.0,
+            "tabOrder": 3,
+            "width": 600.0,
+            "x": 32.0,
+            "y": 184.0,
+            "z": 3
+          },
+          "title": "Revenue by Year",
+          "visualType": "lineChart"
+        },
+        {
+          "bindings": [
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Total Revenue",
+              "format": null,
+              "kind": "measure",
+              "measure": "Total Revenue",
+              "nativeQueryRef": "Total Revenue",
+              "queryRef": "FactSales.Total Revenue",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Values: FactSales.Total Revenue",
+          "handle": "visual:ReportSectionOverview:VisualContainerTotalRevenueCard",
+          "index": 2,
+          "position": {
+            "height": 120.0,
+            "tabOrder": 0,
+            "width": 220.0,
+            "x": 32.0,
+            "y": 32.0,
+            "z": 0
+          },
+          "title": "Total Revenue",
+          "visualType": "card"
+        },
+        {
+          "bindings": [
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Total Units",
+              "format": null,
+              "kind": "measure",
+              "measure": "Total Units",
+              "nativeQueryRef": "Total Units",
+              "queryRef": "FactSales.Total Units",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Values: FactSales.Total Units",
+          "handle": "visual:ReportSectionOverview:VisualContainerTotalUnitsCard",
+          "index": 3,
+          "position": {
+            "height": 120.0,
+            "tabOrder": 1,
+            "width": 220.0,
+            "x": 276.0,
+            "y": 32.0,
+            "z": 1
+          },
+          "title": "Total Units",
+          "visualType": "card"
+        },
+        {
+          "bindings": [
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Umsatz Übersicht",
+              "format": null,
+              "kind": "measure",
+              "measure": "Umsatz Übersicht",
+              "nativeQueryRef": "Umsatz Übersicht",
+              "queryRef": "FactSales.Umsatz Übersicht",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Values: FactSales.Umsatz Übersicht",
+          "handle": "visual:ReportSectionOverview:VisualContainerUmsatzUebersichtCard",
+          "index": 4,
+          "position": {
+            "height": 120.0,
+            "tabOrder": 2,
+            "width": 220.0,
+            "x": 520.0,
+            "y": 32.0,
+            "z": 2
+          },
+          "title": "Umsatz Übersicht",
+          "visualType": "card"
+        }
+      ],
+      "width": 1280.0
+    },
+    {
+      "artifact": "ReportSectionCustomerDetail.svg",
+      "displayName": "Customer Detail",
+      "handle": "page:ReportSectionCustomerDetail",
+      "height": 720.0,
+      "lintMarkers": [],
+      "name": "ReportSectionCustomerDetail",
+      "ordinal": 1,
+      "slotCount": 9,
+      "slots": [
+        {
+          "col": 2,
+          "colSpan": 10,
+          "minFamily": "textbox",
+          "name": "heading",
+          "position": {
+            "height": 56.0,
+            "width": 1024.0,
+            "x": 232.0,
+            "y": 24.0
+          },
+          "preferredFamilies": [
+            "textbox"
+          ],
+          "row": 0,
+          "rowSpan": 7
+        },
+        {
+          "col": 0,
+          "colSpan": 2,
+          "minFamily": "slicer",
+          "name": "rail",
+          "position": {
+            "height": 600.0,
+            "width": 192.0,
+            "x": 24.0,
+            "y": 80.0
+          },
+          "preferredFamilies": [
+            "slicer"
+          ],
+          "row": 7,
+          "rowSpan": 75
+        },
+        {
+          "col": 2,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.1",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 232.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 4,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.2",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 440.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 6,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.3",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 648.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 8,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.4",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 856.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 2,
+          "colSpan": 5,
+          "minFamily": "chart",
+          "name": "primary",
+          "position": {
+            "height": 240.0,
+            "width": 504.0,
+            "x": 232.0,
+            "y": 208.0
+          },
+          "preferredFamilies": [
+            "lineChart",
+            "columnChart"
+          ],
+          "row": 23,
+          "rowSpan": 30
+        },
+        {
+          "col": 7,
+          "colSpan": 5,
+          "minFamily": "chart",
+          "name": "secondary",
+          "position": {
+            "height": 240.0,
+            "width": 504.0,
+            "x": 752.0,
+            "y": 208.0
+          },
+          "preferredFamilies": [
+            "barChart",
+            "areaChart"
+          ],
+          "row": 23,
+          "rowSpan": 30
+        },
+        {
+          "col": 2,
+          "colSpan": 10,
+          "minFamily": "table",
+          "name": "detail",
+          "position": {
+            "height": 216.0,
+            "width": 1024.0,
+            "x": 232.0,
+            "y": 464.0
+          },
+          "preferredFamilies": [
+            "tableEx",
+            "matrix"
+          ],
+          "row": 55,
+          "rowSpan": 27
+        }
+      ],
+      "visualCount": 2,
+      "visuals": [
+        {
+          "bindings": [
+            {
+              "column": "Customer",
+              "displayName": null,
+              "field": "Customer",
+              "format": null,
+              "kind": "column",
+              "measure": null,
+              "nativeQueryRef": "Customer",
+              "queryRef": "DimCustomer.Customer",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "DimCustomer"
+            },
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Total Revenue",
+              "format": null,
+              "kind": "measure",
+              "measure": "Total Revenue",
+              "nativeQueryRef": "Total Revenue",
+              "queryRef": "FactSales.Total Revenue",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Values: DimCustomer.Customer · Values: FactSales.Total Revenue",
+          "handle": "visual:ReportSectionCustomerDetail:VisualContainerCustomerDetailTable",
+          "index": 0,
+          "position": {
+            "height": 400.0,
+            "tabOrder": 0,
+            "width": 700.0,
+            "x": 32.0,
+            "y": 32.0,
+            "z": 0
+          },
+          "title": "Customer Detail",
+          "visualType": "tableEx"
+        },
+        {
+          "bindings": [
+            {
+              "column": "Segment",
+              "displayName": null,
+              "field": "Segment",
+              "format": null,
+              "kind": "column",
+              "measure": null,
+              "nativeQueryRef": "Segment",
+              "queryRef": "DimCustomer.Segment",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "DimCustomer"
+            }
+          ],
+          "bindingsSummary": "Values: DimCustomer.Segment",
+          "handle": "visual:ReportSectionCustomerDetail:VisualContainerSegmentSlicer",
+          "index": 1,
+          "position": {
+            "height": 240.0,
+            "tabOrder": 1,
+            "width": 280.0,
+            "x": 764.0,
+            "y": 32.0,
+            "z": 1
+          },
+          "title": "Segment",
+          "visualType": "slicer"
+        }
+      ],
+      "width": 1280.0
+    },
+    {
+      "artifact": "ReportSectionSegmentDetail.svg",
+      "displayName": "Segment Detail",
+      "handle": "page:ReportSectionSegmentDetail",
+      "height": 720.0,
+      "lintMarkers": [],
+      "name": "ReportSectionSegmentDetail",
+      "ordinal": 2,
+      "slotCount": 9,
+      "slots": [
+        {
+          "col": 2,
+          "colSpan": 10,
+          "minFamily": "textbox",
+          "name": "heading",
+          "position": {
+            "height": 56.0,
+            "width": 1024.0,
+            "x": 232.0,
+            "y": 24.0
+          },
+          "preferredFamilies": [
+            "textbox"
+          ],
+          "row": 0,
+          "rowSpan": 7
+        },
+        {
+          "col": 0,
+          "colSpan": 2,
+          "minFamily": "slicer",
+          "name": "rail",
+          "position": {
+            "height": 600.0,
+            "width": 192.0,
+            "x": 24.0,
+            "y": 80.0
+          },
+          "preferredFamilies": [
+            "slicer"
+          ],
+          "row": 7,
+          "rowSpan": 75
+        },
+        {
+          "col": 2,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.1",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 232.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 4,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.2",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 440.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 6,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.3",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 648.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 8,
+          "colSpan": 2,
+          "minFamily": "card",
+          "name": "kpi.4",
+          "position": {
+            "height": 96.0,
+            "width": 192.0,
+            "x": 856.0,
+            "y": 96.0
+          },
+          "preferredFamilies": [
+            "card"
+          ],
+          "row": 9,
+          "rowSpan": 12
+        },
+        {
+          "col": 2,
+          "colSpan": 5,
+          "minFamily": "chart",
+          "name": "primary",
+          "position": {
+            "height": 240.0,
+            "width": 504.0,
+            "x": 232.0,
+            "y": 208.0
+          },
+          "preferredFamilies": [
+            "lineChart",
+            "columnChart"
+          ],
+          "row": 23,
+          "rowSpan": 30
+        },
+        {
+          "col": 7,
+          "colSpan": 5,
+          "minFamily": "chart",
+          "name": "secondary",
+          "position": {
+            "height": 240.0,
+            "width": 504.0,
+            "x": 752.0,
+            "y": 208.0
+          },
+          "preferredFamilies": [
+            "barChart",
+            "areaChart"
+          ],
+          "row": 23,
+          "rowSpan": 30
+        },
+        {
+          "col": 2,
+          "colSpan": 10,
+          "minFamily": "table",
+          "name": "detail",
+          "position": {
+            "height": 216.0,
+            "width": 1024.0,
+            "x": 232.0,
+            "y": 464.0
+          },
+          "preferredFamilies": [
+            "tableEx",
+            "matrix"
+          ],
+          "row": 55,
+          "rowSpan": 27
+        }
+      ],
+      "visualCount": 2,
+      "visuals": [
+        {
+          "bindings": [
+            {
+              "column": "Segment",
+              "displayName": null,
+              "field": "Segment",
+              "format": null,
+              "kind": "column",
+              "measure": null,
+              "nativeQueryRef": "Segment",
+              "queryRef": "DimCustomer.Segment",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "DimCustomer"
+            },
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Total Revenue",
+              "format": null,
+              "kind": "measure",
+              "measure": "Total Revenue",
+              "nativeQueryRef": "Total Revenue",
+              "queryRef": "FactSales.Total Revenue",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Values: DimCustomer.Segment · Values: FactSales.Total Revenue",
+          "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentDetailTable",
+          "index": 0,
+          "position": {
+            "height": 400.0,
+            "tabOrder": 0,
+            "width": 700.0,
+            "x": 32.0,
+            "y": 32.0,
+            "z": 0
+          },
+          "title": "Segment Detail",
+          "visualType": "tableEx"
+        },
+        {
+          "bindings": [
+            {
+              "column": null,
+              "displayName": null,
+              "field": "Total Revenue",
+              "format": null,
+              "kind": "measure",
+              "measure": "Total Revenue",
+              "nativeQueryRef": "Total Revenue",
+              "queryRef": "FactSales.Total Revenue",
+              "role": "Values",
+              "sortDirection": null,
+              "table": "FactSales"
+            }
+          ],
+          "bindingsSummary": "Values: FactSales.Total Revenue",
+          "handle": "visual:ReportSectionSegmentDetail:VisualContainerSegmentTotalCard",
+          "index": 1,
+          "position": {
+            "height": 120.0,
+            "tabOrder": 1,
+            "width": 220.0,
+            "x": 764.0,
+            "y": 32.0,
+            "z": 1
+          },
+          "title": "Total Revenue",
+          "visualType": "card"
+        }
+      ],
+      "width": 1280.0
+    }
+  ],
+  "schema": "powerbi-cli.report.wireframe.v2",
+  "template": "overview"
+}

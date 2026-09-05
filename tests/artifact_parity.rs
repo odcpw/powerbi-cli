@@ -1,12 +1,11 @@
 mod common;
 
-use common::{run_powerbi_owned, stdout_json};
+use common::{TreeFingerprint, hash_tree, run_powerbi_owned, stdout_json};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,13 +34,6 @@ struct BoundInput {
     sha256: String,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq)]
-struct TreeFingerprint {
-    files: usize,
-    bytes: u64,
-    sha256: String,
-}
-
 #[test]
 fn generated_artifact_trees_are_byte_deterministic_and_match_the_bound_corpus() {
     let manifest: CorpusManifest =
@@ -65,8 +57,8 @@ fn generated_artifact_trees_are_byte_deterministic_and_match_the_bound_corpus() 
         build_case(&case, &first);
         build_case(&case, &second);
 
-        let first_fingerprint = fingerprint_tree(&first);
-        let second_fingerprint = fingerprint_tree(&second);
+        let first_fingerprint = hash_tree(&first);
+        let second_fingerprint = hash_tree(&second);
         assert_eq!(
             first_fingerprint, second_fingerprint,
             "{} changed across two executions of the same binary",
@@ -124,8 +116,8 @@ fn normalized_schema_input_keeps_include_and_inline_artifact_fingerprints_equal(
     build_paths(&included_schema, &spec, &included_project);
     build_paths(&inline_schema, &spec, &inline_project);
     assert_eq!(
-        fingerprint_tree(&included_project),
-        fingerprint_tree(&inline_project),
+        hash_tree(&included_project),
+        hash_tree(&inline_project),
         "artifact parity must fingerprint normalized schema content"
     );
 }
@@ -189,46 +181,6 @@ fn verify_input(input: &BoundInput) {
     let canonical = text.replace("\r\n", "\n");
     let actual = format!("{:x}", Sha256::digest(canonical.as_bytes()));
     assert_eq!(actual, input.sha256, "parity input drifted: {}", input.path);
-}
-
-fn fingerprint_tree(root: &Path) -> TreeFingerprint {
-    let mut files = WalkDir::new(root)
-        .follow_links(false)
-        .into_iter()
-        .map(|entry| entry.expect("walk generated artifact tree"))
-        .filter(|entry| entry.file_type().is_file())
-        .map(|entry| entry.into_path())
-        .collect::<Vec<_>>();
-    files.sort_by_key(|path| normalized_relative(root, path));
-
-    let mut hasher = Sha256::new();
-    hasher.update(b"powerbi-cli.artifact-tree.v1\0");
-    let mut total_bytes = 0_u64;
-    for path in &files {
-        let relative = normalized_relative(root, path);
-        let bytes = fs::read(path).expect("read generated artifact");
-        let relative_bytes = relative.as_bytes();
-        hasher.update((relative_bytes.len() as u64).to_le_bytes());
-        hasher.update(relative_bytes);
-        hasher.update((bytes.len() as u64).to_le_bytes());
-        hasher.update(&bytes);
-        total_bytes += bytes.len() as u64;
-    }
-
-    TreeFingerprint {
-        files: files.len(),
-        bytes: total_bytes,
-        sha256: format!("{:x}", hasher.finalize()),
-    }
-}
-
-fn normalized_relative(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .expect("artifact under tree root")
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
 }
 
 fn path_arg(path: &Path) -> String {

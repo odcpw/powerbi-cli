@@ -491,11 +491,12 @@ its own BCApps or pilot reference:
 
 ### T4.9 Report UX features currently `planned`
 
-`report.slicer-sync-authoring`, `report.tooltip-pages`,
-`report.bookmark-mutations` (capture state), `report.interaction-default-reset`.
-Each needs a Desktop-authored fixture; each is one bead that either promotes
-the feature or records why the shape could not be proven. Slicer sync is
-required for the rail template to feel finished.
+`report.slicer-sync-authoring`, `report.tooltip-pages`, and
+`report.bookmark-mutations` (capture state). `report.interaction-default-reset`
+now has a guarded unit-smoke implementation: it removes one explicit
+`visualInteractions` row and records the documented default semantics. A
+Desktop-authored reset fixture is still needed before claiming canvas
+compatibility. Slicer sync is required for the rail template to feel finished.
 
 ---
 

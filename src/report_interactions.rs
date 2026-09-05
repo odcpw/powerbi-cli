@@ -4,7 +4,9 @@ use crate::pbir_interactions::{
     interaction_matches_source, interaction_matches_target, interaction_record_json,
     interaction_semantics, list_report_interactions,
 };
-use crate::report_interaction_mutations::{disable_interaction, set_interaction};
+use crate::report_interaction_mutations::{
+    disable_interaction, reset_interaction, set_interaction,
+};
 use crate::{CliError, CliResult, canonical_display, command_arg, resolve_project};
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,7 +35,7 @@ struct ShowOptions {
 pub(crate) fn interactions_command(args: &[String]) -> CliResult<Value> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::invalid_args(
-            "report interactions requires a subcommand: list, show, set, or disable",
+            "report interactions requires a subcommand: list, show, set, disable, or reset",
         )
         .with_hint(
             "Run `powerbi-cli report interactions list --project <project-dir-or.pbip> --json`.",
@@ -48,7 +50,8 @@ pub(crate) fn interactions_command(args: &[String]) -> CliResult<Value> {
         "show" | "get" => show_interaction(rest),
         "set" | "update" => set_interaction(rest),
         "disable" => disable_interaction(rest),
-        "reset" | "default" | "delete" | "remove" => {
+        "reset" => reset_interaction(rest),
+        "default" | "delete" | "remove" => {
             Err(unsupported_feature_error("report.interaction-default-reset"))
         }
         _ => Err(CliError::invalid_args(format!(
