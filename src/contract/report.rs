@@ -8,7 +8,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; root/page/visual filters compile through AddFilter and page drillthrough through SetDrillthrough with model/type validation, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, while filters and drillthrough compile through typed kernels, with operation outcomes, stable-handle readback, scorecard, and proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -22,9 +22,9 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
-            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "compiled.styleTokens", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.styleTokens.allowContrastBelowAA", "scorecard.next[]", "styleTokens.id", "styleTokens.allowContrastBelowAA", "styleTokens.warningCount", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "layoutCompilation": "Dashboard v2 pages[].template and visuals[].slot resolve through the shared grid; explicit layout wins. Heading/subtitle textboxes consume style.tokens.typography.family/scale. Unknown slots return spec.missing_input with available slots; duplicates fail and family mismatches warn. Section dividers are omitted with feature_pending.",
-            "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args", "feature_pending", "design.slot_family_mismatch"]
+            "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "design.contrast_below_aa", "unsupported_feature", "invalid_args", "feature_pending", "design.slot_family_mismatch"]
         }),
         json!({
             "path": "report spec validate",
@@ -1009,6 +1009,38 @@ pub(super) fn commands() -> Vec<Value> {
             "flags": ["<before-style.json>", "<after-style.json>", "--json", "--format json"],
             "examples": ["powerbi-cli report style diff old-style.json new-style.json --json"],
             "followUpFields": ["left", "right", "diff.sameFingerprint", "diff.themeCollectionChanged", "diff.visualStyleCountDelta"]
+        }),
+        json!({
+            "path": "report style tokens show",
+            "aliases": ["report styles tokens show", "report style tokens list"],
+            "usage": "powerbi-cli report style tokens show --project <project-dir-or.pbip> [--preset <corporate-neutral|high-contrast|dark|print>] --json",
+            "summary": "Show the embedded versioned design-token catalog and the selected built-in token set for a report project",
+            "tags": ["pbir", "report", "style", "tokens", "design", "catalog", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.style.tokens.show.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--preset <token-set-id>", "--id <token-set-id>", "--json", "--format json"],
+            "examples": ["powerbi-cli report style tokens show --project build/sales --json", "powerbi-cli report style tokens show --project build/sales --preset dark --json"],
+            "followUpFields": ["catalog.schema", "catalog.version", "catalog.sets[].id", "selected.id", "selected.tokens.palette", "selected.tokens.semantic", "selected.tokens.ramps", "selected.tokens.typography", "selected.tokens.surfaces", "selected.tokens.spacing", "selected.tokens.numberFormats", "selected.tokens.textClasses", "selected.tokens.visualDefaults", "selected.tokens.allowContrastBelowAA", "validation", "next"]
+        }),
+        json!({
+            "path": "report style tokens derive",
+            "aliases": ["report styles tokens derive", "report style tokens from-report"],
+            "usage": "powerbi-cli report style tokens derive --project <project-dir-or.pbip> --json",
+            "summary": "Derive deterministic style tokens from a report theme and visual formatting without copying literal report text",
+            "tags": ["pbir", "report", "style", "tokens", "design", "derive", "agent"],
+            "readOnly": true,
+            "mutates": false,
+            "writesDataCache": false,
+            "stability": "alpha-output",
+            "proofLevel": "unit-smoke",
+            "outputSchema": "powerbi-cli.report.style.tokens.derive.v1",
+            "flags": ["--project <project-dir-or.pbip>", "--json", "--format json"],
+            "examples": ["powerbi-cli report style tokens derive --project build/sales --json"],
+            "followUpFields": ["source.themeHandle", "source.themeFingerprint", "source.visualCount", "source.sampledColorCount", "tokens.palette", "tokens.semantic", "tokens.ramps", "tokens.typography", "tokens.surfaces", "tokens.spacing", "tokens.numberFormats", "tokens.textClasses", "tokens.visualDefaults", "next"]
         }),
         json!({
             "path": "report visuals list",
