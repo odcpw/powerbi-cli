@@ -1,6 +1,6 @@
 {
   "schema": "powerbi-cli.artifact-parity-corpus.v1",
-  "sourceRevision": "fb43237f1b1ef2436f2575b5792fc6e6ffb47d0e",
+  "sourceRevision": "9ba2b899599f71f074c19e04b34e92827f28cff8",
   "artifactAlgorithm": "powerbi-cli.artifact-tree.v1",
   "closure": "complete_for_declared_corpus",
   "nonclaims": [
@@ -73,11 +73,11 @@
       "name": "catalog-proof",
       "schema": {
         "path": "examples/archetypes/catalog-proof.schema.json",
-        "sha256": "64d57809dc78a2a7b2da7f1d4ff0942045fc4551e32afd852b5c38c09c0ecc84"
+        "sha256": "0c5225bd4dee8757475ba0a688a33e39cd535037e032f724c3c3f877167bb513"
       },
       "profile": {
         "path": "examples/archetypes/catalog-proof.profile.json",
-        "sha256": "4adcdf90b58e0597134413f920c8517efb5f2f9d3989751f75d2c3f92ef9788e"
+        "sha256": "0bf9e4f73ace93ef2e076c13eeb308f871be5a3c96c6e63f59806768584e4871"
       },
       "spec": {
         "path": "examples/archetypes/catalog-proof.dashboard.json",
@@ -85,8 +85,8 @@
       },
       "expected": {
         "files": 27,
-        "bytes": 30956,
-        "sha256": "dd6c911d9da26421ef7848b85c92747d7236dbc227078d73743d1bb143d81ba4"
+        "bytes": 31810,
+        "sha256": "977003d22853d9e4ee3fb9ec58a34ba0740b25a5c4b25b2512ec07675b9af667"
       }
     },
     {
