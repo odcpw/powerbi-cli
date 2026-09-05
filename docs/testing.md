@@ -31,6 +31,38 @@ Each line has schema `powerbi-cli.test-run.v1` and fields `argv`, `stdout`,
 record remains one grep-able physical line. Test fixtures must never place
 credentials or real data in command output.
 
+## Artifact parity and operation paths
+
+`tests/common/artifact_tree.rs` owns the `powerbi-cli.artifact-tree.v1`
+fingerprint used by `tests/artifact_parity.rs`, `tests/ops_equivalence.rs`, and
+`tests/metamorphic.rs`. It sorts normalized relative paths, includes each path
+length and file length in the SHA-256 input, and reports the two tree
+fingerprints plus the first differing file (with lengths and digests only) when
+a comparison fails. Keep this helper as the single implementation; do not add
+a second WalkDir hash in a focused test.
+
+`tests/ops_equivalence.rs` is a table of fixture, operation tag, and execution
+rows. Each row builds two independent copies, runs the public CLI mutation into
+one output directory, applies the serialized operation through the registered
+transaction/kernel path into the other, and checks exit status, diagnostics,
+JSON receipts, and the full artifact tree. The registry exposes its currently
+compiled kernel tags to the runner, so adding a kernel without adding a row
+fails the test. Add a new case by appending one OperationEquivalenceCase row;
+the callback should keep CLI argv and operation JSON next to each other.
+
+`tests/metamorphic.rs` uses the same table shape for
+build(spec + X) == build(spec) then apply(X). A row authors the fragment with
+DashboardSpecBuilder, builds both specs, applies the operation to the base
+tree, and compares the generated PBIP/PBIR/TMDL artifacts. The
+`powerbi-cli.manifest.copy.json` file is an immutable source-manifest sidecar, so
+metamorphic comparisons explicitly exclude that one metadata path; changes to
+generated report or model files still fail with the first-file diagnostic. T3
+compiler beads append one row per newly compiled section and archetype.
+
+Both runners use the shared CLI logger and direct-operation records, remain
+offline, and use fresh temporary directories so a test cannot accidentally
+mutate a checked-in fixture.
+
 ## Archetypes and spec builders
 
 `load_archetype(name)` resolves the checked-in schema, profile, dashboard spec,

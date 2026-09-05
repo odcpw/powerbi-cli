@@ -318,6 +318,53 @@ pub(crate) fn content_slots(template: &Template) -> impl Iterator<Item = &Slot> 
     })
 }
 
+/// Return the vertical and horizontal guide coordinates for a resolved
+/// template.  Keeping guide math beside [`resolve_with_grid`] ensures a
+/// wireframe cannot drift from the coordinates used by auto-layout.
+pub(crate) fn guide_lines(
+    template: &Template,
+    page_size: PageSize,
+    grid: Grid,
+) -> CliResult<(Vec<f64>, Vec<f64>)> {
+    let page_size = page_size.validate()?;
+    let grid = grid.validate()?;
+    validate_template(template)?;
+    let scale_x = page_size.width / REFERENCE_WIDTH;
+    let scale_y = page_size.height / REFERENCE_HEIGHT;
+    let margin_x = grid.margin * scale_x;
+    let margin_y = grid.margin * scale_y;
+    let gutter_x = grid.gutter * scale_x;
+    let row_unit = grid.row_unit * scale_y;
+    let columns = grid.columns as f64;
+    let column_width = (page_size.width - margin_x * 2.0 - gutter_x * (columns - 1.0)) / columns;
+    if !column_width.is_finite() || column_width <= 0.0 {
+        return Err(
+            CliError::invalid_args("layout grid leaves no usable page width").with_pointer("/grid"),
+        );
+    }
+
+    let mut vertical = Vec::with_capacity(grid.columns as usize + 1);
+    for column in 0..=grid.columns {
+        let x = if column == grid.columns {
+            page_size.width - margin_x
+        } else {
+            margin_x + column as f64 * (column_width + gutter_x)
+        };
+        vertical.push(round(x));
+    }
+    let max_row = template
+        .slots
+        .iter()
+        .map(|slot| slot.row.saturating_add(slot.row_span))
+        .max()
+        .unwrap_or(0);
+    let mut horizontal = Vec::with_capacity(max_row as usize + 1);
+    for row in 0..=max_row {
+        horizontal.push(round(margin_y + row as f64 * row_unit));
+    }
+    Ok((vertical, horizontal))
+}
+
 fn validate_catalog(catalog: &TemplateCatalog) -> CliResult<()> {
     if catalog.schema != "powerbi-cli.design.templates.v1" {
         return Err(CliError::unexpected(format!(

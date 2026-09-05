@@ -3,12 +3,17 @@ use crate::cli_support::{
 };
 use crate::input_safety::{InputKind, read_utf8};
 use crate::json_composition::normalize_spec_file;
-use crate::ops::OpOutcome;
+use crate::ops::{Op, OpKernel, OpOutcome, OpPlan, ProjectIndex, Transaction, kernel_for};
+use crate::pbir_filters::{FilterArrayOrigin, FilterScope, named_filter_handle};
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
     slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::report_filter_shapes::{
+    FilterSpec, RelativeDateOperator, RelativeDateUnit, ResolvedFilterColumn,
+    ResolvedFilterMeasure, TopNDirection, generated_filter_name, parse_field_reference,
+};
 use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
@@ -21,7 +26,7 @@ use crate::tmdl::{measure_handle, table_handle};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
-    scaffold_schema_value, validate_project,
+    resolve_project, scaffold_schema_value, validate_project,
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -83,7 +88,7 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
         validate_known_fields(spec)?;
     }
     let profile_value = load_optional_profile(options.profile.as_deref())?;
-    let compiled = compile_dashboard(&schema_value, spec_value.as_ref())?;
+    let mut compiled = compile_dashboard(&schema_value, spec_value.as_ref())?;
     let dry_run_proof_plan = if mode == MutationMode::DryRun {
         compile_proof_plan(spec_value.as_ref(), None)?
     } else {
@@ -129,12 +134,16 @@ pub(crate) fn build_command(args: &[String]) -> CliResult<Value> {
             )
     })?;
     let proof_plan = compile_proof_plan(spec_value.as_ref(), Some(&out_dir))?;
-    let scaffold = scaffold_schema_value(
-        compiled.schema.clone(),
-        &schema_path,
-        &out_dir,
-        options.force,
-    )?;
+    let scaffold = if compiled.typed_operations.is_empty() {
+        scaffold_schema_value(
+            compiled.schema.clone(),
+            &schema_path,
+            &out_dir,
+            options.force,
+        )?
+    } else {
+        build_with_operations(&mut compiled, &schema_path, &out_dir, options.force)?
+    };
     Ok(build_response(BuildResponse {
         dry_run: false,
         changed: true,
@@ -811,6 +820,9 @@ fn escape_pointer_token(value: &str) -> String {
 struct CompiledDashboard {
     schema: Value,
     operations: Vec<Value>,
+    typed_operations: Vec<Op>,
+    operation_pointers: Vec<String>,
+    operation_outcomes: Vec<OpOutcome>,
     warnings: Vec<Value>,
     defaults_applied: Vec<Value>,
 }
@@ -823,6 +835,9 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
             operations: vec![
                 json!({"kind": "legacySchema", "summary": "used pages embedded in schema manifest"}),
             ],
+            typed_operations: Vec::new(),
+            operation_pointers: Vec::new(),
+            operation_outcomes: Vec::new(),
             warnings: notes
                 .into_iter()
                 .map(|message| json!({"code": "report_build.legacy_schema", "message": message}))
@@ -859,6 +874,9 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
             operations: vec![
                 json!({"kind": "legacySpecMerge", "summary": "merged top-level dashboard fields into schema manifest"}),
             ],
+            typed_operations: Vec::new(),
+            operation_pointers: Vec::new(),
+            operation_outcomes: Vec::new(),
             warnings: notes
                 .into_iter()
                 .map(|message| json!({"code": "report_build.legacy_spec", "message": message}))
@@ -898,6 +916,17 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
         "kind": "compileDashboardSpec",
         "summary": "compiled powerbi-cli.dashboard.v1 report/pages/visuals into scaffold-compatible manifest"
     })];
+    let (mut typed_operations, mut operation_pointers) =
+        compile_filter_operations(spec_object, &model)?;
+    let (drillthrough_operations, drillthrough_pointers, drillthrough_warnings) =
+        compile_drillthrough_operations(spec_object, &model)?;
+    typed_operations.extend(drillthrough_operations);
+    operation_pointers.extend(drillthrough_pointers);
+    operations.extend(
+        typed_operations
+            .iter()
+            .map(|operation| serde_json::to_value(operation).expect("typed operation serializes")),
+    );
     if spec_object.get("style").is_some() {
         return Err(CliError::unsupported_feature(
             "report build style application from dashboard spec is not implemented yet"
@@ -915,9 +944,131 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
     Ok(CompiledDashboard {
         schema: merged,
         operations,
-        warnings: Vec::new(),
+        typed_operations,
+        operation_pointers,
+        operation_outcomes: Vec::new(),
+        warnings: drillthrough_warnings,
         defaults_applied,
     })
+}
+
+/// Apply compiler-generated operations to a scaffolded working copy before it
+/// is published. Keeping this path on the same transaction/kernels used by
+/// operation replay makes spec builds and command mutations artifact-identical
+/// while still discarding a failed plan without touching the requested output.
+fn build_with_operations(
+    compiled: &mut CompiledDashboard,
+    schema_path: &Path,
+    out_dir: &Path,
+    force: bool,
+) -> CliResult<Value> {
+    let staging = tempfile::tempdir().map_err(|error| {
+        CliError::unexpected(format!("create report build staging directory: {error}"))
+    })?;
+    let mut scaffold =
+        scaffold_schema_value(compiled.schema.clone(), schema_path, staging.path(), false)?;
+    let staged_project = resolve_project(staging.path())?;
+    let plan = OpPlan::new(compiled.typed_operations.clone());
+    let project_index = ProjectIndex::from_project(&staged_project)?;
+    let validated = plan
+        .validate(&project_index)
+        .map_err(|error| map_plan_error(error, &compiled.operation_pointers))?;
+    let mut transaction = Transaction::begin(staged_project)?;
+    // Kernel summaries carry paths rooted at the transaction's source
+    // project (the scaffold's nested `*.Report` directory), while the
+    // scaffold metadata itself is rooted at the outer staging directory.
+    // Capture both roots before committing so every path in the response is
+    // rewritten to the requested output directory.
+    let source_project_root = canonical_display(&transaction.source.project_dir);
+    let working_project_root = canonical_display(transaction.work_dir());
+    let mut kernel = CompilerOperationKernel;
+    let receipt = transaction
+        .apply_all(&validated, &mut kernel)
+        .map_err(|failure| map_plan_failure(failure, &compiled.operation_pointers))?;
+    compiled.operation_outcomes = receipt.outcomes;
+    transaction.commit_out_dir(out_dir, force)?;
+
+    let from = canonical_display(staging.path());
+    let to = canonical_display(out_dir);
+    relocate_json_paths(&mut scaffold, &from, &to);
+    relocate_json_paths(&mut scaffold, &source_project_root, &to);
+    relocate_operation_outcomes(&mut compiled.operation_outcomes, &from, &to);
+    relocate_operation_outcomes(&mut compiled.operation_outcomes, &source_project_root, &to);
+    relocate_json_paths(&mut scaffold, &working_project_root, &to);
+    relocate_operation_outcomes(&mut compiled.operation_outcomes, &working_project_root, &to);
+    Ok(scaffold)
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct CompilerOperationKernel;
+
+impl OpKernel for CompilerOperationKernel {
+    fn apply(&mut self, operation: &Op, transaction: &mut Transaction) -> CliResult<OpOutcome> {
+        let mut kernel = kernel_for(operation).ok_or_else(|| {
+            CliError::unsupported_feature(format!(
+                "report build cannot apply operation `{}` because its kernel is not registered",
+                operation.tag()
+            ))
+        })?;
+        kernel.apply(operation, transaction)
+    }
+}
+
+fn map_plan_error(error: crate::ops::PlanError, pointers: &[String]) -> CliError {
+    let mut mapped = error.as_cli_error();
+    if let Some(index) = operation_index_from_pointer(&error.pointer)
+        && let Some(pointer) = pointers.get(index)
+    {
+        mapped = mapped.with_pointer(pointer.clone());
+    }
+    mapped
+}
+
+fn map_plan_failure(failure: crate::ops::PlanFailure, pointers: &[String]) -> CliError {
+    let mut mapped = *failure.error;
+    if let Some(pointer) = pointers.get(failure.failed_index) {
+        mapped = mapped.with_pointer(pointer.clone());
+    }
+    mapped
+}
+
+fn operation_index_from_pointer(pointer: &str) -> Option<usize> {
+    pointer
+        .strip_prefix("/ops/")
+        .and_then(|value| value.split('/').next())
+        .and_then(|value| value.parse().ok())
+}
+
+fn relocate_operation_outcomes(outcomes: &mut [OpOutcome], from: &str, to: &str) {
+    for outcome in outcomes {
+        for command in &mut outcome.readback {
+            *command = command.replace(from, to);
+        }
+        for change in &mut outcome.changes {
+            relocate_json_paths(change, from, to);
+        }
+    }
+}
+
+fn relocate_json_paths(value: &mut Value, from: &str, to: &str) {
+    match value {
+        Value::String(text) => {
+            if text.contains(from) {
+                *text = text.replace(from, to);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                relocate_json_paths(item, from, to);
+            }
+        }
+        Value::Object(object) => {
+            for item in object.values_mut() {
+                relocate_json_paths(item, from, to);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
 }
 
 fn apply_model_extensions(
@@ -1036,14 +1187,6 @@ fn compile_pages(
                 out.insert("height".to_string(), height.clone());
             }
         }
-        if page.get("filters").is_some() {
-            return Err(CliError::unsupported_feature(
-                "report build page filters from dashboard spec are planned; add filters after build with report filters add"
-            )
-            .with_suggested_command(
-                "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json",
-            ));
-        }
         let visuals = compile_visuals(page_index, page, model, defaults_applied)?;
         out.insert("visuals".to_string(), Value::Array(visuals));
         let interactions = compile_interactions(page_index, page)?;
@@ -1053,6 +1196,530 @@ fn compile_pages(
         pages.push(Value::Object(out));
     }
     Ok(pages)
+}
+
+fn compile_filter_operations(
+    spec: &Map<String, Value>,
+    model: &ModelIndex,
+) -> CliResult<(Vec<Op>, Vec<String>)> {
+    let mut operations = Vec::new();
+    let mut pointers = Vec::new();
+
+    if let Some(filters) = spec.get("filters") {
+        let filters = filters.as_array().ok_or_else(|| {
+            CliError::invalid_args("dashboard spec filters must be an array")
+                .with_pointer("/filters")
+        })?;
+        for (filter_index, filter) in filters.iter().enumerate() {
+            let pointer = format!("/filters/{filter_index}");
+            operations.push(compile_filter_operation(
+                filter,
+                FilterScope::Report,
+                "report:main".to_string(),
+                None,
+                None,
+                model,
+                &pointer,
+            )?);
+            pointers.push(pointer);
+        }
+    }
+
+    for (page_index, page) in spec
+        .get("pages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        let page = page.as_object().ok_or_else(|| {
+            CliError::invalid_args(format!("pages[{page_index}] must be an object"))
+        })?;
+        let page_name = compiled_page_name(page, page_index)?;
+        let page_handle = format!("page:{page_name}");
+        if let Some(filters) = page.get("filters") {
+            let filters = filters.as_array().ok_or_else(|| {
+                CliError::invalid_args(format!("pages[{page_index}].filters must be an array"))
+                    .with_pointer(format!("/pages/{page_index}/filters"))
+            })?;
+            for (filter_index, filter) in filters.iter().enumerate() {
+                let pointer = format!("/pages/{page_index}/filters/{filter_index}");
+                operations.push(compile_filter_operation(
+                    filter,
+                    FilterScope::Page,
+                    page_handle.clone(),
+                    Some(&page_name),
+                    None,
+                    model,
+                    &pointer,
+                )?);
+                pointers.push(pointer);
+            }
+        }
+
+        for (visual_index, visual) in page
+            .get("visuals")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            let visual = visual.as_object().ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].visuals[{visual_index}] must be an object"
+                ))
+            })?;
+            let Some(filters) = visual.get("filters") else {
+                continue;
+            };
+            let visual_name = compiled_visual_name(visual, visual_index)?;
+            let visual_handle = format!("visual:{page_name}:{visual_name}");
+            let filters = filters.as_array().ok_or_else(|| {
+                CliError::invalid_args(format!(
+                    "pages[{page_index}].visuals[{visual_index}].filters must be an array"
+                ))
+                .with_pointer(format!(
+                    "/pages/{page_index}/visuals/{visual_index}/filters"
+                ))
+            })?;
+            for (filter_index, filter) in filters.iter().enumerate() {
+                let pointer =
+                    format!("/pages/{page_index}/visuals/{visual_index}/filters/{filter_index}");
+                operations.push(compile_filter_operation(
+                    filter,
+                    FilterScope::Visual,
+                    visual_handle.clone(),
+                    Some(&page_name),
+                    Some(&visual_name),
+                    model,
+                    &pointer,
+                )?);
+                pointers.push(pointer);
+            }
+        }
+    }
+
+    Ok((operations, pointers))
+}
+
+fn compile_drillthrough_operations(
+    spec: &Map<String, Value>,
+    model: &ModelIndex,
+) -> CliResult<(Vec<Op>, Vec<String>, Vec<Value>)> {
+    const BACK_BUTTON_BEAD: &str = "pbi-t4-pbir-catalog-expansion-sn2.8";
+    let mut operations = Vec::new();
+    let mut pointers = Vec::new();
+    let mut warnings = Vec::new();
+
+    for (page_index, page) in spec
+        .get("pages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        let page = page.as_object().ok_or_else(|| {
+            CliError::invalid_args(format!("pages[{page_index}] must be an object"))
+        })?;
+        let Some(value) = page.get("drillthrough") else {
+            continue;
+        };
+        let pointer = format!("/pages/{page_index}/drillthrough");
+        let drillthrough = value.as_object().ok_or_else(|| {
+            CliError::invalid_args("pages[].drillthrough must be an object")
+                .with_pointer(pointer.clone())
+        })?;
+        let target = drillthrough
+            .get("target")
+            .and_then(Value::as_str)
+            .filter(|target| !target.trim().is_empty())
+            .ok_or_else(|| {
+                CliError::invalid_args(
+                    "pages[].drillthrough.target must be a non-empty Table[Column] reference",
+                )
+                .with_pointer(format!("{pointer}/target"))
+            })?;
+        let (table, column) = parse_field_reference(target)
+            .map_err(|error| error.with_pointer(format!("{pointer}/target")))?;
+        let resolved = model
+            .resolve_filter_column(&table, &column)
+            .map_err(|error| error.with_pointer(format!("{pointer}/target")))?;
+        let hidden = match drillthrough.get("hidden") {
+            Some(value) => value.as_bool().ok_or_else(|| {
+                CliError::invalid_args("pages[].drillthrough.hidden must be a boolean")
+                    .with_pointer(format!("{pointer}/hidden"))
+            })?,
+            None => true,
+        };
+        let back_button = match drillthrough.get("backButton") {
+            Some(value) => value.as_bool().ok_or_else(|| {
+                CliError::invalid_args("pages[].drillthrough.backButton must be a boolean")
+                    .with_pointer(format!("{pointer}/backButton"))
+            })?,
+            None => false,
+        };
+        let page_name = compiled_page_name(page, page_index)?;
+        let target = format!("{}[{}]", resolved.table, resolved.column);
+        operations.push(Op::SetDrillthrough(crate::ops::SetDrillthrough {
+            page: format!("page:{page_name}"),
+            target: target.clone(),
+            fields: vec![target.clone()],
+            table: Some(resolved.table),
+            column: Some(resolved.column),
+            keep_all_filters: None,
+            keep_visible: Some(!hidden),
+            hidden: Some(hidden),
+            // The first proven slice is pageBinding plus its paired filter.
+            // Do not pass an unsupported action-button request to the kernel.
+            back_button: None,
+        }));
+        pointers.push(pointer.clone());
+        if back_button {
+            warnings.push(json!({
+                "code": "spec.feature_pending",
+                "message": "dashboard spec drillthrough backButton is pending the proven action-button kernel; the page drillthrough binding was compiled",
+                "pointer": format!("{pointer}/backButton"),
+                "owningBead": BACK_BUTTON_BEAD
+            }));
+        }
+    }
+
+    Ok((operations, pointers, warnings))
+}
+
+fn compile_filter_operation(
+    value: &Value,
+    expected_scope: FilterScope,
+    owner: String,
+    page_name: Option<&str>,
+    visual_name: Option<&str>,
+    model: &ModelIndex,
+    pointer: &str,
+) -> CliResult<Op> {
+    let filter = value.as_object().ok_or_else(|| {
+        CliError::invalid_args("dashboard spec filter must be an object")
+            .with_pointer(pointer.to_string())
+    })?;
+    let scope = match filter.get("scope") {
+        Some(value) => {
+            let value = value.as_str().ok_or_else(|| {
+                CliError::invalid_args("dashboard spec filter scope must be a string")
+                    .with_pointer(format!("{pointer}/scope"))
+            })?;
+            parse_filter_scope(value)
+                .map_err(|error| error.with_pointer(format!("{pointer}/scope")))?
+        }
+        None => expected_scope,
+    };
+    if scope != expected_scope {
+        return Err(CliError::invalid_args(format!(
+            "dashboard spec filter scope `{}` does not match its {} owner",
+            scope.as_str(),
+            expected_scope.as_str()
+        ))
+        .with_pointer(format!("{pointer}/scope")));
+    }
+
+    let target = filter
+        .get("target")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            CliError::invalid_args("dashboard spec filter requires target Table[Column]")
+                .with_pointer(format!("{pointer}/target"))
+        })?;
+    let (table, column) = parse_field_reference(target)
+        .map_err(|error| error.with_pointer(format!("{pointer}/target")))?;
+    let resolved_column = model
+        .resolve_filter_column(&table, &column)
+        .map_err(|error| error.with_pointer(format!("{pointer}/target")))?;
+    let kind = filter.get("kind").and_then(Value::as_str).ok_or_else(|| {
+        CliError::invalid_args("dashboard spec filter requires kind")
+            .with_pointer(format!("{pointer}/kind"))
+    })?;
+    let spec = compile_filter_spec(filter, kind, model, pointer)?;
+    spec.validate_for(&resolved_column, scope)
+        .map_err(|error| error.with_pointer(pointer.to_string()))?;
+
+    let name = generated_filter_name(scope, &resolved_column, &spec);
+    let handle = named_filter_handle(
+        scope,
+        page_name,
+        visual_name,
+        &name,
+        FilterArrayOrigin::FilterConfig,
+    );
+    let display_name = match filter.get("displayName") {
+        Some(value) => Some(
+            value
+                .as_str()
+                .ok_or_else(|| {
+                    CliError::invalid_args("dashboard spec filter displayName must be a string")
+                        .with_pointer(format!("{pointer}/displayName"))
+                })?
+                .to_string(),
+        ),
+        None => None,
+    };
+    let (filter_type, condition, values, relative) = filter_operation_parts(&spec);
+    Ok(Op::AddFilter(crate::ops::AddFilter {
+        handle,
+        scope: scope.as_str().to_string(),
+        owner,
+        filter_type,
+        target: json!({"table": resolved_column.table, "column": resolved_column.column}),
+        name: Some(name),
+        display_name,
+        condition,
+        values,
+        relative,
+    }))
+}
+
+fn compile_filter_spec(
+    filter: &Map<String, Value>,
+    kind: &str,
+    model: &ModelIndex,
+    pointer: &str,
+) -> CliResult<FilterSpec> {
+    let normalized = kind.to_ascii_lowercase().replace(['_', '-'], "");
+    match normalized.as_str() {
+        "categorical" | "in" => {
+            let values = filter
+                .get("values")
+                .and_then(Value::as_array)
+                .cloned()
+                .ok_or_else(|| {
+                    CliError::invalid_args(
+                        "categorical dashboard spec filters require a values array",
+                    )
+                    .with_pointer(format!("{pointer}/values"))
+                })?;
+            Ok(FilterSpec::Categorical { values })
+        }
+        "range" | "numericrange" | "advanced" => {
+            let min = filter.get("min").cloned().filter(|value| !value.is_null());
+            let max = filter.get("max").cloned().filter(|value| !value.is_null());
+            for (field, value) in [("min", min.as_ref()), ("max", max.as_ref())] {
+                if let Some(value) = value
+                    && !value.is_number()
+                {
+                    return Err(CliError::invalid_args(format!(
+                        "numeric range dashboard spec filter {field} must be a number"
+                    ))
+                    .with_pointer(format!("{pointer}/{field}")));
+                }
+            }
+            Ok(FilterSpec::NumericRange { min, max })
+        }
+        "relativedate" | "relativetime" => {
+            let relative = filter
+                .get("relative")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    CliError::invalid_args(
+                        "relative-date dashboard spec filters require a relative object",
+                    )
+                    .with_pointer(format!("{pointer}/relative"))
+                })?;
+            let direction = relative
+                .get("direction")
+                .or_else(|| relative.get("operator"))
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    CliError::invalid_args("relative filter requires direction")
+                        .with_pointer(format!("{pointer}/relative/direction"))
+                })?;
+            let operator = RelativeDateOperator::parse(direction)
+                .map_err(|error| error.with_pointer(format!("{pointer}/relative/direction")))?;
+            let unit = relative
+                .get("unit")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    CliError::invalid_args("relative filter requires unit")
+                        .with_pointer(format!("{pointer}/relative/unit"))
+                })?;
+            let unit = RelativeDateUnit::parse(unit)
+                .map_err(|error| error.with_pointer(format!("{pointer}/relative/unit")))?;
+            let span = relative
+                .get("span")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    CliError::invalid_args("relative filter requires integer span")
+                        .with_pointer(format!("{pointer}/relative/span"))
+                })?;
+            for field in ["calendar", "includeToday"] {
+                if relative.contains_key(field) {
+                    return Err(CliError::unsupported_feature(format!(
+                        "relative filter field `{field}` is not compiled yet"
+                    ))
+                    .with_pointer(format!("{pointer}/relative/{field}"))
+                    .with_hint(
+                        "Use relative direction, unit, and span only; calendar-boundary options require a later filter compiler slice.",
+                    ));
+                }
+            }
+            Ok(FilterSpec::RelativeDate {
+                operator,
+                unit,
+                span,
+            })
+        }
+        "topn" | "top" => {
+            let top = filter.get("top").and_then(Value::as_u64);
+            let bottom = filter.get("bottom").and_then(Value::as_u64);
+            let direction_value = filter.get("direction").and_then(Value::as_str);
+            let count_value = filter.get("count").and_then(Value::as_u64);
+            let (direction, count) = match (top, bottom, direction_value, count_value) {
+                (Some(_), Some(_), _, _) => {
+                    return Err(CliError::invalid_args(
+                        "TopN dashboard spec filters may set top or bottom, not both",
+                    )
+                    .with_pointer(pointer.to_string()));
+                }
+                (Some(count), None, _, _) => (TopNDirection::Top, count),
+                (None, Some(count), _, _) => (TopNDirection::Bottom, count),
+                (None, None, Some(direction), Some(count)) => {
+                    let direction = match direction.to_ascii_lowercase().as_str() {
+                        "top" | "--top" => TopNDirection::Top,
+                        "bottom" | "--bottom" => TopNDirection::Bottom,
+                        _ => {
+                            return Err(CliError::invalid_args(
+                                "TopN direction must be top or bottom",
+                            )
+                            .with_pointer(format!("{pointer}/direction")));
+                        }
+                    };
+                    (direction, count)
+                }
+                _ => {
+                    return Err(CliError::invalid_args(
+                        "TopN dashboard spec filters require top or bottom count",
+                    )
+                    .with_pointer(format!("{pointer}/top")));
+                }
+            };
+            let by = filter
+                .get("by")
+                .and_then(|value| {
+                    value.as_str().map(ToOwned::to_owned).or_else(|| {
+                        Some(format!(
+                            "{}[{}]",
+                            value.get("table")?.as_str()?,
+                            value.get("measure")?.as_str()?
+                        ))
+                    })
+                })
+                .ok_or_else(|| {
+                    CliError::invalid_args("TopN dashboard spec filters require by measure")
+                        .with_pointer(format!("{pointer}/by"))
+                })?;
+            let by = model
+                .resolve_filter_measure(&by)
+                .map_err(|error| error.with_pointer(format!("{pointer}/by")))?;
+            Ok(FilterSpec::TopN {
+                direction,
+                count,
+                by,
+            })
+        }
+        _ => Err(CliError::unsupported_feature(format!(
+            "unsupported dashboard spec filter kind: {kind}"
+        ))
+        .with_pointer(format!("{pointer}/kind"))),
+    }
+}
+
+fn filter_operation_parts(spec: &FilterSpec) -> (String, Option<Value>, Vec<Value>, Option<Value>) {
+    match spec {
+        FilterSpec::Categorical { values } => (
+            "Categorical".to_string(),
+            Some(json!({"values": values})),
+            values.clone(),
+            None,
+        ),
+        FilterSpec::NumericRange { min, max } => (
+            "Advanced".to_string(),
+            Some(json!({"min": min, "max": max})),
+            Vec::new(),
+            None,
+        ),
+        FilterSpec::TopN {
+            direction,
+            count,
+            by,
+        } => (
+            "TopN".to_string(),
+            Some(json!({
+                "direction": direction.flag(),
+                "count": count,
+                "by": {"table": by.table, "measure": by.measure}
+            })),
+            Vec::new(),
+            None,
+        ),
+        FilterSpec::RelativeDate {
+            operator,
+            unit,
+            span,
+        } => (
+            "RelativeDate".to_string(),
+            None,
+            Vec::new(),
+            Some(json!({
+                "operator": operator.as_str(),
+                "unit": unit.as_str(),
+                "span": span
+            })),
+        ),
+    }
+}
+
+fn parse_filter_scope(value: &str) -> CliResult<FilterScope> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "report" => Ok(FilterScope::Report),
+        "page" => Ok(FilterScope::Page),
+        "visual" => Ok(FilterScope::Visual),
+        other => Err(CliError::invalid_args(format!(
+            "unsupported dashboard spec filter scope: {other}"
+        ))),
+    }
+}
+
+fn compiled_page_name(page: &Map<String, Value>, page_index: usize) -> CliResult<String> {
+    if let Some(value) = page
+        .get("id")
+        .or_else(|| page.get("name"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+    {
+        return Ok(page_name(value));
+    }
+    Ok(crate::scaffold::object_name(
+        "ReportSection",
+        page.get("displayName")
+            .and_then(Value::as_str)
+            .unwrap_or("Page"),
+        page_index,
+    ))
+}
+
+fn compiled_visual_name(visual: &Map<String, Value>, visual_index: usize) -> CliResult<String> {
+    if let Some(value) = visual
+        .get("id")
+        .or_else(|| visual.get("name"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+    {
+        return Ok(visual_name(value));
+    }
+    Ok(crate::scaffold::object_name(
+        "VisualContainer",
+        visual
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or("visual"),
+        visual_index,
+    ))
 }
 
 fn compile_interactions(page_index: usize, page: &Map<String, Value>) -> CliResult<Vec<Value>> {
@@ -1894,6 +2561,41 @@ impl ModelIndex {
         }
     }
 
+    fn resolve_filter_column(&self, table: &str, column: &str) -> CliResult<ResolvedFilterColumn> {
+        let table_key = table.to_ascii_lowercase();
+        let column_key = column.to_ascii_lowercase();
+        if !self
+            .columns
+            .get(&table_key)
+            .is_some_and(|columns| columns.contains_key(&column_key))
+        {
+            return Err(CliError::invalid_args(format!(
+                "dashboard spec filter target does not exist in schema: {table}[{column}]"
+            )));
+        }
+        Ok(ResolvedFilterColumn {
+            table: table.to_string(),
+            column: column.to_string(),
+            data_type: self.column_data_type(table, column).map(ToOwned::to_owned),
+        })
+    }
+
+    fn resolve_filter_measure(&self, value: &str) -> CliResult<ResolvedFilterMeasure> {
+        let (table, measure) = parse_field_reference(value)?;
+        let table_key = table.to_ascii_lowercase();
+        let measure_key = measure.to_ascii_lowercase();
+        if !self
+            .measures
+            .get(&table_key)
+            .is_some_and(|measures| measures.contains(&measure_key))
+        {
+            return Err(CliError::invalid_args(format!(
+                "dashboard spec TopN measure does not exist in schema: {table}[{measure}]"
+            )));
+        }
+        Ok(ResolvedFilterMeasure { table, measure })
+    }
+
     fn column_data_type(&self, table: &str, column: &str) -> Option<&str> {
         self.columns
             .get(&table.to_ascii_lowercase())?
@@ -1931,6 +2633,68 @@ fn build_response(response: BuildResponse<'_>) -> Value {
     let project_dir = response.out_dir.map(canonical_display);
     let compiled = compiled_summary(response.compiled);
     let execution = legacy_execution_trace(response.compiled, response.out_dir, response.dry_run);
+    // A typed compiler build has one outcome per operation. Use those concrete
+    // kernel changes/readbacks in its response; legacy/schema-only builds keep
+    // the aggregate execution adapter used by the public build contract.
+    let typed_execution = !response.compiled.operation_outcomes.is_empty();
+    let mut changes = if typed_execution {
+        vec![json!({
+            "kind": "pbip.project",
+            "action": "create",
+            "path": project_dir.clone(),
+            "before": Value::Null,
+            "after": {
+                "projectDir": project_dir.clone(),
+                "counts": compiled["counts"].clone()
+            }
+        })]
+    } else {
+        execution.changes.clone()
+    };
+    if typed_execution {
+        for outcome in &response.compiled.operation_outcomes {
+            changes.extend(outcome.changes.iter().cloned());
+        }
+    }
+    let mut executed_primitives = if response.changed {
+        vec![
+            json!({"command": "scaffold", "reason": "report build compiled schema/spec into scaffold-compatible manifest"}),
+        ]
+    } else {
+        Vec::new()
+    };
+    executed_primitives.extend(response.compiled.operation_outcomes.iter().map(|outcome| {
+        json!({
+            "operationCount": 1,
+            "changed": outcome.changed,
+            "createdHandles": outcome.created_handles,
+        })
+    }));
+    let readback = if typed_execution {
+        let mut grouped = BTreeMap::<String, Vec<String>>::new();
+        for outcome in &response.compiled.operation_outcomes {
+            for (handle, command) in outcome.created_handles.iter().zip(&outcome.readback) {
+                grouped
+                    .entry(handle.clone())
+                    .or_default()
+                    .push(command.clone());
+            }
+        }
+        json!(grouped)
+    } else {
+        execution.readback.clone()
+    };
+    let scope = if typed_execution {
+        json!({
+            "kind": "report-build",
+            "mode": if response.dry_run { "dry-run" } else { "out-dir" },
+            "projectDir": project_dir,
+            "operationCount": response.compiled.operation_outcomes.len(),
+            "handles": response.compiled.operation_outcomes.iter().flat_map(|outcome| outcome.created_handles.iter().cloned()).collect::<Vec<_>>()
+        })
+    } else {
+        execution.scope.clone()
+    };
     let validation = response
         .out_dir
         .and_then(|path| crate::resolve_project(path).ok())
@@ -1964,12 +2728,13 @@ fn build_response(response: BuildResponse<'_>) -> Value {
         },
         "compiled": compiled,
         "defaultsApplied": response.compiled.defaults_applied,
-        "changes": execution.changes,
-        "readback": execution.readback,
-        "scope": execution.scope,
+        "changes": changes,
+        "readback": readback,
+        "scope": scope,
         "profileSummary": response.profile.map(profile_summary),
-        "executedPrimitives": if response.changed { vec![json!({"command": "scaffold", "reason": "report build compiled schema/spec into scaffold-compatible manifest"})] } else { Vec::new() },
+        "executedPrimitives": executed_primitives,
         "operations": response.compiled.operations,
+        "operationOutcomes": response.compiled.operation_outcomes,
         "warnings": response.compiled.warnings,
         "validation": validation.as_ref().map(|validation| json!({
             "ok": validation.errors.is_empty(),

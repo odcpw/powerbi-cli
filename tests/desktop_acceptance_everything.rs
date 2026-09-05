@@ -156,6 +156,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
     let style_after = h.root.join("style.after.json");
     let visual_formatting_bundle = h.root.join("visual-formatting.bundle.json");
     let wireframe = h.root.join("wireframe.json");
+    let wireframe_svg = h.root.join("wireframe-svg");
+    let wireframe_html = h.root.join("wireframe.html");
     let dax_file = h.root.join("average-cost.dax");
     let desktop_screenshot = h.root.join("everything-desktop.png");
     let desktop_reference = h.root.join("everything-reference.json");
@@ -1974,6 +1976,53 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["report", "wireframe", "export", &project_arg, "--json"]),
     );
     write_json(&wireframe, &wireframe_json);
+    let wireframe_svg_json = h.ok(
+        "report wireframe export",
+        &svec([
+            "report",
+            "wireframe",
+            "export",
+            &project_arg,
+            "--format",
+            "svg",
+            "--out",
+            &p(&wireframe_svg),
+            "--json",
+        ]),
+    );
+    assert_eq!(wireframe_svg_json["format"], "svg");
+    assert_eq!(wireframe_svg_json["dryRun"], false);
+    assert!(
+        wireframe_svg.is_dir(),
+        "SVG wireframe output directory missing"
+    );
+    assert!(
+        wireframe_svg_json["artifacts"]
+            .as_array()
+            .is_some_and(|artifacts| !artifacts.is_empty()),
+        "SVG wireframe did not report page artifacts"
+    );
+    let wireframe_html_json = h.ok(
+        "report wireframe export",
+        &svec([
+            "report",
+            "wireframe",
+            "export",
+            &project_arg,
+            "--format",
+            "html",
+            "--out",
+            &p(&wireframe_html),
+            "--json",
+        ]),
+    );
+    assert_eq!(wireframe_html_json["format"], "html");
+    assert_eq!(wireframe_html_json["dryRun"], false);
+    assert!(wireframe_html.is_file(), "HTML wireframe artifact missing");
+    assert_eq!(
+        wireframe_html_json["artifacts"][0]["kind"], "html",
+        "HTML wireframe artifact kind"
+    );
     let layout_json = h.ok(
         "report layout auto",
         &svec([

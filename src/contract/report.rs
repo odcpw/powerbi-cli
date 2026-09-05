@@ -8,7 +8,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; root/page/visual filters compile through AddFilter and page drillthrough through SetDrillthrough with model/type validation, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -22,7 +22,7 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
-            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args"]
         }),
         json!({
@@ -291,23 +291,32 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report wireframe export",
-            "usage": "powerbi-cli report wireframe export <project-dir-or.pbip> --json",
-            "summary": "Export report pages, visual geometry, bindings, and report handles as JSON without Power BI Desktop",
+            "usage": "powerbi-cli report wireframe export <project-dir-or.pbip> [--format json|svg|html] [--template <name>] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--out <path> | --dry-run] --json",
+            "summary": "Export report pages, deterministic grid slots, visual geometry, bindings, and lint markers as JSON, SVG, or HTML without Power BI Desktop",
             "tags": ["pbir", "report", "wireframe", "layout", "agent"],
-            "readOnly": true,
-            "mutates": false,
+            "readOnly": false,
+            "mutates": true,
+            "mutatesProject": false,
+            "writesArtifact": true,
+            "requiresOutput": false,
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
-            "outputSchema": "reportWireframe.v1",
-            "flags": ["--json", "--format json"],
-            "examples": ["powerbi-cli report wireframe export build/sales --json"],
-            "followUpFields": ["handles", "pages", "counts", "next", "warnings", "errors"]
+            "outputSchema": "powerbi-cli.report.wireframe.v2",
+            "outputSchemas": ["powerbi-cli.report.wireframe.v1", "powerbi-cli.report.wireframe.v2"],
+            "flags": ["--format json|svg|html", "--template <name>", "--page-size 1280x720|1920x1080", "--grid <columns=12,gutter=16,margin=24,rowUnit=8>", "--out <path>", "--dry-run", "--json", "--format json"],
+            "examples": [
+                "powerbi-cli report wireframe export build/sales --json",
+                "powerbi-cli report wireframe export build/sales --format svg --out proof/sales-wireframe --json",
+                "powerbi-cli report wireframe export build/sales --format html --dry-run --json"
+            ],
+            "followUpFields": ["ok", "format", "dryRun", "mode", "template", "grid", "geometrySource", "gridSource", "handles", "pages[].slots[]", "pages[].visuals[]", "pages[].lintMarkers[]", "artifacts[]", "counts", "next", "warnings", "errors"],
+            "diagnosticCodes": ["input_safety_violation", "invalid_args", "validation_failed"]
         }),
         json!({
             "path": "report layout auto",
             "aliases": ["report layouts auto", "report layout arrange"],
             "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting",
+            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting; legacy overview|analysis|detail|grid presets are aliases for the corresponding named templates",
             "tags": ["pbir", "report", "layout", "visual", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,

@@ -183,7 +183,7 @@ impl Transaction {
         validate_project(&project)
     }
 
-    pub(crate) fn apply_all<K: OpKernel>(
+    pub(crate) fn apply_all<K: OpKernel + ?Sized>(
         &mut self,
         plan: &ValidatedPlan,
         kernel: &mut K,
