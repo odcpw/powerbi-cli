@@ -926,7 +926,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report build",
         ],
         refusal_code: None,
-        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. `report spec normalize` flattens model, page, and style fragments deterministically; `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. Root, page, and visual `filters[]` compile through the typed AddFilter kernel with model/type validation for categorical, numeric-range, relative-date, and visual TopN shapes; page `drillthrough` blocks compile through SetDrillthrough with an existing-column target and hidden-by-default page, while backButton requests return a spec.feature_pending warning for pbi-t4-pbir-catalog-expansion-sn2.8 until the action-button kernel is proven. Page templates and named visual slots resolve through the shared grid with explicit-layout precedence; generated heading/subtitle textboxes consume typography family/scale tokens, and explain exposes resolved coordinates. Unknown slots report available choices, duplicate slots fail, family mismatches warn, and section dividers remain feature_pending. Build responses expose per-operation outcomes and readback. The compiled subset remains artifact-identical to v1 where features overlap; proof is compiled into a side-effect-free proofPlan and exact next commands, while every other recognized future section stops with unsupported_feature and its owning T3 bead id.",
+        reason: "powerbi-cli.dashboard.v2 is a strict superset of v1 with versioned allowed-key tables, bounded relative $include composition, and deny-unknown-fields models. `report spec normalize` flattens model, page, and style fragments deterministically; `report spec upgrade` losslessly rewrites every validated v1 spec to normalized v2, preserving array order and refusing unknown keys before writing. Missing required intent returns the registered spec.missing_input diagnostic with an RFC 6901 pointer and report spec fields candidate command; documented defaults are listed in defaultsApplied[]. Root, page, and visual `filters[]` compile through the typed AddFilter kernel with model/type validation for categorical, numeric-range, relative-date, and visual TopN shapes; page `drillthrough` blocks compile through SetDrillthrough with an existing-column target and hidden-by-default page, while backButton requests return a spec.feature_pending warning for pbi-t4-pbir-catalog-expansion-sn2.8 until the action-button kernel is proven. Page templates and named visual slots resolve through the shared grid with explicit-layout precedence; generated heading/subtitle textboxes consume typography family/scale tokens, and explain exposes resolved coordinates. style.preset and style.bundle compile last through ApplyThemePreset and ApplyStyleBundle; literal text requires allowLiteralText, while defaults and non-typography tokens point to pbi-t3-compiler-completeness-1qi.13. Unknown slots report available choices, duplicate slots fail, family mismatches warn, and section dividers remain feature_pending. Build responses expose per-operation outcomes and readback. The compiled subset remains artifact-identical to v1 where features overlap; proof is compiled into a side-effect-free proofPlan and exact next commands, while every other recognized future section stops with unsupported_feature and its owning T3 bead id.",
         next_proof: &[
             "Land the named T3 compiler bead for each remaining refused v2 section",
             "Promote generated v2 archetypes through the existing Desktop proof ladder",
@@ -1358,6 +1358,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         proof_level: "unit-smoke",
         emits_pbir: true,
         commands: &[
+            "report build",
             "report themes show",
             "report themes extract",
             "report themes apply",
@@ -1375,7 +1376,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report style diff",
         ],
         refusal_code: None,
-        reason: "Theme, visual formatting, and master-style bundle operations preserve raw PBIR cards while guarding literal text and typed color/text patches.",
+        reason: "Theme, visual formatting, and master-style bundle operations preserve raw PBIR cards while guarding literal text and typed color/text patches; report build compiles style.preset and style.bundle through the same kernels at the final operation stage.",
         next_proof: &["Desktop-authored conditional formatting fixture before CF authoring"],
         reference_signals: &[],
         tags: &["pbir", "themes", "formatting"],

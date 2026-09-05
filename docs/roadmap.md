@@ -154,7 +154,10 @@ policies can wait until the object-specific writers and fixtures exist.
   array order, and refusing unknown keys before output.
 - `report build --schema <schema> [--profile <profile>] [--spec <spec>]`:
   compile schema/profile/spec inputs into an offline-safe PBIP project through
-  proven scaffold/report primitives.
+  proven scaffold/report primitives. Style presets and style bundles compile
+  last through ApplyThemePreset/ApplyStyleBundle; literal-text bundles require
+  explicit opt-in, while defaults and non-typography tokens remain assigned to
+  `pbi-t3-compiler-completeness-1qi.13`.
 - `report plan --schema <schema> --profile <profile> --intent <intent.md|intent.json>`
   (or the backward-compatible `--objective <goal>`): deterministic starter
   dashboard planner that normalizes audience, questions, KPIs, comparisons,

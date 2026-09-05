@@ -17,6 +17,7 @@ use crate::pbir_visual_factory::{
     slicer_between_data_type_is_supported,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
+use crate::report_build_style::compile_style_operations;
 use crate::report_filter_shapes::{
     FilterSpec, RelativeDateOperator, RelativeDateUnit, ResolvedFilterColumn,
     ResolvedFilterMeasure, TopNDirection, generated_filter_name, parse_field_reference,
@@ -25,9 +26,7 @@ use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
-use crate::report_spec_schema::{
-    reject_uncompiled_v2_sections, style_is_supported_typography, validate_known_fields,
-};
+use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::scorecard::{dry_run_scorecard, project_scorecard};
@@ -987,6 +986,9 @@ fn compile_dashboard(
         compile_slicer_operations(spec_object, profile)?;
     typed_operations.extend(slicer_operations);
     operation_pointers.extend(slicer_pointers);
+    let (style_operations, style_pointers) = compile_style_operations(spec_object)?;
+    typed_operations.extend(style_operations);
+    operation_pointers.extend(style_pointers);
     operations.extend(
         typed_operations
             .iter()
@@ -994,17 +996,6 @@ fn compile_dashboard(
     );
     warnings.extend(drillthrough_warnings);
     warnings.extend(slicer_warnings);
-    if let Some(style) = spec_object.get("style")
-        && (spec_object.get("schema").and_then(Value::as_str) != Some("powerbi-cli.dashboard.v2")
-            || !style_is_supported_typography(style))
-    {
-        return Err(CliError::unsupported_feature(
-            "report build style application from dashboard spec is not implemented yet"
-        )
-        .with_suggested_command(
-            "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
-        ));
-    }
     if spec_object.get("proof").is_some() {
         operations.push(json!({
             "kind": "proofRequirements",

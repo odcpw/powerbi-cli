@@ -188,7 +188,7 @@ const FORMAT_STRING: NodeSchema = node(
 const STYLE: NodeSchema = node(
     "style",
     "style",
-    &["preset", "bundle", "tokens", "defaults"],
+    &["preset", "bundle", "allowLiteralText", "tokens", "defaults"],
 );
 const STYLE_TOKENS: NodeSchema = node(
     "style.tokens",
@@ -772,6 +772,9 @@ fn version_schema(version: SpecVersion) -> Value {
                 nodes,
                 "style",
                 &[
+                    ("preset", json!({"type": "string", "minLength": 1})),
+                    ("bundle", json!({"type": "string", "minLength": 1})),
+                    ("allowLiteralText", json!({"type": "boolean"})),
                     ("tokens", style_tokens_with_children(nodes, style_tokens)),
                     ("defaults", json!({"type": "object"})),
                 ],
@@ -1027,6 +1030,7 @@ pub(crate) fn reject_uncompiled_v2_sections(spec: &Value) -> CliResult<()> {
     Err(CliError::unsupported_feature(format!(
         "dashboard spec v2 section `{section}` is recognized but not compiled; owning bead: {bead}"
     ))
+    .with_pointer(format!("/{}", section.replace('.', "/")))
     .with_hint(format!(
         "Keep the section in the v2 spec for future compilation, or apply its supported primitive after build. Owning bead: {bead}."
     ))
@@ -1045,28 +1049,47 @@ fn spec_version(root: &Map<String, Value>) -> CliResult<SpecVersion> {
     }
 }
 
-/// Return whether a v2 style contains only the typography tokens consumed by
-/// compiler-generated heading/subtitle textboxes.  Other style sections stay
-/// on the style-completeness bead so report build never silently drops them.
-pub(crate) fn style_is_supported_typography(style: &Value) -> bool {
+/// Return whether every style field is compiled by the current report-build
+/// pipeline. Presets and bundles become typed style-stage operations; the
+/// typography-only token subset remains consumed by generated headings.
+pub(crate) fn style_is_compilable(style: &Value) -> bool {
     let Some(style) = style.as_object() else {
         return false;
     };
-    if style.keys().any(|key| key != "tokens") {
+    if style.contains_key("defaults")
+        || style.keys().any(|key| {
+            !matches!(
+                key.as_str(),
+                "preset" | "bundle" | "allowLiteralText" | "tokens"
+            )
+        })
+    {
         return false;
     }
-    let Some(tokens) = style.get("tokens").and_then(Value::as_object) else {
-        return false;
-    };
-    if tokens.keys().any(|key| key != "typography") {
-        return false;
+    style.get("tokens").is_none_or(|tokens| {
+        tokens.as_object().is_some_and(|tokens| {
+            !tokens.keys().any(|key| key != "typography")
+                && tokens.get("typography").is_some_and(|typography| {
+                    typography.as_object().is_some_and(|typography| {
+                        !typography
+                            .keys()
+                            .any(|key| !matches!(key.as_str(), "family" | "scale"))
+                    })
+                })
+        })
+    })
+}
+
+fn uncompiled_style_section(style: &Value) -> Option<(&'static str, &'static str)> {
+    let style = style.as_object()?;
+    if style.contains_key("defaults") {
+        return Some(("style.defaults", "/style/defaults"));
     }
-    let Some(typography) = tokens.get("typography").and_then(Value::as_object) else {
-        return false;
-    };
-    !typography
-        .keys()
-        .any(|key| !matches!(key.as_str(), "family" | "scale"))
+    let tokens = style.get("tokens")?.as_object()?;
+    if !tokens.contains_key("typography") || tokens.keys().any(|key| key != "typography") {
+        return Some(("style.tokens", "/style/tokens"));
+    }
+    None
 }
 
 fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
@@ -1221,7 +1244,7 @@ fn first_uncompiled_v2_section(
 ) -> Option<(String, &'static str, &'static str)> {
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
-    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
     const FORMAT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.8";
     const PROOF_BEAD: &str = "pbi-t3-compiler-completeness-1qi.9";
@@ -1262,12 +1285,9 @@ fn first_uncompiled_v2_section(
             ));
         }
     }
-    if root
-        .get("style")
-        .is_some_and(|style| !style_is_supported_typography(style))
-    {
+    if let Some((section, _)) = root.get("style").and_then(uncompiled_style_section) {
         return Some((
-            "style".to_string(),
+            section.to_string(),
             STYLE_BEAD,
             "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
         ));
@@ -1367,7 +1387,7 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
 
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
-    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
     const FORMAT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.8";
     const PROOF_BEAD: &str = "pbi-t3-compiler-completeness-1qi.9";
@@ -1422,13 +1442,10 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
             }
         }
     }
-    if root
-        .get("style")
-        .is_some_and(|style| !style_is_supported_typography(style))
-    {
+    if let Some((section, pointer)) = root.get("style").and_then(uncompiled_style_section) {
         push(
-            "style".to_string(),
-            "/style".to_string(),
+            section.to_string(),
+            pointer.to_string(),
             STYLE_BEAD,
             "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
         );
@@ -1673,6 +1690,7 @@ struct StaticTableV2 {
 struct StyleV2 {
     preset: Option<Value>,
     bundle: Option<Value>,
+    allow_literal_text: Option<Value>,
     tokens: Option<StyleTokensV2>,
     defaults: Option<BTreeMap<String, Value>>,
 }

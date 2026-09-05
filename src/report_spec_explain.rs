@@ -12,7 +12,7 @@ use crate::ops::{
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_build::compile_dashboard_for_explain_with_profile;
 use crate::report_spec_schema::{
-    DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, style_is_supported_typography,
+    DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, style_is_compilable,
     uncompiled_v2_sections, validate_known_fields,
 };
 use crate::schema::{load_schema_value, validate_schema_value};
@@ -219,7 +219,7 @@ fn collect_unsupported_sections(
 
 fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
-    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const STYLE_COMMAND: &str = "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json";
     const MODEL_COMMAND: &str = "powerbi-cli --json capabilities --for model";
@@ -228,7 +228,10 @@ fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
         return Vec::new();
     };
     let mut sections = Vec::new();
-    if root.contains_key("style") {
+    if root
+        .get("style")
+        .is_some_and(|style| !style_is_compilable(style))
+    {
         sections.push(UncompiledSection {
             section: "style".into(),
             pointer: "/style".into(),
@@ -283,7 +286,12 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
     let mut sanitized = root.clone();
     match version {
         SpecVersion::V1 => {
-            sanitized.remove("style");
+            if sanitized
+                .get("style")
+                .is_some_and(|style| !style_is_compilable(style))
+            {
+                sanitized.remove("style");
+            }
             if let Some(model) = sanitized.get_mut("model").and_then(Value::as_object_mut) {
                 model.remove("relationships");
             }
@@ -295,7 +303,7 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
             }
             if sanitized
                 .get("style")
-                .is_some_and(|style| !style_is_supported_typography(style))
+                .is_some_and(|style| !style_is_compilable(style))
             {
                 sanitized.remove("style");
             }

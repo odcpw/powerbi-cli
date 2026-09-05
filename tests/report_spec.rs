@@ -578,11 +578,11 @@ fn report_build_rejects_unknown_key_before_creating_output() {
 }
 
 #[test]
-fn recognized_uncompiled_v1_sections_remain_unsupported_features() {
+fn recognized_uncompiled_v1_style_defaults_remain_an_unsupported_feature() {
     let temp = tempfile::tempdir().expect("tempdir");
     let path = temp.path().join("style.dashboard.json");
     let mut spec = minimal_spec();
-    spec["style"] = json!({"preset": "neutral"});
+    spec["style"] = json!({"defaults": {"card": {"title": true}}});
     write_spec(&path, &spec);
 
     let output = run_powerbi(&[
@@ -596,7 +596,14 @@ fn recognized_uncompiled_v1_sections_remain_unsupported_features() {
         "--json",
     ]);
     assert_eq!(output.code, 2);
-    assert_eq!(stderr_json(&output)["error"]["code"], "unsupported_feature");
+    let error = stderr_json(&output);
+    assert_eq!(error["error"]["code"], "unsupported_feature");
+    assert_eq!(error["error"]["pointer"], "/style/defaults");
+    assert!(
+        error["error"]["hint"]
+            .as_str()
+            .is_some_and(|hint| hint.contains("pbi-t3-compiler-completeness-1qi.13"))
+    );
 }
 
 #[test]
@@ -705,7 +712,10 @@ fn spec_fields_catalog_lists_every_v2_node() {
                 "formatStrings",
             ][..],
         ),
-        ("style", &["preset", "bundle", "tokens", "defaults"][..]),
+        (
+            "style",
+            &["preset", "bundle", "allowLiteralText", "tokens", "defaults"][..],
+        ),
         ("layout", &["grid", "pageSize", "rail"][..]),
         ("layout.rail", &["side", "width", "slicers"][..]),
         (
@@ -834,8 +844,8 @@ fn every_uncompiled_v2_section_names_its_owning_bead() {
             "pbi-t3-compiler-completeness-1qi.5",
         ),
         (
-            json!({"style": {"preset": "neutral"}}),
-            "pbi-t3-compiler-completeness-1qi.6",
+            json!({"style": {"defaults": {"card": {"title": true}}}}),
+            "pbi-t3-compiler-completeness-1qi.13",
         ),
         (
             json!({"pages": [{"visuals": [{"format": {"title.show": true}}]}]}),

@@ -151,7 +151,7 @@ fn explain_previews_uncompiled_v2_sections_with_owning_beads() {
         &fs::read_to_string("examples/sales.dashboard.v2.json").expect("sales v2 spec"),
     )
     .expect("parse sales v2 spec");
-    spec["style"] = serde_json::json!({"preset": "neutral"});
+    spec["style"] = serde_json::json!({"preset": "neutral-ops"});
     spec["filters"] = serde_json::json!([{
         "scope": "report",
         "target": "DimCustomer[Segment]",
@@ -180,9 +180,7 @@ fn explain_previews_uncompiled_v2_sections_with_owning_beads() {
         .as_array()
         .expect("unsupported");
     assert!(unsupported.iter().all(|item| item["pointer"] != "/filters"));
-    assert!(unsupported.iter().any(|item| {
-        item["pointer"] == "/style" && item["owningBead"] == "pbi-t3-compiler-completeness-1qi.6"
-    }));
+    assert!(unsupported.iter().all(|item| item["pointer"] != "/style"));
     assert_eq!(fs::read_dir(temp.path()).expect("tempdir read").count(), 1);
 }
 
