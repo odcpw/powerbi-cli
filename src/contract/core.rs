@@ -1759,11 +1759,7 @@ fn response_shapes() -> Value {
             "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
             "requiredFields": ["schema", "ops"],
             "operationTag": "op",
-<<<<<<< HEAD
-            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "applyThemePreset", "setObject", "addCalculatedColumn", "addStaticTable", "setSortBy", "sourceTemplateApply", "addPage", "updatePage", "reorderPages", "setActivePage", "deleteEmptyPage", "clonePage", "setBindings", "setDisplayName", "setTopNGuard", "setDrilldownHierarchy", "cloneVisual", "deleteVisual", "updateFilter", "clearFilter", "deleteFilter", "slicerClear", "setText", "setColor", "formattingApply", "applyThemeBundle", "applyStyleBundle", "bookmarkMetadata", "sanitizeAction"],
-=======
-            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "resetInteraction", "applyThemePreset", "setObject", "setPosition"],
->>>>>>> main
+            "operationTags": ["addCalculatedColumn", "addFilter", "addMeasure", "addPage", "addRelationship", "addStaticTable", "addVisual", "applyStyleBundle", "applyThemeBundle", "applyThemePreset", "bookmarkMetadata", "clearFilter", "clonePage", "cloneVisual", "deleteEmptyPage", "deleteFilter", "deleteVisual", "formattingApply", "reorderPages", "resetInteraction", "sanitizeAction", "setActivePage", "setBindings", "setColor", "setDisplayName", "setDrilldownHierarchy", "setDrillthrough", "setInteraction", "setObject", "setPosition", "setSortBy", "setText", "setTopNGuard", "slicerClear", "sourceTemplateApply", "updateFilter", "updatePage"],
             "validation": ["dangling handles must resolve in the project or an earlier declaration", "declared handles are unique", "identical operations are rejected", "model, page, visual, behavior, and style stages are ordered"],
             "validatedPlanFields": ["ops[].index", "ops[].stage", "ops[].operation", "stages[].stage", "stages[].name", "stages[].operations"],
             "transactionModes": ["dry-run", "out-dir", "in-place with sibling snapshot"],

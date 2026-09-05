@@ -30,12 +30,9 @@ mod page_kernels;
 mod plan;
 mod reset_interaction;
 mod set_interaction;
-<<<<<<< HEAD
-mod style_kernels;
-=======
 mod set_object;
 mod set_position;
->>>>>>> main
+mod style_kernels;
 mod transaction;
 mod visual_kernels;
 
@@ -64,7 +61,6 @@ pub(crate) use page_kernels::*;
 pub(crate) use plan::*;
 pub(crate) use reset_interaction::*;
 pub(crate) use set_interaction::*;
-pub(crate) use style_kernels::*;
 #[allow(unused_imports)]
 pub(crate) use set_object::{
     SetObjectKernel, apply as apply_set_object, execute as execute_set_object,
@@ -73,6 +69,7 @@ pub(crate) use set_object::{
 pub(crate) use set_position::{
     SetPositionKernel, apply as apply_set_position, execute as execute_set_position,
 };
+pub(crate) use style_kernels::*;
 #[allow(unused_imports)]
 pub(crate) use transaction::*;
 pub(crate) use visual_kernels::*;
@@ -99,8 +96,8 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
         Op::SetInteraction(_) => Some(Box::new(SetInteractionKernel)),
         Op::ResetInteraction(_) => Some(Box::new(ResetInteractionKernel)),
         Op::ApplyThemePreset(_) => Some(Box::new(ApplyThemePresetKernel)),
-<<<<<<< HEAD
-        Op::SetObject(_) => None,
+        Op::SetObject(_) => Some(Box::new(SetObjectKernel::default())),
+        Op::SetPosition(_) => Some(Box::new(SetPositionKernel::default())),
         Op::AddCalculatedColumn(_)
         | Op::AddStaticTable(_)
         | Op::SetSortBy(_)
@@ -134,60 +131,45 @@ pub(crate) fn kernel_for(operation: &Op) -> Option<Box<dyn OpKernel>> {
 /// Keep this list next to [`kernel_for`] so the equivalence harness can detect
 /// a newly registered operation that lacks a parity case. Sibling branches may
 /// extend it with their pending operation families when the branches merge.
-=======
-        Op::SetObject(_) => Some(Box::new(SetObjectKernel::default())),
-        Op::SetPosition(_) => Some(Box::new(SetPositionKernel::default())),
-    }
-}
-
-/// Operation tags with a concrete kernel in this build.
-///
-/// Keep this list next to the registry match so equivalence tests fail as soon
-/// as a new kernel is registered without adding its table-driven case.
->>>>>>> main
 pub(crate) const fn registered_kernel_tags() -> &'static [&'static str] {
     &[
-        "addMeasure",
-        "addRelationship",
-        "addVisual",
+        "addCalculatedColumn",
         "addFilter",
+        "addMeasure",
+        "addPage",
+        "addRelationship",
+        "addStaticTable",
+        "addVisual",
+        "applyStyleBundle",
+        "applyThemeBundle",
+        "applyThemePreset",
+        "bookmarkMetadata",
+        "clearFilter",
+        "clonePage",
+        "cloneVisual",
+        "deleteEmptyPage",
+        "deleteFilter",
+        "deleteVisual",
+        "formattingApply",
+        "reorderPages",
+        "resetInteraction",
+        "sanitizeAction",
+        "setActivePage",
+        "setBindings",
+        "setColor",
+        "setDisplayName",
+        "setDrilldownHierarchy",
         "setDrillthrough",
         "setInteraction",
-<<<<<<< HEAD
-        "applyThemePreset",
-        "addCalculatedColumn",
-        "addStaticTable",
-        "setSortBy",
-        "sourceTemplateApply",
-        "addPage",
-        "updatePage",
-        "reorderPages",
-        "setActivePage",
-        "deleteEmptyPage",
-        "clonePage",
-        "setBindings",
-        "setDisplayName",
-        "setTopNGuard",
-        "setDrilldownHierarchy",
-        "cloneVisual",
-        "deleteVisual",
-        "updateFilter",
-        "deleteFilter",
-        "clearFilter",
-        "slicerClear",
-        "setText",
-        "setColor",
-        "formattingApply",
-        "applyThemeBundle",
-        "applyStyleBundle",
-        "bookmarkMetadata",
-        "sanitizeAction",
-=======
-        "resetInteraction",
-        "applyThemePreset",
         "setObject",
         "setPosition",
->>>>>>> main
+        "setSortBy",
+        "setText",
+        "setTopNGuard",
+        "slicerClear",
+        "sourceTemplateApply",
+        "updateFilter",
+        "updatePage",
     ]
 }
 
@@ -209,7 +191,7 @@ pub(crate) enum Op {
     ResetInteraction(ResetInteraction),
     ApplyThemePreset(ApplyThemePreset),
     SetObject(SetObject),
-<<<<<<< HEAD
+    SetPosition(SetPosition),
     AddCalculatedColumn(AddCalculatedColumn),
     AddStaticTable(AddStaticTable),
     SetSortBy(SetSortBy),
@@ -237,9 +219,6 @@ pub(crate) enum Op {
     ApplyStyleBundle(ApplyStyleBundle),
     BookmarkMetadata(BookmarkMetadata),
     SanitizeAction(SanitizeAction),
-=======
-    SetPosition(SetPosition),
->>>>>>> main
 }
 
 /// Flattened, JSON-native payload used by mutation kernels whose command
@@ -494,7 +473,7 @@ impl Op {
             Self::ResetInteraction(_) => "resetInteraction",
             Self::ApplyThemePreset(_) => "applyThemePreset",
             Self::SetObject(_) => "setObject",
-<<<<<<< HEAD
+            Self::SetPosition(_) => "setPosition",
             Self::AddCalculatedColumn(_) => "addCalculatedColumn",
             Self::AddStaticTable(_) => "addStaticTable",
             Self::SetSortBy(_) => "setSortBy",
@@ -522,9 +501,6 @@ impl Op {
             Self::ApplyStyleBundle(_) => "applyStyleBundle",
             Self::BookmarkMetadata(_) => "bookmarkMetadata",
             Self::SanitizeAction(_) => "sanitizeAction",
-=======
-            Self::SetPosition(_) => "setPosition",
->>>>>>> main
         }
     }
 
@@ -579,8 +555,8 @@ impl Op {
             | Self::SetInteraction(_)
             | Self::ResetInteraction(_)
             | Self::ApplyThemePreset(_)
-<<<<<<< HEAD
-            | Self::SetObject(_) => None,
+            | Self::SetObject(_)
+            | Self::SetPosition(_) => None,
             Self::AddCalculatedColumn(value)
             | Self::AddStaticTable(value)
             | Self::SetSortBy(value)
@@ -649,8 +625,10 @@ impl Op {
             | Self::AddFilter(_)
             | Self::SetDrillthrough(_)
             | Self::SetInteraction(_)
+            | Self::ResetInteraction(_)
             | Self::ApplyThemePreset(_)
             | Self::SetObject(_)
+            | Self::SetPosition(_)
             | Self::SetSortBy(_)
             | Self::SourceTemplateApply(_)
             | Self::UpdatePage(_)
@@ -673,10 +651,6 @@ impl Op {
             | Self::ApplyStyleBundle(_)
             | Self::BookmarkMetadata(_)
             | Self::SanitizeAction(_) => None,
-=======
-            | Self::SetObject(_)
-            | Self::SetPosition(_) => None,
->>>>>>> main
         }
     }
 
@@ -795,7 +769,7 @@ impl Serialize for Op {
             Self::ResetInteraction(value) => serialize_tagged(self.tag(), value, serializer),
             Self::ApplyThemePreset(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetObject(value) => serialize_tagged(self.tag(), value, serializer),
-<<<<<<< HEAD
+            Self::SetPosition(value) => serialize_tagged(self.tag(), value, serializer),
             Self::AddCalculatedColumn(value) => serialize_tagged(self.tag(), value, serializer),
             Self::AddStaticTable(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SetSortBy(value) => serialize_tagged(self.tag(), value, serializer),
@@ -823,9 +797,6 @@ impl Serialize for Op {
             Self::ApplyStyleBundle(value) => serialize_tagged(self.tag(), value, serializer),
             Self::BookmarkMetadata(value) => serialize_tagged(self.tag(), value, serializer),
             Self::SanitizeAction(value) => serialize_tagged(self.tag(), value, serializer),
-=======
-            Self::SetPosition(value) => serialize_tagged(self.tag(), value, serializer),
->>>>>>> main
         }
     }
 }
@@ -894,7 +865,9 @@ fn deserialize_tagged(tag: &str, payload: Value) -> Result<Op, String> {
         "setObject" => serde_json::from_value(payload)
             .map(Op::SetObject)
             .map_err(|error| format!("invalid setObject operation: {error}")),
-<<<<<<< HEAD
+        "setPosition" => serde_json::from_value(payload)
+            .map(Op::SetPosition)
+            .map_err(|error| format!("invalid setPosition operation: {error}")),
         "addCalculatedColumn" => serde_json::from_value(payload)
             .map(Op::AddCalculatedColumn)
             .map_err(|error| format!("invalid addCalculatedColumn operation: {error}")),
@@ -976,22 +949,12 @@ fn deserialize_tagged(tag: &str, payload: Value) -> Result<Op, String> {
         "sanitizeAction" => serde_json::from_value(payload)
             .map(Op::SanitizeAction)
             .map_err(|error| format!("invalid sanitizeAction operation: {error}")),
-=======
-        "setPosition" => serde_json::from_value(payload)
-            .map(Op::SetPosition)
-            .map_err(|error| format!("invalid setPosition operation: {error}")),
->>>>>>> main
         other => Err(format!("unsupported operation tag `{other}`")),
     }
 }
 
-<<<<<<< HEAD
 /// JSON Schema for an operation plan. The oneOf list covers the original T1a
 /// kernels and the T1b mutation families; read-only commands stay outside it.
-=======
-/// JSON Schema for an operation plan. The `oneOf` list is the closed set of
-/// operation tags accepted by this version of the ops.v1 contract.
->>>>>>> main
 pub(crate) fn schema_json() -> Value {
     let operation = |tag: &str, properties: Value, required: &[&str]| {
         let mut value = serde_json::json!({
@@ -1070,7 +1033,14 @@ pub(crate) fn schema_json() -> Value {
                             "visual": {"type": "string"}, "object": {"type": "string"},
                             "property": {"type": "string"}, "value": {}
                         }), &["visual", "object", "property", "value"]),
-<<<<<<< HEAD
+                        operation("setPosition", serde_json::json!({
+                            "visual": {"type": "string"},
+                            "x": {"type": "number"}, "y": {"type": "number"},
+                            "width": {"type": "number"}, "height": {"type": "number"},
+                            "z": {"type": "integer", "minimum": 0},
+                            "tabOrder": {"type": "integer", "minimum": 0},
+                            "allowOutsidePage": {"type": "boolean"}
+                        }), &["visual"]),
                         // T1b mutation payloads intentionally allow the
                         // focused command catalog to add fields without
                         // changing the operation envelope.
@@ -1101,16 +1071,6 @@ pub(crate) fn schema_json() -> Value {
                         operation("applyStyleBundle", serde_json::json!({}), &[]),
                         operation("bookmarkMetadata", serde_json::json!({}), &[]),
                         operation("sanitizeAction", serde_json::json!({}), &[]),
-=======
-                        operation("setPosition", serde_json::json!({
-                            "visual": {"type": "string"},
-                            "x": {"type": "number"}, "y": {"type": "number"},
-                            "width": {"type": "number"}, "height": {"type": "number"},
-                            "z": {"type": "integer", "minimum": 0},
-                            "tabOrder": {"type": "integer", "minimum": 0},
-                            "allowOutsidePage": {"type": "boolean"}
-                        }), &["visual"])
->>>>>>> main
                     ]
                 }
             }
@@ -1234,11 +1194,7 @@ mod tests {
             schema["properties"]["ops"]["items"]["oneOf"]
                 .as_array()
                 .map(Vec::len),
-<<<<<<< HEAD
-            Some(35)
-=======
-            Some(10)
->>>>>>> main
+            Some(37)
         );
     }
 

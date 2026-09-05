@@ -432,10 +432,7 @@ mod tests {
             .validate(&ProjectIndex::empty())
             .expect("handles validate");
         assert_eq!(validated.ops.len(), 2);
-        assert_eq!(
-            kernel_for(&Op::AddStaticTable(MutationPayload::default())).is_some(),
-            true
-        );
+        assert!(kernel_for(&Op::AddStaticTable(MutationPayload::default())).is_some());
     }
 
     #[test]
