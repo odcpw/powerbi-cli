@@ -312,7 +312,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -872,6 +872,21 @@ slot/template/style candidate for the layout compiler and is marked
 `planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
 `planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
 `planner.shape-ambiguous-template`, and `planner.overview`.
+
+Profiled Category/Rows groupings above 200 distinct values receive
+`specV2.pages[].visuals[].topnGuard` proposals (default top 50) and matching
+`performance.ops` SetTopNGuard operations. JSON intent can override these
+catalog defaults with `"guards": {"threshold": 200, "top": 50}`.
+Decisions record counts, threshold, cap, shape, and ranking measure; the
+first bound measure is reused, or a cheap COUNTROWS measure is proposed for
+one unambiguous fact table. The legacy `spec` / `--out` remains unchanged;
+these operations target the v2 candidate and do not imply full v2 build support.
+`performance.kernelAvailable` reports typed replay availability, and
+`performance.previewCommands` provides the existing TopN mutation dry-run path.
+Optional `--project <project-dir-or.pbip>` inspects existing partition M with
+the registered `m.unbuffered_reuse` analyzer and recommends reviewing
+Table.Buffer and query folding, without rewriting partitions. Without a
+project, `performance.bufferAnalysis` reports `project-not-supplied`.
 
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
