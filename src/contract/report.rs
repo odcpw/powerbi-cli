@@ -1368,9 +1368,9 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report visuals set-object",
-            "usage": "powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw> (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Set one curated PBIR visual object property (labels, categoryLabels, categoryAxis, valueAxis, or title) using Desktop literal encoding",
-            "tags": ["pbir", "report", "visual", "formatting", "objects", "labels", "axis", "title", "mutation", "agent"],
+            "usage": "powerbi-cli report visuals set-object --project <project-dir-or.pbip> (--batch <ops.v1.json> | (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --object <name> --property <name> --value <raw>) (--dry-run | --in-place | --out-dir <dir>) --json",
+            "summary": "Set one curated PBIR visual object property, or atomically apply a bounded SetObject-only ops.v1 batch across many visual handles",
+            "tags": ["pbir", "report", "visual", "formatting", "objects", "labels", "axis", "title", "batch", "transaction", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,
             "requiresOutput": true,
@@ -1378,10 +1378,11 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.visuals.objectMutation.v1",
-            "flags": ["--project <project-dir-or.pbip>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--object <name>", "--property <name>", "--value <raw>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
-            "examples": ["powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object title --property text --value \"Rate zuletzt (BU je 1'000 FTE)\" --in-place --json"],
-            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature. Run report visuals catalog --formatting --json for the versioned catalog, encoding, container, and evidence for each pair."],
-            "followUpFields": ["dryRun", "mode", "target.handle", "plan.object", "plan.property", "changes[].before", "changes[].after", "readbackCommand", "inspectCommand", "validateCommand"]
+            "outputSchemas": ["powerbi-cli.report.visuals.objectMutation.v1", "powerbi-cli.report.visuals.objectBatchMutation.v1"],
+            "flags": ["--project <project-dir-or.pbip>", "--batch <ops.v1.json>", "--handle <visual-handle>", "--page <page-name-or-handle>", "--visual <visual-name-or-title>", "--object <name>", "--property <name>", "--value <raw>", "--dry-run", "--in-place", "--out-dir <dir>", "--json", "--format json"],
+            "examples": ["powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object categoryLabels --property fontSize --value 20 --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --batch formatting.ops.json --dry-run --json", "powerbi-cli report visuals set-object --project build/sales --handle <visual-handle> --object title --property text --value \"Rate zuletzt (BU je 1'000 FTE)\" --in-place --json"],
+            "limitations": ["Curated catalog only: labels.show/fontSize, categoryLabels.show/fontSize/wordWrap, categoryAxis.show/showAxisTitle, valueAxis.show/showAxisTitle, and title.show/text. title writes visual.visualContainerObjects; every other object writes visual.objects slot [0] and preserves sibling properties. Unknown pairs return unsupported_feature. Run report visuals catalog --formatting --json for the versioned catalog, encoding, container, and evidence for each pair.", "--batch accepts a bounded powerbi-cli.ops.v1 file containing only setObject operations with already encoded PBIR literal values. Every handle and catalog pair is preflighted and the complete list commits through one all-or-nothing transaction."],
+            "followUpFields": ["dryRun", "mode", "target.handle", "plan.object", "plan.property", "batch.operationCount", "operationOutcomes[].index", "operationOutcomes[].operation", "operationOutcomes[].changed", "operationOutcomes[].changes", "operationOutcomes[].readback", "changes[].before", "changes[].after", "readbackCommand", "readbackCommands", "inspectCommand", "validateCommand"]
         }),
         json!({
             "path": "report visuals set-display-name",

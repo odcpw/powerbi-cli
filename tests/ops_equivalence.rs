@@ -68,6 +68,103 @@ fn set_object_op_replays_are_deterministic_and_preserve_cli_contract() {
 }
 
 #[test]
+fn set_object_batch_matches_replaying_each_registered_set_object_operation() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let source = scaffold_sales(temp.path());
+    let page = first_page_name(&source);
+    let (first, second) = first_two_visual_names(&source);
+    let first = format!("visual:{page}:{first}");
+    let second = format!("visual:{page}:{second}");
+    let operations = json!({
+        "schema": "powerbi-cli.ops.v1",
+        "ops": [
+            {
+                "op": "setObject",
+                "visual": first,
+                "object": "categoryLabels",
+                "property": "fontSize",
+                "value": {"expr": {"Literal": {"Value": "20D"}}}
+            },
+            {
+                "op": "setObject",
+                "visual": second,
+                "object": "title",
+                "property": "show",
+                "value": {"expr": {"Literal": {"Value": "false"}}}
+            }
+        ]
+    });
+    let batch_file = temp.path().join("set-object.ops.json");
+    fs::write(
+        &batch_file,
+        serde_json::to_vec_pretty(&operations).expect("serialize operation plan"),
+    )
+    .expect("write operation plan");
+
+    let batch_out = temp.path().join("batch-out");
+    let batch = run_powerbi_owned(&[
+        "report".to_string(),
+        "visuals".to_string(),
+        "set-object".to_string(),
+        "--project".to_string(),
+        source.to_string_lossy().into_owned(),
+        "--batch".to_string(),
+        batch_file.to_string_lossy().into_owned(),
+        "--out-dir".to_string(),
+        batch_out.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ]);
+    assert_eq!(batch.exit, 0, "batch stderr: {}", batch.stderr);
+
+    let first_out = temp.path().join("first-out");
+    let first_call = run_powerbi_owned(&[
+        "report".to_string(),
+        "visuals".to_string(),
+        "set-object".to_string(),
+        "--project".to_string(),
+        source.to_string_lossy().into_owned(),
+        "--handle".to_string(),
+        first,
+        "--object".to_string(),
+        "categoryLabels".to_string(),
+        "--property".to_string(),
+        "fontSize".to_string(),
+        "--value".to_string(),
+        "20".to_string(),
+        "--out-dir".to_string(),
+        first_out.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ]);
+    assert_eq!(first_call.exit, 0, "first stderr: {}", first_call.stderr);
+    let replay_out = temp.path().join("replay-out");
+    let second_call = run_powerbi_owned(&[
+        "report".to_string(),
+        "visuals".to_string(),
+        "set-object".to_string(),
+        "--project".to_string(),
+        first_out.to_string_lossy().into_owned(),
+        "--handle".to_string(),
+        second,
+        "--object".to_string(),
+        "title".to_string(),
+        "--property".to_string(),
+        "show".to_string(),
+        "--value".to_string(),
+        "false".to_string(),
+        "--out-dir".to_string(),
+        replay_out.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ]);
+    assert_eq!(second_call.exit, 0, "second stderr: {}", second_call.stderr);
+
+    assert_tree_equal(
+        &batch_out,
+        &replay_out,
+        "set-object batch and registered kernel replay",
+    );
+}
+
+#[test]
 fn set_position_op_replays_are_deterministic_and_preserve_cli_contract() {
     let temp = tempfile::tempdir().expect("tempdir");
     let first = scaffold_sales(&temp.path().join("first"));

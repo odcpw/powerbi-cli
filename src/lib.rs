@@ -100,6 +100,7 @@ mod report_visual_formatting_bundle;
 mod report_visual_formatting_color;
 mod report_visual_formatting_text;
 mod report_visual_mutations;
+mod report_visual_object_batch;
 mod report_visual_objects;
 mod report_visual_scaffold;
 mod report_visuals;

@@ -373,6 +373,9 @@ validation, proof, then mutation breadth.
   `report visuals catalog --formatting` additionally exposes the strict,
   embedded eleven-entry formatting catalog consumed by `set-object`, including
   PBIR containers, encoding, wildcard visual scope, and dated evidence.
+  `report visuals set-object --batch <file>` applies a bounded SetObject-only
+  `powerbi-cli.ops.v1` list across many handles through one atomic transaction,
+  returning per-entry outcomes and readback commands in every guarded mode.
   `report visuals add` creates card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,
   columnChart, lineClusteredColumnComboChart, and scatterChart containers from
