@@ -655,6 +655,8 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] PBIR page/visual/filter/slicer/interaction/bookmark metadata surfaces,
   theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
   harvester, with each feature's proof level published by `features list`.
+- [x] Dashboard-spec v2 page slicers and shared layout rails compile to
+  deterministic slicer visuals, including profile-aware mode defaults.
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
   execution, and read-only live TMDL export remain explicit opt-in Windows
   tracks; no command claims automated canvas/refresh proof.

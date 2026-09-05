@@ -4,7 +4,7 @@ use crate::profile::{load_profile_value, profile_summary, validate_profile_value
 use crate::profile_shape::classify;
 use crate::project_io::write_json_pretty;
 use crate::report_build::{
-    compile_dashboard_summary, spec_missing_input, spec_missing_input_with_command,
+    compile_dashboard_summary_with_profile, spec_missing_input, spec_missing_input_with_command,
 };
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{
@@ -180,7 +180,11 @@ pub(crate) fn plan_command(args: &[String]) -> CliResult<Value> {
     );
     planned.warnings.extend(loaded_intent.warnings);
     sort_intent_warnings(&mut planned.warnings);
-    let compiled = compile_dashboard_summary(&schema_value, &planned.spec)?;
+    let compiled = compile_dashboard_summary_with_profile(
+        &schema_value,
+        &planned.spec,
+        profile_value.as_ref(),
+    )?;
     let mut profile_summary_value = profile_value.as_ref().map(profile_summary);
     if let Some(summary) = profile_summary_value.as_mut() {
         // The planner has the normalized schema and can therefore retain
