@@ -410,7 +410,7 @@ fn unsupported_visual_type_error(value: &str, normalized: &str) -> CliError {
             "report.visuals.planned-types",
             format!("unsupported visual type for generated report visuals: {value}. {evidence}"),
         )
-        .with_hint(format!("{evidence} Supply a sanitized Desktop reference and record validation in docs/pbir-desktop-oracle.md before enabling generation."))
+        .with_hint(format!("{evidence} Run `report visuals catalog` for supported types. Supply a sanitized Desktop reference and record validation in docs/pbir-desktop-oracle.md before enabling generation."))
         .with_suggested_command("powerbi-cli report visuals catalog --json");
     }
     if TEMPLATE_ONLY_TYPES
