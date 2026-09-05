@@ -12,8 +12,8 @@ use crate::ops::{
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
 use crate::report_build::compiled_schema_for_explain;
 use crate::report_spec_schema::{
-    DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, uncompiled_v2_sections,
-    validate_known_fields,
+    DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, style_is_supported_typography,
+    uncompiled_v2_sections, validate_known_fields,
 };
 use crate::schema::{load_schema_value, validate_schema_value};
 use crate::{CliError, CliResult, EXIT_SUCCESS, canonical_display, command_arg};
@@ -288,8 +288,14 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
             sanitize_pages(&mut sanitized, &[], &["drilldown"]);
         }
         SpecVersion::V2 => {
-            for field in ["style", "layout", "filters", "proof"] {
+            for field in ["layout", "filters", "proof"] {
                 sanitized.remove(field);
+            }
+            if sanitized
+                .get("style")
+                .is_some_and(|style| !style_is_supported_typography(style))
+            {
+                sanitized.remove("style");
             }
             if let Some(model) = sanitized.get_mut("model").and_then(Value::as_object_mut) {
                 for field in [
@@ -314,21 +320,12 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
             }
             sanitize_pages(
                 &mut sanitized,
-                &[
-                    "filters",
-                    "slicers",
-                    "drillthrough",
-                    "tooltipFor",
-                    "template",
-                    "heading",
-                    "subtitle",
-                ],
+                &["filters", "slicers", "drillthrough", "tooltipFor"],
                 &[
                     "sort",
                     "drilldown",
                     "topnGuard",
                     "filters",
-                    "slot",
                     "subtitle",
                     "format",
                     "conditionalFormatting",
@@ -436,23 +433,28 @@ fn compile_operations(
             let page_handle_value = page_handle(page);
             let raw_visuals = raw_page.get("visuals").and_then(Value::as_array);
             let compiled_visuals = compiled_page.get("visuals").and_then(Value::as_array);
-            if let (Some(raw_visuals), Some(compiled_visuals)) = (raw_visuals, compiled_visuals) {
-                for (visual_index, raw_visual) in raw_visuals.iter().enumerate() {
-                    let Some(raw_visual) = raw_visual.as_object() else {
+            if let Some(compiled_visuals) = compiled_visuals {
+                for (visual_index, compiled_visual) in compiled_visuals.iter().enumerate() {
+                    let Some(compiled_visual) = compiled_visual.as_object() else {
                         continue;
                     };
-                    let Some(compiled_visual) = compiled_visuals
-                        .get(visual_index)
-                        .and_then(Value::as_object)
-                    else {
-                        continue;
-                    };
+                    let raw_visual = raw_visuals
+                        .and_then(|visuals| visuals.get(visual_index))
+                        .and_then(Value::as_object);
                     let visual_id = raw_visual
-                        .get("id")
-                        .or_else(|| raw_visual.get("name"))
-                        .and_then(Value::as_str)
+                        .and_then(|visual| {
+                            visual
+                                .get("id")
+                                .or_else(|| visual.get("name"))
+                                .and_then(Value::as_str)
+                        })
                         .or_else(|| compiled_visual.get("name").and_then(Value::as_str))
                         .unwrap_or("visual");
+                    let pointer = if raw_visual.is_some() {
+                        format!("/pages/{page_index}/visuals/{visual_index}")
+                    } else {
+                        format!("/pages/{page_index}/generatedVisuals/{visual_index}")
+                    };
                     let handle = visual_handle(page, visual_id);
                     let visual_type = compiled_visual
                         .get("visualType")
@@ -488,8 +490,12 @@ fn compile_operations(
                                 .cloned()
                                 .unwrap_or_default(),
                         }),
-                        pointer: format!("/pages/{page_index}/visuals/{visual_index}"),
-                        summary: "declare compiled report visual".to_string(),
+                        pointer,
+                        summary: if raw_visual.is_some() {
+                            "declare compiled report visual".to_string()
+                        } else {
+                            "declare compiler-generated layout visual".to_string()
+                        },
                     });
                 }
             }
@@ -692,7 +698,7 @@ fn layout_json(spec: &Value, compiled_schema: &Value) -> Value {
                         .or_else(|| compiled_visual.get("name").and_then(Value::as_str))
                         .unwrap_or("visual");
                     let position = position_value(compiled_visual.as_object()?)?;
-                    Some(json!({
+                    let mut assignment = json!({
                         "visual": visual_handle(page, visual_id),
                         "pointer": format!("/pages/{page_index}/visuals/{visual_index}"),
                         "coordinates": position,
@@ -700,14 +706,52 @@ fn layout_json(spec: &Value, compiled_schema: &Value) -> Value {
                         "y": position["y"],
                         "width": position["width"],
                         "height": position["height"]
-                    }))
+                    });
+                    if let Some(slot) = raw_visual.get("slot") {
+                        assignment["slot"] = slot.clone();
+                    }
+                    Some(assignment)
                 })
                 .collect::<Vec<_>>();
-            pages.push(json!({
+            let mut page_layout = json!({
                 "page": page_handle(page),
                 "pointer": format!("/pages/{page_index}"),
                 "slots": slots
-            }));
+            });
+            if let Some(layout) = compiled_page.get("layout").and_then(Value::as_object) {
+                if let Some(template) = layout.get("template") {
+                    page_layout["template"] = template.clone();
+                }
+                if let Some(resolved_slots) = layout.get("slots") {
+                    page_layout["resolvedSlots"] = resolved_slots.clone();
+                }
+                if let Some(compiled_visuals) =
+                    compiled_page.get("visuals").and_then(Value::as_array)
+                {
+                    let raw_len = raw_page
+                        .get("visuals")
+                        .and_then(Value::as_array)
+                        .map_or(0, Vec::len);
+                    let headings = compiled_visuals
+                        .iter()
+                        .enumerate()
+                        .skip(raw_len)
+                        .filter_map(|(visual_index, visual)| {
+                            let visual = visual.as_object()?;
+                            let position = position_value(visual)?;
+                            Some(json!({
+                                "kind": visual.get("generatedKind"),
+                                "visual": visual.get("name").and_then(Value::as_str).map(|name| visual_handle(page, name)),
+                                "text": visual.get("text"),
+                                "pointer": format!("/pages/{page_index}/generatedVisuals/{}", visual_index.saturating_sub(raw_len)),
+                                "coordinates": position
+                            }))
+                        })
+                        .collect::<Vec<_>>();
+                    page_layout["headings"] = Value::Array(headings);
+                }
+            }
+            pages.push(page_layout);
         }
     }
     json!({"available": true, "unavailable": Value::Null, "pages": pages})
@@ -770,6 +814,25 @@ fn defaults_json(spec: &Value, compiled_schema: &Value) -> Value {
                     "defaulted": !defaulted_fields.is_empty(),
                     "defaultedFields": defaulted_fields,
                     "position": position_value(compiled_visual.as_object().unwrap_or(&Map::new()))
+                }));
+            }
+            for (visual_index, compiled_visual) in
+                compiled_visuals.iter().enumerate().skip(raw_visuals.len())
+            {
+                let Some(compiled_visual) = compiled_visual.as_object() else {
+                    continue;
+                };
+                let Some(name) = compiled_visual.get("name").and_then(Value::as_str) else {
+                    continue;
+                };
+                per_visual.push(json!({
+                    "handle": visual_handle(page, name),
+                    "pointer": format!("/pages/{page_index}/generatedVisuals/{}", visual_index.saturating_sub(raw_visuals.len())),
+                    "visualType": compiled_visual.get("visualType"),
+                    "generated": true,
+                    "defaulted": true,
+                    "defaultedFields": ["text", "textStyle", "x", "y", "width", "height"],
+                    "position": position_value(compiled_visual)
                 }));
             }
         }

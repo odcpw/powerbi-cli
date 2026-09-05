@@ -1042,6 +1042,30 @@ fn spec_version(root: &Map<String, Value>) -> CliResult<SpecVersion> {
     }
 }
 
+/// Return whether a v2 style contains only the typography tokens consumed by
+/// compiler-generated heading/subtitle textboxes.  Other style sections stay
+/// on the style-completeness bead so report build never silently drops them.
+pub(crate) fn style_is_supported_typography(style: &Value) -> bool {
+    let Some(style) = style.as_object() else {
+        return false;
+    };
+    if style.keys().any(|key| key != "tokens") {
+        return false;
+    }
+    let Some(tokens) = style.get("tokens").and_then(Value::as_object) else {
+        return false;
+    };
+    if tokens.keys().any(|key| key != "typography") {
+        return false;
+    }
+    let Some(typography) = tokens.get("typography").and_then(Value::as_object) else {
+        return false;
+    };
+    !typography
+        .keys()
+        .any(|key| !matches!(key.as_str(), "family" | "scale"))
+}
+
 fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
     walk_object(root, ROOT_V2, "")?;
     walk_child_object(root, "report", REPORT, "")?;
@@ -1236,7 +1260,10 @@ fn first_uncompiled_v2_section(
             ));
         }
     }
-    if root.contains_key("style") {
+    if root
+        .get("style")
+        .is_some_and(|style| !style_is_supported_typography(style))
+    {
         return Some((
             "style".to_string(),
             STYLE_BEAD,
@@ -1279,16 +1306,9 @@ fn first_uncompiled_v2_section(
                 "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
             ));
         }
-        if ["template", "heading", "subtitle"]
-            .iter()
-            .any(|field| page.contains_key(*field))
-        {
-            return Some((
-                format!("pages[{page_index}].template|heading|subtitle"),
-                LAYOUT_BEAD,
-                "powerbi-cli report layout auto --project <project-dir> --page <page-handle> --preset overview --dry-run --json",
-            ));
-        }
+        // Page templates, headings, and subtitles are compiled by the
+        // dashboard compiler through the design-system grid.  Keep the
+        // remaining page-level sections on their owning bead below.
         for (visual_index, visual) in page
             .get("visuals")
             .and_then(Value::as_array)
@@ -1307,9 +1327,9 @@ fn first_uncompiled_v2_section(
                     "powerbi-cli --json capabilities --for report",
                 ));
             }
-            if visual.contains_key("slot") || visual.contains_key("subtitle") {
+            if visual.contains_key("subtitle") {
                 return Some((
-                    format!("pages[{page_index}].visuals[{visual_index}].slot|subtitle"),
+                    format!("pages[{page_index}].visuals[{visual_index}].subtitle"),
                     LAYOUT_BEAD,
                     "powerbi-cli report visuals set-position --project <project-dir> --handle <visual-handle> --x <x> --y <y> --width <width> --height <height> --dry-run --json",
                 ));
@@ -1413,7 +1433,10 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
             }
         }
     }
-    if root.contains_key("style") {
+    if root
+        .get("style")
+        .is_some_and(|style| !style_is_supported_typography(style))
+    {
         push(
             "style".to_string(),
             "/style".to_string(),
@@ -1460,16 +1483,6 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                     "powerbi-cli report drillthrough set --project <project-dir> --page <page-handle> --target <Table[Column]> --dry-run --json",
                 );
             }
-            for field in ["template", "heading", "subtitle"] {
-                if page.contains_key(field) {
-                    push(
-                        format!("pages[{page_index}].{field}"),
-                        format!("{page_pointer}/{field}"),
-                        LAYOUT_BEAD,
-                        "powerbi-cli report layout auto --project <project-dir> --page <page-handle> --preset overview --dry-run --json",
-                    );
-                }
-            }
             if let Some(visuals) = page.get("visuals").and_then(Value::as_array) {
                 for (visual_index, visual) in visuals.iter().enumerate() {
                     let Some(visual) = visual.as_object() else {
@@ -1486,7 +1499,7 @@ pub(crate) fn uncompiled_v2_sections(spec: &Value) -> CliResult<Vec<UncompiledSe
                             );
                         }
                     }
-                    for field in ["slot", "subtitle"] {
+                    for field in ["subtitle"] {
                         if visual.contains_key(field) {
                             push(
                                 format!("pages[{page_index}].visuals[{visual_index}].{field}"),

@@ -2,10 +2,11 @@
 
 use crate::pbir_bindings::{VisualBindingKind, VisualBindingResolved, resolved_binding_kind};
 use crate::pbir_visual_factory::{VisualBuildSpec, resolve_slicer_mode, visual_container_json};
+use crate::report_visual_scaffold::{TextboxStyle, textbox_visual_json_styled};
 use crate::scaffold::{DashboardSpec, normalize_data_type, object_name};
 use crate::{CliResult, report_visual_mutations};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +43,10 @@ pub(super) struct VisualSpec {
     pub(super) visual_type: Option<String>,
     #[serde(default)]
     pub(super) title: Option<String>,
+    #[serde(default)]
+    pub(super) text: Option<String>,
+    #[serde(default)]
+    pub(super) text_style: Option<TextboxStyle>,
     #[serde(default)]
     pub(super) mode: Option<String>,
     #[serde(default)]
@@ -111,6 +116,8 @@ impl Clone for VisualSpec {
             name: self.name.clone(),
             visual_type: self.visual_type.clone(),
             title: self.title.clone(),
+            text: self.text.clone(),
+            text_style: self.text_style.clone(),
             mode: self.mode.clone(),
             single_select: self.single_select,
             bindings: self.bindings.clone(),
@@ -149,6 +156,28 @@ pub(super) fn visual_json(
         .visual_type
         .clone()
         .unwrap_or_else(|| "card".to_string());
+    let name = visual
+        .name
+        .clone()
+        .unwrap_or_else(|| object_name("VisualContainer", &title, visual_index));
+    if visual_type.eq_ignore_ascii_case("textbox") {
+        let text = visual.text.clone().unwrap_or_else(|| title.clone());
+        let position = json!({
+            "x": visual.x.unwrap_or(40.0 + (visual_index as f64 * 40.0)),
+            "y": visual.y.unwrap_or(40.0 + (visual_index as f64 * 40.0)),
+            "z": visual_index as u64,
+            "height": visual.height.unwrap_or(180.0),
+            "width": visual.width.unwrap_or(320.0),
+            "tabOrder": visual_index as u64
+        });
+        return Ok(textbox_visual_json_styled(
+            &name,
+            &title,
+            &position,
+            &[text],
+            visual.text_style.as_ref(),
+        ));
+    }
     let bindings = visual
         .bindings
         .iter()
@@ -158,10 +187,7 @@ pub(super) fn visual_json(
     crate::pbir_bindings::validate_sort_bindings(&bindings)?;
     let slicer_mode = resolve_slicer_mode(&visual_type, visual.mode.as_deref())?;
     visual_container_json(&VisualBuildSpec {
-        name: visual
-            .name
-            .clone()
-            .unwrap_or_else(|| object_name("VisualContainer", &title, visual_index)),
+        name,
         title,
         visual_type,
         bindings,
