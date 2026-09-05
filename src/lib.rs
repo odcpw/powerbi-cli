@@ -56,6 +56,8 @@ mod pbir_visual_factory;
 mod planner_evidence;
 mod planner_performance;
 mod planner_rules;
+mod planner_variant_output;
+mod planner_variants;
 mod profile;
 mod profile_shape;
 mod project_io;

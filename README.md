@@ -319,7 +319,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--variants <N>] [--explain-rules] --json` — Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -921,6 +921,19 @@ compiler boundary and must be resolved before building a guarded candidate.
 `planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
 `planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
 `planner.shape-ambiguous-template`, `planner.overview`, and `planner.narrative-flow`.
+
+Add `--variants 3 --out dashboard.json` for three structurally distinct v2
+specs at `dashboard.json.variant-1.json` through `dashboard.json.variant-3.json`.
+Variants use the narrative v2 plan before guard annotations, preserving its
+overview-first page order, shared rail, and drillthrough targets. Template
+alternatives reuse narrative rail geometry; diffs compare against that plan.
+The catalog ranks compatible named templates; `variants[]` reports scores,
+structure hashes, decision diffs against the primary plan, and validation commands.
+Every candidate passes compiled spec validation before any outputs are written.
+Counts are bounded to 1–8; too few compatible choices return
+`plan.variants_insufficient` without writing. Guard decisions and replay proposals
+are attached separately, not embedded in these validated specs. This is Linux
+compiler validation, not Desktop proof. Existing outputs require `--force`.
 
 Profiled Category/Rows groupings above 200 distinct values receive
 `specV2.pages[].visuals[].topnGuard` proposals (default top 50) and matching

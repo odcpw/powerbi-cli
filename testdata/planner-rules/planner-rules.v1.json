@@ -8,6 +8,16 @@
     "maximumFactCandidates": 1
   },
   "performance": {"threshold": 200, "top": 50, "bufferReuseThreshold": 2},
+  "variants": {
+    "maxCount": 8,
+    "choices": [
+      {"ruleId":"planner.variant.overview","template":"overview","score":100,"reason":"Keep KPI, trend, breakdown, and detail together with a side rail.","conditions":[{"signal":"measureCount","operator":"gte","value":1}]},
+      {"ruleId":"planner.variant.kpi-strip","template":"kpi-strip-trend-breakdown","score":95,"reason":"Use full-width KPI and detail bands with a wider trend area.","conditions":[{"signal":"measureCount","operator":"gte","value":1}]},
+      {"ruleId":"planner.variant.time-series","template":"time-series","score":90,"reason":"Give the time-series primary visual the full page width.","conditions":[{"signal":"hasTimeAxis","operator":"eq","value":true}]},
+      {"ruleId":"planner.variant.comparison","template":"comparison","score":85,"reason":"Give comparison panels balanced space.","conditions":[{"signal":"measureCount","operator":"gte","value":2}]},
+      {"ruleId":"planner.variant.ranking","template":"ranking","score":80,"reason":"Emphasize categorical ranking with a filtering rail.","conditions":[{"signal":"categoryCount","operator":"gte","value":1}]}
+    ]
+  },
   "rules": [
     {
       "id": "planner.narrative-flow",

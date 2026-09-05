@@ -958,6 +958,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "examples/intents/sales.intent.json",
             "examples/intents/sales.intent.md",
             "testdata/planner-rules/planner-rules.v1.json",
+            "tests/planner_variants.rs: --variants N writes distinct score-ordered compiler-valid v2 template alternatives with structure hashes, primary-plan decision diffs, and separate guard replay proposals; Linux proof only",
             "testdata/golden/planner-narrative: schema-only star and flat fixtures with synthetic aggregate cardinalities; tests/planner_narrative.rs proves build ordering, replicated rails, drillthrough, and determinism",
         ],
         tags: &["report", "intent", "planner", "markdown", "json", "agent"],
