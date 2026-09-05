@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 #![allow(dead_code)]
 
+mod apply;
 mod bridge;
 mod calculated_columns;
 mod child_process;

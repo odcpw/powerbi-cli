@@ -87,10 +87,21 @@ const OP_KIND_CATALOG: &[&str] = &[
     "SourceTemplateApply",
     "UpdateFilter",
     "UpdatePage",
+    // Recognize raw-patch spellings only to return the public refusal code.
+    "rawPatch",
+    "raw-patch",
+    "RawPatch",
+    "patch",
 ];
 
 pub(crate) fn read_plan_file(path: &Path) -> CliResult<OpPlan> {
-    let mut value = input_safety::read_ops(path, OP_KIND_CATALOG)?;
+    let mut value = input_safety::read_ops(path, OP_KIND_CATALOG).map_err(|error| {
+        if error.pointer().is_none() {
+            error.with_pointer("")
+        } else {
+            error
+        }
+    })?;
     let object = value
         .as_object_mut()
         .ok_or_else(|| CliError::validation_failed("operation plan must be a JSON object"))?;
@@ -104,20 +115,100 @@ pub(crate) fn read_plan_file(path: &Path) -> CliResult<OpPlan> {
         ))
         .with_pointer("/schema"));
     }
-    object.remove("schema");
+    if let Some(key) = object
+        .keys()
+        .find(|key| !matches!(key.as_str(), "schema" | "ops"))
+    {
+        return Err(plan_input_error(
+            format!("unknown plan field `{key}`"),
+            format!("/{}", crate::diagnostics::escape_pointer_token(key)),
+        ));
+    }
+    let mut decoded = Vec::new();
     if let Some(ops) = object.get_mut("ops").and_then(Value::as_array_mut) {
-        for operation in ops {
+        for (index, operation) in ops.iter_mut().enumerate() {
+            let pointer = format!("/ops/{index}");
             if let Some(map) = operation.as_object_mut() {
-                let tag = map.get("op").cloned().or_else(|| map.remove("kind"));
+                if let (Some(op), Some(kind)) = (map.get("op"), map.get("kind"))
+                    && normalize_tag(op.clone()) != normalize_tag(kind.clone())
+                {
+                    return Err(plan_input_error(
+                        "conflicting op and kind tags",
+                        format!("{pointer}/kind"),
+                    ));
+                }
+                let legacy_tag = map.remove("kind");
+                let tag = map.get("op").cloned().or(legacy_tag);
                 if let Some(tag) = tag {
+                    if matches!(
+                        tag.as_str(),
+                        Some("rawPatch" | "raw-patch" | "RawPatch" | "patch")
+                    ) {
+                        return Err(CliError::unsupported_feature("raw-patch operations are not supported")
+                            .with_pointer(format!("{pointer}/op"))
+                            .with_hint("Use typed operations from the registered kernel catalog; arbitrary JSON patches cannot be replayed safely.")
+                            .with_suggested_command("powerbi-cli capabilities --for 'ops apply' --json"));
+                    }
                     map.insert("op".to_string(), normalize_tag(tag));
                 }
+                for key in map.keys() {
+                    if matches!(
+                        key.as_str(),
+                        "project"
+                            | "p"
+                            | "out"
+                            | "outDir"
+                            | "dryRun"
+                            | "inPlace"
+                            | "emitOp"
+                            | "json"
+                            | "format"
+                            | "snapshotDir"
+                            | "_"
+                    ) || !key.chars().all(|ch| ch.is_ascii_alphanumeric())
+                    {
+                        return Err(plan_input_error(
+                            format!(
+                                "operation field `{key}` is not a payload field; project/output transport belongs to ops apply"
+                            ),
+                            format!(
+                                "{pointer}/{}",
+                                crate::diagnostics::escape_pointer_token(key)
+                            ),
+                        ));
+                    }
+                }
             }
+            let op: super::Op = serde_json::from_value(operation.clone()).map_err(|error| {
+                plan_input_error(
+                    format!("decode operation {index}: {error}"),
+                    pointer.clone(),
+                )
+            })?;
+            let encoded = serde_json::to_value(&op).expect("Op serializes");
+            if let Some(key) = operation
+                .as_object()
+                .and_then(|map| map.keys().find(|key| encoded.get(key.as_str()).is_none()))
+            {
+                return Err(plan_input_error(
+                    format!("unknown operation field `{key}`"),
+                    format!(
+                        "{pointer}/{}",
+                        crate::diagnostics::escape_pointer_token(key)
+                    ),
+                ));
+            }
+            decoded.push(op);
         }
     }
-    serde_json::from_value(value).map_err(|error| {
-        CliError::validation_failed(format!("decode operation plan {}: {error}", path.display()))
-    })
+    Ok(OpPlan::new(decoded))
+}
+
+fn plan_input_error(message: impl Into<String>, pointer: impl Into<String>) -> CliError {
+    CliError::new(crate::rules::OPS_INVALID_PLAN, crate::EXIT_VALIDATION_FAILED, message)
+        .with_pointer(pointer)
+        .with_hint("Supply a bounded powerbi-cli.ops.v1 envelope with typed payloads and project/output options only on the command line.")
+        .with_suggested_command("powerbi-cli capabilities --for 'ops apply' --json")
 }
 
 fn normalize_tag(value: Value) -> Value {
@@ -183,6 +274,16 @@ mod tests {
             description: None,
             display_folder: None,
         })])
+    }
+
+    #[test]
+    fn bounded_loader_catalog_covers_every_registered_kernel() {
+        for tag in crate::ops::registered_kernel_tags() {
+            assert!(
+                OP_KIND_CATALOG.contains(tag),
+                "missing input-safety kind: {tag}"
+            );
+        }
     }
 
     #[test]

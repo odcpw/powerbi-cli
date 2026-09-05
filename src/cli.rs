@@ -145,6 +145,7 @@ fn dispatch(flags: &GlobalFlags, args: &[String]) -> CliResult<CliOutput> {
         "lint" => value_output(lint_command(&args[1..])?, flags.json),
         "integrations" => value_output(integrations_command(&args[1..])?, flags.json),
         "model" => value_output(model_command(&args[1..])?, flags.json),
+        "ops" => value_output(crate::apply::command(&args[1..])?, flags.json),
         "package" | "packages" => value_output(package_command(&args[1..])?, flags.json),
         "report" => value_output(report_command(&args[1..])?, flags.json),
         "source-template" | "source-templates" | "sourceTemplate" | "sourceTemplates" => {

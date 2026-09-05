@@ -102,6 +102,39 @@ pub(crate) fn validate_set_object_operation(operation: &SetObject) -> CliResult<
     resolve_object_property(Some(&operation.object), Some(&operation.property)).map(|_| ())
 }
 
+/// Public replay accepts only the catalog's proven literal encodings.
+pub(crate) fn validate_replay_object_value(operation: &SetObject) -> CliResult<()> {
+    validate_set_object_operation(operation)?;
+    let spec = resolve_object_property(Some(&operation.object), Some(&operation.property))?;
+    let literal = operation
+        .value
+        .pointer("/expr/Literal/Value")
+        .and_then(Value::as_str);
+    let valid = literal.is_some_and(|literal| {
+        if operation.value != literal_expression(literal) {
+            return false;
+        }
+        match spec.encoding {
+            FormattingEncoding::Bool => matches!(literal, "true" | "false"),
+            FormattingEncoding::Double => literal
+                .strip_suffix('D')
+                .and_then(|number| number.parse::<f64>().ok())
+                .is_some_and(f64::is_finite),
+            FormattingEncoding::String => literal
+                .strip_prefix('\'')
+                .and_then(|text| text.strip_suffix('\''))
+                .is_some_and(|text| encode_text_literal(&text.replace("''", "'")) == literal),
+        }
+    });
+    if valid {
+        Ok(())
+    } else {
+        Err(CliError::unsupported_feature("setObject replay requires the catalog property's proven PBIR literal encoding")
+            .with_pointer("/value")
+            .with_hint("Use expr.Literal.Value with true/false, a finite double ending in D, or a single-quoted string with doubled apostrophes, as required by the formatting catalog."))
+    }
+}
+
 pub(crate) fn parse_set_object_args(args: &[String]) -> CliResult<ParsedSetObject> {
     let options = parse_object_args(args)?;
     let source_project = required_project(options.project.clone(), SET_OBJECT)?;

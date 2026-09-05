@@ -56,6 +56,7 @@ pub(crate) fn help_text() -> String {
     r#"powerbi-cli helps agents author offline-safe Power BI PBIP projects.
 
 Usage:
+  powerbi-cli ops apply --project <project-dir-or.pbip> --ops <ops.json> (--dry-run | --out-dir <fresh-dir> | --in-place) --json
   powerbi-cli version --json
   powerbi-cli triage <project-dir-or.pbip> --json
   powerbi-cli --json capabilities [--for <filter> [--compact]]
@@ -342,7 +343,7 @@ pub(crate) fn capabilities(args: &[String]) -> CliResult<Value> {
         "contractNotes": {
             "explainFlagDiscipline": "--explain <id> always takes an identifier. Whole-artifact explanations are subcommands, such as report spec explain and report plan explain."
         },
-        // The response-shape catalog includes the internal ops.v1 spine and
+        // The response-shape catalog includes the durable ops.v1 envelope and
         // is intentionally emitted only by full discovery. Focused command
         // discovery must stay small and omit unrelated catalogs, matching the
         // null-shaped schemaManifest/generatedVisualContract fields below.
@@ -748,6 +749,18 @@ fn command_paths() -> Vec<String> {
 
 pub(crate) fn command_catalog() -> Vec<Value> {
     let mut commands = vec![
+        json!({
+            "path": "ops apply",
+            "usage": "powerbi-cli ops apply --project <project-dir-or.pbip> --ops <ops.json> (--dry-run | --out-dir <fresh-dir> | --in-place) --json",
+            "summary": "Validate and atomically replay a bounded typed operation plan through the registered kernels",
+            "tags": ["ops", "replay", "mutation"],
+            "readOnly": false, "mutates": true, "stability": "stable-shape",
+            "proofLevel": "unit-smoke", "outputSchema": "powerbi-cli.ops.apply.v1",
+            "flags": ["--project <path>", "--ops <ops.json>", "--dry-run", "--out-dir <fresh-dir>", "--in-place", "--json"],
+            "examples": ["powerbi-cli ops apply --project ./project --ops ./ops.json --dry-run --json"],
+            "followUpFields": ["scope", "readback", "scorecard", "inspectCommand", "validateCommand", "next"],
+            "limits": ["Typed ops.v1 only; raw patches and embedded transport flags are refused", "All operations are staged and validated before commit; in-place changes create a sibling snapshot", "No Desktop compatibility claim"]
+        }),
         json!({
             "path": "capabilities",
             "usage": "powerbi-cli --json capabilities [--for <filter> [--compact]]",
@@ -1817,7 +1830,15 @@ fn response_shapes() -> Value {
             "validation": ["dangling handles must resolve in the project or an earlier declaration", "declared handles are unique", "identical operations are rejected", "model, page, visual, behavior, and style stages are ordered"],
             "validatedPlanFields": ["ops[].index", "ops[].stage", "ops[].operation", "stages[].stage", "stages[].name", "stages[].operations"],
             "transactionModes": ["dry-run", "out-dir", "in-place with sibling snapshot"],
-            "status": "internal-spine-no-cli-command-yet"
+            "status": "public-atomic-replay",
+            "command": "ops apply"
+        },
+        "opsApply": {
+            "schema": "powerbi-cli.ops.apply.v1",
+            "fields": ["scope", "operationCount", "operationOutcomes", "changes", "journal", "readback", "scorecard", "warnings", "snapshotDir", "inspectCommand", "validateCommand", "next"],
+            "readback": "Object keyed by touched stable handles, containing command arrays.",
+            "scorecardScope": "staged-result, including dry-run; proof remains unit-smoke",
+            "atomicity": "Every operation and native validation completes in a disposable tree before commit. Failure pointers identify the operation index; no output is committed."
         },
         "followUps": {
             "next": "Executable powerbi-cli command templates only.",

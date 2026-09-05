@@ -2283,6 +2283,19 @@ fn everything_acceptance_invokes_every_catalog_command() {
         }),
     );
     h.ok(
+        "ops apply",
+        &svec([
+            "ops",
+            "apply",
+            "--project",
+            &project_arg,
+            "--ops",
+            &p(&set_object_batch),
+            "--dry-run",
+            "--json",
+        ]),
+    );
+    h.ok(
         "report visuals set-object",
         &svec([
             "report",
