@@ -4,15 +4,18 @@
 //! validates and compiles the supported portion of a dashboard specification,
 //! but never opens a transaction or writes a project/artifact.
 
+use crate::design::defaults::{effective_defaults, effective_json};
 use crate::json_composition::normalize_spec_file;
 use crate::ops::{
     AddMeasure, AddVisual, Op, OpPlan, ProjectIndex, SetInteraction, measure_handle, page_handle,
     visual_handle,
 };
 use crate::profile::{load_profile_value, profile_summary, validate_profile_value};
-use crate::report_build::compile_dashboard_for_explain_with_profile;
+use crate::report_build::{
+    compile_dashboard_for_explain_with_profile, style_requests_design_defaults,
+};
 use crate::report_spec_schema::{
-    DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, style_is_supported_typography,
+    DASHBOARD_V1, DASHBOARD_V2, SpecVersion, UncompiledSection, style_is_supported_compiled,
     uncompiled_v2_sections, validate_known_fields,
 };
 use crate::schema::{load_schema_value, validate_schema_value};
@@ -26,6 +29,7 @@ struct ExplainOptions {
     schema: Option<PathBuf>,
     profile: Option<PathBuf>,
     spec: Option<PathBuf>,
+    design_defaults: bool,
 }
 
 #[derive(Debug)]
@@ -67,10 +71,15 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
     let spec = normalized.value;
     let version = validate_known_fields(&spec)?;
     let profile = load_optional_profile(options.profile.as_deref())?;
-    let unsupported = collect_unsupported_sections(&spec, version)?;
-    let sanitized = sanitize_for_compile(&spec, version);
-    let (compiled_schema, compiled_warnings) =
-        compile_dashboard_for_explain_with_profile(&schema, &sanitized, profile.as_ref())?;
+    let design_defaults = options.design_defaults || style_requests_design_defaults(&spec);
+    let unsupported = collect_unsupported_sections(&spec, version, design_defaults)?;
+    let sanitized = sanitize_for_compile(&spec, version, design_defaults);
+    let (compiled_schema, compiled_warnings) = compile_dashboard_for_explain_with_profile(
+        &schema,
+        &sanitized,
+        profile.as_ref(),
+        design_defaults,
+    )?;
     let compiled_validation = validate_schema_value(&compiled_schema);
     if !compiled_validation.errors.is_empty() {
         return Err(CliError::validation_failed(format!(
@@ -86,7 +95,7 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
     let (entries, index) = compile_operations(&spec, &compiled_schema, &schema)?;
     let plan = build_plan_json(&entries, &index)?;
     let layout = layout_json(&spec, &compiled_schema);
-    let defaults = defaults_json(&spec, &compiled_schema);
+    let defaults = defaults_json(&spec, &compiled_schema, design_defaults)?;
     let unsupported_json = unsupported
         .iter()
         .map(|item| {
@@ -149,6 +158,15 @@ fn parse_args(args: &[String]) -> CliResult<ExplainOptions> {
             "--schema" => options.schema = Some(take_value(args, &mut index, "--schema")?),
             "--profile" => options.profile = Some(take_value(args, &mut index, "--profile")?),
             "--spec" => options.spec = Some(take_value(args, &mut index, "--spec")?),
+            "--design-defaults" | "--defaults" => {
+                if options.design_defaults {
+                    return Err(CliError::invalid_args(
+                        "--design-defaults may be specified only once",
+                    ));
+                }
+                options.design_defaults = true;
+                index += 1;
+            }
             value if value.starts_with('-') => {
                 return Err(CliError::invalid_args(format!(
                     "unknown report spec explain flag: {value}"
@@ -207,9 +225,10 @@ fn load_optional_profile(path: Option<&Path>) -> CliResult<Option<Value>> {
 fn collect_unsupported_sections(
     spec: &Value,
     version: SpecVersion,
+    design_defaults: bool,
 ) -> CliResult<Vec<UncompiledSection>> {
     let mut sections = if version == SpecVersion::V2 {
-        uncompiled_v2_sections(spec)?
+        uncompiled_v2_sections(spec, design_defaults)?
     } else {
         collect_v1_unsupported(spec)
     };
@@ -276,7 +295,7 @@ fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
     sections
 }
 
-fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
+fn sanitize_for_compile(spec: &Value, version: SpecVersion, design_defaults: bool) -> Value {
     let Some(root) = spec.as_object() else {
         return spec.clone();
     };
@@ -295,7 +314,7 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
             }
             if sanitized
                 .get("style")
-                .is_some_and(|style| !style_is_supported_typography(style))
+                .is_some_and(|style| !style_is_supported_compiled(style))
             {
                 sanitized.remove("style");
             }
@@ -329,10 +348,12 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
                     "topnGuard",
                     "filters",
                     "subtitle",
-                    "format",
                     "conditionalFormatting",
                 ],
             );
+            if !design_defaults {
+                sanitize_pages(&mut sanitized, &[], &["format"]);
+            }
         }
     }
     Value::Object(sanitized)
@@ -806,7 +827,11 @@ fn layout_json(spec: &Value, compiled_schema: &Value) -> Value {
     json!({"available": true, "unavailable": Value::Null, "pages": pages})
 }
 
-fn defaults_json(spec: &Value, compiled_schema: &Value) -> Value {
+fn defaults_json(
+    spec: &Value,
+    compiled_schema: &Value,
+    design_defaults_enabled: bool,
+) -> CliResult<Value> {
     let mut per_visual = Vec::new();
     let raw_pages = spec.get("pages").and_then(Value::as_array);
     let compiled_pages = compiled_schema["pages"].as_array();
@@ -856,14 +881,26 @@ fn defaults_json(spec: &Value, compiled_schema: &Value) -> Value {
                     })
                     .map(ToOwned::to_owned)
                     .collect::<Vec<_>>();
-                per_visual.push(json!({
+                let mut entry = json!({
                     "handle": visual_handle(page, visual_id),
                     "pointer": format!("/pages/{page_index}/visuals/{visual_index}"),
                     "visualType": compiled_visual.get("visualType"),
                     "defaulted": !defaulted_fields.is_empty(),
                     "defaultedFields": defaulted_fields,
                     "position": position_value(compiled_visual.as_object().unwrap_or(&Map::new()))
-                }));
+                });
+                if design_defaults_enabled {
+                    let visual_type = compiled_visual
+                        .get("visualType")
+                        .and_then(Value::as_str)
+                        .unwrap_or("card");
+                    let visual_format = raw_visual.get("format").and_then(Value::as_object);
+                    let resolved =
+                        effective_defaults(visual_type, spec.get("style"), visual_format)?;
+                    entry["designDefaultsEnabled"] = Value::Bool(true);
+                    entry["designDefaults"] = Value::Array(effective_json(&resolved));
+                }
+                per_visual.push(entry);
             }
             for (visual_index, compiled_visual) in
                 compiled_visuals.iter().enumerate().skip(raw_visuals.len())
@@ -886,7 +923,7 @@ fn defaults_json(spec: &Value, compiled_schema: &Value) -> Value {
             }
         }
     }
-    json!({"perVisual": per_visual})
+    Ok(json!({"perVisual": per_visual}))
 }
 
 fn position_value(visual: &Map<String, Value>) -> Option<Value> {

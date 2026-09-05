@@ -1,0 +1,108 @@
+{
+  "schema": "powerbi-cli.design-defaults.v1",
+  "families": [
+    {
+      "family": "card",
+      "visualTypes": ["card"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 12}
+      ]
+    },
+    {
+      "family": "bar-column",
+      "visualTypes": ["barChart", "clusteredBarChart", "columnChart", "clusteredColumnChart", "hundredPercentStackedColumnChart"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "categoryLabels.fontSize", "catalogKey": "categoryLabels.fontSize", "value": 10},
+        {"token": "categoryAxis.showAxisTitle", "catalogKey": "categoryAxis.showAxisTitle", "value": false},
+        {"token": "valueAxis.showAxisTitle", "catalogKey": "valueAxis.showAxisTitle", "value": false},
+        {"token": "valueAxis.gridlines.show", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Gridline visibility awaits a Desktop-referenced formatting catalog entry."}
+      ]
+    },
+    {
+      "family": "line-area",
+      "visualTypes": ["lineChart", "areaChart", "stackedAreaChart"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": false},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "categoryLabels.fontSize", "catalogKey": "categoryLabels.fontSize", "value": 10},
+        {"token": "categoryAxis.showAxisTitle", "catalogKey": "categoryAxis.showAxisTitle", "value": false},
+        {"token": "valueAxis.showAxisTitle", "catalogKey": "valueAxis.showAxisTitle", "value": false},
+        {"token": "valueAxis.gridlines.show", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Subtle gridline styling awaits a Desktop-referenced formatting catalog entry."},
+        {"token": "dataPoint.markers.show", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Line marker visibility awaits a Desktop-referenced formatting catalog entry."}
+      ]
+    },
+    {
+      "family": "combo",
+      "visualTypes": ["lineClusteredColumnComboChart"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "categoryAxis.showAxisTitle", "catalogKey": "categoryAxis.showAxisTitle", "value": false},
+        {"token": "valueAxis.showAxisTitle", "catalogKey": "valueAxis.showAxisTitle", "value": false}
+      ]
+    },
+    {
+      "family": "scatter",
+      "visualTypes": ["scatterChart"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "bubbleSize", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Scatter bubble size awaits the Desktop bubble-size catalog entry."},
+        {"token": "legend.position", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Legend placement awaits a Desktop-referenced formatting catalog entry."}
+      ]
+    },
+    {
+      "family": "share",
+      "visualTypes": ["pieChart", "donutChart"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "categoryLabels.show", "catalogKey": "categoryLabels.show", "value": true},
+        {"token": "categoryLabels.fontSize", "catalogKey": "categoryLabels.fontSize", "value": 10}
+      ]
+    },
+    {
+      "family": "table",
+      "visualTypes": ["tableEx"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "table.header.bold", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Table header emphasis awaits a Desktop-referenced formatting catalog entry."},
+        {"token": "table.alternatingRows", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Table banding awaits a Desktop-referenced formatting catalog entry."},
+        {"token": "table.columnWidth", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Table auto-width awaits a Desktop-referenced formatting catalog entry."}
+      ]
+    },
+    {
+      "family": "matrix",
+      "visualTypes": ["pivotTable"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "matrix.expandCollapse", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Matrix expand/collapse is emitted by the visual factory when multiple row levels are bound; the general formatting catalog entry is pending."},
+        {"token": "matrix.subtotals.show", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Matrix subtotal visibility awaits a Desktop-referenced formatting catalog entry."}
+      ]
+    },
+    {
+      "family": "slicer",
+      "visualTypes": ["slicer"],
+      "defaults": [
+        {"token": "title.show", "catalogKey": "title.show", "value": true},
+        {"token": "labels.show", "catalogKey": "labels.show", "value": true},
+        {"token": "labels.fontSize", "catalogKey": "labels.fontSize", "value": 10},
+        {"token": "categoryLabels.wordWrap", "catalogKey": "categoryLabels.wordWrap", "value": true},
+        {"token": "slicer.header.case", "inert": true, "owner": "pbi-t4-pbir-catalog-expansion-sn2.5", "reason": "Sentence-case slicer headers are a text-generation policy, not a proven PBIR formatting property."}
+      ]
+    }
+  ]
+}
