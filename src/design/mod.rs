@@ -7,3 +7,4 @@
 //! applying those coordinates to a project.
 
 pub(crate) mod grid;
+pub(crate) mod lint;

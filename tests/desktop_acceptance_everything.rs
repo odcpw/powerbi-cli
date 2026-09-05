@@ -2885,6 +2885,18 @@ fn everything_acceptance_invokes_every_catalog_command() {
         &svec(["report", "audit", "--project", &project_arg, "--json"]),
     );
     h.ok(
+        "report audit",
+        &svec([
+            "report",
+            "audit",
+            "--project",
+            &project_arg,
+            "--rules",
+            "design",
+            "--json",
+        ]),
+    );
+    h.ok(
         "report sanitize plan",
         &svec([
             "report",

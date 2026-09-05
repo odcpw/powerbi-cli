@@ -13,8 +13,6 @@ use crate::{
 };
 use serde_json::{Value, json};
 
-const DESIGN_LINT_UNAVAILABLE_REASON: &str = "design lint lands in t5-3";
-
 /// Build a scorecard from a project path.  The helper owns the read-only
 /// validation/lint/handoff calls so callers that do not already have those
 /// reports (for example report build after scaffolding) can still use the
@@ -76,8 +74,17 @@ pub(crate) fn scorecard_from_parts(
     });
     let lint_value = lint_scorecard(lint);
     let handoff = handoff_scorecard(resolved);
+    let design_lint = lint.get("designLint").cloned().unwrap_or_else(|| {
+        json!({
+            "status": "unavailable",
+            "proofLevel": Value::Null,
+            "reason": "design lint did not return a report",
+            "findings": []
+        })
+    });
     let all_green = validation.errors.is_empty()
         && lint_value["ok"].as_bool().unwrap_or(false)
+        && design_lint["ok"].as_bool().unwrap_or(false)
         && handoff["safeForOfflineHandoff"] == Value::Bool(true);
     let next = scorecard_next(resolved, all_green);
 
@@ -86,11 +93,7 @@ pub(crate) fn scorecard_from_parts(
         "validation": validation_value,
         "microsoftValidator": microsoft_validator_scorecard(),
         "lint": lint_value,
-        "designLint": {
-            "status": "unavailable",
-            "reason": DESIGN_LINT_UNAVAILABLE_REASON,
-            "findings": []
-        },
+        "designLint": design_lint,
         "handoff": handoff,
         "proofLevel": proof_level,
         "next": next
@@ -120,7 +123,8 @@ pub(crate) fn dry_run_scorecard(proof_level: &str, next: Vec<String>) -> Value {
         },
         "designLint": {
             "status": "unavailable",
-            "reason": DESIGN_LINT_UNAVAILABLE_REASON,
+            "proofLevel": Value::Null,
+            "reason": "dry-run does not create a project tree",
             "findings": []
         },
         "handoff": {
@@ -154,7 +158,8 @@ fn unavailable_scorecard(validation: Option<Value>, proof_level: &str, reason: S
         },
         "designLint": {
             "status": "unavailable",
-            "reason": DESIGN_LINT_UNAVAILABLE_REASON,
+            "proofLevel": Value::Null,
+            "reason": "native validation could not inspect the project",
             "findings": []
         },
         "handoff": {

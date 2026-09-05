@@ -655,6 +655,9 @@ IDs and dependencies; this roadmap records what has already landed:
 - [x] PBIR page/visual/filter/slicer/interaction/bookmark metadata surfaces,
   theme/style bundles, visual role catalog, and the Linux-safe Desktop reference
   harvester, with each feature's proof level published by `features list`.
+- [x] Deterministic design-geometry lint now evaluates eleven stable
+  grid/template rules in `lint`, `report audit --rules design`, `triage`, and
+  the shared scorecard, with pointers and plan-only sanitize actions.
 - [x] Dashboard-spec v2 page slicers and shared layout rails compile to
   deterministic slicer visuals, including profile-aware mode defaults.
 - [x] Managed Desktop open/close/open-check/screenshot lifecycle, bounded DAX
@@ -673,7 +676,7 @@ IDs and dependencies; this roadmap records what has already landed:
   counts and ranking measure choices. Optional project inspection reuses
   `m.unbuffered_reuse` for Table.Buffer recommendations without M rewrites.
 
-Remaining work—such as `report compose`, full v2 compilation, design lint,
+Remaining work—such as `report compose`, full v2 compilation, style-token lint,
 broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
 is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
 associated beads. Keep command and feature claims synchronized with the live

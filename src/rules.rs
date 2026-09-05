@@ -107,7 +107,6 @@ define_rules! {
     PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
     SPEC_MISSING_INPUT => ("spec.missing_input", Validation, "error", "A required dashboard-spec input is missing or cannot be inferred safely.", "Provide the field named by the RFC 6901 pointer, using `report spec fields` to inspect valid model candidates.", None),
     FEATURE_PENDING => ("feature_pending", Report, "warning", "Template section dividers are omitted until a proven shape capability is available.", "Keep the resolved template geometry and follow the shape capability proof status.", None),
-    DESIGN_SLOT_FAMILY_MISMATCH => ("design.slot_family_mismatch", Report, "warning", "A visual uses a slot intended for another visual family.", "Choose a slot whose preferredFamilies includes this visual type, or provide explicit layout coordinates.", None),
     PLAN_MISSING_INPUT => ("plan.missing_input", Validation, "error", "Required planner evidence is missing or ambiguous.", "Supply the named intent or schema field and rerun the suggested command; no default layout is written.", None),
     VALIDATION_STRUCTURE => ("validation.structure", Validation, "error", "The project fails native PBIP/PBIR/TMDL structural validation.", "Run `powerbi-cli validate <project> --json`, repair every reported structural error, and lint again.", None),
     VALIDATION_WARNING => ("validation.warning", Validation, "warning", "Native project validation reported a non-fatal compatibility warning.", "Review the corresponding validation warning and use Power BI Desktop when compatibility proof is required.", None),
@@ -139,7 +138,11 @@ define_rules! {
     REPORT_VISUAL_UNBOUND => ("report.visual_unbound", Report, "info", "A visual has no field bindings.", "Bind the required fields with `report visuals set-bindings` or remove the unused visual.", None),
     PBIR_VISUAL_ALT_TEXT_LEGACY_LOCATION => ("pbir.visual_alt_text_legacy_location", Report, "warning", "Visual alt text is stored at a legacy PBIR location rejected by the Microsoft validator.", "Remove the rejected property with `report visuals formatting set-text --clear-alt-text`.", None),
     PBIR_VISUAL_ALT_TEXT_UNSUPPORTED_LOCATION => ("pbir.visual_alt_text_unsupported_location", Report, "warning", "Visual alt text is stored at a PBIR location rejected by the Microsoft validator.", "Remove the rejected property with `report visuals formatting set-text --clear-alt-text`; authoring remains fixture-gated.", None),
-    REPORT_VISUAL_OUTSIDE_PAGE => ("report.visual_outside_page", Report, "warning", "A visual extends outside its page bounds.", "Move or resize it with `report visuals set-position` or re-run the layout command.", None),
+    // This identifier predates the typed design family.  Keep the public id
+    // stable while classifying it with the rest of the design rules so
+    // `report audit --rules design` can expose the existing check without
+    // emitting a second, aliased finding.
+    REPORT_VISUAL_OUTSIDE_PAGE => ("report.visual_outside_page", Design, "warning", "A visual extends outside its page bounds.", "Move or resize it with `report visuals set-position` or re-run the layout command.", Some("relayout-template")),
     MODEL_TABLE_WITHOUT_COLUMNS => ("model.table_without_columns", Model, "error", "A semantic-model table has no columns.", "Add the intended columns or remove the invalid table definition.", None),
     MODEL_TABLE_WITHOUT_PARTITION => ("model.table_without_partition", Model, "warning", "A semantic-model table has no partition.", "Add a credential-free dummy or model-derived partition before handoff.", None),
     MODEL_RELATIONSHIP_COMMENT_UNSUPPORTED => ("model.relationship_comment_unsupported", Model, "error", "A TMDL comment above a relationship is rejected by older supported Desktop builds.", "Delete the comment above the relationship and keep explanatory prose outside TMDL.", None),
@@ -201,6 +204,16 @@ define_rules! {
     MODEL_RELATIONSHIP_DIRECTION_SUSPECT => ("model.relationship_direction_suspect", Model, "warning", "A many-to-one fact-to-dimension relationship uses both-direction filtering.", "Prefer oneDirection from the fact table to the dimension; use bothDirections only with an explicit, reviewed ambiguity requirement.", None),
     MODEL_COLUMN_UNUSED => ("model.column_unused", Model, "warning", "A model column is not referenced by a visual, measure, or relationship.", "Remove the column or document its intended use; otherwise hide or omit it before handoff to keep the model focused.", None),
     M_DUPLICATE_STEP_NAME => ("m.duplicate_step_name", M, "error", "An M let expression defines the same step name more than once, which can surface as a cyclic-reference refresh error in Power BI Desktop.", "Rename or remove the duplicate M step; lint reports the first and duplicate source positions, including quoted identifiers, before Desktop handoff.", None),
+    DESIGN_VISUAL_OVERLAP => ("design.visual_overlap", Design, "warning", "Two visuals overlap on the report canvas.", "Move or resize one visual with `report visuals set-position`, or re-run the named layout template.", Some("relayout-template")),
+    DESIGN_VISUAL_OFF_GRID => ("design.visual_off_grid", Design, "warning", "A visual edge is not aligned to the twelve-column design grid.", "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.", Some("relayout-template")),
+    DESIGN_ROW_HEIGHT_INCONSISTENT => ("design.row_height_inconsistent", Design, "warning", "Visuals sharing a grid row have inconsistent heights.", "Re-run the named layout template so sibling visuals share the row height.", Some("relayout-template")),
+    DESIGN_COLUMN_WIDTH_INCONSISTENT => ("design.column_width_inconsistent", Design, "warning", "Visuals sharing a grid column have inconsistent widths.", "Re-run the named layout template so sibling visuals share the column width.", Some("relayout-template")),
+    DESIGN_PAGE_OVERCROWDED => ("design.page_overcrowded", Design, "warning", "A page contains more visuals than its selected template budget.", "Choose a template with a larger budget, remove an unused visual, or split the page.", Some("relayout-template")),
+    DESIGN_PAGE_MISSING_HEADING => ("design.page_missing_heading", Design, "warning", "A heading slot is declared but no heading visual is present.", "Add a heading textbox to the declared heading slot or choose a template without a heading band.", Some("add-heading")),
+    DESIGN_SLICER_TOO_SHORT => ("design.slicer_too_short", Design, "warning", "A slicer is shorter than the proven minimum height for its mode.", "Resize the slicer to at least 76 pixels (104 pixels for a Between slicer).", Some("resize-slicer")),
+    DESIGN_RAIL_NOT_SYNCED => ("design.rail_not_synced", Design, "warning", "Slicer rails on pages using the same template do not expose the same fields.", "Synchronize the rail slicers or explicitly opt a page out of the shared rail.", Some("sync-rail")),
+    DESIGN_DRILLTHROUGH_NO_BACK_BUTTON => ("design.drillthrough_no_back_button", Design, "warning", "A drillthrough page has no proven back-navigation button.", "Add a Desktop-proven back button before handing the drillthrough page to report authors.", None),
+    DESIGN_SLOT_FAMILY_MISMATCH => ("design.slot_family_mismatch", Design, "warning", "A visual family does not match the preferred family for its assigned design slot.", "Choose a visual family listed by the slot or assign the visual to a compatible slot.", Some("relayout-template")),
 }
 
 pub(crate) fn all_rules() -> &'static [RuleDefinition] {
@@ -282,8 +295,26 @@ mod tests {
     }
 
     #[test]
-    fn design_lint_has_a_typed_empty_extension_point() {
-        assert_eq!(rules_for_family(RuleFamily::Design).count(), 0);
+    fn design_lint_has_a_typed_complete_rule_family() {
+        assert_eq!(rules_for_family(RuleFamily::Design).count(), 11);
+        for id in [
+            "report.visual_outside_page",
+            "design.visual_overlap",
+            "design.visual_off_grid",
+            "design.row_height_inconsistent",
+            "design.column_width_inconsistent",
+            "design.page_overcrowded",
+            "design.page_missing_heading",
+            "design.slicer_too_short",
+            "design.rail_not_synced",
+            "design.drillthrough_no_back_button",
+            "design.slot_family_mismatch",
+        ] {
+            assert_eq!(
+                find_rule(id).map(|rule| rule.family),
+                Some(RuleFamily::Design)
+            );
+        }
     }
 
     #[test]
