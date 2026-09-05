@@ -51,31 +51,22 @@ project invariants, not automated Desktop rendering. The live `desktop
 open-check` command remains launch-level proof and must continue to say so until
 canvas/refresh automation is implemented.
 
-## Status 2026-09
+## Status (updated 2026-09-04)
 
-The 2026-09-04 reality check finds 172 advertised command paths and 50 feature
-catalog entries (45 supported, 5 planned). The offline compiler/workbench
-reliably validates schemas and profiles, plans and builds the currently
-compiled report-spec subset, authors guarded PBIR pages/visuals/filters and
-TMDL tables/columns/measures/relationships, and packages safe handoff metadata.
-The Desktop reference harvester, managed Desktop lifecycle, bounded DAX path,
-and read-only TMDL export are explicit opt-in surfaces.
-
-The remaining limits are deliberate: report-spec v2 sections whose compiler
-has not landed return `unsupported_feature`, the starter planner still emits a
-fixed seven-visual template, and Desktop canvas/refresh automation is not
-implemented. Local validation and schema/golden checks therefore cannot claim
-the final `desktop-canvas-refresh` proof level. The current supported feature
-proof mix is 33 `unit-smoke`, 7 `schema-golden`, 4 `desktop-golden-pending`,
-and 1 `manual-desktop-canvas-refresh`; no feature currently claims automated
+The 2026-09-04 reality check of the live catalogs finds 184 advertised command
+paths and 54 feature entries (48 supported, 6 planned). The proof mix is 42
+`unit-smoke`, 7 `schema-golden`, 4 `desktop-golden-pending`, and 1
+`manual-desktop-canvas-refresh`; no feature claims automated
 `desktop-canvas-refresh`.
 
-The August production pilot supplies the field evidence for these boundaries
-and the hand-patched idioms still to compile; see
-[`docs/pilot-lessons.md`](docs/pilot-lessons.md). The dependency-ordered work
-to close those gaps is maintained in
-[`docs/bridge-plan-2026-09.md`](docs/bridge-plan-2026-09.md), which is the
-authoritative September plan.
+The offline compiler/workbench covers the currently compiled report-spec subset,
+guarded PBIR/TMDL authoring, safe handoff metadata, and explicit opt-in Desktop
+and bounded DAX surfaces. Uncompiled v2 sections remain honest
+`unsupported_feature` refusals, the starter planner remains a fixed
+seven-visual template, and Desktop canvas/refresh automation is still open.
+The field evidence and dependency-ordered work remain in
+[`docs/pilot-lessons.md`](docs/pilot-lessons.md) and
+[`docs/bridge-plan-2026-09.md`](docs/bridge-plan-2026-09.md).
 
 ## 2026-06-23 Parity Tranche Status
 

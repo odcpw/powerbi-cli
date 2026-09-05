@@ -30,6 +30,12 @@ jobs:
       - name: Check generated documentation
         run: cargo run --locked -- robot-docs render --check
 
+      - name: Verify documentation command contract
+        run: cargo run --locked -- robot-docs verify
+
+      - name: Verify catalog discovery coverage
+        run: cargo test --locked --test robot_docs render_rejects_unknown_sections_and_catalog_paths_are_in_skill_region
+
       - name: Check
         run: cargo check --locked --all-targets
 
