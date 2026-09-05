@@ -1726,6 +1726,19 @@ fn response_shapes() -> Value {
             "requiredFields": ["ok", "exitCode", "specPath", "normalizedOut", "normalizedFrom", "specVersion", "next"],
             "normalizedFrom": "Root-relative included JSON fragments, sorted and de-duplicated for deterministic provenance."
         },
+        "reportSpecExplainPlan": {
+            "schema": "powerbi-cli.report.spec.explainPlan.v1",
+            "transport": "embedded stdout object at plan in report spec explain",
+            "operationFields": ["index", "stage", "stageName", "op", "handle", "summary", "pointer", "operation"],
+            "replay": "Annotated explanation only, not an ops.v1 input file. Each operation field contains its typed IR payload."
+        },
+        "reportVisualObjectBatchMutation": {
+            "schema": "powerbi-cli.report.visuals.objectBatchMutation.v1",
+            "transport": "stdout",
+            "requiredFields": ["schema", "ok", "exitCode", "action", "dryRun", "mode", "batch", "count", "changedCount", "operationOutcomes", "changes", "readbackCommands", "next"],
+            "input": "Bounded powerbi-cli.ops.v1 envelope containing only setObject operations with PBIR-encoded values; unknown fields and conflicting tags are refused with RFC 6901 pointers.",
+            "atomicity": "All entries are preflighted and staged before any output is committed. Dry-run never writes the source or output project."
+        },
         "reportSpecUpgrade": {
             "schema": "powerbi-cli.report.spec.upgrade.v1",
             "transport": "stdout",
@@ -1794,7 +1807,7 @@ fn response_shapes() -> Value {
         },
         "ops.v1": {
             "schema": "powerbi-cli.ops.v1",
-            "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
+            "transport": "UTF-8 JSON plan file; the setObject subset is consumed by report visuals set-object --batch, with general replay reserved for a future ops apply command",
             "requiredFields": ["schema", "ops"],
             "operationTag": "op",
             "operationTags": ["addCalculatedColumn", "addFilter", "addMeasure", "addPage", "addRelationship", "addStaticTable", "addVisual", "applyStyleBundle", "applyThemeBundle", "applyThemePreset", "bookmarkMetadata", "clearFilter", "clonePage", "cloneVisual", "deleteEmptyPage", "deleteFilter", "deleteVisual", "formattingApply", "reorderPages", "resetInteraction", "sanitizeAction", "setActivePage", "setBindings", "setColor", "setDisplayName", "setDrilldownHierarchy", "setDrillthrough", "setInteraction", "setObject", "setPosition", "setSortBy", "setText", "setTopNGuard", "slicerClear", "sourceTemplateApply", "updateFilter", "updatePage"],

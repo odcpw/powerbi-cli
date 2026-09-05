@@ -609,7 +609,10 @@ fn parse_grid_override(grid: &mut Grid, raw: &str) -> CliResult<()> {
             _ => {
                 return Err(
                     CliError::invalid_args(format!("unknown --grid setting: {key}"))
-                        .with_pointer(format!("/grid/{key}"))
+                        .with_pointer(format!(
+                            "/grid/{}",
+                            crate::diagnostics::escape_pointer_token(key)
+                        ))
                         .with_hint("Supported settings are columns, gutter, margin, and rowUnit."),
                 );
             }
@@ -690,4 +693,15 @@ fn require_layout_mode(mode: Option<MutationMode>, command: &str) -> CliResult<M
             "powerbi-cli {command} --project <project-dir-or.pbip> --page <page-handle> --preset overview --dry-run --json"
         ))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn unknown_grid_setting_escapes_rfc6901_pointer_tokens() {
+        let error = super::parse_grid_override(&mut super::Grid::default(), "a/b~c=1")
+            .expect_err("unknown setting");
+        assert_eq!(error.code, "invalid_args");
+        assert_eq!(error.pointer(), Some("/grid/a~1b~0c"));
+    }
 }

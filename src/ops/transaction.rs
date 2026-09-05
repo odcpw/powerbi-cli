@@ -237,7 +237,9 @@ impl Transaction {
                                 outcome.created_handles.join(", ")
                             ),
                         )
-                        .with_pointer(format!("/ops/{}/handle", validated.index)),
+                        .with_pointer(format!("/ops/{}/handle", validated.index))
+                        .with_hint("No output was committed. Inspect the declared and returned handles and report the kernel mismatch.")
+                        .with_suggested_command("powerbi-cli lint --explain ops.handle_mismatch --json"),
                         &succeeded,
                     ));
                 }

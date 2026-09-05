@@ -95,6 +95,16 @@ Inspect `report spec explain` for resolved slots and heading geometry before
 building. Duplicate slots fail; family mismatches and pending section dividers
 produce warnings. Other style tokens remain on their compiler boundary.
 
+The nested explain plan uses `powerbi-cli.report.spec.explainPlan.v1`: its
+annotated entries are not a replayable `powerbi-cli.ops.v1` envelope. For
+`report visuals set-object --batch`, provide canonical typed `setObject` entries
+and already encoded PBIR values; misspelled fields and conflicting tags are
+refused with RFC 6901 pointers. Operation-plan errors can be queried with
+`powerbi-cli lint --explain ops.dangling_handle --json` (or the returned code).
+Build/validation next commands retain `--profile`, and robot-docs next commands
+retain explicit `--root` and render sections. Follow-ups are command templates;
+fill any remaining angle-bracket placeholders before invocation.
+
 <!-- powerbi-cli:commands:start -->
 ### Commands (generated from `capabilities --json`)
 
@@ -217,7 +227,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic starter specs and v2 narrative plans with overview-first pages, replicated slicer rails, and evidence-backed drillthrough; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -999,20 +1009,33 @@ commands without writing output, even with `--force`. Set `model.factTable`
 in the JSON intent to resolve ambiguous facts; `profile infer --rows` supplies
 profile evidence and `report spec fields` lists schema candidates. Numeric
 columns alone do not authorize generated SUM measures. Add
+date evidence explicitly: `catalog-proof` provides the annual boundary
+`YearStart`, `flat-ops` provides `WorkDate`, and `slicer-rail` uses sales
+`DimDate.Date`. `regional-sales` and `scatter-bubble` intentionally lack a typed
+date and return `plan.missing_input`; build their authored specs directly.
+A populated profile does not by itself supply a date axis. Pass
 `--explain-rules` (or invoke the equivalent `report plan explain` alias) when
 you need the fired rule ids, scores, and actual evidence values in the output.
 Every `planner.proposals[]` entry is slot-agnostic and carries its rule id,
 visual family, bindings, priority, size class, and semantic color token. The
 legacy `spec` remains a build-compatible dashboard.v1 document; `specV2`
-contains the template, 12-column grid token names, semantic style preset, and
-slot-only candidate for the concurrent layout compiler. It remains
+contains a buildable narrative plan through named templates: overview, trend,
+breakdowns, optional comparison/exceptions, detail, and warranted drillthrough
+detail. Read `narrativeFlow` for page order, active overview, replicated rail,
+and source/target column evidence. Templates without rails use explicit geometry
+from one shared-grid rail boundary, with slicers emitted by the shared compiler.
+The catalog selects the flat-table KPI/trend/breakdown overview template
+and an ambiguous-model table-focused detail template while retaining the
+same narrative page order.
+Uncompiled styles and performance `topnGuard` annotations retain their existing
+compiler boundaries; resolve those before building a guarded candidate. It remains
 `desktop-golden-pending` until a Desktop canvas proof exists. The catalog currently
 documents `planner.time-series`, `planner.category-ranking`,
 `planner.scatter-focus`, `planner.detail-table`, `planner.measure-target`,
 `planner.measure-total`, `planner.alert-exception-list`,
 `planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
 `planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
-`planner.shape-ambiguous-template`, and `planner.overview`.
+`planner.shape-ambiguous-template`, `planner.overview`, and `planner.narrative-flow`.
 
 When the compiler cannot safely infer a required value, it asks through a
 structured `spec.missing_input` diagnostic instead of silently choosing a

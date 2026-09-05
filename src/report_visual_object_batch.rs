@@ -153,7 +153,7 @@ fn read_batch_operations(path: &Path) -> CliResult<Vec<Op>> {
     if let Some(key) = object.keys().find(|key| !allowed.contains(key.as_str())) {
         return Err(batch_input_error(
             format!("ops batch contains unknown top-level field `{key}`"),
-            &format!("/{key}"),
+            &format!("/{}", key.replace('~', "~0").replace('/', "~1")),
         ));
     }
     if object.get("schema").and_then(Value::as_str) != Some(crate::ops::OPS_SCHEMA) {
@@ -194,6 +194,37 @@ fn read_batch_operations(path: &Path) -> CliResult<Vec<Op>> {
                 ),
                 &format!("/ops/{index}/op"),
             ));
+        }
+        let allowed = BTreeSet::from(["op", "kind", "visual", "object", "property", "value"]);
+        if let Some(key) = map.keys().find(|key| !allowed.contains(key.as_str())) {
+            return Err(batch_input_error(
+                format!("ops[{index}] contains unknown field `{key}`"),
+                &format!("/ops/{index}/{}", key.replace('~', "~0").replace('/', "~1")),
+            ));
+        }
+        if map.contains_key("op")
+            && map.contains_key("kind")
+            && !matches!(map["kind"].as_str(), Some("setObject" | "SetObject"))
+        {
+            return Err(batch_input_error(
+                "conflicting operation tags; use only the canonical op field",
+                &format!("/ops/{index}/kind"),
+            ));
+        }
+        for field in ["visual", "object", "property", "value"] {
+            let valid = map.get(field).is_some_and(|value| {
+                if field == "value" {
+                    !value.is_null()
+                } else {
+                    value.is_string()
+                }
+            });
+            if !valid {
+                return Err(batch_input_error(
+                    format!("ops[{index}].{field} is missing or has an invalid type"),
+                    &format!("/ops/{index}/{field}"),
+                ));
+            }
         }
         map.remove("kind");
         map.insert("op".to_string(), Value::String("setObject".to_string()));
@@ -403,6 +434,9 @@ fn batch_input_error(message: impl Into<String>, pointer: &str) -> CliError {
 
 fn normalize_batch_input_error(mut error: CliError) -> CliError {
     if error.code == INPUT_SAFETY_ERROR_CODE {
+        if error.pointer().is_none() {
+            error = error.with_pointer("");
+        }
         error.hint = Some(
             "Supply a bounded powerbi-cli.ops.v1 JSON file containing only setObject operations."
                 .to_string(),
