@@ -48,6 +48,7 @@ impl HygieneProfile {
 struct HygieneOptions {
     project: Option<PathBuf>,
     profile: Option<HygieneProfile>,
+    rules_design: bool,
     include_raw: bool,
     confirm: Option<String>,
     mode: Option<MutationMode>,
@@ -94,7 +95,30 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
     let profile = options.profile.unwrap_or(HygieneProfile::AgentSafe);
     let resolved = resolve_project(&project)?;
     let validation = validate_project(&resolved)?;
-    let plan = build_hygiene_plan(&resolved, &validation, profile, options.include_raw)?;
+    let mut plan = build_hygiene_plan(&resolved, &validation, profile, options.include_raw)?;
+    if options.rules_design {
+        plan.findings.retain(|finding| {
+            finding["ruleId"]
+                .as_str()
+                .is_some_and(crate::design::lint::is_design_rule_id)
+        });
+        plan.actions.retain(|action| {
+            action["sourceRuleIds"].as_array().is_some_and(|rules| {
+                rules.iter().any(|rule| {
+                    rule.as_str()
+                        .is_some_and(crate::design::lint::is_design_rule_id)
+                })
+            })
+        });
+        plan.unsupported_actions.retain(|action| {
+            action["sourceRuleIds"].as_array().is_some_and(|rules| {
+                rules.iter().any(|rule| {
+                    rule.as_str()
+                        .is_some_and(crate::design::lint::is_design_rule_id)
+                })
+            })
+        });
+    }
     let ok = validation.errors.is_empty() && !has_error_findings(&plan.findings);
     let exit_code = if ok {
         EXIT_SUCCESS
@@ -109,6 +133,7 @@ fn audit_command(args: &[String]) -> CliResult<Value> {
         "pbip": canonical_display(&resolved.pbip_path),
         "reportDir": canonical_display(&resolved.report_dir),
         "profile": profile.as_str(),
+        "rules": if options.rules_design { Value::String("design".to_string()) } else { Value::Null },
         "rawIncluded": options.include_raw,
         "projectFingerprint": plan.project_fingerprint,
         "counts": counts_json(&plan.findings, &plan.actions, &plan.unsupported_actions),
@@ -284,6 +309,20 @@ fn parse_hygiene_args(command: &str, args: &[String]) -> CliResult<HygieneOption
             "--profile" => {
                 options.profile = Some(parse_profile(&take_value(args, &mut i, "--profile")?)?);
             }
+            "--rules" => {
+                let value = take_value(args, &mut i, "--rules")?;
+                if value.eq_ignore_ascii_case("design") {
+                    options.rules_design = true;
+                } else {
+                    return Err(CliError::invalid_args(format!(
+                        "{command} supports only `--rules design`"
+                    ))
+                    .with_hint("Use `--rules design` to inspect geometry and design-system findings.")
+                    .with_suggested_command(
+                        "powerbi-cli report audit --project <project-dir-or.pbip> --rules design --json",
+                    ));
+                }
+            }
             "--include-raw" | "--includeRaw" => {
                 options.include_raw = true;
                 i += 1;
@@ -454,6 +493,18 @@ fn build_hygiene_plan(
                 finding,
                 "interaction repair requires visual-specific intent; use report interactions commands explicitly",
             ));
+        } else if crate::design::lint::is_design_rule_id(
+            finding["ruleId"].as_str().unwrap_or_default(),
+        ) && finding["sanitizeAction"].as_str().is_some()
+        {
+            let action = finding["sanitizeAction"]
+                .as_str()
+                .unwrap_or("review-design");
+            unsupported_actions.push(plan_only_action(
+                action,
+                finding,
+                "design sanitization is plan-only until the typed auto-improve operations are Desktop-proven",
+            ));
         }
     }
 
@@ -491,13 +542,18 @@ fn add_lint_findings(
                 "surface": "lint",
                 "handle": finding["handle"].clone(),
                 "path": finding["path"].clone(),
-                "jsonPointer": Value::Null,
+                "pointer": finding["pointer"].clone(),
+                "jsonPointer": finding["pointer"].clone(),
                 "fingerprint": Value::Null,
                 "mayContainDataValues": false,
                 "literalCount": 0,
                 "message": finding["message"],
                 "evidence": finding,
-                "recommendedActions": ["fix-lint-finding"]
+                "sanitizeAction": finding["sanitizeAction"].clone(),
+                "recommendedActions": finding["sanitizeAction"]
+                    .as_str()
+                    .map(|action| vec![Value::String(action.to_string())])
+                    .unwrap_or_else(|| vec![Value::String("fix-lint-finding".to_string())])
             }));
         }
     }
