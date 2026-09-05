@@ -199,7 +199,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, visual drilldown, proven descending sort and TopN guards through typed kernels, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
 - `powerbi-cli report design defaults show [--project <project-dir-or.pbip> | --spec <dashboard.json>] [--design-defaults] --json` — Resolve deterministic per-visual design-defaults.v1 entries with catalog evidence and style override precedence _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
@@ -1529,6 +1529,13 @@ column has a pilot-backed fixture; 100% stacked bars and maps return
 `unsupported_feature` naming missing Desktop evidence. Map generation also
 requires proof of offline operation without online geocoding.
 Combo charts require Category columns, Y column measures, and Y2 line measures.
+Dashboard v2 visual `drilldown.fields` requires at least two model columns on
+a line/area/bar/column/combo chart. `sort {field,direction}` accepts a single
+descending projected measure on combo/pie/donut. `topnGuard {orderBy,top}`
+ranks the first hierarchy/Category column using an explicit measure and a
+positive integer cap. Visual `filters[]` compile as visual-scoped AddFilter.
+These sections use the same kernels as CLI mutations and appear in explain;
+ascending and table/matrix sorts remain fixture-gated under sn2.1.
 Use `sort=descending` in binding text or `sortDirection=Descending` in JSON on
 at most one projected measure for explicit category ordering; ascending and
 multi-key sort are refused. Generated titles are visible literal

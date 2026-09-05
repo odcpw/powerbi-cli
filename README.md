@@ -290,7 +290,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, visual drilldown, proven descending sort and TopN guards through typed kernels, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
 - `powerbi-cli report design defaults show [--project <project-dir-or.pbip> | --spec <dashboard.json>] [--design-defaults] --json` — Resolve deterministic per-visual design-defaults.v1 entries with catalog evidence and style override precedence _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
@@ -1111,6 +1111,12 @@ This generated snapshot keeps status and proof claims aligned with
   below `.git`, `.vscode`, `.powerbi-cli`, or another dot-directory—cause a
   deterministic refusal listing and no archive is written.
 - Programmatic visual authoring currently covers first-slice PBIR visual
+  behavior in dashboard v2: `drilldown.fields` compiles hierarchy columns,
+  `sort` supports one descending projected measure on combo/pie/donut, and
+  `topnGuard` ranks the first hierarchy/Category column by `orderBy` with a
+  positive `top`. Visual `filters[]` use the visual-scoped AddFilter kernel.
+  These share the CLI mutation kernels; unproven sorts remain fixture-gated.
+  The visual authoring surface also covers
   discovery with `report visuals catalog` and generated PBIR visual creation
   with `report visuals add` for card, tableEx, lineChart, areaChart,
   stackedAreaChart, clusteredBarChart, clusteredColumnChart, barChart,

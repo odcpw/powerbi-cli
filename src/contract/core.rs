@@ -1365,6 +1365,8 @@ fn schema_manifest() -> Value {
         "intentVersions": ["intent.v1"],
         "intentFields": ["schema", "audience", "questions[]", "kpis[].name", "kpis[].measure", "kpis[].target", "comparisons[]", "periods[]", "drillPaths[]", "alerts[].measure", "alerts[].op", "alerts[].threshold", "alerts[].semantic", "filterDimensions[]", "preferredArchetypes[]", "pageFlow[]", "handoff.target", "handoff.sourceKinds[]"],
         "dashboardSpecV2AllowedFields": crate::report_spec_schema::allowed_fields_json(),
+        "dashboardVisualBehaviorFields": ["pages[].visuals[].drilldown.fields[]", "pages[].visuals[].sort.field", "pages[].visuals[].sort.direction", "pages[].visuals[].topnGuard.orderBy", "pages[].visuals[].topnGuard.top", "pages[].visuals[].filters[]"],
+        "dashboardVisualBehaviorOperations": ["setDrilldownHierarchy", "setBindings", "setTopNGuard", "addFilter"],
         "designTokenFields": ["preset", "id", "name", "summary", "palette", "semantic", "ramps", "typography", "surfaces", "spacing", "numberFormats", "textClasses", "visualDefaults", "allowContrastBelowAA"],
         "designTokenCatalog": {"schema": "powerbi-cli.tokens.v1", "version": 1, "builtIns": ["corporate-neutral", "high-contrast", "dark", "print"], "contrast": {"algorithm": "WCAG 2 relative luminance", "minimumRatio": 4.5, "allowFlag": "style.tokens.allowContrastBelowAA"}},
         "plannerRuleCatalog": planner_rule_catalog_json().unwrap_or_else(|error| json!({

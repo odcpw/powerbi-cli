@@ -936,6 +936,8 @@ const FEATURE_CATALOG: &[Feature] = &[
             "tests/report_spec_schema_explain.rs: annotated explainPlan.v1 is distinct from replayable ops.v1; tests/report_build_response.rs: profile-preserving follow-ups",
             "tests/report_build_layout.rs: template/slot coordinates, typography-styled headings, explicit-layout artifact parity, and explain geometry; section dividers remain feature_pending",
             "examples/filter-kinds.dashboard.v2.json: root/page/visual filter compiler coverage",
+            "examples/visual-behavior.dashboard.v2.json: compiled drilldown.fields, descending combo/pie/donut sort, topnGuard, and visual filters",
+            "tests/report_build_behavior.rs: registered per-section typed-kernel and CLI byte parity, deterministic artifacts, dry-run, and pointer-rich refusals",
             "examples/archetypes/regional-sales.dashboard.json: declarative drillthrough compiler and pending back-button warning",
         ],
         tags: &["report", "dashboard", "spec", "v2", "compiler", "agent"],

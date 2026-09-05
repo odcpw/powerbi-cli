@@ -698,6 +698,9 @@ IDs and dependencies; this roadmap records what has already landed:
   `report design defaults show`/`report spec explain`, and merge overrides as
   catalog < `style.tokens` < `style.defaults` < `visuals[].format`; unavailable
   design properties remain explicitly inert under their owning T4 bead.
+- [x] Dashboard v2 visual hierarchy drilldown, fixture-proven descending sort,
+  TopN guards, and visual filters compile through registered operation kernels
+  with per-section compiler/CLI artifact parity and pointer-rich refusals.
 - [x] Stacked visual aliases preserve Desktop-recorded bar/column ids; role
   maps cite their evidence. Unproven 100% stacked bars and offline maps remain
   fixture-gated with explicit missing-evidence refusals.

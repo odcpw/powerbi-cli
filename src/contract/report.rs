@@ -8,7 +8,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--design-defaults] [--trace] --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, root/page/visual filters compile through AddFilter, page drillthrough through SetDrillthrough, visual drilldown, proven descending sort and TopN guards through typed kernels, and opt-in design defaults through catalog-backed SetObject mutations, with operation outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,

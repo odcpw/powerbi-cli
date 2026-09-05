@@ -1,0 +1,7 @@
+{
+  "field": "DimCustomer[Segment]",
+  "handle": "visual:ReportSectionOverview:VisualContainerTrend",
+  "op": "setTopNGuard",
+  "orderBy": "FactSales[Total Revenue]",
+  "top": 5
+}
