@@ -177,6 +177,13 @@ refreshing every changed page in Desktop.
 
 ## No Fake Fallbacks
 
+Dashboard v2 pages can select a named `template`, with visuals assigned by
+`slot`; explicit visual `layout` coordinates take precedence. Page `heading`
+and `subtitle` generate textboxes in the heading band, styled by
+`style.tokens.typography.family` and `scale`. `report spec explain` shows the
+resolved coordinates. Unknown slots report available choices, duplicate slots
+fail, and family mismatches warn. Section dividers remain `feature_pending`.
+
 `powerbi-cli` is agent-first: supported features emit real PBIP/PBIR/TMDL
 metadata, and unproven Power BI features fail with
 `error.code = "unsupported_feature"` instead of writing partial guessed JSON.
@@ -312,7 +319,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report slicers clear --project <project-dir-or.pbip> (--handle <slicer-or-visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) (--dry-run | --in-place --confirm <confirm-token> | --out-dir <dir>) [--include-raw] --json` — Clear persisted PBIR slicer selection/filter state for one slicer visual without changing bindings, layout, or formatting _(proof: `unit-smoke`)_
 - `powerbi-cli report slicers list --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--include-raw] --json` — List PBIR slicer visuals with stable slicer handles, visual handles, bindings, state summaries, and persisted-value safety warnings _(proof: `unit-smoke`)_
 - `powerbi-cli report slicers show --project <project-dir-or.pbip> --handle <slicer-handle> [--no-raw] --json` — Show one PBIR slicer visual by slicer or visual handle, including raw visual state and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json` — Compile a strict dashboard spec to a deterministic staged operation plan without writing a project _(proof: `unit-smoke`)_
+- `powerbi-cli report spec explain --schema <schema.json> [--profile <profile.json>] --spec <dashboard.json> --json` — Compile a strict dashboard spec to a deterministic staged operation plan with resolved template slots and generated heading/subtitle geometry without writing a project _(proof: `unit-smoke`)_
 - `powerbi-cli report spec fields [--schema <schema.json>] [--profile <profile.json>] --json` — List the strict dashboard-spec key catalog and, when a schema is supplied, exact column and measure binding references _(proof: `unit-smoke`)_
 - `powerbi-cli report spec normalize [--spec <dashboard.json> | <dashboard.json>] --out <canonical.json> --json` — Resolve supported dashboard-spec includes and write one deterministic canonical JSON document _(proof: `unit-smoke`)_
 - `powerbi-cli report spec schema [--version v1|v2|all] --json` — Emit the draft 2020-12 JSON Schema generated from the strict v1/v2 dashboard-spec key catalog _(proof: `unit-smoke`)_
