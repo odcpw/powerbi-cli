@@ -25,6 +25,17 @@ fn visual_handle(project: &Path) -> String {
     )
 }
 
+macro_rules! legacy_case {
+    ($name:ident, $tag:literal) => {
+        OperationEquivalenceCase {
+            name: concat!($tag, "/sales"),
+            fixture: "sales",
+            operation_tag: $tag,
+            execute: $name,
+        }
+    };
+}
+
 #[test]
 fn set_object_op_replays_are_deterministic_and_preserve_cli_contract() {
     let temp = tempfile::tempdir().expect("tempdir");
@@ -121,30 +132,62 @@ fn set_position_op_replays_are_deterministic_and_preserve_cli_contract() {
 #[test]
 fn registered_operations_have_cli_and_typed_kernel_equivalence_cases() {
     let cases = [
-        OperationEquivalenceCase {
-            name: "addMeasure/sales",
-            fixture: "sales",
-            operation_tag: "addMeasure",
-            execute: add_measure_case,
-        },
-        OperationEquivalenceCase {
-            name: "addRelationship/sales",
-            fixture: "sales",
-            operation_tag: "addRelationship",
-            execute: add_relationship_case,
-        },
-        OperationEquivalenceCase {
-            name: "addVisual/sales",
-            fixture: "sales",
-            operation_tag: "addVisual",
-            execute: add_visual_case,
-        },
+        legacy_case!(add_calculated_column, "addCalculatedColumn"),
         OperationEquivalenceCase {
             name: "addFilter/sales",
             fixture: "sales",
             operation_tag: "addFilter",
             execute: add_filter_case,
         },
+        OperationEquivalenceCase {
+            name: "addMeasure/sales",
+            fixture: "sales",
+            operation_tag: "addMeasure",
+            execute: add_measure_case,
+        },
+        legacy_case!(add_page, "addPage"),
+        OperationEquivalenceCase {
+            name: "addRelationship/sales",
+            fixture: "sales",
+            operation_tag: "addRelationship",
+            execute: add_relationship_case,
+        },
+        legacy_case!(add_static_table, "addStaticTable"),
+        OperationEquivalenceCase {
+            name: "addVisual/sales",
+            fixture: "sales",
+            operation_tag: "addVisual",
+            execute: add_visual_case,
+        },
+        legacy_case!(apply_style_bundle, "applyStyleBundle"),
+        legacy_case!(apply_theme_bundle, "applyThemeBundle"),
+        OperationEquivalenceCase {
+            name: "applyThemePreset/sales",
+            fixture: "sales",
+            operation_tag: "applyThemePreset",
+            execute: apply_theme_preset_case,
+        },
+        legacy_case!(bookmark_metadata, "bookmarkMetadata"),
+        legacy_case!(clear_filter, "clearFilter"),
+        legacy_case!(clone_page, "clonePage"),
+        legacy_case!(clone_visual, "cloneVisual"),
+        legacy_case!(delete_empty_page, "deleteEmptyPage"),
+        legacy_case!(delete_filter, "deleteFilter"),
+        legacy_case!(delete_visual, "deleteVisual"),
+        legacy_case!(formatting_apply, "formattingApply"),
+        legacy_case!(reorder_pages, "reorderPages"),
+        OperationEquivalenceCase {
+            name: "resetInteraction/sales",
+            fixture: "sales",
+            operation_tag: "resetInteraction",
+            execute: reset_interaction_case,
+        },
+        legacy_case!(sanitize_action, "sanitizeAction"),
+        legacy_case!(set_active_page, "setActivePage"),
+        legacy_case!(set_bindings, "setBindings"),
+        legacy_case!(set_color, "setColor"),
+        legacy_case!(set_display_name, "setDisplayName"),
+        legacy_case!(set_drilldown_hierarchy, "setDrilldownHierarchy"),
         OperationEquivalenceCase {
             name: "setDrillthrough/sales",
             fixture: "sales",
@@ -158,18 +201,6 @@ fn registered_operations_have_cli_and_typed_kernel_equivalence_cases() {
             execute: set_interaction_case,
         },
         OperationEquivalenceCase {
-            name: "resetInteraction/sales",
-            fixture: "sales",
-            operation_tag: "resetInteraction",
-            execute: reset_interaction_case,
-        },
-        OperationEquivalenceCase {
-            name: "applyThemePreset/sales",
-            fixture: "sales",
-            operation_tag: "applyThemePreset",
-            execute: apply_theme_preset_case,
-        },
-        OperationEquivalenceCase {
             name: "setObject/sales",
             fixture: "sales",
             operation_tag: "setObject",
@@ -181,8 +212,957 @@ fn registered_operations_have_cli_and_typed_kernel_equivalence_cases() {
             operation_tag: "setPosition",
             execute: set_position_case,
         },
+        legacy_case!(set_sort_by, "setSortBy"),
+        legacy_case!(set_text, "setText"),
+        legacy_case!(set_topn_guard, "setTopNGuard"),
+        legacy_case!(slicer_clear, "slicerClear"),
+        legacy_case!(source_template_apply, "sourceTemplateApply"),
+        legacy_case!(update_filter, "updateFilter"),
+        legacy_case!(update_page, "updatePage"),
     ];
     run_operation_equivalence(&cases);
+}
+
+fn legacy_sources(
+    fixture: &ArchetypeFixture,
+    workspace: &Path,
+    label: &str,
+) -> (std::path::PathBuf, std::path::PathBuf) {
+    let cli_source = workspace.join(format!("{label}-cli-source"));
+    let op_source = workspace.join(format!("{label}-op-source"));
+    scaffold_fixture(fixture, &cli_source);
+    scaffold_fixture(fixture, &op_source);
+    (cli_source, op_source)
+}
+
+fn finish_legacy_case(
+    workspace: &Path,
+    label: &str,
+    cli_source: &Path,
+    op_source: &Path,
+    operation: Value,
+    command: &[&str],
+    flags: &[String],
+) -> OperationExecution {
+    let cli_tree = workspace.join(format!("{label}-cli-output"));
+    let op_tree = workspace.join(format!("{label}-op-output"));
+    let mut argv = command
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
+    argv.extend([
+        "--project".to_string(),
+        cli_source.to_string_lossy().into_owned(),
+    ]);
+    argv.extend_from_slice(flags);
+    argv.extend([
+        "--out-dir".to_string(),
+        cli_tree.to_string_lossy().into_owned(),
+        "--json".to_string(),
+    ]);
+    let cli = run_powerbi_owned(&argv);
+    let op = run_direct_operation(&operation, op_source, &op_tree);
+    OperationExecution {
+        operation,
+        cli,
+        op,
+        cli_tree,
+        op_tree,
+    }
+}
+
+fn run_in_place(project: &Path, command: &[&str], flags: &[String]) {
+    let mut argv = command
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
+    argv.extend([
+        "--project".to_string(),
+        project.to_string_lossy().into_owned(),
+    ]);
+    argv.extend_from_slice(flags);
+    argv.extend(["--in-place".to_string(), "--json".to_string()]);
+    let run = run_powerbi_owned(&argv);
+    assert_eq!(
+        run.exit, 0,
+        "seed command {:?} failed: {}",
+        command, run.stderr
+    );
+}
+
+fn add_calculated_column(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "add-calculated-column");
+    let operation = json!({
+        "op": "addCalculatedColumn", "table": "FactSales", "name": "Equivalence Calc",
+        "expression": "1", "dataType": "int64"
+    });
+    let flags = strings(&[
+        "--table",
+        "FactSales",
+        "--name",
+        "Equivalence Calc",
+        "--expression",
+        "1",
+        "--data-type",
+        "int64",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "add-calculated-column",
+        &cli_source,
+        &op_source,
+        operation,
+        &["model", "calculated-columns", "add"],
+        &flags,
+    )
+}
+
+fn add_static_table(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "add-static-table");
+    let operation = json!({
+        "op": "addStaticTable", "table": "Equivalence Static", "column": "Label",
+        "valuesJson": "[\"A\",\"B\"]"
+    });
+    let flags = strings(&[
+        "--table",
+        "Equivalence Static",
+        "--column",
+        "Label",
+        "--values-json",
+        "[\"A\",\"B\"]",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "add-static-table",
+        &cli_source,
+        &op_source,
+        operation,
+        &["model", "tables", "add-static"],
+        &flags,
+    )
+}
+
+fn set_sort_by(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-sort-by");
+    let operation = json!({
+        "op": "setSortBy", "table": "DimDate", "column": "Month", "by": "FiscalYear"
+    });
+    let flags = strings(&[
+        "--table",
+        "DimDate",
+        "--column",
+        "Month",
+        "--by",
+        "FiscalYear",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-sort-by",
+        &cli_source,
+        &op_source,
+        operation,
+        &["model", "columns", "set-sort-by"],
+        &flags,
+    )
+}
+
+fn strings(values: &[&str]) -> Vec<String> {
+    values.iter().map(|value| (*value).to_string()).collect()
+}
+
+fn page_handles(project: &Path) -> Vec<String> {
+    let run = run_powerbi_owned(&[
+        "report".into(),
+        "pages".into(),
+        "list".into(),
+        "--project".into(),
+        project.to_string_lossy().into_owned(),
+        "--json".into(),
+    ]);
+    assert_eq!(run.exit, 0, "list pages failed: {}", run.stderr);
+    stdout_json(&run)["pages"]
+        .as_array()
+        .expect("pages")
+        .iter()
+        .map(|page| page["handle"].as_str().expect("page handle").to_string())
+        .collect()
+}
+
+fn seed_empty_page(project: &Path) {
+    run_in_place(
+        project,
+        &["report", "pages", "add"],
+        &strings(&[
+            "--name",
+            "ReportSectionEquivalenceEmpty",
+            "--display-name",
+            "Equivalence Empty",
+        ]),
+    );
+}
+
+fn add_page(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "add-page");
+    let operation =
+        json!({"op": "addPage", "name": "ReportSectionEquivalence", "displayName": "Equivalence"});
+    let flags = strings(&[
+        "--name",
+        "ReportSectionEquivalence",
+        "--display-name",
+        "Equivalence",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "add-page",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "pages", "add"],
+        &flags,
+    )
+}
+
+fn update_page(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "update-page");
+    let handle = page_handles(&cli_source)[0].clone();
+    assert_eq!(handle, page_handles(&op_source)[0]);
+    let operation =
+        json!({"op": "updatePage", "handle": handle, "displayName": "Equivalence Updated"});
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--display-name",
+        "Equivalence Updated",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "update-page",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "pages", "update"],
+        &flags,
+    )
+}
+
+fn reorder_pages(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "reorder-pages");
+    seed_empty_page(&cli_source);
+    seed_empty_page(&op_source);
+    let handles = page_handles(&cli_source);
+    assert_eq!(handles, page_handles(&op_source));
+    let order = handles.iter().rev().cloned().collect::<Vec<_>>().join(",");
+    let operation = json!({"op": "reorderPages", "order": order});
+    let flags = strings(&["--order", operation["order"].as_str().unwrap()]);
+    finish_legacy_case(
+        workspace,
+        "reorder-pages",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "pages", "reorder"],
+        &flags,
+    )
+}
+
+fn set_active_page(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-active-page");
+    seed_empty_page(&cli_source);
+    seed_empty_page(&op_source);
+    let handle = page_handles(&cli_source)[1].clone();
+    assert_eq!(handle, page_handles(&op_source)[1]);
+    let operation = json!({"op": "setActivePage", "handle": handle});
+    let flags = strings(&["--handle", operation["handle"].as_str().unwrap()]);
+    finish_legacy_case(
+        workspace,
+        "set-active-page",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "pages", "set-active"],
+        &flags,
+    )
+}
+
+fn delete_empty_page(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "delete-empty-page");
+    seed_empty_page(&cli_source);
+    seed_empty_page(&op_source);
+    let handle = page_handles(&cli_source)[1].clone();
+    assert_eq!(handle, page_handles(&op_source)[1]);
+    let operation = json!({"op": "deleteEmptyPage", "handle": handle, "confirm": handle});
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--confirm",
+        operation["confirm"].as_str().unwrap(),
+    ]);
+    finish_legacy_case(
+        workspace,
+        "delete-empty-page",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "pages", "delete-empty"],
+        &flags,
+    )
+}
+
+fn clone_page(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "clone-page");
+    let from = page_handles(&cli_source)[0].clone();
+    assert_eq!(from, page_handles(&op_source)[0]);
+    let operation = json!({
+        "op": "clonePage", "from": from, "newName": "ReportSectionEquivalenceClone",
+        "displayName": "Equivalence Clone", "visualPrefix": "Equivalence"
+    });
+    let flags = strings(&[
+        "--from",
+        operation["from"].as_str().unwrap(),
+        "--new-name",
+        "ReportSectionEquivalenceClone",
+        "--display-name",
+        "Equivalence Clone",
+        "--visual-prefix",
+        "Equivalence",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "clone-page",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "pages", "clone"],
+        &flags,
+    )
+}
+
+fn source_template_apply(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "source-template-apply");
+    let seed = strings(&[
+        "--table",
+        "FactSales",
+        "--name",
+        "EquivalenceSource",
+        "--kind",
+        "sql",
+        "--server",
+        "<server>",
+        "--database",
+        "<database>",
+        "--schema",
+        "dbo",
+        "--object",
+        "FactSales",
+    ]);
+    run_in_place(&cli_source, &["source-template", "add"], &seed);
+    run_in_place(&op_source, &["source-template", "add"], &seed);
+    let operation = json!({
+        "op": "sourceTemplateApply", "handle": "source-template:FactSales:EquivalenceSource",
+        "server": "db.example.internal", "database": "analytics"
+    });
+    let flags = strings(&[
+        "--handle",
+        "source-template:FactSales:EquivalenceSource",
+        "--server",
+        "db.example.internal",
+        "--database",
+        "analytics",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "source-template-apply",
+        &cli_source,
+        &op_source,
+        operation,
+        &["source-template", "apply"],
+        &flags,
+    )
+}
+
+fn visual_handle_by_type(project: &Path, visual_type: &str) -> String {
+    let run = run_powerbi_owned(&[
+        "report".into(),
+        "visuals".into(),
+        "list".into(),
+        "--project".into(),
+        project.to_string_lossy().into_owned(),
+        "--json".into(),
+    ]);
+    assert_eq!(run.exit, 0, "list visuals failed: {}", run.stderr);
+    stdout_json(&run)["visuals"]
+        .as_array()
+        .expect("visuals")
+        .iter()
+        .find(|visual| visual["visualType"] == visual_type)
+        .and_then(|visual| visual["handle"].as_str())
+        .expect("visual type handle")
+        .to_string()
+}
+
+fn set_bindings(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-bindings");
+    let handle = visual_handle_by_type(&cli_source, "lineChart");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "lineChart"));
+    let category = "role=Category,table=DimDate,column=Month";
+    let value = "role=Y,table=FactSales,measure=Total Revenue";
+    let operation = json!({"op": "setBindings", "handle": handle, "binding": [category, value]});
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--binding",
+        category,
+        "--binding",
+        value,
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-bindings",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "set-bindings"],
+        &flags,
+    )
+}
+
+fn set_display_name(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-display-name");
+    let handle = visual_handle_by_type(&cli_source, "card");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "card"));
+    let operation = json!({
+        "op": "setDisplayName", "handle": handle, "role": "Values",
+        "displayName": "Equivalence Revenue"
+    });
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--role",
+        "Values",
+        "--display-name",
+        "Equivalence Revenue",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-display-name",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "set-display-name"],
+        &flags,
+    )
+}
+
+fn set_topn_guard(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-topn-guard");
+    let handle = visual_handle_by_type(&cli_source, "lineChart");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "lineChart"));
+    let operation = json!({
+        "op": "setTopNGuard", "handle": handle, "field": "DimDate.FiscalYear",
+        "orderBy": "FactSales.Total Revenue", "top": "10"
+    });
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--field",
+        "DimDate.FiscalYear",
+        "--order-by",
+        "FactSales.Total Revenue",
+        "--top",
+        "10",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-topn-guard",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "set-topn-guard"],
+        &flags,
+    )
+}
+
+fn set_drilldown_hierarchy(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-drilldown-hierarchy");
+    let handle = visual_handle_by_type(&cli_source, "lineChart");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "lineChart"));
+    let operation = json!({
+        "op": "setDrilldownHierarchy", "handle": handle,
+        "field": ["DimDate[FiscalYear]", "DimDate[Month]"]
+    });
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--field",
+        "DimDate[FiscalYear]",
+        "--field",
+        "DimDate[Month]",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-drilldown-hierarchy",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "drilldown", "set-hierarchy"],
+        &flags,
+    )
+}
+
+fn clone_visual(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "clone-visual");
+    let handle = visual_handle_by_type(&cli_source, "card");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "card"));
+    let operation = json!({
+        "op": "cloneVisual", "handle": handle, "name": "VisualContainerEquivalenceClone",
+        "title": "Equivalence Clone", "x": "360", "y": "32"
+    });
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--name",
+        "VisualContainerEquivalenceClone",
+        "--title",
+        "Equivalence Clone",
+        "--x",
+        "360",
+        "--y",
+        "32",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "clone-visual",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "clone"],
+        &flags,
+    )
+}
+
+fn delete_visual(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "delete-visual");
+    let handle = visual_handle_by_type(&cli_source, "card");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "card"));
+    let operation = json!({"op": "deleteVisual", "handle": handle, "confirm": handle});
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--confirm",
+        operation["confirm"].as_str().unwrap(),
+    ]);
+    finish_legacy_case(
+        workspace,
+        "delete-visual",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "delete"],
+        &flags,
+    )
+}
+
+fn seed_report_filter(project: &Path) {
+    run_in_place(
+        project,
+        &["report", "filters", "add"],
+        &strings(&[
+            "--scope",
+            "report",
+            "--target",
+            "DimCustomer[Segment]",
+            "--name",
+            "EquivalenceFilter",
+            "--value",
+            "Enterprise",
+        ]),
+    );
+}
+
+fn update_filter(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "update-filter");
+    seed_report_filter(&cli_source);
+    seed_report_filter(&op_source);
+    let handle = "filter:report:main:EquivalenceFilter";
+    let operation =
+        json!({"op": "updateFilter", "handle": handle, "displayName": "Equivalence Segment"});
+    let flags = strings(&["--handle", handle, "--display-name", "Equivalence Segment"]);
+    finish_legacy_case(
+        workspace,
+        "update-filter",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "filters", "update"],
+        &flags,
+    )
+}
+
+fn delete_filter(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "delete-filter");
+    seed_report_filter(&cli_source);
+    seed_report_filter(&op_source);
+    let handle = "filter:report:main:EquivalenceFilter";
+    let operation = json!({"op": "deleteFilter", "handle": handle, "confirm": handle});
+    let flags = strings(&["--handle", handle, "--confirm", handle]);
+    finish_legacy_case(
+        workspace,
+        "delete-filter",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "filters", "delete"],
+        &flags,
+    )
+}
+
+fn clear_filter(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "clear-filter");
+    seed_report_filter(&cli_source);
+    seed_report_filter(&op_source);
+    let confirm = "clear:filters:report:report:main:1";
+    let operation = json!({"op": "clearFilter", "scope": "report", "confirm": confirm});
+    let flags = strings(&["--scope", "report", "--confirm", confirm]);
+    finish_legacy_case(
+        workspace,
+        "clear-filter",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "filters", "clear"],
+        &flags,
+    )
+}
+
+fn seed_slicer(project: &Path) {
+    let page = page_handles(project)[0].clone();
+    run_in_place(
+        project,
+        &["report", "visuals", "add-slicer"],
+        &strings(&[
+            "--page",
+            &page,
+            "--name",
+            "VisualContainerEquivalenceSlicer",
+            "--title",
+            "Segment",
+            "--field",
+            "DimCustomer.Segment",
+            "--x",
+            "960",
+            "--y",
+            "32",
+            "--width",
+            "240",
+            "--height",
+            "120",
+        ]),
+    );
+}
+
+fn slicer_clear(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "slicer-clear");
+    seed_slicer(&cli_source);
+    seed_slicer(&op_source);
+    let visual_handle = visual_handle_by_type(&cli_source, "slicer");
+    assert_eq!(visual_handle, visual_handle_by_type(&op_source, "slicer"));
+    let handle = visual_handle.replacen("visual:", "slicer:", 1);
+    let confirm = format!("clear:slicer:{handle}:0");
+    let operation = json!({"op": "slicerClear", "handle": handle, "confirm": confirm});
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--confirm",
+        operation["confirm"].as_str().unwrap(),
+    ]);
+    finish_legacy_case(
+        workspace,
+        "slicer-clear",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "slicers", "clear"],
+        &flags,
+    )
+}
+
+fn set_text(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-text");
+    let handle = visual_handle_by_type(&cli_source, "card");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "card"));
+    let operation = json!({"op": "setText", "handle": handle, "title": "Equivalence KPI"});
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--title",
+        "Equivalence KPI",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-text",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "formatting", "set-text"],
+        &flags,
+    )
+}
+
+fn set_color(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "set-color");
+    let handle = visual_handle_by_type(&cli_source, "card");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "card"));
+    let operation = json!({
+        "op": "setColor", "handle": handle, "slot": "title.fontColor", "color": "#112233"
+    });
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--slot",
+        "title.fontColor",
+        "--color",
+        "#112233",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "set-color",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "formatting", "set-color"],
+        &flags,
+    )
+}
+
+fn export_bundle(project: &Path, command: &[&str], out: &Path, extra: &[&str]) {
+    let mut argv = command
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
+    argv.extend([
+        "--project".to_string(),
+        project.to_string_lossy().into_owned(),
+        "--out".to_string(),
+        out.to_string_lossy().into_owned(),
+    ]);
+    argv.extend(extra.iter().map(|value| (*value).to_string()));
+    argv.push("--json".to_string());
+    let run = run_powerbi_owned(&argv);
+    assert_eq!(
+        run.exit, 0,
+        "bundle export {:?} failed: {}",
+        command, run.stderr
+    );
+}
+
+fn formatting_apply(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "formatting-apply");
+    let handle = visual_handle_by_type(&cli_source, "card");
+    assert_eq!(handle, visual_handle_by_type(&op_source, "card"));
+    let seed = strings(&[
+        "--handle",
+        &handle,
+        "--slot",
+        "title.fontColor",
+        "--color",
+        "#445566",
+    ]);
+    run_in_place(
+        &cli_source,
+        &["report", "visuals", "formatting", "set-color"],
+        &seed,
+    );
+    run_in_place(
+        &op_source,
+        &["report", "visuals", "formatting", "set-color"],
+        &seed,
+    );
+    let bundle = workspace.join("formatting-bundle.json");
+    let extract_handle = handle.clone();
+    let extract = ["--handle", extract_handle.as_str()];
+    export_bundle(
+        &cli_source,
+        &["report", "visuals", "formatting", "extract"],
+        &bundle,
+        &extract,
+    );
+    let bundle_text = bundle.to_string_lossy().into_owned();
+    let operation = json!({
+        "op": "formattingApply", "handle": handle, "bundle": bundle_text,
+        "allowLiteralText": true
+    });
+    let flags = strings(&[
+        "--handle",
+        operation["handle"].as_str().unwrap(),
+        "--bundle",
+        operation["bundle"].as_str().unwrap(),
+        "--allow-literal-text",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "formatting-apply",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "visuals", "formatting", "apply"],
+        &flags,
+    )
+}
+
+fn apply_theme_bundle(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "apply-theme-bundle");
+    let bundle = workspace.join("theme-bundle.json");
+    export_bundle(&cli_source, &["report", "themes", "extract"], &bundle, &[]);
+    let bundle_text = bundle.to_string_lossy().into_owned();
+    let operation = json!({"op": "applyThemeBundle", "bundle": bundle_text});
+    let flags = strings(&["--bundle", operation["bundle"].as_str().unwrap()]);
+    finish_legacy_case(
+        workspace,
+        "apply-theme-bundle",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "themes", "apply"],
+        &flags,
+    )
+}
+
+fn apply_style_bundle(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "apply-style-bundle");
+    let bundle = workspace.join("style-bundle.json");
+    export_bundle(
+        &cli_source,
+        &["report", "style", "extract"],
+        &bundle,
+        &["--include-literal-text"],
+    );
+    let bundle_text = bundle.to_string_lossy().into_owned();
+    let operation = json!({
+        "op": "applyStyleBundle", "bundle": bundle_text, "allowLiteralText": true
+    });
+    let flags = strings(&[
+        "--bundle",
+        operation["bundle"].as_str().unwrap(),
+        "--allow-literal-text",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "apply-style-bundle",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "style", "apply"],
+        &flags,
+    )
+}
+
+fn install_equivalence_bookmark(project: &Path) {
+    let report_dir = fs::read_dir(project)
+        .expect("project dir")
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry.file_type().expect("entry type").is_dir()
+                && entry.file_name().to_string_lossy().ends_with(".Report")
+        })
+        .expect("report dir")
+        .path();
+    let bookmarks = report_dir.join("definition").join("bookmarks");
+    fs::create_dir_all(&bookmarks).expect("bookmarks dir");
+    let metadata = json!({
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmarksMetadata/1.0.0/schema.json",
+        "items": [{"name": "BookmarkEquivalence"}]
+    });
+    let bookmark = json!({
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+        "displayName": "Equivalence", "name": "BookmarkEquivalence", "options": {},
+        "explorationState": {"version": "1.3", "activeSection": first_page_name(project), "sections": {}}
+    });
+    fs::write(
+        bookmarks.join("bookmarks.json"),
+        serde_json::to_vec_pretty(&metadata).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        bookmarks.join("BookmarkEquivalence.bookmark.json"),
+        serde_json::to_vec_pretty(&bookmark).unwrap(),
+    )
+    .unwrap();
+}
+
+fn bookmark_metadata(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "bookmark-metadata");
+    install_equivalence_bookmark(&cli_source);
+    install_equivalence_bookmark(&op_source);
+    let operation = json!({
+        "op": "bookmarkMetadata", "action": "set-display-name",
+        "handle": "bookmark:BookmarkEquivalence", "displayName": "Equivalence Updated"
+    });
+    let flags = strings(&[
+        "--handle",
+        "bookmark:BookmarkEquivalence",
+        "--display-name",
+        "Equivalence Updated",
+    ]);
+    finish_legacy_case(
+        workspace,
+        "bookmark-metadata",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "bookmarks", "set-display-name"],
+        &flags,
+    )
+}
+
+fn sanitize_action(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
+    let (cli_source, op_source) = legacy_sources(fixture, workspace, "sanitize-action");
+    let cli_plan = run_powerbi_owned(&strings(&[
+        "report",
+        "sanitize",
+        "plan",
+        "--project",
+        cli_source.to_str().expect("CLI source path"),
+        "--profile",
+        "agent-safe",
+        "--json",
+    ]));
+    assert_eq!(cli_plan.exit, 0, "stderr: {}", cli_plan.stderr);
+    let confirm = stdout_json(&cli_plan)["confirmToken"]
+        .as_str()
+        .expect("sanitize confirmation token")
+        .to_string();
+    let op_plan = run_powerbi_owned(&strings(&[
+        "report",
+        "sanitize",
+        "plan",
+        "--project",
+        op_source.to_str().expect("operation source path"),
+        "--profile",
+        "agent-safe",
+        "--json",
+    ]));
+    assert_eq!(op_plan.exit, 0, "stderr: {}", op_plan.stderr);
+    assert_eq!(
+        stdout_json(&op_plan)["confirmToken"].as_str(),
+        Some(confirm.as_str()),
+        "equivalent source trees must produce the same sanitize confirmation token"
+    );
+    let operation = json!({"op": "sanitizeAction", "profile": "agent-safe", "confirm": confirm});
+    let flags = strings(&[
+        "--profile",
+        "agent-safe",
+        "--confirm",
+        operation["confirm"].as_str().unwrap(),
+    ]);
+    finish_legacy_case(
+        workspace,
+        "sanitize-action",
+        &cli_source,
+        &op_source,
+        operation,
+        &["report", "sanitize", "apply"],
+        &flags,
+    )
 }
 
 fn add_measure_case(fixture: &ArchetypeFixture, workspace: &Path) -> OperationExecution {
@@ -824,4 +1804,51 @@ fn set_drillthrough_ops_equivalence_fixture_is_byte_deterministic() {
         assert_eq!(run.code, 0, "stderr: {}", run.stderr);
     }
     assert_tree_equal(&first, &second, "set-drillthrough CLI determinism");
+}
+
+#[test]
+fn remaining_mutation_commands_expose_replayable_operation_kinds() {
+    let run = run_powerbi(&["--json", "capabilities"]);
+    assert_eq!(run.code, 0, "capabilities: {}", run.stderr);
+    let document: serde_json::Value = serde_json::from_str(&run.stdout).expect("capabilities JSON");
+    let commands = document["commands"].as_array().expect("command catalog");
+    let expected = [
+        ("model calculated-columns add", "addCalculatedColumn"),
+        ("model tables add-static", "addStaticTable"),
+        ("model columns set-sort-by", "setSortBy"),
+        ("source-template apply", "sourceTemplateApply"),
+        ("report pages add", "addPage"),
+        ("report pages update", "updatePage"),
+        ("report pages reorder", "reorderPages"),
+        ("report pages set-active", "setActivePage"),
+        ("report pages delete-empty", "deleteEmptyPage"),
+        ("report pages clone", "clonePage"),
+        ("report visuals set-bindings", "setBindings"),
+        ("report visuals set-display-name", "setDisplayName"),
+        ("report visuals set-topn-guard", "setTopNGuard"),
+        ("report drilldown set-hierarchy", "setDrilldownHierarchy"),
+        ("report visuals clone", "cloneVisual"),
+        ("report visuals delete", "deleteVisual"),
+        ("report filters update", "updateFilter"),
+        ("report filters delete", "deleteFilter"),
+        ("report filters clear", "clearFilter"),
+        ("report slicers clear", "slicerClear"),
+        ("report visuals formatting set-text", "setText"),
+        ("report visuals formatting set-color", "setColor"),
+        ("report visuals formatting apply", "formattingApply"),
+        ("report themes apply", "applyThemeBundle"),
+        ("report style apply", "applyStyleBundle"),
+        ("report bookmarks set-display-name", "bookmarkMetadata"),
+        ("report bookmarks reorder", "bookmarkMetadata"),
+        ("report bookmarks delete", "bookmarkMetadata"),
+        ("report sanitize apply", "sanitizeAction"),
+    ];
+    for (path, op_kind) in expected {
+        let command = commands
+            .iter()
+            .find(|command| command["path"] == path)
+            .unwrap_or_else(|| panic!("missing catalog path {path}"));
+        assert_eq!(command["mutates"], true, "{path} must remain a mutation");
+        assert_eq!(command["opKind"], op_kind, "wrong opKind for {path}");
+    }
 }

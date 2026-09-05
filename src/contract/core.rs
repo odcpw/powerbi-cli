@@ -1194,7 +1194,73 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "followUpFields": ["ok", "exitCode", "backend", "counts", "warnings", "warnings[].code", "warnings[].message", "warnings[].path", "warnings[].pointer", "errors", "errors[].code", "errors[].message", "errors[].path", "errors[].pointer", "lint", "validators.native", "validators.microsoftReport"]
         }),
     ]);
+    annotate_operation_kinds(&mut commands);
     commands
+}
+
+/// Attach the durable operation tag to every mutation that has crossed the
+/// operation-kernel boundary. Read-only commands intentionally remain
+/// unannotated; their output is not replayable state.
+fn annotate_operation_kinds(commands: &mut [Value]) {
+    for command in commands {
+        let Some(path) = command["path"].as_str() else {
+            continue;
+        };
+        let Some(kind) = operation_kind_for_path(path) else {
+            continue;
+        };
+        if command["mutates"] == Value::Bool(true)
+            && let Some(object) = command.as_object_mut()
+        {
+            object.insert("opKind".to_string(), Value::String(kind.to_string()));
+        }
+    }
+}
+
+fn operation_kind_for_path(path: &str) -> Option<&'static str> {
+    Some(match path {
+        "model measures add" => "addMeasure",
+        "model relationships add" => "addRelationship",
+        "report visuals add"
+        | "report visuals add-card"
+        | "report visuals add-slicer"
+        | "report visuals add-textbox" => "addVisual",
+        "report filters add" => "addFilter",
+        "report drillthrough set" => "setDrillthrough",
+        "report interactions set" => "setInteraction",
+        "report themes apply-preset" => "applyThemePreset",
+        "report visuals set-object" => "setObject",
+        "model calculated-columns add" => "addCalculatedColumn",
+        "model tables add-static" => "addStaticTable",
+        "model columns set-sort-by" => "setSortBy",
+        "source-template apply" => "sourceTemplateApply",
+        "report pages add" => "addPage",
+        "report pages update" => "updatePage",
+        "report pages reorder" => "reorderPages",
+        "report pages set-active" => "setActivePage",
+        "report pages delete-empty" => "deleteEmptyPage",
+        "report pages clone" => "clonePage",
+        "report visuals set-bindings" => "setBindings",
+        "report visuals set-display-name" => "setDisplayName",
+        "report visuals set-topn-guard" => "setTopNGuard",
+        "report drilldown set-hierarchy" => "setDrilldownHierarchy",
+        "report visuals clone" => "cloneVisual",
+        "report visuals delete" => "deleteVisual",
+        "report filters update" => "updateFilter",
+        "report filters delete" => "deleteFilter",
+        "report filters clear" => "clearFilter",
+        "report slicers clear" => "slicerClear",
+        "report visuals formatting set-text" => "setText",
+        "report visuals formatting set-color" => "setColor",
+        "report visuals formatting apply" => "formattingApply",
+        "report themes apply" => "applyThemeBundle",
+        "report style apply" => "applyStyleBundle",
+        "report bookmarks set-display-name"
+        | "report bookmarks reorder"
+        | "report bookmarks delete" => "bookmarkMetadata",
+        "report sanitize apply" => "sanitizeAction",
+        _ => return None,
+    })
 }
 
 fn global_flags() -> Vec<Value> {
@@ -1693,7 +1759,7 @@ fn response_shapes() -> Value {
             "transport": "UTF-8 JSON plan file consumed by the future ops/apply command",
             "requiredFields": ["schema", "ops"],
             "operationTag": "op",
-            "operationTags": ["addMeasure", "addRelationship", "addVisual", "addFilter", "setDrillthrough", "setInteraction", "resetInteraction", "applyThemePreset", "setObject", "setPosition"],
+            "operationTags": ["addCalculatedColumn", "addFilter", "addMeasure", "addPage", "addRelationship", "addStaticTable", "addVisual", "applyStyleBundle", "applyThemeBundle", "applyThemePreset", "bookmarkMetadata", "clearFilter", "clonePage", "cloneVisual", "deleteEmptyPage", "deleteFilter", "deleteVisual", "formattingApply", "reorderPages", "resetInteraction", "sanitizeAction", "setActivePage", "setBindings", "setColor", "setDisplayName", "setDrilldownHierarchy", "setDrillthrough", "setInteraction", "setObject", "setPosition", "setSortBy", "setText", "setTopNGuard", "slicerClear", "sourceTemplateApply", "updateFilter", "updatePage"],
             "validation": ["dangling handles must resolve in the project or an earlier declaration", "declared handles are unique", "identical operations are rejected", "model, page, visual, behavior, and style stages are ordered"],
             "validatedPlanFields": ["ops[].index", "ops[].stage", "ops[].operation", "stages[].stage", "stages[].name", "stages[].operations"],
             "transactionModes": ["dry-run", "out-dir", "in-place with sibling snapshot"],
