@@ -1549,7 +1549,7 @@ const FEATURE_CATALOG: &[Feature] = &[
         emits_pbir: false,
         commands: &[],
         refusal_code: Some("unsupported_feature"),
-        reason: "Non-catalog visual families are intentionally refused until their field wells and formatting shapes are fixture-proven.",
+        reason: "Non-catalog visual families are intentionally refused until their field wells and formatting shapes are fixture-proven. The 100% stacked-bar variant lacks a Desktop reference; maps lack both role-shape evidence and proof of offline operation without online geocoding. Stacked bar/column aliases emit the recorded barChart/columnChart ids; only hundredPercentStackedColumnChart has a pilot-backed 100% stacked fixture.",
         next_proof: &[
             "Add Desktop-authored fixtures for maps, navigators, gauges, decomposition trees, and non-catalog custom visuals",
         ],

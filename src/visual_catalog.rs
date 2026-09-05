@@ -140,10 +140,16 @@ const VISUAL_TYPES: &[VisualTypeSpec] = &[
 
 const TEMPLATE_ONLY_TYPES: &[(&str, &str)] = &[];
 
-const PLANNED_TYPES: &[(&str, &str)] = &[(
-    "map",
-    "Planned after Desktop-authored PBIR fixtures prove location, latitude/longitude, legend, and size role shapes.",
-)];
+const PLANNED_TYPES: &[(&str, &str)] = &[
+    (
+        "map",
+        "Missing Desktop-authored map reference proving location, latitude/longitude, legend, and size roles plus offline operation without online geocoding. Online geocoding is not supported.",
+    ),
+    (
+        "hundredPercentStackedBarChart",
+        "Missing Desktop-authored 100% stacked-bar reference and validator/open verdict. The hundredPercentStackedColumnChart pilot fixture proves only the column variant; its shape must not be transposed by guessing a visual id.",
+    ),
+];
 
 #[derive(Debug, Default)]
 struct CatalogOptions {
@@ -389,12 +395,27 @@ fn lookup_visual_type(value: &str) -> CliResult<VisualTypeSpec> {
 }
 
 fn unsupported_visual_type_error(value: &str, normalized: &str) -> CliError {
+    let planned = PLANNED_TYPES.iter().find(|(visual_type, _)| {
+        normalize_key(visual_type) == normalized
+            || (*visual_type == "hundredPercentStackedBarChart"
+                && matches!(
+                    normalized,
+                    "hundredpercentstackedbar"
+                        | "100percentstackedbar"
+                        | "100percentstackedbarchart"
+                ))
+    });
+    if let Some((_, evidence)) = planned {
+        return unsupported_feature_error_with_message(
+            "report.visuals.planned-types",
+            format!("unsupported visual type for generated report visuals: {value}. {evidence}"),
+        )
+        .with_hint(format!("{evidence} Supply a sanitized Desktop reference and record validation in docs/pbir-desktop-oracle.md before enabling generation."))
+        .with_suggested_command("powerbi-cli report visuals catalog --json");
+    }
     if TEMPLATE_ONLY_TYPES
         .iter()
         .any(|(visual_type, _)| normalize_key(visual_type) == normalized)
-        || PLANNED_TYPES
-            .iter()
-            .any(|(visual_type, _)| normalize_key(visual_type) == normalized)
     {
         unsupported_feature_error_with_message(
             "report.visuals.planned-types",
@@ -583,6 +604,22 @@ fn runtime_parity_rules(spec: &VisualTypeSpec) -> Vec<Value> {
 
 fn role_rule_provenance(spec: &VisualTypeSpec) -> (&'static str, &'static str, Vec<&'static str>) {
     match spec.visual_type {
+        "barChart" | "columnChart" => (
+            "desktop-golden-pending",
+            "repository-generated-desktop-rendered",
+            vec![
+                "docs/desktop-acceptance-everything.md",
+                "docs/pbir-desktop-oracle.md",
+            ],
+        ),
+        "hundredPercentStackedColumnChart" => (
+            "schema-golden",
+            "repository-generated-pilot",
+            vec![
+                "testdata/golden/visual-authoring/hundredPercentStackedColumnChart.visual.json",
+                "testdata/golden/visual-authoring/PROVENANCE.md",
+            ],
+        ),
         "pieChart" => (
             "desktop-golden-pending",
             "desktop-authored-reference",

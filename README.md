@@ -1086,6 +1086,11 @@ This generated snapshot keeps status and proof claims aligned with
   clone` copies one simple existing visual container as template reuse, patches
   only name, position, and clone annotations, and preserves visual type,
   bindings, formatting, filters, and raw PBIR already inside `visual.json`.
+  Stacked bar/column aliases emit Desktop-recorded `barChart`/`columnChart` ids.
+  A 100% stacked bar and map generation remain planned: the former needs its
+  own Desktop reference; the latter also needs proof of offline operation
+  without online geocoding. Requests return `unsupported_feature` with the
+  missing evidence, as recorded in `docs/pbir-desktop-oracle.md`.
   It validates table, column, and measure names against local TMDL and returns
   readback commands. Generated `--title` text is emitted as PBIR container chrome
   under `/visual/visualContainerObjects/title` (`show = true`), with annotation

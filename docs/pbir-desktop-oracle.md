@@ -8,6 +8,19 @@ rediscover these by trial and error.
 
 ## Rule Of Record
 
+Stacked variant evidence review (2026-09-05): the 2026-06-25 finding recorded
+in `docs/desktop-acceptance-everything.md` identifies `barChart` and
+`columnChart` as the rendered stacked ids. Desktop treated literal
+`stackedBarChart` and `stackedColumnChart` as missing custom visuals; CLI
+aliases must continue to canonicalize to the rendered ids.
+`testdata/golden/visual-authoring/hundredPercentStackedColumnChart.visual.json`
+and its `PROVENANCE.md` prove the pilot column shape at schema-golden level.
+No checked-in reference proves a separate 100% stacked-bar id, or map roles
+and offline operation without online geocoding. Both remain planned and
+return `unsupported_feature` with the missing evidence. This Linux review
+does not confirm whether such ids exist in current Desktop; an official
+validator and Desktop open/refresh/save verdict remain outstanding.
+
 Power BI Desktop is the oracle. Microsoft schemas and validators are necessary
 but not sufficient. A generated report is not proven compatible until Desktop:
 
