@@ -815,14 +815,9 @@ fn v2_unknown_keys_in_new_sections_are_pointer_rich() {
 fn every_uncompiled_v2_section_names_its_owning_bead() {
     let temp = tempfile::tempdir().expect("tempdir");
     let cases = [
-        (json!({"filters": []}), "pbi-t3-compiler-completeness-1qi.1"),
         (
             json!({"layout": {"rail": {"side": "left", "slicers": []}}}),
             "pbi-t3-compiler-completeness-1qi.2",
-        ),
-        (
-            json!({"pages": [{"drillthrough": {"target": "DimDate[Date]"}}]}),
-            "pbi-t3-compiler-completeness-1qi.3",
         ),
         (
             json!({"pages": [{"visuals": [{"sort": {"field": "FactSales[Total Revenue]", "direction": "Descending"}}]}]}),

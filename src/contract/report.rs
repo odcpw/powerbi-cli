@@ -8,7 +8,7 @@ pub(super) fn commands() -> Vec<Value> {
         json!({
             "path": "report build",
             "usage": "powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json",
-            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
+            "summary": "Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; root/page/visual filters compile through AddFilter and page drillthrough through SetDrillthrough with model/type validation, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands",
             "tags": ["report", "dashboard", "build", "schema", "profile", "spec", "agent", "offline"],
             "readOnly": false,
             "mutates": true,
@@ -22,7 +22,7 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report build --schema examples/sales.schema.json --out-dir build/sales --json",
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
-            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.next[]", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
             "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "unsupported_feature", "invalid_args"]
         }),
         json!({
@@ -143,8 +143,9 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report plan",
-            "usage": "powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] --json",
-            "summary": "Create a deterministic starter dashboard spec from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text)",
+            "aliases": ["report plan explain"],
+            "usage": "powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json",
+            "summary": "Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text)",
             "tags": ["report", "dashboard", "plan", "intent", "spec", "agent"],
             "readOnly": false,
             "mutates": true,
@@ -153,12 +154,12 @@ pub(super) fn commands() -> Vec<Value> {
             "stability": "alpha-output",
             "proofLevel": "unit-smoke",
             "outputSchema": "powerbi-cli.report.plan.v1",
-            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|intent.json|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--json", "--format json"],
+            "flags": ["--schema <schema.json>", "--profile <profile.json>", "--intent <intent.md|intent.json|text>", "--objective <goal>", "--out <dashboard.json>", "--force", "--explain-rules", "--json", "--format json"],
             "examples": [
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --intent examples/intents/sales.intent.json --out build/sales.dashboard.json --json",
                 "powerbi-cli report plan --schema examples/sales.schema.json --profile build/sales.profile.json --objective \"Executive overview with trends and segment breakdown\" --out build/sales.dashboard.json --json"
             ],
-            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].shape", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
+            "followUpFields": ["ok", "schemaPath", "profilePath", "specPath", "intent.schema", "intent.audience", "intent.questions", "intent.kpis", "intent.comparisons", "intent.periods", "intent.drillPaths", "intent.alerts", "intent.filterDimensions", "intent.preferredArchetypes", "intent.pageFlow", "intent.handoff", "profileSummary.shape.kind", "profileSummary.shape.facts[]", "shape.kind", "shape.facts[]", "shape.dimensions[]", "shape.dateTables[]", "shape.keyCandidates[]", "shape.highCardinality[]", "shape.warnings[]", "shape.hypotheses[]", "shape.relationships[]", "spec", "specV2", "planner.schema", "planner.version", "planner.rules[]", "planner.rules[].ruleId", "planner.rules[].score", "planner.rules[].summary", "planner.rules[].evidence[]", "planner.rules[].proposal", "planner.proposals[]", "planner.proposals[].kind", "planner.proposals[].ruleId", "planner.proposals[].ruleIds[]", "planner.proposals[].score", "planner.proposals[].archetype", "planner.proposals[].template", "planner.proposals[].visualFamily", "planner.proposals[].bindings[]", "planner.proposals[].bindings[].role", "planner.proposals[].bindings[].field", "planner.proposals[].bindings[].fields[]", "planner.proposals[].bindings[].source", "planner.proposals[].evidence[]", "planner.proposals[].priority", "planner.proposals[].sizeClass", "planner.proposals[].semanticColor", "planner.proposals[].page", "ruleExplanations[]", "ruleExplanations[].ruleId", "ruleExplanations[].score", "ruleExplanations[].summary", "ruleExplanations[].evidence[]", "ruleExplanations[].proposal", "explainRules", "compiled.counts", "compiled.defaultsApplied", "defaultsApplied", "decisions", "decisions[].kind", "decisions[].ruleId", "decisions[].shape", "decisions[].score", "decisions[].evidence[]", "warnings", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "next"],
             "diagnosticCodes": ["spec.invalid_intent", "spec.missing_input", "input_safety_violation", "invalid_args"]
         }),
         json!({
@@ -315,7 +316,7 @@ pub(super) fn commands() -> Vec<Value> {
             "path": "report layout auto",
             "aliases": ["report layouts auto", "report layout arrange"],
             "usage": "powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json",
-            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting",
+            "summary": "Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting; legacy overview|analysis|detail|grid presets are aliases for the corresponding named templates",
             "tags": ["pbir", "report", "layout", "visual", "mutation", "agent"],
             "readOnly": false,
             "mutates": true,

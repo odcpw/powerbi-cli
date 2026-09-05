@@ -1,5 +1,5 @@
 {
-  "schema": "powerbi-cli.dashboard.v1",
+  "schema": "powerbi-cli.dashboard.v2",
   "report": {
     "name": "RegionalSales",
     "displayName": "Regional Sales",
@@ -69,6 +69,11 @@
       "id": "customer_detail",
       "displayName": "Customer Detail",
       "size": { "width": 1280, "height": 720 },
+      "drillthrough": {
+        "target": "DimCustomer[Customer]",
+        "hidden": true,
+        "backButton": true
+      },
       "visuals": [
         {
           "id": "customer_detail_table",
@@ -77,6 +82,15 @@
           "bindings": [
             { "role": "Values", "field": "DimCustomer[Customer]" },
             { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "filters": [
+            {
+              "scope": "visual",
+              "target": "DimCustomer[Customer]",
+              "kind": "topn",
+              "top": 3,
+              "by": "FactSales[Total Revenue]"
+            }
           ],
           "layout": { "x": 32, "y": 32, "width": 700, "height": 400 }
         },
@@ -96,6 +110,11 @@
       "id": "segment_detail",
       "displayName": "Segment Detail",
       "size": { "width": 1280, "height": 720 },
+      "drillthrough": {
+        "target": "DimCustomer[Segment]",
+        "hidden": true,
+        "backButton": true
+      },
       "visuals": [
         {
           "id": "segment_detail_table",
@@ -104,6 +123,15 @@
           "bindings": [
             { "role": "Values", "field": "DimCustomer[Segment]" },
             { "role": "Values", "field": "FactSales[Total Revenue]" }
+          ],
+          "filters": [
+            {
+              "scope": "visual",
+              "target": "DimCustomer[Segment]",
+              "kind": "topn",
+              "top": 2,
+              "by": "FactSales[Total Revenue]"
+            }
           ],
           "layout": { "x": 32, "y": 32, "width": 700, "height": 400 }
         },

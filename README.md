@@ -277,7 +277,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only, including aggregated operation changes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; root/page/visual filters compile through AddFilter and page drillthrough through SetDrillthrough with model/type validation, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
 - `powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <table[column]> --field <table[column]>... (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Replace a category-axis chart's Category projections with a multi-column hierarchy and enable its Desktop drill controls _(proof: `unit-smoke`)_
@@ -296,7 +296,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report interactions reset --project <project-dir-or.pbip> --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle> (--dry-run | --in-place | --out-dir <dir>) --json` — Remove one explicit PBIR visualInteractions row so the target visual returns to its documented default interaction behavior _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions set --project <project-dir-or.pbip> (--handle <interaction-handle> | --page <page-name-or-handle> --source <visual-name-or-handle> --target <visual-name-or-handle>) --type DataFilter|HighlightFilter|NoFilter (--dry-run | --in-place | --out-dir <dir>) --json` — Upsert one explicit PBIR page visualInteraction override for a source/target visual pair; Default authoring remains Desktop-fixture gated _(proof: `unit-smoke`)_
 - `powerbi-cli report interactions show --project <project-dir-or.pbip> --handle <interaction-handle> [--no-raw] --json` — Show one explicit PBIR page visualInteraction override by handle or page/source/target selector _(proof: `unit-smoke`)_
-- `powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json` — Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting _(proof: `unit-smoke`)_
+- `powerbi-cli report layout auto --project <project-dir-or.pbip> [--page <page-name-or-handle>] [--template <name> | --preset overview|analysis|detail|grid] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--margin <n>] [--gap <n>] [--row-unit <n>] (--dry-run | --in-place | --out-dir <dir>) --json` — Resolve named twelve-column design-system slots and reposition existing visuals into deterministic canvas coordinates without changing bindings or formatting; legacy overview|analysis|detail|grid presets are aliases for the corresponding named templates _(proof: `unit-smoke`)_
 - `powerbi-cli report pages add --project <project-dir-or.pbip> --display-name <name> [--name <pbir-page-name>] [--width <n>] [--height <n>] [--display-option <mode>] [--before <page-handle>|--after <page-handle>] [--set-active] (--dry-run | --in-place | --out-dir <dir>) --json` — Add an empty PBIR report page and update pageOrder with guarded output semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report pages clone --project <project-dir-or.pbip> --from <page-name-or-handle> --new-name <ReportSectionX> [--display-name <text>] [--visual-prefix <Prefix>] (--dry-run | --in-place | --out-dir <dir>) --json` — Clone a complete PBIR page, regenerate page/visual/filter identities, prune stale visual interactions, and append pageOrder _(proof: `schema-golden`)_
 - `powerbi-cli report pages delete-empty --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place --confirm <page-handle> | --out-dir <dir>) --json` — Delete only a simple empty PBIR page; pages with visuals or unknown files are refused _(proof: `unit-smoke`)_
@@ -305,7 +305,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> --profile <profile.json> (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] --json` — Create a deterministic starter dashboard spec from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -568,7 +568,9 @@ profile output retain their documented family-specific fields.
 
 `report build` also returns `compiled.ops`, a flat operation-change aggregate,
 and `readback` command arrays keyed by stable report/page/visual/table/measure
-handles. Its shared `scorecard.v1` contains native validation, Microsoft
+handles. When a dashboard spec emits typed operations, `operationOutcomes[]`
+records each kernel's concrete changes, readback commands, warnings, and
+created handles. Its shared `scorecard.v1` contains native validation, Microsoft
 validator availability, lint grouped by severity, the fixed unavailable design
 lint shape, offline handoff status, and the honest proof level. Add `--trace`
 to include a deterministic `trace[]` of `{op, ms}` planning buckets; the
@@ -645,6 +647,8 @@ cargo run --bin powerbi-cli -- report spec explain --schema .\examples\sales.sch
 cargo run --bin powerbi-cli -- report spec normalize .\examples\sales.dashboard.json --out .\build\sales.dashboard.normalized.json --json
 cargo run --bin powerbi-cli -- report spec upgrade --spec .\examples\sales.dashboard.json --out .\build\sales.dashboard.v2.json --json
 cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --profile .\examples\sales.profile.json --spec .\examples\sales.dashboard.json --out-dir .\build\generic-sales --force --json
+# V2 spec filters compile through the same typed AddFilter kernels as the CLI.
+cargo run --bin powerbi-cli -- report build --schema .\examples\sales.schema.json --spec .\examples\filter-kinds.dashboard.v2.json --out-dir .\build\filter-kinds --force --json
 cargo run --bin powerbi-cli -- validate --strict .\build\generic-sales --json
 cargo run --bin powerbi-cli -- handoff check .\build\generic-sales --json
 cargo run --bin powerbi-cli -- fixture verify .\build\generic-sales --expected .\testdata\golden\generic-sales.summary.json --json
@@ -846,6 +850,22 @@ it returns `ambiguous` with competing hypotheses. Date-like columns without a
 related date dimension produce a date-table proposal, and high-cardinality
 categorical columns are called out as possible noise.
 
+Planner v2 evaluates the embedded, versioned `planner-rules.v1` catalog after
+shape and intent normalization. Pass `--explain-rules` (or use the equivalent
+`report plan explain` form) to make the fired rules, deterministic scores, and
+actual evidence values explicit. The response always carries the same
+`planner.proposals[]` records: each names its rule id, visual family, bindings,
+priority, size class, and semantic color token without coordinates or hex
+values. The build-compatible `spec` remains dashboard.v1; `specV2` is the
+slot/template/style candidate for the layout compiler and is marked
+`desktop-golden-pending` until a Desktop canvas proof exists. Current rule ids are:
+`planner.time-series`, `planner.category-ranking`, `planner.scatter-focus`,
+`planner.detail-table`, `planner.measure-target`,
+`planner.measure-total`, `planner.alert-exception-list`,
+`planner.high-cardinality-drillthrough`, `planner.shape-flat-template`,
+`planner.shape-snowflake-template`, `planner.shape-multi-fact-template`,
+`planner.shape-ambiguous-template`, and `planner.overview`.
+
 `scaffold --force` only rebuilds a non-empty directory when its prior
 `powerbi-cli.manifest.copy.json` is present and readable. It removes the exact
 artifacts named by that prior manifest (including removed table/page/visual
@@ -950,10 +970,20 @@ This generated snapshot keeps status and proof claims aligned with
   `proofPlan` plus exact `next[]` commands. Desktop levels are never claimed by
   the Linux compiler: `proofPlan.unavailable[]` records the platform, missing
   Desktop, or missing-reference reason and the Windows instruction. Sections
-  whose other compiler bead has not landed return `unsupported_feature` with
-  the owning bead id instead of being dropped. The checked-in
-  `examples/sales.dashboard.v2.json` demonstrates the currently compilable v2
-  subset and builds byte-identically to the v1 sales fixture. To migrate any
+  Root, page, and visual `filters[]` compile to the same typed `AddFilter`
+  operations used by `report filters add`; categorical, numeric range,
+  relative-date, and visual TopN filters are model/type checked and surfaced
+  in `operationOutcomes[]`. Sections whose other compiler bead has not landed
+  return `unsupported_feature` with the owning bead id instead of being dropped.
+  Page `drillthrough` blocks likewise compile to the typed `SetDrillthrough`
+  operation: `target` must resolve to an existing model column and `hidden`
+  defaults to `true`. A requested `backButton:true` keeps the page binding but
+  returns a `spec.feature_pending` warning naming
+  `pbi-t4-pbir-catalog-expansion-sn2.8` until the proven action-button kernel
+  lands; no guessed visual is emitted.
+  The checked-in `examples/sales.dashboard.v2.json` demonstrates the minimal
+  compiled-v2 subset, while `examples/filter-kinds.dashboard.v2.json` exercises
+  every supported filter kind. To migrate any
   validated v1 spec, run `report spec upgrade --spec <v1.json> --out <v2.json>`;
   the command rewrites only `/schema`, preserves array order, normalizes object
   keys, and returns every transformed pointer. Unknown v1 keys fail with
@@ -1235,6 +1265,12 @@ This generated snapshot keeps status and proof claims aligned with
   same-report slice is `schema-golden`, backed by the public page schema and
   Desktop-authored reference shape; reproducible Desktop drillthrough
   navigation proof remains open.
+  Declarative v2 `pages[].drillthrough` uses the same `SetDrillthrough` kernel
+  during `report build`, validates its target column, and defaults the page to
+  hidden. `backButton:true` currently produces a structured
+  `spec.feature_pending` warning for
+  `pbi-t4-pbir-catalog-expansion-sn2.8`; it does not author an unproven
+  action-button visual.
 - Programmatic report filter handling covers `report filters
   list/show/add/update/delete/clear` for raw report/page/visual PBIR
   `filterConfig.filters` readback; categorical, numeric range, visual TopN, and
@@ -1266,6 +1302,9 @@ This generated snapshot keeps status and proof claims aligned with
   PBIR schemas and reference shapes, but Desktop canvas/open-save verification
   remains pending. Filter sort, tuple filters, arbitrary Advanced expressions,
   and type-changing updates remain unsupported.
+  Declarative v2 root/page/visual `filters[]` use the same AddFilter validation
+  and PBIR emission path during `report build`, so a spec build and the
+  equivalent CLI filter commands produce byte-identical artifacts.
 - Programmatic visual formatting authoring covers raw formatting bundle
   extract/apply plus typed `report visuals formatting set-text` and
   `set-color`. `set-color` patches only static literal `title.fontColor` and
@@ -1318,8 +1357,12 @@ This generated snapshot keeps status and proof claims aligned with
   the project with `--out` or can be reviewed inline with `--dry-run`; they
   embed their CSS and never fetch external assets. Layout mutations support `--dry-run`, `--out-dir`, and
   guarded `--in-place`; legacy `--preset overview|analysis|detail|grid`
-  remains an alias for the corresponding templates; auto-layout rewrites only
-  visual `position` blocks;
+  remains an alias for `overview`, `time-series`, `drillthrough-detail`, and
+  `kpi-strip-trend-breakdown`, respectively. The aliases now use the shared
+  12-column grid (24px margin, 16px gutter, 8px row unit), so older fixed
+  two-column coordinates may change where the named template reserves a
+  heading, rail, KPI, chart, or detail slot; auto-layout rewrites only visual
+  `position` blocks;
   drilldown hierarchy replaces a chart's Category
   projections with two or more resolved model columns, marks the first field
   active as the initial level, and explicitly enables its visual-header drill

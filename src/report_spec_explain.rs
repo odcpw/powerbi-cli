@@ -218,11 +218,9 @@ fn collect_unsupported_sections(
 fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
     const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
-    const FILTER_BEAD: &str = "pbi-t3-compiler-completeness-1qi.1";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const STYLE_COMMAND: &str = "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json";
     const MODEL_COMMAND: &str = "powerbi-cli --json capabilities --for model";
-    const FILTER_COMMAND: &str = "powerbi-cli report filters add --project <project-dir> --target <Table[Column]> --value <value> --dry-run --json";
     const VISUAL_COMMAND: &str = "powerbi-cli --json capabilities --for report";
     let Some(root) = spec.as_object() else {
         return Vec::new();
@@ -254,14 +252,6 @@ fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
                 continue;
             };
             let page_pointer = format!("/pages/{page_index}");
-            if page.contains_key("filters") {
-                sections.push(UncompiledSection {
-                    section: format!("pages[{page_index}].filters"),
-                    pointer: format!("{page_pointer}/filters"),
-                    owning_bead: FILTER_BEAD,
-                    suggested_command: FILTER_COMMAND,
-                });
-            }
             if let Some(visuals) = page.get("visuals").and_then(Value::as_array) {
                 for (visual_index, visual) in visuals.iter().enumerate() {
                     let Some(visual) = visual.as_object() else {
@@ -295,7 +285,7 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion) -> Value {
             if let Some(model) = sanitized.get_mut("model").and_then(Value::as_object_mut) {
                 model.remove("relationships");
             }
-            sanitize_pages(&mut sanitized, &["filters"], &["drilldown"]);
+            sanitize_pages(&mut sanitized, &[], &["drilldown"]);
         }
         SpecVersion::V2 => {
             for field in ["style", "layout", "filters", "proof"] {

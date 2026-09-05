@@ -1,6 +1,6 @@
 {
   "schema": "powerbi-cli.artifact-parity-corpus.v1",
-  "sourceRevision": "a5efc1fa374575fdbee270b2b1cb2e418c2826e7",
+  "sourceRevision": "fb43237f1b1ef2436f2575b5792fc6e6ffb47d0e",
   "artifactAlgorithm": "powerbi-cli.artifact-tree.v1",
   "closure": "complete_for_declared_corpus",
   "nonclaims": [
@@ -101,12 +101,12 @@
       },
       "spec": {
         "path": "examples/archetypes/regional-sales.dashboard.json",
-        "sha256": "1c711e3f5550547670af24663beafb8deb5ec23c80a12a0ba729a0fb52545964"
+        "sha256": "3a895603fcb8ee2df67241d66fed732f20111d9617e259285210d2ccd4552a53"
       },
       "expected": {
         "files": 28,
-        "bytes": 37452,
-        "sha256": "8d0dbac93e83f951fe905eeddfa8cb23e00188f107fc61ba9c09d5ba8600b65c"
+        "bytes": 45399,
+        "sha256": "88c1533974ba58a547223068c4871ab85f37625659509099bcd37dcf1b149b82"
       }
     }
   ]

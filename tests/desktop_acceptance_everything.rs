@@ -193,6 +193,10 @@ fn everything_acceptance_invokes_every_catalog_command() {
     h.ok("features list", &svec(["features", "list", "--json"]));
     h.ok("robot-docs guide", &svec(["robot-docs", "guide", "--json"]));
     h.ok(
+        "robot-docs verify",
+        &svec(["robot-docs", "verify", "--json"]),
+    );
+    h.ok(
         "robot-docs render",
         &svec(["robot-docs", "render", "--check", "--json"]),
     );

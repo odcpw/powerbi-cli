@@ -103,8 +103,8 @@ impl ArchetypeFixture {
 
     /// Start a dashboard-v2 builder from this real fixture.
     ///
-    /// V2 compilation belongs to T2; this helper intentionally only authors
-    /// test input and does not imply the current CLI accepts v2 yet.
+    /// V2 compilation is exercised by the strict compiler tests; this helper
+    /// keeps fixture input construction deterministic for those tests.
     pub fn v2_spec_builder(&self) -> DashboardSpecBuilder {
         let mut builder = self.spec_builder();
         builder.value["schema"] = Value::String("powerbi-cli.dashboard.v2".into());

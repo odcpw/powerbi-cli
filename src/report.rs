@@ -24,6 +24,11 @@ pub(crate) fn report_command(args: &[String]) -> CliResult<Value> {
     match args {
         [family, rest @ ..] if family == "build" => build_command(rest),
         [family, rest @ ..] if family == "spec" => spec_command(rest),
+        [family, action, rest @ ..] if family == "plan" && action == "explain" => {
+            let mut plan_args = rest.to_vec();
+            plan_args.push("--explain-rules".to_string());
+            plan_command(&plan_args)
+        }
         [family, rest @ ..] if family == "plan" => plan_command(rest),
         [family, action, rest @ ..] if family == "design" && action == "plan" => {
             design_plan_command(rest)
