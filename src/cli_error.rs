@@ -33,6 +33,7 @@ struct ErrorDetails {
     reason: Option<String>,
     candidates_command: Option<String>,
     example: Option<Value>,
+    candidates: Option<Vec<Value>>,
 }
 
 impl CliError {
@@ -105,6 +106,17 @@ impl CliError {
     pub(crate) fn with_example(mut self, example: Value) -> Self {
         self.details_mut().example = Some(example);
         self
+    }
+
+    pub(crate) fn with_candidates(mut self, candidates: Vec<Value>) -> Self {
+        self.details_mut().candidates = Some(candidates);
+        self
+    }
+
+    pub(crate) fn candidates(&self) -> Option<&Vec<Value>> {
+        self.details
+            .as_deref()
+            .and_then(|details| details.candidates.as_ref())
     }
 
     pub(crate) fn pointer(&self) -> Option<&str> {

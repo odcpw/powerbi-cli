@@ -1,6 +1,12 @@
 {
   "schema": "powerbi-cli.planner-rules.v1",
   "version": 1,
+  "evidenceThresholds": {
+    "minimumDateColumns": 1,
+    "minimumMeasures": 1,
+    "minimumIntentSignals": 1,
+    "maximumFactCandidates": 1
+  },
   "performance": {"threshold": 200, "top": 50, "bufferReuseThreshold": 2},
   "rules": [
     {

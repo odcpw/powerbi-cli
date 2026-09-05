@@ -1,0 +1,22 @@
+{
+  "candidates": [],
+  "candidatesCommand": "powerbi-cli report spec fields --schema <schema.json> --json",
+  "code": "plan.missing_input",
+  "example": {
+    "kpis": [
+      {
+        "measure": "FactSales[Revenue]",
+        "name": "Revenue"
+      }
+    ]
+  },
+  "exitCode": 10,
+  "field": "intent.kpis[0].measure",
+  "hint": "Supply the named schema or intent field and rerun report plan; no default layout is applied.",
+  "message": "required planner input `intent.kpis[0].measure` is missing: no declared measure is available; declare a schema measure and bind the intended KPI instead of guessing a SUM",
+  "pointer": "/intent/kpis/0/measure",
+  "reason": "no declared measure is available; declare a schema measure and bind the intended KPI instead of guessing a SUM",
+  "suggestedCommands": [
+    "powerbi-cli report spec fields --schema <schema.json> --json"
+  ]
+}

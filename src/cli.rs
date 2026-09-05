@@ -469,5 +469,8 @@ fn error_json(err: &CliError) -> Value {
     if let Some(example) = err.example() {
         error.insert("example".to_string(), example.clone());
     }
+    if let Some(candidates) = err.candidates() {
+        error.insert("candidates".to_string(), json!(candidates));
+    }
     json!({ "error": Value::Object(error) })
 }

@@ -1,0 +1,28 @@
+{
+  "candidates": [
+    "Total Revenue",
+    "FactSales[Total Revenue]",
+    "Total Units",
+    "FactSales[Total Units]"
+  ],
+  "candidatesCommand": "powerbi-cli report spec fields --schema <schema.json> --json",
+  "code": "plan.missing_input",
+  "example": {
+    "candidates": [
+      "Total Revenue",
+      "FactSales[Total Revenue]",
+      "Total Units",
+      "FactSales[Total Units]"
+    ],
+    "measure": "FactSales[Total Revenue]"
+  },
+  "exitCode": 10,
+  "field": "intent.kpis[0].measure",
+  "hint": "Supply the named schema or intent field and rerun report plan; no default layout is applied.",
+  "message": "required planner input `intent.kpis[0].measure` is missing: KPI `Total Revenue` does not resolve to a model measure; candidates: Total Revenue, FactSales[Total Revenue], Total Units, FactSales[Total Units]",
+  "pointer": "/intent/kpis/0/measure",
+  "reason": "KPI `Total Revenue` does not resolve to a model measure; candidates: Total Revenue, FactSales[Total Revenue], Total Units, FactSales[Total Units]",
+  "suggestedCommands": [
+    "powerbi-cli report spec fields --schema <schema.json> --json"
+  ]
+}

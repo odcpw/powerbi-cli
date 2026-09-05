@@ -249,7 +249,7 @@ fn planner_shape_schema(kind: &str) -> Value {
 }
 
 #[test]
-fn six_shape_planner_goldens_have_distinct_templates_and_slots() {
+fn six_shape_planner_fixtures_require_evidence_before_emitting_distinct_layouts() {
     let temp = tempfile::tempdir().expect("tempdir");
     let cases = [
         ("flat", "flat"),
@@ -262,12 +262,16 @@ fn six_shape_planner_goldens_have_distinct_templates_and_slots() {
     let mut signatures = Vec::new();
     for (fixture_name, expected_kind) in cases {
         let schema_path = temp.path().join(format!("{fixture_name}.schema.json"));
+        let mut schema = planner_shape_schema(fixture_name);
+        let table_name = schema["tables"][0]["name"].as_str().unwrap().to_string();
+        schema["tables"][0]["measures"] = serde_json::json!([{
+            "name": "Row Count", "expression": format!("COUNTROWS('{table_name}')")
+        }]);
         std::fs::write(
             &schema_path,
             format!(
                 "{}\n",
-                serde_json::to_string_pretty(&planner_shape_schema(fixture_name))
-                    .expect("schema JSON")
+                serde_json::to_string_pretty(&schema).expect("schema JSON")
             ),
         )
         .expect("write schema fixture");
@@ -280,7 +284,43 @@ fn six_shape_planner_goldens_have_distinct_templates_and_slots() {
             "shape golden",
             "--json",
         ];
-        let result = run_powerbi(&args);
+        let mut result = run_powerbi(&args);
+        if matches!(
+            fixture_name,
+            "snowflake" | "no-date" | "ambiguous" | "multi-fact"
+        ) {
+            assert_eq!(result.code, 10, "{fixture_name}: {}", result.stderr);
+            let error = common::stderr_json(&result);
+            assert_eq!(error["error"]["code"], "plan.missing_input");
+            assert_eq!(
+                error["error"]["pointer"],
+                if fixture_name == "multi-fact" {
+                    "/intent/model/factTable"
+                } else {
+                    "/schema/tables"
+                }
+            );
+            if fixture_name != "multi-fact" {
+                schema["tables"][0]["columns"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(serde_json::json!({"name":"EventDate", "dataType":"date"}));
+            }
+            std::fs::write(&schema_path, serde_json::to_vec_pretty(&schema).unwrap()).unwrap();
+            let intent = serde_json::json!({
+                "questions": ["shape golden"], "model": {"factTable": table_name}
+            })
+            .to_string();
+            result = run_powerbi(&[
+                "report",
+                "plan",
+                "--schema",
+                schema_path.to_str().unwrap(),
+                "--intent",
+                &intent,
+                "--json",
+            ]);
+        }
         assert_eq!(
             result.code, 0,
             "{fixture_name} planner stderr: {}",
@@ -302,11 +342,18 @@ fn six_shape_planner_goldens_have_distinct_templates_and_slots() {
                 })
             }).collect::<Vec<_>>()
         });
-        assert!(
-            signatures.iter().all(|previous| previous != &signature),
-            "{fixture_name} planner structure duplicates another shape"
-        );
-        signatures.push(signature);
+        if fixture_name == "no-date" {
+            assert_eq!(
+                signature, signatures[1],
+                "supplying the missing date restores the star layout"
+            );
+        } else {
+            assert!(
+                signatures.iter().all(|previous| previous != &signature),
+                "{fixture_name} planner structure duplicates another shape"
+            );
+            signatures.push(signature);
+        }
     }
-    assert_eq!(signatures.len(), cases.len());
+    assert_eq!(signatures.len(), cases.len() - 1);
 }

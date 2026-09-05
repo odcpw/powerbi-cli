@@ -217,7 +217,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -961,7 +961,7 @@ backward-compatible objective text, then validate the emitted spec before
 `report build`. Intent v1 normalizes audience, questions, KPIs, comparisons,
 periods, drill paths, alerts, filter dimensions, preferred archetypes, page
 flow, and handoff requirements. KPI names resolve to exact model measures;
-unresolved names return `spec.missing_input` with a pointer and candidates.
+unresolved names return `plan.missing_input` with a pointer and candidates.
 Fields not compiled by this starter planner remain in the response with an
 owning-bead warning. It is not a substitute for reviewing generated report
 intent or for Desktop compatibility proof.
@@ -981,6 +981,14 @@ Use optional `--project <project-dir-or.pbip>` for existing partition
 planning never rewrites partition M. Missing project evidence is explicit.
 
 Planner v2 also evaluates the embedded strict `planner-rules.v1` catalog. Add
+evidence first: a typed date column, a declared measure, a meaningful intent
+signal, and one unambiguous fact table
+must meet the catalog's `evidenceThresholds`. Otherwise `plan.missing_input`
+returns the exact field, RFC 6901 pointer, candidates, example, and recovery
+commands without writing output, even with `--force`. Set `model.factTable`
+in the JSON intent to resolve ambiguous facts; `profile infer --rows` supplies
+profile evidence and `report spec fields` lists schema candidates. Numeric
+columns alone do not authorize generated SUM measures. Add
 `--explain-rules` (or invoke the equivalent `report plan explain` alias) when
 you need the fired rule ids, scores, and actual evidence values in the output.
 Every `planner.proposals[]` entry is slot-agnostic and carries its rule id,

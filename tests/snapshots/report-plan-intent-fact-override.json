@@ -1,0 +1,22 @@
+{
+  "alerts": [],
+  "audience": null,
+  "comparisons": [],
+  "drillPaths": [],
+  "filterDimensions": [],
+  "format": "json",
+  "handoff": null,
+  "kpis": [],
+  "model": {
+    "factTable": "Events"
+  },
+  "pageFlow": [],
+  "periods": [],
+  "preferredArchetypes": [],
+  "questions": [
+    "Overview"
+  ],
+  "schema": "intent.v1",
+  "source": "intent",
+  "text": "{\"questions\":[\"Overview\"],\"model\":{\"factTable\":\"Events\"}}"
+}

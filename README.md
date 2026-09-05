@@ -312,7 +312,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report pages set-active --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) (--dry-run | --in-place | --out-dir <dir>) --json` — Set pages.json activePageName to an existing PBIR page _(proof: `unit-smoke`)_
 - `powerbi-cli report pages show --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) --json` — Show one PBIR report page with visual geometry and bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report pages update --project <project-dir-or.pbip> (--handle <page-handle> | --page <page-name-or-handle>) [--display-name <name>] [--width <n>] [--height <n>] [--display-option <mode>] [--allow-visuals-outside-page] (--dry-run | --in-place | --out-dir <dir>) --json` — Patch PBIR page display metadata without renaming the internal page handle _(proof: `unit-smoke`)_
-- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create a deterministic starter dashboard spec and slot-agnostic planner-v2 proposals from schema/profile candidates and a typed JSON or Markdown report intent (with backward-compatible objective text) _(proof: `unit-smoke`)_
+- `powerbi-cli report plan --schema <schema.json> [--profile <profile.json>] [--project <project-dir-or.pbip>] (--intent <intent.md|intent.json> | --objective <goal>) [--out <dashboard.json>] [--explain-rules] --json` — Create deterministic dashboard plans from schema/profile and intent evidence; refuse missing dates, declared measures, or ambiguous facts with plan.missing_input and recovery commands _(proof: `unit-smoke`)_
 - `powerbi-cli report query --project <project-dir-or.pbip> --selector <selector> [--include-raw] --json` — Run a constrained stable-selector query over report objects for agent automation _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize apply --project <project-dir-or.pbip> [--profile agent-safe|handoff] (--dry-run | --out-dir <dir> | --in-place --confirm sanitize:<planFingerprint>) --json` — Apply only supported sanitize actions under guarded dry-run/out-dir/in-place semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report sanitize plan --project <project-dir-or.pbip> [--profile agent-safe|handoff] --json` — Create a deterministic sanitize plan before clearing persisted report filter/slicer state or flagging plan-only manual review items _(proof: `unit-smoke`)_
@@ -856,7 +856,7 @@ the `intent.v1` shape. JSON fields and Markdown H2 sections cover audience,
 questions, KPIs, comparisons, periods, drill paths, alert rules, filter
 dimensions, preferred visual archetypes, page flow, and handoff requirements.
 The response preserves the normalized document under `intent`; each KPI must
-resolve to an exact model measure or the command returns `spec.missing_input`
+resolve to an exact model measure or the command returns `plan.missing_input`
 with its pointer and measure candidates. Fields that the starter planner does
 not compile remain visible in `warnings[]` with their owning bead. The
 free-form `--objective` form remains available for quick question-only plans.
@@ -869,7 +869,15 @@ related date dimension produce a date-table proposal, and high-cardinality
 categorical columns are called out as possible noise.
 
 Planner v2 evaluates the embedded, versioned `planner-rules.v1` catalog after
-shape and intent normalization. Pass `--explain-rules` (or use the equivalent
+checking its `evidenceThresholds`: a typed date column, a declared measure, a
+meaningful intent signal, and one unambiguous fact table are required.
+Missing evidence returns `plan.missing_input`
+with a pointer, field, reason, candidates, example, and recovery commands, before
+writing any output (including `--force`). Supply `model.factTable` in the JSON
+intent to choose among fact candidates; use `profile infer --rows` for additional
+profile evidence and `report spec fields` to inspect schema fields. Numeric
+columns alone no longer authorize guessed SUM measures or a default layout.
+Rule evaluation follows shape and intent normalization. Pass `--explain-rules` (or use the equivalent
 `report plan explain` form) to make the fired rules, deterministic scores, and
 actual evidence values explicit. The response always carries the same
 `planner.proposals[]` records: each names its rule id, visual family, bindings,

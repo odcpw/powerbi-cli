@@ -105,10 +105,19 @@ fn intent_guard_overrides_apply_and_invalid_values_refuse_before_output() {
     let temp = tempfile::tempdir().unwrap();
     let profile = profile(temp.path(), 201);
     let intent = temp.path().join("intent.json");
-    fs::write(&intent, r#"{"guards":{"threshold":300,"top":7}}"#).unwrap();
+    fs::write(
+        &intent,
+        r#"{"questions":["Executive overview"],"model":{"factTable":"FactSales"},"guards":{"threshold":300,"top":7}}"#,
+    )
+    .unwrap();
     let value = plan(&profile, &["--intent", intent.to_str().unwrap()]);
     assert_eq!(value["performance"]["ops"]["ops"], json!([]));
-    fs::write(&intent, r#"{"guards":{"threshold":100,"top":7}}"#).unwrap();
+    assert_eq!(value["intent"]["model"]["factTable"], "FactSales");
+    fs::write(
+        &intent,
+        r#"{"questions":["Executive overview"],"model":{"factTable":"FactSales"},"guards":{"threshold":100,"top":7}}"#,
+    )
+    .unwrap();
     let value = plan(&profile, &["--intent", intent.to_str().unwrap()]);
     assert!(
         value["performance"]["ops"]["ops"]

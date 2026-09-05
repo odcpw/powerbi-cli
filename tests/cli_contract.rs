@@ -1524,6 +1524,49 @@ fn typo_recovery_for_bare_families_suggests_an_executable_discovery_command() {
 }
 
 #[test]
+fn planner_missing_evidence_suggests_executable_catalog_commands() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("schema.json");
+    let capabilities = run_powerbi(&["capabilities", "--json"]);
+    let catalog = stdout_json(&capabilities);
+    for case in ["date", "measure", "fact"] {
+        let mut table = json!({"name":"Events", "columns":[
+            {"name":"Date", "dataType":"date"}, {"name":"Amount", "dataType":"decimal"}
+        ], "measures":[{"name":"Total", "expression":"SUM('Events'[Amount])"}]});
+        if case == "date" {
+            table["columns"][0]["dataType"] = json!("string");
+        }
+        if case == "measure" {
+            table["measures"] = json!([]);
+        }
+        let mut schema = json!({"name":"Evidence", "tables":[table.clone()]});
+        if case == "fact" {
+            table["name"] = json!("OtherEvents");
+            schema["tables"].as_array_mut().unwrap().push(table);
+        }
+        std::fs::write(&path, serde_json::to_vec(&schema).unwrap()).unwrap();
+        let output = run_powerbi(&[
+            "report",
+            "plan",
+            "--schema",
+            path.to_str().unwrap(),
+            "--objective",
+            "Overview",
+            "--json",
+        ]);
+        assert_eq!(output.code, 10, "{}", output.stderr);
+        let value = stderr_json(&output);
+        assert_eq!(value["error"]["code"], "plan.missing_input");
+        for command in value["error"]["suggestedCommands"].as_array().unwrap() {
+            assert_executable_command_template(
+                command.as_str().unwrap(),
+                catalog["commands"].as_array().unwrap(),
+            );
+        }
+    }
+}
+
+#[test]
 fn misplaced_nested_commands_suggest_the_exact_live_path() {
     let dax = run_powerbi(&["dax", "lint", "--json"]);
     assert_eq!(dax.code, 2);

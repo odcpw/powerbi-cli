@@ -789,8 +789,8 @@ fn report_plan_rejects_malformed_intent_with_pointer_and_missing_kpi_with_candid
     ]);
     assert_eq!(missing_result.code, 10);
     let missing_error = stderr_json(&missing_result);
-    assert_eq!(missing_error["error"]["code"], "spec.missing_input");
-    assert_eq!(missing_error["error"]["pointer"], "/kpis/0/name");
+    assert_eq!(missing_error["error"]["code"], "plan.missing_input");
+    assert_eq!(missing_error["error"]["pointer"], "/intent/kpis/0/measure");
     assert!(
         missing_error["error"]["message"]
             .as_str()
