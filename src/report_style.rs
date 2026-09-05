@@ -460,6 +460,36 @@ fn read_style_bundle(path: &Path) -> CliResult<Value> {
     Ok(value)
 }
 
+/// Validate the style-bundle safety contract before report-build records an
+/// ApplyStyleBundle operation. Doing this during compilation makes dry-run and
+/// out-dir builds reject the same unsafe input before any project is written.
+pub(crate) fn validate_compiler_bundle(path: &Path, allow_literal_text: bool) -> CliResult<()> {
+    let bundle = read_style_bundle(path).map_err(|error| error.with_pointer("/style/bundle"))?;
+    let contains_literal_text =
+        bundle["visualStyles"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|style| {
+                style_safety(&style["formatting"])["containsLiteralText"]
+                    .as_bool()
+                    .unwrap_or(false)
+            });
+    if contains_literal_text && !allow_literal_text {
+        return Err(CliError::invalid_args(
+            "style.bundle contains literal text; report build requires style.allowLiteralText: true after review",
+        )
+        .with_pointer("/style/allowLiteralText")
+        .with_hint(
+            "Set style.allowLiteralText to true only when copying display strings is intentional.",
+        )
+        .with_suggested_command(
+            "powerbi-cli report style inspect --project <source-project> --json",
+        ));
+    }
+    Ok(())
+}
+
 fn style_safety(payload: &Value) -> Value {
     let scan = formatting_safety([payload], STYLE_CREDENTIAL_NEEDLES, true);
     json!({

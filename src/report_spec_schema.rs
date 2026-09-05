@@ -188,7 +188,7 @@ const FORMAT_STRING: NodeSchema = node(
 const STYLE: NodeSchema = node(
     "style",
     "style",
-    &["preset", "bundle", "tokens", "defaults"],
+    &["preset", "bundle", "allowLiteralText", "tokens", "defaults"],
 );
 const STYLE_TOKENS: NodeSchema = node(
     "style.tokens",
@@ -819,6 +819,9 @@ fn version_schema(version: SpecVersion) -> Value {
                 nodes,
                 "style",
                 &[
+                    ("preset", json!({"type": "string", "minLength": 1})),
+                    ("bundle", json!({"type": "string", "minLength": 1})),
+                    ("allowLiteralText", json!({"type": "boolean"})),
                     ("tokens", style_tokens_with_children(nodes, style_tokens)),
                     ("defaults", json!({"type": "object"})),
                 ],
@@ -1076,6 +1079,7 @@ pub(crate) fn reject_uncompiled_v2_sections(spec: &Value) -> CliResult<()> {
     Err(CliError::unsupported_feature(format!(
         "dashboard spec v2 section `{section}` is recognized but not compiled; owning bead: {bead}"
     ))
+    .with_pointer(format!("/{}", section.replace('.', "/")))
     .with_hint(format!(
         "Keep the section in the v2 spec for future compilation, or apply its supported primitive after build. Owning bead: {bead}."
     ))
@@ -1107,11 +1111,14 @@ pub(crate) fn style_is_supported_compiled(style: &Value) -> bool {
     let Some(style) = style.as_object() else {
         return false;
     };
-    !style.is_empty()
-        && style
-            .keys()
-            .all(|key| matches!(key.as_str(), "tokens" | "defaults"))
-        && style.values().all(Value::is_object)
+    style.keys().all(|key| {
+        matches!(
+            key.as_str(),
+            "preset" | "bundle" | "allowLiteralText" | "tokens" | "defaults"
+        )
+    }) && ["tokens", "defaults"]
+        .iter()
+        .all(|key| style.get(*key).is_none_or(Value::is_object))
 }
 
 fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
@@ -1268,7 +1275,7 @@ fn first_uncompiled_v2_section(
 ) -> Option<(String, &'static str, &'static str)> {
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
-    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
     const FORMAT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.8";
     const PROOF_BEAD: &str = "pbi-t3-compiler-completeness-1qi.9";
@@ -1417,7 +1424,7 @@ pub(crate) fn uncompiled_v2_sections(
 
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
-    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const LAYOUT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.7";
     const FORMAT_BEAD: &str = "pbi-t3-compiler-completeness-1qi.8";
     const PROOF_BEAD: &str = "pbi-t3-compiler-completeness-1qi.9";
@@ -1731,6 +1738,7 @@ struct StaticTableV2 {
 struct StyleV2 {
     preset: Option<Value>,
     bundle: Option<Value>,
+    allow_literal_text: Option<Value>,
     tokens: Option<StyleTokensV2>,
     defaults: Option<BTreeMap<String, Value>>,
 }
