@@ -250,7 +250,7 @@ fn rail_field(model: &PlanModel<'_>, intent: &Intent) -> CliResult<Option<String
 /// Reserve the shared left rail using grid geometry. The slicer compiler
 /// materializes the rail; other templates have content scaled into its
 /// remaining area through explicit-layout precedence.
-fn place_with_rail(
+pub(crate) fn place_with_rail(
     template: &str,
     rail_template: &str,
     visuals: &mut [Value],

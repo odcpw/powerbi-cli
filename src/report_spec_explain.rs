@@ -238,7 +238,7 @@ fn collect_unsupported_sections(
 
 fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
     const MODEL_BEAD: &str = "pbi-t3-compiler-completeness-1qi.5";
-    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.6";
+    const STYLE_BEAD: &str = "pbi-t3-compiler-completeness-1qi.13";
     const VISUAL_BEHAVIOR_BEAD: &str = "pbi-t3-compiler-completeness-1qi.4";
     const STYLE_COMMAND: &str = "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json";
     const MODEL_COMMAND: &str = "powerbi-cli --json capabilities --for model";
@@ -247,7 +247,10 @@ fn collect_v1_unsupported(spec: &Value) -> Vec<UncompiledSection> {
         return Vec::new();
     };
     let mut sections = Vec::new();
-    if root.contains_key("style") {
+    if root
+        .get("style")
+        .is_some_and(|style| !style_is_supported_compiled(style))
+    {
         sections.push(UncompiledSection {
             section: "style".into(),
             pointer: "/style".into(),
@@ -302,7 +305,12 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion, design_defaults: boo
     let mut sanitized = root.clone();
     match version {
         SpecVersion::V1 => {
-            sanitized.remove("style");
+            if sanitized
+                .get("style")
+                .is_some_and(|style| !style_is_supported_compiled(style))
+            {
+                sanitized.remove("style");
+            }
             if let Some(model) = sanitized.get_mut("model").and_then(Value::as_object_mut) {
                 model.remove("relationships");
             }

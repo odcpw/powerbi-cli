@@ -438,6 +438,8 @@ fn everything_acceptance_invokes_every_catalog_command() {
             &p(&scaffold_project),
             "--out",
             &p(&planned_spec),
+            "--variants",
+            "3",
             "--json",
         ]),
     );

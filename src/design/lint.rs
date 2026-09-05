@@ -40,6 +40,7 @@ pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult
         .unwrap_or_default();
     let mut findings = Vec::new();
     let mut contexts = Vec::new();
+    let style_policy = crate::design_lint_style::resolved_policy(resolved)?;
 
     for (page_index, page) in pages.iter().enumerate() {
         let context = PageContext::load(
@@ -50,9 +51,20 @@ pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult
             &grid_catalog.templates,
         )?;
         lint_page_geometry(&context, &mut findings)?;
+        crate::design_lint_content::lint_page(
+            page,
+            page_index,
+            context
+                .template
+                .as_ref()
+                .is_some_and(|template| template.name == "ranking"),
+            &mut findings,
+            style_policy.as_ref(),
+        )?;
         contexts.push(context);
     }
     lint_rail_sync(&contexts, &mut findings)?;
+    crate::design_lint_content::lint_measure_formats(deep, &mut findings);
 
     sort_findings(&mut findings);
     rules::ensure_finding_ids_registered(&findings, "ruleId")?;
@@ -66,8 +78,8 @@ pub(crate) fn lint_report(resolved: &ResolvedProject, deep: &Value) -> CliResult
         "projectDir": project,
         "counts": counts,
         "ruleIds": design_rule_ids(),
-        "evaluatedRules": design_rule_ids(),
-        "deferredRules": [],
+        "evaluatedRules": design_rule_ids().into_iter().filter(|id| style_policy.is_some() || !crate::design_lint_content::is_deferred(id)).collect::<Vec<_>>(),
+        "deferredRules": if style_policy.is_some() { json!([]) } else { crate::design_lint_content::deferred_rules() },
         "grid": {
             "schema": grid_catalog.schema,
             "columns": grid_catalog.grid.columns,
@@ -833,7 +845,7 @@ fn finite_or(value: Option<f64>, fallback: f64) -> f64 {
     value.filter(|value| value.is_finite()).unwrap_or(fallback)
 }
 
-fn design_finding(
+pub(crate) fn design_finding(
     rule_id: &str,
     handle: Option<&str>,
     path: Option<&Path>,

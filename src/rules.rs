@@ -104,6 +104,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    PLAN_VARIANTS_INSUFFICIENT => ("plan.variants_insufficient", Validation, "error", "Too few distinct compiler-valid template choices exist for the requested variant count.", "Request fewer variants or supply more model and intent evidence for catalog choices.", None),
     PLANNER_CARDINALITY_GUARD => ("planner.cardinality-guard", Audit, "info", "A category grouping exceeds the planner cardinality threshold.", "Review the proposed TopN guard, ranking measure, and profile evidence before applying the plan.", None),
     OPS_STAGE_ORDER => ("ops.stage_order", Validation, "error", "Operation stages are out of order.", "Order operations by model, page, visual, behavior, then style stage, keeping declarations before references.", None),
     SPEC_UNCOMPILED_SECTION => ("report.spec.uncompiled_section", Report, "warning", "An explain preview contains a recognized section that is not compiled yet.", "Read the warning's owningBead and unsupportedSections entry; omit the pending section for a supported build or wait for its compiler implementation.", None),
@@ -214,6 +215,14 @@ define_rules! {
     MODEL_COLUMN_UNUSED => ("model.column_unused", Model, "warning", "A model column is not referenced by a visual, measure, or relationship.", "Remove the column or document its intended use; otherwise hide or omit it before handoff to keep the model focused.", None),
     M_DUPLICATE_STEP_NAME => ("m.duplicate_step_name", M, "error", "An M let expression defines the same step name more than once, which can surface as a cyclic-reference refresh error in Power BI Desktop.", "Rename or remove the duplicate M step; lint reports the first and duplicate source positions, including quoted identifiers, before Desktop handoff.", None),
     DESIGN_VISUAL_OVERLAP => ("design.visual_overlap", Design, "warning", "Two visuals overlap on the report canvas.", "Move or resize one visual with `report visuals set-position`, or re-run the named layout template.", Some("relayout-template")),
+    DESIGN_TITLE_CASE_INCONSISTENT => ("design.title_case_inconsistent", Design, "warning", "Visual title casing differs from the page convention.", "Review the title and use the same casing convention as peer visuals.", Some("normalize-title")),
+    DESIGN_TITLE_MISSING => ("design.title_missing", Design, "warning", "A data visual has no visible title text or dynamic title expression.", "Set a visible title through report visuals formatting set-text.", Some("set-title")),
+    DESIGN_TITLE_DUPLICATE => ("design.title_duplicate", Design, "warning", "Data visuals on the same page share a normalized title.", "Give each visual a title that describes its distinct purpose.", Some("normalize-title")),
+    DESIGN_FONT_BELOW_MINIMUM => ("design.font_below_minimum", Design, "warning", "Visual text is smaller than the resolved typography minimum.", "Apply the typography token minimum once the style-token policy is available.", Some("apply-default")),
+    DESIGN_PALETTE_DRIFT => ("design.palette_drift", Design, "warning", "A visual color is outside the resolved palette and semantic colors.", "Use a resolved palette or semantic color token.", Some("apply-theme")),
+    DESIGN_NUMBER_FORMAT_MISSING => ("design.number_format_missing", Design, "warning", "A report-bound measure has no static or dynamic number format.", "Set a deliberate static format string or dynamic format definition on the measure.", Some("apply-format")),
+    DESIGN_DISPLAY_UNITS_MISSING => ("design.display_units_missing", Design, "warning", "Explicit automatic display units override the resolved compact-unit policy.", "Remove the automatic-unit override or set deliberate compact units from the resolved policy.", Some("apply-format")),
+    DESIGN_RANKING_NOT_SORTED => ("design.ranking_not_sorted", Design, "warning", "A ranking-template chart has no explicit descending measure sort.", "Set the ranking measure sortDirection to Descending.", Some("apply-sort")),
     DESIGN_VISUAL_OFF_GRID => ("design.visual_off_grid", Design, "warning", "A visual edge is not aligned to the twelve-column design grid.", "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.", Some("relayout-template")),
     DESIGN_ROW_HEIGHT_INCONSISTENT => ("design.row_height_inconsistent", Design, "warning", "Visuals sharing a grid row have inconsistent heights.", "Re-run the named layout template so sibling visuals share the row height.", Some("relayout-template")),
     DESIGN_COLUMN_WIDTH_INCONSISTENT => ("design.column_width_inconsistent", Design, "warning", "Visuals sharing a grid column have inconsistent widths.", "Re-run the named layout template so sibling visuals share the column width.", Some("relayout-template")),
@@ -305,8 +314,16 @@ mod tests {
 
     #[test]
     fn design_lint_has_a_typed_complete_rule_family() {
-        assert_eq!(rules_for_family(RuleFamily::Design).count(), 12);
+        assert_eq!(rules_for_family(RuleFamily::Design).count(), 20);
         for id in [
+            "design.title_case_inconsistent",
+            "design.title_missing",
+            "design.title_duplicate",
+            "design.font_below_minimum",
+            "design.palette_drift",
+            "design.number_format_missing",
+            "design.display_units_missing",
+            "design.ranking_not_sorted",
             "design.contrast_below_aa",
             "report.visual_outside_page",
             "design.visual_overlap",
