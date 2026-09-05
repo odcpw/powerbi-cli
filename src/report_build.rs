@@ -1,9 +1,14 @@
 use crate::cli_support::{
     MutationMode, require_mode_with_allowed_modes, set_mode_with_allowed_modes, shell_arg,
 };
+use crate::design::grid::{self, PageSize, SlotPosition, Template};
+
+mod layout;
 use crate::input_safety::{InputKind, read_utf8};
 use crate::json_composition::normalize_spec_file;
-use crate::ops::{Op, OpKernel, OpOutcome, OpPlan, ProjectIndex, Transaction, kernel_for};
+use crate::ops::{
+    Op, OpKernel, OpOutcome, OpPlan, ProjectIndex, Transaction, kernel_for, visual_handle,
+};
 use crate::pbir_filters::{FilterArrayOrigin, FilterScope, named_filter_handle};
 use crate::pbir_visual_factory::{
     BETWEEN_SLICER_MIN_HEIGHT, SLICER_MIN_HEIGHT, SlicerMode, resolve_slicer_mode,
@@ -18,7 +23,9 @@ use crate::report_proof::{ProofPlan, compile_proof_plan};
 use crate::report_spec_explain::explain_command;
 use crate::report_spec_fields::fields_command;
 use crate::report_spec_normalize::normalize_command;
-use crate::report_spec_schema::{reject_uncompiled_v2_sections, validate_known_fields};
+use crate::report_spec_schema::{
+    reject_uncompiled_v2_sections, style_is_supported_typography, validate_known_fields,
+};
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
 use crate::scorecard::{dry_run_scorecard, project_scorecard};
@@ -28,6 +35,7 @@ use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, canonical_display, command_arg,
     resolve_project, scaffold_schema_value, validate_project,
 };
+use layout::{append_heading_visuals, layout_metadata, resolve_page_layout, resolve_visual_slot};
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -504,7 +512,6 @@ fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> 
             &model,
         )?;
 
-        let template = page.get("template").and_then(Value::as_str);
         for (visual_index, visual) in page
             .get("visuals")
             .and_then(Value::as_array)
@@ -516,19 +523,6 @@ fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> 
                 continue;
             };
             let visual_pointer = format!("/pages/{page_index}/visuals/{visual_index}");
-            if let (Some(template), Some(slot)) = (
-                template.filter(|template| !template.trim().is_empty()),
-                visual.get("slot").and_then(Value::as_str),
-            ) && !template_slot_allowed(template, slot)
-            {
-                return Err(spec_missing_input(
-                    format!("{visual_pointer}/slot"),
-                    "visuals[].slot",
-                    format!("slot `{slot}` is not defined by page template `{template}`"),
-                    json!({"slot": "primary"}),
-                ));
-            }
-
             if let Some(topn) = visual.get("topnGuard").and_then(Value::as_object) {
                 let measure_count = visual_measure_binding_count(visual, &model);
                 if measure_count > 1 && !has_nonempty_string(topn.get("orderBy")) {
@@ -548,7 +542,6 @@ fn validate_required_spec_inputs(schema: &Value, spec: &Value) -> CliResult<()> 
                 "filters",
                 "format",
                 "conditionalFormatting",
-                "slot",
                 "subtitle",
             ]
             .iter()
@@ -767,45 +760,6 @@ fn collect_semantic_tokens(value: &Value, semantic_context: bool, tokens: &mut B
     }
 }
 
-fn template_slot_allowed(template: &str, slot: &str) -> bool {
-    let templates = [
-        "kpi-strip-trend-breakdown",
-        "overview",
-        "time-series",
-        "ranking",
-        "distribution",
-        "comparison",
-        "detail-table",
-        "drillthrough-detail",
-        "exception-list",
-        "matrix-focus",
-        "scatter-focus",
-    ];
-    if !templates
-        .iter()
-        .any(|name| name.eq_ignore_ascii_case(template.trim()))
-    {
-        // Unknown template names are still owned by the layout compiler. Let
-        // the normal unsupported-feature boundary report that section rather
-        // than guessing a slot catalogue for an unrecognized template.
-        return true;
-    }
-    [
-        "heading",
-        "kpi.1",
-        "kpi.2",
-        "kpi.3",
-        "kpi.4",
-        "primary",
-        "secondary",
-        "tertiary",
-        "detail",
-        "rail",
-    ]
-    .iter()
-    .any(|name| name.eq_ignore_ascii_case(slot.trim()))
-}
-
 fn has_nonempty_string(value: Option<&Value>) -> bool {
     value
         .and_then(Value::as_str)
@@ -825,6 +779,12 @@ struct CompiledDashboard {
     operation_outcomes: Vec<OpOutcome>,
     warnings: Vec<Value>,
     defaults_applied: Vec<Value>,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedPageLayout {
+    template: Template,
+    positions: BTreeMap<String, SlotPosition>,
 }
 
 fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<CompiledDashboard> {
@@ -905,7 +865,14 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
     }
     let model = ModelIndex::from_schema(&merged);
     let mut defaults_applied = Vec::new();
-    let pages = compile_pages(spec_object, &model, &mut defaults_applied)?;
+    let mut warnings = Vec::new();
+    let pages = compile_pages(
+        spec_object,
+        &model,
+        spec_object.get("style"),
+        &mut defaults_applied,
+        &mut warnings,
+    )?;
     if !pages.is_empty() {
         merged
             .as_object_mut()
@@ -927,7 +894,11 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
             .iter()
             .map(|operation| serde_json::to_value(operation).expect("typed operation serializes")),
     );
-    if spec_object.get("style").is_some() {
+    warnings.extend(drillthrough_warnings);
+    if let Some(style) = spec_object.get("style")
+        && (spec_object.get("schema").and_then(Value::as_str) != Some("powerbi-cli.dashboard.v2")
+            || !style_is_supported_typography(style))
+    {
         return Err(CliError::unsupported_feature(
             "report build style application from dashboard spec is not implemented yet"
         )
@@ -944,10 +915,10 @@ fn compile_dashboard(schema: &Value, spec: Option<&Value>) -> CliResult<Compiled
     Ok(CompiledDashboard {
         schema: merged,
         operations,
+        warnings,
         typed_operations,
         operation_pointers,
         operation_outcomes: Vec::new(),
-        warnings: drillthrough_warnings,
         defaults_applied,
     })
 }
@@ -1152,7 +1123,9 @@ fn add_measure_to_schema(schema: &mut Map<String, Value>, measure: &Value) -> Cl
 fn compile_pages(
     spec: &Map<String, Value>,
     model: &ModelIndex,
+    style: Option<&Value>,
     defaults_applied: &mut Vec<Value>,
+    warnings: &mut Vec<Value>,
 ) -> CliResult<Vec<Value>> {
     let mut pages = Vec::new();
     for (page_index, page) in spec
@@ -1187,7 +1160,30 @@ fn compile_pages(
                 out.insert("height".to_string(), height.clone());
             }
         }
-        let visuals = compile_visuals(page_index, page, model, defaults_applied)?;
+        let layout = resolve_page_layout(page_index, page, defaults_applied)?;
+        if let Some(layout) = layout.as_ref() {
+            out.insert(
+                "template".to_string(),
+                Value::String(layout.template.name.clone()),
+            );
+            out.insert("layout".to_string(), layout_metadata(layout));
+            warnings.push(json!({
+                "code": crate::rules::FEATURE_PENDING,
+                "feature": "report.section-divider",
+                "pointer": format!("/pages/{page_index}/template"),
+                "template": layout.template.name,
+                "message": "section divider shapes are not available in the current PBIR shape catalog; the template layout is preserved and dividers are omitted"
+            }));
+        }
+        let mut visuals = compile_visuals(
+            page_index,
+            page,
+            model,
+            layout.as_ref(),
+            defaults_applied,
+            warnings,
+        )?;
+        append_heading_visuals(page_index, page, layout.as_ref(), style, &mut visuals)?;
         out.insert("visuals".to_string(), Value::Array(visuals));
         let interactions = compile_interactions(page_index, page)?;
         if !interactions.is_empty() {
@@ -1811,9 +1807,12 @@ fn compile_visuals(
     page_index: usize,
     page: &Map<String, Value>,
     model: &ModelIndex,
+    layout: Option<&ResolvedPageLayout>,
     defaults_applied: &mut Vec<Value>,
+    warnings: &mut Vec<Value>,
 ) -> CliResult<Vec<Value>> {
     let mut visuals = Vec::new();
+    let mut used_slots = BTreeSet::new();
     for (visual_index, visual) in page
         .get("visuals")
         .and_then(Value::as_array)
@@ -1831,7 +1830,11 @@ fn compile_visuals(
             .or_else(|| visual.get("visualType"))
             .and_then(Value::as_str)
             .unwrap_or("card");
-        let visual_type = canonical_visual_type(requested_type)?;
+        let visual_type = if requested_type.eq_ignore_ascii_case("textbox") {
+            "textbox".to_string()
+        } else {
+            canonical_visual_type(requested_type)?
+        };
         let mut out = Map::new();
         if let Some(id) = visual
             .get("id")
@@ -1869,14 +1872,37 @@ fn compile_visuals(
         if let Some(title) = visual.get("title").and_then(Value::as_str) {
             out.insert("title".to_string(), Value::String(title.to_string()));
         }
-        apply_layout(page_index, visual_index, visual, &mut out, defaults_applied);
+        let slot_position = resolve_visual_slot(
+            page_index,
+            visual_index,
+            page,
+            visual,
+            layout,
+            &mut used_slots,
+            warnings,
+        )?;
+        apply_layout(
+            page_index,
+            visual_index,
+            visual,
+            slot_position,
+            &mut out,
+            defaults_applied,
+        );
         validate_minimum_visual_size(page_index, visual_index, &visual_type, slicer_mode, &out)?;
         let bindings = compile_bindings(page_index, visual_index, &visual_type, visual, model)?;
-        validate_binding_contract(page_index, visual_index, &visual_type, &bindings)?;
+        if visual_type != "textbox" {
+            validate_binding_contract(page_index, visual_index, &visual_type, &bindings)?;
+        }
         if slicer_mode == Some(SlicerMode::Between) {
             validate_between_binding(page_index, visual_index, &bindings, model)?;
         }
         out.insert("bindings".to_string(), Value::Array(bindings));
+        if visual_type == "textbox"
+            && let Some(text) = visual_text(visual)
+        {
+            out.insert("text".to_string(), Value::String(text.to_string()));
+        }
         if visual.get("drilldown").is_some() {
             return Err(CliError::unsupported_feature(
                 "report build drilldown from dashboard spec is planned for a later slice; build first, then run report drilldown set-hierarchy"
@@ -2384,16 +2410,37 @@ fn apply_layout(
     page_index: usize,
     visual_index: usize,
     visual: &Map<String, Value>,
+    slot_position: Option<SlotPosition>,
     out: &mut Map<String, Value>,
     defaults_applied: &mut Vec<Value>,
 ) {
     let layout = visual.get("layout").and_then(Value::as_object);
     for key in ["x", "y", "width", "height"] {
+        let slot_value = slot_position.and_then(|slot| match key {
+            "x" => Some(Value::from(slot.x)),
+            "y" => Some(Value::from(slot.y)),
+            "width" => Some(Value::from(slot.width)),
+            "height" => Some(Value::from(slot.height)),
+            _ => None,
+        });
         if let Some(value) = visual
             .get(key)
             .or_else(|| layout.and_then(|layout| layout.get(key)))
+            .cloned()
+            .or(slot_value)
         {
             out.insert(key.to_string(), value.clone());
+            if slot_position.is_some()
+                && visual.get(key).is_none()
+                && layout.and_then(|layout| layout.get(key)).is_none()
+            {
+                defaults_applied.push(json!({
+                    "pointer": format!("/pages/{page_index}/visuals/{visual_index}/{key}"),
+                    "field": "visuals[].slot",
+                    "value": value,
+                    "reason": "the named template slot supplies the missing visual coordinate"
+                }));
+            }
         }
     }
     if !out.contains_key("x") {

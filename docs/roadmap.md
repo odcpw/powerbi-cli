@@ -486,6 +486,12 @@ frozen until proven.
   equivalent CLI commands are byte-identical. Mutations require `--dry-run`,
   `--out-dir`, or guarded `--in-place`; arbitrary Advanced expressions and
   type-changing updates remain fixture-gated.
+- Implemented dashboard v2 template compilation: `pages[].template` and
+  `visuals[].slot` resolve through the shared grid; explicit layout wins.
+  Heading/subtitle textboxes use the heading band and typography family/scale
+  tokens. Explain exposes all resolved slots; unknown slots return
+  `spec.missing_input`, duplicate slots fail, and family mismatches warn.
+  Section dividers remain omitted with `feature_pending` pending proven shapes.
 - Implemented dashboard-spec drillthrough compiler parity: v2
   `pages[].drillthrough` uses the SetDrillthrough kernel, validates a model
   column target, defaults pages to hidden, and matches the two regional-sales
