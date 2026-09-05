@@ -214,7 +214,50 @@ pub(crate) fn compile_dashboard_for_explain_with_profile(
     profile: Option<&Value>,
 ) -> CliResult<(Value, Vec<Value>)> {
     let compiled = compile_dashboard(schema, Some(spec), profile)?;
-    Ok((compiled.schema, compiled.warnings))
+    let mut explain_schema = compiled.schema.clone();
+    materialize_visual_operations_for_explain(&mut explain_schema, &compiled.typed_operations);
+    Ok((explain_schema, compiled.warnings))
+}
+
+fn materialize_visual_operations_for_explain(schema: &mut Value, operations: &[Op]) {
+    let Some(pages) = schema.get_mut("pages").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for visual in operations.iter().filter_map(|operation| match operation {
+        Op::AddVisual(visual) => Some(visual),
+        _ => None,
+    }) {
+        let page_name = visual.page.strip_prefix("page:").unwrap_or(&visual.page);
+        let Some(page) = pages.iter_mut().find(|page| {
+            page.get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name == page_name)
+        }) else {
+            continue;
+        };
+        let mut compiled_visual = json!({
+            "name": visual.name,
+            "visualType": visual.visual_type,
+            "title": visual.title,
+            "mode": visual.mode,
+            "singleSelect": visual.single_select,
+            "bindings": visual.bindings.iter().filter(|binding| binding.get("__powerbiCli").is_none()).cloned().collect::<Vec<_>>()
+        });
+        if let Some(position) = visual.position.as_ref().and_then(Value::as_object) {
+            for field in ["x", "y", "width", "height"] {
+                if let Some(value) = position.get(field) {
+                    compiled_visual[field] = value.clone();
+                }
+            }
+        }
+        page.as_object_mut()
+            .expect("compiled page is an object")
+            .entry("visuals")
+            .or_insert_with(|| Value::Array(Vec::new()))
+            .as_array_mut()
+            .expect("compiled visuals is an array")
+            .push(compiled_visual);
+    }
 }
 
 fn spec_validate(args: &[String]) -> CliResult<Value> {
@@ -1378,7 +1421,7 @@ fn compile_slicer_operations(
                     "width": rail.width,
                     "height": height
                 })),
-                bindings: vec![json!({"role": "Values", "field": field})],
+                bindings: slicer_bindings(field, mode)?,
             }));
             pointers.push(pointer);
         }
@@ -1425,7 +1468,7 @@ fn compile_slicer_operations(
                     "width": 560.0,
                     "height": 184.0
                 })),
-                bindings: vec![json!({"role": "Values", "field": field})],
+                bindings: slicer_bindings(field, mode)?,
             }));
             pointers.push(pointer);
             free_index += 1;
@@ -1525,6 +1568,18 @@ fn required_slicer_field<'a>(slicer: &'a Map<String, Value>, pointer: &str) -> C
             CliError::invalid_args(format!("{pointer}/field requires a non-empty model column"))
                 .with_pointer(format!("{pointer}/field"))
         })
+}
+
+fn slicer_bindings(field: &str, mode: SlicerMode) -> CliResult<Vec<Value>> {
+    let (table, column) = parse_field(field)?;
+    let mut bindings = vec![json!({"role": "Values", "table": table, "column": column})];
+    if mode != SlicerMode::Between {
+        bindings.push(json!({
+            "__powerbiCli": "addVisualScaffold",
+            "kind": "slicer"
+        }));
+    }
+    Ok(bindings)
 }
 
 fn slicer_title<'a>(slicer: &'a Map<String, Value>, field: &'a str) -> &'a str {
@@ -3245,6 +3300,15 @@ fn build_response(response: BuildResponse<'_>) -> Value {
 
 fn compiled_summary(compiled: &CompiledDashboard) -> Value {
     let validation = validate_schema_value(&compiled.schema);
+    let generated_visuals = compiled
+        .typed_operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Op::AddVisual(visual) => Some(visual),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let generated_bindings = generated_visuals.len();
     json!({
         "counts": {
             "tables": validation.counts.tables,
@@ -3252,8 +3316,8 @@ fn compiled_summary(compiled: &CompiledDashboard) -> Value {
             "measures": validation.counts.measures,
             "relationships": validation.counts.relationships,
             "pages": validation.counts.pages,
-            "visuals": validation.counts.visuals,
-            "bindings": validation.counts.bindings,
+            "visuals": validation.counts.visuals + generated_visuals.len(),
+            "bindings": validation.counts.bindings + generated_bindings,
             "rows": validation.counts.rows
         },
         "ops": compiled.operations.len(),
