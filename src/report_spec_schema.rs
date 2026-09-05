@@ -194,18 +194,31 @@ const STYLE_TOKENS: NodeSchema = node(
     "style.tokens",
     "style.tokens",
     &[
+        "preset",
+        "id",
+        "name",
+        "summary",
         "palette",
         "semantic",
+        "ramps",
         "typography",
         "surfaces",
         "spacing",
         "numberFormats",
+        "textClasses",
+        "visualDefaults",
+        "allowContrastBelowAA",
     ],
 );
 const STYLE_SEMANTIC: NodeSchema = node(
     "style.tokens.semantic",
     "style.tokens.semantic",
     &["good", "bad", "neutral", "warning", "emphasis"],
+);
+const STYLE_RAMPS: NodeSchema = node(
+    "style.tokens.ramps",
+    "style.tokens.ramps",
+    &["sequential", "diverging"],
 );
 const STYLE_TYPOGRAPHY: NodeSchema = node(
     "style.tokens.typography",
@@ -392,6 +405,7 @@ const V2_NODES: &[NodeSchema] = &[
     STYLE,
     STYLE_TOKENS,
     STYLE_SEMANTIC,
+    STYLE_RAMPS,
     STYLE_TYPOGRAPHY,
     STYLE_SURFACES,
     STYLE_SPACING,
@@ -439,6 +453,13 @@ pub(crate) fn validate_known_fields(spec: &Value) -> CliResult<SpecVersion> {
             CliError::invalid_args(format!("invalid {DASHBOARD_V2} shape: {error}"))
                 .with_suggested_command("powerbi-cli report spec fields --json")
         })?;
+        if let Some(tokens) = root
+            .get("style")
+            .and_then(Value::as_object)
+            .and_then(|style| style.get("tokens"))
+        {
+            crate::design::tokens::validate_style_tokens_shape(tokens)?;
+        }
         return Ok(version);
     }
     walk_object(root, ROOT_V1, "")?;
@@ -463,6 +484,13 @@ pub(crate) fn validate_known_fields(spec: &Value) -> CliResult<SpecVersion> {
             |_| Ok(()),
         )
     })?;
+    if let Some(tokens) = root
+        .get("style")
+        .and_then(Value::as_object)
+        .and_then(|style| style.get("tokens"))
+    {
+        crate::design::tokens::validate_style_tokens_shape(tokens)?;
+    }
     Ok(version)
 }
 
@@ -1045,9 +1073,9 @@ fn spec_version(root: &Map<String, Value>) -> CliResult<SpecVersion> {
     }
 }
 
-/// Return whether a v2 style contains only the typography tokens consumed by
-/// compiler-generated heading/subtitle textboxes.  Other style sections stay
-/// on the style-completeness bead so report build never silently drops them.
+/// Return whether a v2 style uses the compiled `style.tokens` boundary. The
+/// layout compiler consumes its typography subset for generated headings,
+/// while the token compiler validates and lowers the complete token object.
 pub(crate) fn style_is_supported_typography(style: &Value) -> bool {
     let Some(style) = style.as_object() else {
         return false;
@@ -1055,18 +1083,7 @@ pub(crate) fn style_is_supported_typography(style: &Value) -> bool {
     if style.keys().any(|key| key != "tokens") {
         return false;
     }
-    let Some(tokens) = style.get("tokens").and_then(Value::as_object) else {
-        return false;
-    };
-    if tokens.keys().any(|key| key != "typography") {
-        return false;
-    }
-    let Some(typography) = tokens.get("typography").and_then(Value::as_object) else {
-        return false;
-    };
-    !typography
-        .keys()
-        .any(|key| !matches!(key.as_str(), "family" | "scale"))
+    style.get("tokens").is_some_and(Value::is_object)
 }
 
 fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
@@ -1106,6 +1123,7 @@ fn walk_v2(root: &Map<String, Value>) -> CliResult<()> {
         && let Some(tokens) = walk_child_object_at(style, "tokens", STYLE_TOKENS, "/style")?
     {
         walk_child_object_at(tokens, "semantic", STYLE_SEMANTIC, "/style/tokens")?;
+        walk_child_object_at(tokens, "ramps", STYLE_RAMPS, "/style/tokens")?;
         walk_child_object_at(tokens, "typography", STYLE_TYPOGRAPHY, "/style/tokens")?;
         walk_child_object_at(tokens, "surfaces", STYLE_SURFACES, "/style/tokens")?;
         walk_child_object_at(tokens, "spacing", STYLE_SPACING, "/style/tokens")?;
@@ -1262,15 +1280,15 @@ fn first_uncompiled_v2_section(
             ));
         }
     }
-    if root
-        .get("style")
-        .is_some_and(|style| !style_is_supported_typography(style))
-    {
-        return Some((
-            "style".to_string(),
-            STYLE_BEAD,
-            "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
-        ));
+    if let Some(style) = root.get("style").and_then(Value::as_object) {
+        let tokens_only = style.len() == 1 && style.contains_key("tokens");
+        if !tokens_only {
+            return Some((
+                "style".to_string(),
+                STYLE_BEAD,
+                "powerbi-cli report themes apply-preset --project <project-dir> --preset <preset> --dry-run --json",
+            ));
+        }
     }
     if let Some(layout) = root.get("layout").and_then(Value::as_object)
         && (!layout.contains_key("rail") || layout.keys().any(|key| key != "rail"))
@@ -1681,12 +1699,21 @@ struct StyleV2 {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StyleTokensV2 {
+    preset: Option<Value>,
+    id: Option<Value>,
+    name: Option<Value>,
+    summary: Option<Value>,
     palette: Option<Vec<Value>>,
     semantic: Option<SemanticTokensV2>,
+    ramps: Option<RampsTokensV2>,
     typography: Option<TypographyTokensV2>,
     surfaces: Option<SurfaceTokensV2>,
     spacing: Option<SpacingTokensV2>,
     number_formats: Option<NumberFormatTokensV2>,
+    text_classes: Option<BTreeMap<String, Value>>,
+    visual_defaults: Option<BTreeMap<String, Value>>,
+    #[serde(rename = "allowContrastBelowAA")]
+    allow_contrast_below_aa: Option<bool>,
 }
 
 value_struct!(SemanticTokensV2 {
@@ -1695,6 +1722,10 @@ value_struct!(SemanticTokensV2 {
     neutral,
     warning,
     emphasis
+});
+value_struct!(RampsTokensV2 {
+    sequential,
+    diverging
 });
 value_struct!(TypographyTokensV2 { family, scale });
 value_struct!(SurfaceTokensV2 {

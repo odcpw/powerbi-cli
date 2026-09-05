@@ -547,6 +547,15 @@ frozen until proven.
   improvements. `report drilldown set-hierarchy`
   replaces existing Category projections on Category/Y charts with two or more
   resolved model columns.
+- Implemented the deterministic P0 design-token slice: the embedded
+  `powerbi-cli.tokens.v1` catalog exposes corporate-neutral, high-contrast,
+  dark, and print sets; `report style tokens show` and `report style tokens derive`
+  read or propose
+  semantic palettes, ramps, typography, surfaces, spacing, number formats,
+  text classes, and per-visual defaults. `style.tokens` compiles through the
+  registered-resource theme boundary, writes locale-aware inferred numeric
+  `formatString` values to TMDL, and enforces WCAG AA contrast (or records an explicit
+  `allowContrastBelowAA` warning in the build scorecard and handoff runbook).
 
 ### Phase 7: Filters, Slicers, Bookmarks, Interactions
 

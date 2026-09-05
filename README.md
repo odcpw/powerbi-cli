@@ -284,7 +284,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report bookmarks reorder --project <project-dir-or.pbip> --order <bookmark-handle,...> (--dry-run | --in-place | --out-dir <dir>) --json` — Reorder flat bookmark metadata without changing captured bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks set-display-name --project <project-dir-or.pbip> --handle <bookmark-handle> --display-name <text> (--dry-run | --in-place | --out-dir <dir>) --json` — Patch only bookmark displayName metadata without capturing or changing bookmark state _(proof: `unit-smoke`)_
 - `powerbi-cli report bookmarks show --project <project-dir-or.pbip> --handle <bookmark-handle> [--no-raw] --json` — Show one raw PBIR bookmark by stable handle, including captured state summary and persisted-value safety metadata _(proof: `unit-smoke`)_
-- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; root/page/visual filters compile through AddFilter and page drillthrough through SetDrillthrough with model/type validation, and the response includes operation changes/outcomes, stable-handle readback, scorecard, and side-effect-free proofPlan commands _(proof: `unit-smoke`)_
+- `powerbi-cli report build --schema <schema.json> [--profile <profile.json>] [--spec <dashboard.json>] (--dry-run | --out-dir <project-dir> [--force]) [--trace] --json` — Compile a data schema plus optional strict v1/v2 dashboard spec into an offline-safe PBIP/PBIR/TMDL project using supported primitives only; style.tokens compile to registered themes and number formats, while filters and drillthrough compile through typed kernels, with operation outcomes, stable-handle readback, scorecard, and proofPlan commands _(proof: `unit-smoke`)_
 - `powerbi-cli report cat --project <project-dir-or.pbip> --handle <object-handle> [--include-raw] --json` — Show one report object by stable handle; raw PBIR content is returned only with --include-raw _(proof: `unit-smoke`)_
 - `powerbi-cli report design-plan --project <project-dir-or.pbip> --json` — Profile a model/report and return agent-ready visual, layout, drilldown, and style authoring opportunities with exact next commands _(proof: `unit-smoke`)_
 - `powerbi-cli report drilldown set-hierarchy --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-title>) --field <table[column]> --field <table[column]>... (--dry-run | --in-place | --out-dir <dir>) [--include-raw] --json` — Replace a category-axis chart's Category projections with a multi-column hierarchy and enable its Desktop drill controls _(proof: `unit-smoke`)_
@@ -329,6 +329,8 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report style diff <before-style.json> <after-style.json> --json` — Compare two extracted report style bundles by fingerprint, themeCollection, and visual-style counts _(proof: `unit-smoke`)_
 - `powerbi-cli report style extract --project <project-dir-or.pbip> [--out <style-bundle.json>] [--include-literal-text] --json` — Extract a portable master-style bundle containing report themeCollection and per-visual formatting payloads _(proof: `unit-smoke`)_
 - `powerbi-cli report style inspect --project <project-dir-or.pbip> --json` — Inspect a combined report style bundle: report themeCollection plus per-visual formatting payload summaries _(proof: `unit-smoke`)_
+- `powerbi-cli report style tokens derive --project <project-dir-or.pbip> --json` — Derive deterministic style tokens from a report theme and visual formatting without copying literal report text _(proof: `unit-smoke`)_
+- `powerbi-cli report style tokens show --project <project-dir-or.pbip> [--preset <corporate-neutral|high-contrast|dark|print>] --json` — Show the embedded versioned design-token catalog and the selected built-in token set for a report project _(proof: `unit-smoke`)_
 - `powerbi-cli report themes apply --project <target-project-or.pbip> --bundle <theme-bundle.json> (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a raw report theme bundle by replacing themeCollection and copied registered theme JSON resources; does not copy per-visual formatting _(proof: `unit-smoke`)_
 - `powerbi-cli report themes apply-preset --project <target-project-or.pbip> [--preset risk-dashboard|neutral-ops] (--dry-run | --in-place | --out-dir <dir>) --json` — Apply a built-in registered-resource theme preset to a report with guarded output semantics _(proof: `unit-smoke`)_
 - `powerbi-cli report themes extract --project <source-project-or.pbip> [--out <theme-bundle.json>] --json` — Extract a deterministic raw report theme bundle from themeCollection and already-present registered theme JSON resources _(proof: `unit-smoke`)_
@@ -526,7 +528,7 @@ Each feature carries its live support status and proof level; update `src/featur
 - `report.slicer-authoring` — **supported**, generated-clean-state-desktop-golden-pending, proof `desktop-golden-pending`: Generated basic, dropdown, and between slicers with v2 page and rail compilation. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`, `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-clear` — **supported**, read-write-clear-only, proof `unit-smoke`: Slicer inventory and persisted-selection clear. Commands: `report slicers list`, `report slicers show`, `report slicers clear`.
 - `report.slicer-sync-authoring` — **planned**, unsupported, proof `unit-smoke`: Slicer sync groups.
-- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`.
+- `report.themes` — **supported**, guarded-bundle-copy, proof `unit-smoke`: Theme, visual formatting, and master style bundles. Commands: `report themes show`, `report themes extract`, `report themes apply`, `report themes presets`, `report themes apply-preset`, `report visuals formatting list`, `report visuals formatting show`, `report visuals formatting extract`, `report visuals formatting apply`, `report visuals formatting set-text`, `report visuals formatting set-color`, `report style inspect`, `report style extract`, `report style apply`, `report style diff`, `report style tokens show`, `report style tokens derive`.
 - `report.tooltip-pages` — **planned**, unsupported, proof `unit-smoke`: Report tooltip pages.
 - `report.visuals.category-share` — **supported**, generated-desktop-golden-pending, proof `desktop-golden-pending`: Generated pie and donut visuals. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
 - `report.visuals.combo-pareto` — **supported**, generated-manual-desktop-canvas-refresh, proof `manual-desktop-canvas-refresh`: Generated line and clustered-column combo visual. Commands: `report visuals catalog`, `report visuals add`, `report visuals set-bindings`, `report build`.
@@ -1431,6 +1433,19 @@ This generated snapshot keeps status and proof claims aligned with
   categorical update, bookmark captured-state mutation,
   logos, richer typed PBIR formatting, and conditional formatting authoring
   remain planned.
+- Deterministic design tokens are available through `report style tokens show`
+  and `report style tokens derive` with `--project <project-dir-or.pbip>`. The
+  embedded `tokens.v1`
+  catalog provides `corporate-neutral`, `high-contrast`, `dark`, and `print`
+  sets with semantic colors, sequential/diverging ramps, typography, surfaces,
+  spacing, number formats, text classes, and per-visual defaults. Dashboard
+  specs may compile `style.tokens`; the compiler emits a registered theme,
+  infers missing numeric `formatString` values in TMDL using the report locale
+  and sets label display units,
+  and enforces WCAG AA foreground/page contrast. `allowContrastBelowAA: true`
+  records named design warnings in the build scorecard and handoff runbook.
+  Derivation samples formatting colors only and never copies report literal
+  text.
 - `handoff check` defaults to an offline/dummy target and fails on real
   connectors. Use `handoff check <project> --target work` for a canonical PBIP
   whose partitions already use recognized SQL Server, PostgreSQL, ODBC, Web,
