@@ -1,8 +1,11 @@
 mod common;
 
-use common::{assert_json_snapshot, run_powerbi, scaffold_sales, stdout_json};
+use common::{
+    assert_json_snapshot, first_visual_json, patch_json, run_powerbi, scaffold_sales, stdout_json,
+};
 use serde_json::Value;
 use std::fs;
+use std::path::Path;
 
 fn preview_page(value: &Value) -> Value {
     let mut page = value["preview"]["pages"][0].clone();
@@ -342,6 +345,263 @@ fn three_named_templates_have_stable_golden_slot_layouts() {
         assert_eq!(output.code, 0, "{template} stderr: {}", output.stderr);
         let value = stdout_json(&output);
         assert_json_snapshot(&format!("report-layout-{template}"), &preview_page(&value));
+    }
+}
+
+/// The page and visual directory names double as the stable name components
+/// of a `visual:<page>:<name>` handle.
+fn first_visual_identifiers(project: &Path) -> (String, String) {
+    let visual_json = first_visual_json(project);
+    let visual_dir = visual_json.parent().expect("visual dir");
+    let visual_name = visual_dir
+        .file_name()
+        .expect("visual dir name")
+        .to_str()
+        .expect("visual name utf8")
+        .to_string();
+    let page_name = visual_dir
+        .parent()
+        .expect("visuals dir")
+        .parent()
+        .expect("page dir")
+        .file_name()
+        .expect("page dir name")
+        .to_str()
+        .expect("page name utf8")
+        .to_string();
+    (page_name, visual_name)
+}
+
+fn clone_first_visual(project_arg: &str, source_handle: &str, name: &str, rect: [f64; 4]) {
+    let [x, y, width, height] = rect.map(|value| value.to_string());
+    let output = run_powerbi(&[
+        "report",
+        "visuals",
+        "clone",
+        "--project",
+        project_arg,
+        "--handle",
+        source_handle,
+        "--name",
+        name,
+        "--x",
+        &x,
+        "--y",
+        &y,
+        "--width",
+        &width,
+        "--height",
+        &height,
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(output.code, 0, "clone {name} stderr: {}", output.stderr);
+}
+
+fn off_grid_findings(project_arg: &str) -> Vec<Value> {
+    let audit = run_powerbi(&[
+        "report",
+        "audit",
+        "--project",
+        project_arg,
+        "--rules",
+        "design",
+        "--json",
+    ]);
+    assert_eq!(audit.code, 0, "audit stderr: {}", audit.stderr);
+    stdout_json(&audit)["findings"]
+        .as_array()
+        .expect("audit findings")
+        .iter()
+        .filter(|finding| finding["ruleId"] == "design.visual_off_grid")
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn snap_clears_off_grid_findings_on_a_page_too_dense_for_any_template() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let (page_name, visual_name) = first_visual_identifiers(&project);
+    let source_handle = format!("visual:{page_name}:{visual_name}");
+
+    // Twelve extra off-grid visuals overflow even the largest slot template.
+    for index in 0..12 {
+        clone_first_visual(
+            project_arg,
+            &source_handle,
+            &format!("SnapDense{index}"),
+            [
+                25.0 + f64::from(index % 3) * 30.0,
+                190.0 + f64::from(index) * 35.0,
+                210.0,
+                30.0,
+            ],
+        );
+    }
+
+    let before = off_grid_findings(project_arg);
+    assert!(
+        before.len() >= 12,
+        "expected the cloned visuals to be off grid: {before:?}"
+    );
+    // The finding says what the predicate checks and names the guides.
+    let message = before[0]["message"].as_str().expect("finding message");
+    for fragment in ["column start guide", "column end guide", "row-unit"] {
+        assert!(
+            message.contains(fragment),
+            "finding message must mention {fragment:?}: {message}"
+        );
+    }
+
+    // Slot templates cannot fit the dense page; the refusal points at --snap.
+    let template_attempt = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--template",
+        "kpi-strip-trend-breakdown",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(template_attempt.code, 2);
+    let template_error: Value =
+        serde_json::from_str(template_attempt.stderr.trim()).expect("error JSON");
+    assert_eq!(template_error["error"]["code"], "invalid_args");
+    assert!(
+        template_error["error"]["hint"]
+            .as_str()
+            .expect("hint")
+            .contains("--snap")
+    );
+
+    let snapped = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--snap",
+        "--in-place",
+        "--json",
+    ]);
+    assert_eq!(snapped.code, 0, "snap stderr: {}", snapped.stderr);
+    let snapped_json = stdout_json(&snapped);
+    assert_eq!(snapped_json["action"], "snap");
+    assert_eq!(snapped_json["snap"], true);
+    assert_eq!(snapped_json["layoutPlan"]["template"], Value::Null);
+    assert!(
+        !snapped_json["changes"]
+            .as_array()
+            .expect("changes")
+            .is_empty(),
+        "snapping a dense off-grid page must move visuals"
+    );
+
+    assert_eq!(
+        off_grid_findings(project_arg),
+        Vec::<Value>::new(),
+        "snap must clear every design.visual_off_grid finding"
+    );
+
+    // Replaying the snap is a byte-level no-op.
+    let replay = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--snap",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(replay.code, 0, "replay stderr: {}", replay.stderr);
+    assert_eq!(stdout_json(&replay)["changes"], Value::Array(Vec::new()));
+}
+
+#[test]
+fn snap_reports_emergent_overlaps_instead_of_writing_them_silently() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project = scaffold_sales(temp.path());
+    let project_arg = project.to_str().expect("project path");
+    let (page_name, visual_name) = first_visual_identifiers(&project);
+    let source_handle = format!("visual:{page_name}:{visual_name}");
+
+    // Disjoint before the snap: the left visual's right edge (170) pulls to the
+    // column end guide at 216 while the right visual's left edge (172) pulls to
+    // the column start guide at 128, so the snapped rectangles collide.
+    patch_json(&first_visual_json(&project), |visual| {
+        visual["position"]["x"] = Value::from(24.0);
+        visual["position"]["y"] = Value::from(200.0);
+        visual["position"]["width"] = Value::from(146.0);
+        visual["position"]["height"] = Value::from(80.0);
+    });
+    clone_first_visual(
+        project_arg,
+        &source_handle,
+        "SnapOverlapTwin",
+        [172.0, 200.0, 148.0, 80.0],
+    );
+
+    let output = run_powerbi(&[
+        "report",
+        "layout",
+        "auto",
+        "--project",
+        project_arg,
+        "--page",
+        &page_name,
+        "--snap",
+        "--dry-run",
+        "--json",
+    ]);
+    assert_eq!(output.code, 0, "stderr: {}", output.stderr);
+    let value = stdout_json(&output);
+    let twin_handle = format!("visual:{page_name}:SnapOverlapTwin");
+    let overlap = value["warnings"]
+        .as_array()
+        .expect("warnings")
+        .iter()
+        .find(|warning| {
+            let pair = [
+                warning["visual"].as_str().unwrap_or_default(),
+                warning["otherVisual"].as_str().unwrap_or_default(),
+            ];
+            warning["code"] == "design.visual_overlap"
+                && pair.contains(&twin_handle.as_str())
+                && pair.contains(&source_handle.as_str())
+        });
+    assert!(
+        overlap.is_some(),
+        "snap must report the emergent overlap between {source_handle} and {twin_handle}: {}",
+        value["warnings"]
+    );
+    assert_eq!(
+        value["preview"]["pages"][0]["invariants"]["overlapFree"], false,
+        "snap preview must not claim the page is overlap-free"
+    );
+}
+
+#[test]
+fn snap_conflicts_with_template_and_preset_selection() {
+    for selector in [["--template", "overview"], ["--preset", "grid"]] {
+        let output = run_powerbi(&[
+            "report",
+            "layout",
+            "auto",
+            "--snap",
+            selector[0],
+            selector[1],
+            "--dry-run",
+            "--json",
+        ]);
+        assert_eq!(output.code, 2, "selector {selector:?}");
+        let error: Value = serde_json::from_str(output.stderr.trim()).expect("error JSON");
+        assert_eq!(error["error"]["code"], "invalid_args");
+        assert_eq!(error["error"]["pointer"], "/snap");
     }
 }
 

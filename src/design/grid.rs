@@ -36,7 +36,7 @@ impl PageSize {
         }
     }
 
-    fn validate(self) -> CliResult<Self> {
+    pub(crate) fn validate(self) -> CliResult<Self> {
         if !self.width.is_finite() || !self.height.is_finite() {
             return Err(CliError::invalid_args(
                 "layout page width and height must be finite numbers",
@@ -349,6 +349,48 @@ pub(crate) fn resolve_rail_position(
     })
 }
 
+/// Scaled column start/end guides plus the scaled row unit for one page.
+/// The design-lint alignment predicate and `report layout auto --snap` share
+/// this math so a snapped visual can never remain off-grid.
+#[derive(Debug, Clone)]
+pub(crate) struct GridGuides {
+    pub(crate) column_starts: Vec<f64>,
+    pub(crate) column_ends: Vec<f64>,
+    pub(crate) row_unit: f64,
+}
+
+impl GridGuides {
+    pub(crate) fn column_width(&self) -> f64 {
+        self.column_ends[0] - self.column_starts[0]
+    }
+}
+
+/// Compute the unrounded twelve-column guides for a page.  Guides are pure
+/// geometry: callers that mutate positions validate the page size and grid
+/// first, while the lint predicate tolerates malformed pages by finding no
+/// aligned guide.
+pub(crate) fn grid_guides(page_size: PageSize, grid: Grid) -> GridGuides {
+    let scale_x = page_size.width / REFERENCE_WIDTH;
+    let scale_y = page_size.height / REFERENCE_HEIGHT;
+    let margin_x = grid.margin * scale_x;
+    let gutter_x = grid.gutter * scale_x;
+    let row_unit = grid.row_unit * scale_y;
+    let columns = grid.columns as f64;
+    let column_width = (page_size.width - margin_x * 2.0 - gutter_x * (columns - 1.0)) / columns;
+    let column_starts = (0..grid.columns)
+        .map(|column| margin_x + column as f64 * (column_width + gutter_x))
+        .collect::<Vec<_>>();
+    let column_ends = column_starts
+        .iter()
+        .map(|start| start + column_width)
+        .collect();
+    GridGuides {
+        column_starts,
+        column_ends,
+        row_unit,
+    }
+}
+
 pub(crate) fn content_slots(template: &Template) -> impl Iterator<Item = &Slot> {
     template.slots.iter().filter(|slot| {
         !matches!(slot.name.as_str(), "heading" | "rail")
@@ -606,7 +648,10 @@ fn minimum_size(family: &str) -> Option<MinimumSize> {
     Some(size)
 }
 
-fn round(value: f64) -> f64 {
+/// Round to hundredths, the byte-stable precision used for every resolved
+/// coordinate.  Hundredths sit inside the 0.01 px lint epsilon, so a rounded
+/// guide value still counts as aligned.
+pub(crate) fn round(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
 }
 

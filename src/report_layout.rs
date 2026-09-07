@@ -2,7 +2,8 @@ use crate::cli_support::{
     MutationMode, mode_name, required_project, set_mode, take_value, target_project,
 };
 use crate::design::grid::{
-    Grid, PageSize, RailSide, SlotPosition, Template, content_slots, resolve_with_grid, template,
+    Grid, GridGuides, PageSize, RailSide, SlotPosition, Template, content_slots, grid_guides,
+    resolve_with_grid, round, template,
 };
 use crate::pbir::{PageRecord, PageSelector, find_page, load_report_snapshot, page_summary};
 use crate::report_visuals::apply_positions;
@@ -21,6 +22,7 @@ struct LayoutOptions {
     preset: LayoutPreset,
     preset_explicit: bool,
     template: Option<String>,
+    snap: bool,
     grid: Grid,
     page_size: Option<PageSize>,
     mode: Option<MutationMode>,
@@ -38,7 +40,9 @@ enum LayoutPreset {
 
 struct PageLayoutPlan {
     page: PageRecord,
-    template: Template,
+    /// `None` in snap mode, which keeps the existing arrangement instead of
+    /// assigning template slots.
+    template: Option<Template>,
     grid: Grid,
     preview: Value,
     assignments: Vec<LayoutAssignment>,
@@ -84,9 +88,14 @@ fn auto_layout(args: &[String]) -> CliResult<Value> {
     let pages = selected_pages(&snapshot.pages, &options)?;
     let mut plans = Vec::new();
     for page in pages {
-        plans.push(build_page_layout_plan(&page, &options)?);
+        plans.push(if options.snap {
+            build_page_snap_plan(&page, &options)?
+        } else {
+            build_page_layout_plan(&page, &options)?
+        });
     }
 
+    let action = if options.snap { "snap" } else { "auto-layout" };
     let dry_run = matches!(mode, MutationMode::DryRun);
     for plan in &mut plans {
         let applied = apply_positions(
@@ -120,7 +129,7 @@ fn auto_layout(args: &[String]) -> CliResult<Value> {
                 })?;
             plan.changes.push(json!({
                 "kind": "pbir.visual.position",
-                "action": "auto-layout",
+                "action": action,
                 "path": canonical_display(&application.path),
                 "page": {
                     "handle": plan.page.handle,
@@ -139,7 +148,13 @@ fn auto_layout(args: &[String]) -> CliResult<Value> {
         }
     }
 
-    layout_response(&target_resolved, mode, &plans, &snapshot.validation)
+    layout_response(
+        &target_resolved,
+        mode,
+        &plans,
+        &snapshot.validation,
+        options.snap,
+    )
 }
 
 fn selected_pages(pages: &[PageRecord], options: &LayoutOptions) -> CliResult<Vec<PageRecord>> {
@@ -178,7 +193,11 @@ fn build_page_layout_plan(page: &PageRecord, options: &LayoutOptions) -> CliResu
             visuals.len()
         ))
         .with_pointer(format!("/pages/{}/visuals/{}", page.ordinal, slots.len()))
-        .with_hint("Choose a template with more slots, remove visuals, or provide explicit layout positions."));
+        .with_hint("Choose a template with more slots, remove visuals, or run `report layout auto --snap` to align the existing arrangement to the column guides.")
+        .with_suggested_command(format!(
+            "powerbi-cli report layout auto --project <project-dir-or.pbip> --page {} --snap --dry-run --json",
+            page.handle
+        )));
     }
 
     let mut assignments = Vec::new();
@@ -291,7 +310,7 @@ fn build_page_layout_plan(page: &PageRecord, options: &LayoutOptions) -> CliResu
     });
     Ok(PageLayoutPlan {
         page: page.clone(),
-        template,
+        template: Some(template),
         grid: options.grid,
         preview,
         assignments,
@@ -300,6 +319,200 @@ fn build_page_layout_plan(page: &PageRecord, options: &LayoutOptions) -> CliResu
         warnings,
     })
 }
+
+/// Snap the existing arrangement onto the twelve-column guides without
+/// assigning template slots: each visual's left edge moves to the nearest
+/// column start guide, its right edge to the nearest column end guide, and its
+/// top/bottom to the nearest row-unit multiples.  Emergent overlaps are
+/// reported as design.visual_overlap warnings, never silently written.
+fn build_page_snap_plan(page: &PageRecord, options: &LayoutOptions) -> CliResult<PageLayoutPlan> {
+    let page_size = options
+        .page_size
+        .unwrap_or_else(|| page_size_for_page(page))
+        .validate()?;
+    let grid = options.grid.validate()?;
+    let guides = grid_guides(page_size, grid);
+    let column_width = guides.column_width();
+    if !column_width.is_finite() || column_width <= 0.0 {
+        return Err(
+            CliError::invalid_args("layout grid leaves no usable page width").with_pointer("/grid"),
+        );
+    }
+
+    let mut assignments = Vec::new();
+    let mut updates = Vec::new();
+    let mut snapped_previews = Vec::new();
+    for visual in sorted_visuals(page) {
+        let before = position_rect(&visual.position);
+        let after = snap_rect(before, page_size, &guides);
+        let path = visual.path.clone().ok_or_else(|| {
+            CliError::validation_failed(format!("visual has no path: {}", visual.handle))
+        })?;
+        let position = snapped_position_value(&visual.position, after)?;
+        snapped_previews.push(json!({
+            "visual": visual.handle,
+            "visualType": visual.visual_type,
+            "before": slot_position_json(before),
+            "after": slot_position_json(after),
+            "changed": !slot_positions_close(before, after)
+        }));
+        assignments.push(LayoutAssignment {
+            visual,
+            slot_name: "snap".to_string(),
+            position: position.clone(),
+        });
+        updates.push((path, position));
+    }
+
+    // Snapping preserves the arrangement, so two visuals can land on the same
+    // guides.  Report every emergent overlap with the design lint's rule id so
+    // the caller sees the collision in this response instead of discovering it
+    // in a later audit.
+    let mut warnings = Vec::new();
+    for (left_index, left) in assignments.iter().enumerate() {
+        for (right_index, right) in assignments.iter().enumerate().skip(left_index + 1) {
+            let left_rect = position_rect(&left.position);
+            let right_rect = position_rect(&right.position);
+            if snapped_rects_overlap(left_rect, right_rect) {
+                warnings.push(json!({
+                    "code": crate::rules::DESIGN_VISUAL_OVERLAP,
+                    "pointer": format!("/pages/{}/visuals/{}/position", page.ordinal, right_index),
+                    "message": format!(
+                        "snapping to the twelve-column guides makes visuals {} and {} overlap on page {}",
+                        left.visual.handle, right.visual.handle, page.display_name
+                    ),
+                    "visual": left.visual.handle,
+                    "otherVisual": right.visual.handle,
+                    "visualPosition": slot_position_json(left_rect),
+                    "otherPosition": slot_position_json(right_rect)
+                }));
+            }
+        }
+    }
+
+    let preview = json!({
+        "page": page_summary(page),
+        "pageSize": page_size,
+        "grid": grid,
+        "template": Value::Null,
+        "snap": {
+            "columnStarts": guides.column_starts.iter().copied().map(round).collect::<Vec<_>>(),
+            "columnEnds": guides.column_ends.iter().copied().map(round).collect::<Vec<_>>(),
+            "rowUnit": round(guides.row_unit)
+        },
+        "visuals": snapped_previews,
+        "invariants": {
+            "overlapFree": warnings.is_empty(),
+            "withinPage": true
+        }
+    });
+    Ok(PageLayoutPlan {
+        page: page.clone(),
+        template: None,
+        grid,
+        preview,
+        assignments,
+        updates,
+        changes: Vec::new(),
+        warnings,
+    })
+}
+
+fn position_rect(position: &Value) -> SlotPosition {
+    SlotPosition {
+        x: position_number(position, "x"),
+        y: position_number(position, "y"),
+        width: position_number(position, "width"),
+        height: position_number(position, "height"),
+    }
+}
+
+fn snap_rect(before: SlotPosition, page_size: PageSize, guides: &GridGuides) -> SlotPosition {
+    let start = nearest_guide(&guides.column_starts, before.x);
+    let end = nearest_guide(&guides.column_ends, before.x + before.width).max(start);
+    let left = round(guides.column_starts[start]);
+    let right = round(guides.column_ends[end]);
+    let row_unit = guides.row_unit;
+    let max_bottom = (page_size.height / row_unit).floor() * row_unit;
+    let mut top = ((before.y / row_unit).round() * row_unit).max(0.0);
+    let mut bottom = (((before.y + before.height) / row_unit).round() * row_unit).min(max_bottom);
+    if bottom < top + row_unit {
+        bottom = top + row_unit;
+    }
+    if bottom > max_bottom {
+        bottom = max_bottom;
+        top = (bottom - row_unit).max(0.0);
+    }
+    let top = round(top);
+    let bottom = round(bottom);
+    SlotPosition {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    }
+}
+
+fn nearest_guide(guides: &[f64], value: f64) -> usize {
+    let mut best = 0;
+    let mut best_distance = f64::INFINITY;
+    for (index, guide) in guides.iter().enumerate() {
+        let distance = (guide - value).abs();
+        if distance < best_distance {
+            best = index;
+            best_distance = distance;
+        }
+    }
+    best
+}
+
+/// Replace only the geometry fields so z, tabOrder, and unknown position
+/// fields survive the snap untouched.  Whole numbers are written as integers,
+/// which keeps a second snap (and an already aligned visual) a byte-level
+/// no-op.
+fn snapped_position_value(before: &Value, after: SlotPosition) -> CliResult<Value> {
+    let mut object = before.as_object().cloned().unwrap_or_default();
+    for (name, value) in [
+        ("x", after.x),
+        ("y", after.y),
+        ("width", after.width),
+        ("height", after.height),
+    ] {
+        object.insert(name.to_string(), snapped_number(value, name)?);
+    }
+    Ok(Value::Object(object))
+}
+
+fn snapped_number(value: f64, name: &str) -> CliResult<Value> {
+    let number = finite_number(value, name)?;
+    if value.fract() == 0.0 && value <= u64::MAX as f64 {
+        return Ok(Value::Number(Number::from(value as u64)));
+    }
+    Ok(number)
+}
+
+fn slot_positions_close(left: SlotPosition, right: SlotPosition) -> bool {
+    [
+        (left.x, right.x),
+        (left.y, right.y),
+        (left.width, right.width),
+        (left.height, right.height),
+    ]
+    .iter()
+    .all(|(before, after)| (before - after).abs() <= SNAP_EPSILON)
+}
+
+/// Same half-open, epsilon-tolerant predicate the design lint uses for
+/// design.visual_overlap, so a collision reported here is exactly one the
+/// audit would flag.
+fn snapped_rects_overlap(left: SlotPosition, right: SlotPosition) -> bool {
+    left.x < right.x + right.width - SNAP_EPSILON
+        && right.x < left.x + left.width - SNAP_EPSILON
+        && left.y < right.y + right.height - SNAP_EPSILON
+        && right.y < left.y + left.height - SNAP_EPSILON
+}
+
+const SNAP_EPSILON: f64 = 0.01;
 
 fn sorted_visuals(page: &PageRecord) -> Vec<crate::pbir::VisualRecord> {
     let mut visuals = page.visuals.clone();
@@ -412,6 +625,7 @@ fn layout_response(
     mode: MutationMode,
     plans: &[PageLayoutPlan],
     dry_validation: &crate::ValidationReport,
+    snap: bool,
 ) -> CliResult<Value> {
     let dry_run = matches!(mode, MutationMode::DryRun);
     let validation = if dry_run {
@@ -452,14 +666,18 @@ fn layout_response(
         "schema": "powerbi-cli.report.layout.autoMutation.v1",
         "ok": validation_ok,
         "exitCode": exit_code,
-        "action": "auto-layout",
+        "action": if snap { "snap" } else { "auto-layout" },
+        "snap": snap,
         "dryRun": dry_run,
         "mode": mode_name(mode),
         "projectDir": canonical_display(&resolved.project_dir),
         "pbip": canonical_display(&resolved.pbip_path),
         "reportDir": canonical_display(&resolved.report_dir),
         "layoutPlan": {
-            "template": plans.first().map(|plan| plan.template.name.clone()),
+            "template": plans
+                .first()
+                .and_then(|plan| plan.template.as_ref())
+                .map(|template| template.name.clone()),
             "grid": plans.first().map(|plan| plan.grid),
             "pages": plans.iter().map(|plan| page_summary(&plan.page)).collect::<Vec<_>>(),
             "changedVisuals": changes.len()
@@ -522,6 +740,10 @@ fn parse_auto_args(args: &[String]) -> CliResult<LayoutOptions> {
                 }
                 options.template = Some(take_value(args, &mut i, "--template")?);
             }
+            "--snap" => {
+                options.snap = true;
+                i += 1;
+            }
             "--grid" => {
                 parse_grid_override(&mut options.grid, &take_value(args, &mut i, "--grid")?)?
             }
@@ -569,6 +791,16 @@ fn parse_auto_args(args: &[String]) -> CliResult<LayoutOptions> {
                 ));
             }
         }
+    }
+    if options.snap && (options.template.is_some() || options.preset_explicit) {
+        return Err(CliError::invalid_args(
+            "report layout auto --snap preserves the existing arrangement and cannot combine with --template or --preset",
+        )
+        .with_pointer("/snap")
+        .with_hint("Use --snap alone to move edges onto the nearest column guides, or drop --snap to assign template slots.")
+        .with_suggested_command(
+            "powerbi-cli report layout auto --project <project-dir-or.pbip> --page <page-handle> --snap --dry-run --json",
+        ));
     }
     Ok(options)
 }

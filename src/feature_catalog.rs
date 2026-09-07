@@ -1050,7 +1050,7 @@ const FEATURE_CATALOG: &[Feature] = &[
             "report wireframe export",
         ],
         refusal_code: None,
-        reason: "The design planner profiles local TMDL/PBIR metadata, report layout auto resolves the embedded eleven-template twelve-column grid (with page-size and grid overrides) and rewrites only visual position blocks through the shared position mutation boundary, and report wireframe export renders the same grid plus deep-inspection geometry as deterministic offline JSON/SVG/HTML previews.",
+        reason: "The design planner profiles local TMDL/PBIR metadata, report layout auto resolves the embedded eleven-template twelve-column grid (with page-size and grid overrides, plus --snap to align an existing arrangement to the column guides while reporting emergent overlaps) and rewrites only visual position blocks through the shared position mutation boundary, and report wireframe export renders the same grid plus deep-inspection geometry as deterministic offline JSON/SVG/HTML previews.",
         next_proof: &[
             "Desktop screenshot fixture to assert generated layouts are visually readable across page sizes",
         ],

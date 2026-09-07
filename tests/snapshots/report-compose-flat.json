@@ -519,6 +519,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -528,8 +529,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/2/visuals/0/position",
           "recommendedActions": [
@@ -542,6 +543,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -551,8 +553,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/2/visuals/2/position",
           "recommendedActions": [
@@ -565,6 +567,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -574,8 +577,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Ticket]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Ticket]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/3/visuals/0/position",
           "recommendedActions": [
@@ -588,6 +591,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -597,8 +601,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/3/visuals/2/position",
           "recommendedActions": [
@@ -611,6 +615,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -620,8 +625,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionDetail:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/4/visuals/2/position",
           "recommendedActions": [
@@ -634,6 +639,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 264.0,
               "width": 418.91,
@@ -643,8 +649,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/0/visuals/0/position",
           "recommendedActions": [
@@ -657,6 +663,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 264.0,
               "width": 591.79,
@@ -666,8 +673,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerPlannerTimeSeries0",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Trend",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Trend",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPlannerTimeSeries0/visual.json",
           "pointer": "/report/pages/0/visuals/2/position",
           "recommendedActions": [
@@ -680,6 +687,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 96.0,
               "width": 246.03,
@@ -689,8 +697,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerPrimaryKpi",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Primary KPI",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Primary KPI",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPrimaryKpi/visual.json",
           "pointer": "/report/pages/0/visuals/3/position",
           "recommendedActions": [
@@ -703,6 +711,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -712,8 +721,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/0/visuals/4/position",
           "recommendedActions": [
@@ -726,6 +735,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -735,8 +745,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionTrend:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/1/visuals/2/position",
           "recommendedActions": [
@@ -847,6 +857,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 400.0,
                 "width": 591.79,
@@ -856,8 +867,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
             "pointer": "/report/pages/2/visuals/0/position",
             "recommendedActions": [
@@ -870,6 +881,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -879,8 +891,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown1:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailEventsCategory/visual.json",
             "pointer": "/report/pages/2/visuals/2/position",
             "recommendedActions": [
@@ -893,6 +905,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 400.0,
                 "width": 591.79,
@@ -902,8 +915,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By Events[Ticket]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Ticket]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
             "pointer": "/report/pages/3/visuals/0/position",
             "recommendedActions": [
@@ -916,6 +929,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -925,8 +939,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown2:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailEventsCategory/visual.json",
             "pointer": "/report/pages/3/visuals/2/position",
             "recommendedActions": [
@@ -953,6 +967,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -962,8 +977,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionDetail:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailEventsCategory/visual.json",
             "pointer": "/report/pages/4/visuals/2/position",
             "recommendedActions": [
@@ -976,6 +991,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 264.0,
                 "width": 418.91,
@@ -985,8 +1001,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionOverview:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerBreakdown/visual.json",
             "pointer": "/report/pages/0/visuals/0/position",
             "recommendedActions": [
@@ -999,6 +1015,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 264.0,
                 "width": 591.79,
@@ -1008,8 +1025,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionOverview:VisualContainerPlannerTimeSeries0",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Trend",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Trend",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPlannerTimeSeries0/visual.json",
             "pointer": "/report/pages/0/visuals/2/position",
             "recommendedActions": [
@@ -1022,6 +1039,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 96.0,
                 "width": 246.03,
@@ -1031,8 +1049,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionOverview:VisualContainerPrimaryKpi",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Primary KPI",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Primary KPI",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPrimaryKpi/visual.json",
             "pointer": "/report/pages/0/visuals/3/position",
             "recommendedActions": [
@@ -1045,6 +1063,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -1054,8 +1073,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionOverview:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailEventsCategory/visual.json",
             "pointer": "/report/pages/0/visuals/4/position",
             "recommendedActions": [
@@ -1082,6 +1101,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -1091,8 +1111,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionTrend:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailEventsCategory/visual.json",
             "pointer": "/report/pages/1/visuals/2/position",
             "recommendedActions": [
@@ -1116,6 +1136,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -1125,8 +1146,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/2/visuals/0/position",
           "recommendedActions": [
@@ -1139,6 +1160,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1148,8 +1170,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/2/visuals/2/position",
           "recommendedActions": [
@@ -1162,6 +1184,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -1171,8 +1194,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Ticket]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Ticket]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/3/visuals/0/position",
           "recommendedActions": [
@@ -1185,6 +1208,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1194,8 +1218,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/3/visuals/2/position",
           "recommendedActions": [
@@ -1222,6 +1246,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1231,8 +1256,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionDetail:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/4/visuals/2/position",
           "recommendedActions": [
@@ -1245,6 +1270,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 264.0,
               "width": 418.91,
@@ -1254,8 +1280,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/0/visuals/0/position",
           "recommendedActions": [
@@ -1268,6 +1294,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 264.0,
               "width": 591.79,
@@ -1277,8 +1304,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerPlannerTimeSeries0",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Trend",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Trend",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPlannerTimeSeries0/visual.json",
           "pointer": "/report/pages/0/visuals/2/position",
           "recommendedActions": [
@@ -1291,6 +1318,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 96.0,
               "width": 246.03,
@@ -1300,8 +1328,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerPrimaryKpi",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Primary KPI",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Primary KPI",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPrimaryKpi/visual.json",
           "pointer": "/report/pages/0/visuals/3/position",
           "recommendedActions": [
@@ -1314,6 +1342,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1323,8 +1352,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/0/visuals/4/position",
           "recommendedActions": [
@@ -1351,6 +1380,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1360,8 +1390,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionTrend:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): Events[Category]",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailEventsCategory/visual.json",
           "pointer": "/report/pages/1/visuals/2/position",
           "recommendedActions": [

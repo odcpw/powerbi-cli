@@ -557,6 +557,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -566,8 +567,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/2/visuals/0/position",
           "recommendedActions": [
@@ -580,6 +581,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -589,8 +591,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/2/visuals/2/position",
           "recommendedActions": [
@@ -603,6 +605,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -612,8 +615,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By DimCustomer[Region]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By DimCustomer[Region]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/3/visuals/0/position",
           "recommendedActions": [
@@ -626,6 +629,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -635,8 +639,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/3/visuals/2/position",
           "recommendedActions": [
@@ -649,6 +653,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -658,8 +663,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionDetail:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/4/visuals/2/position",
           "recommendedActions": [
@@ -672,6 +677,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -681,8 +687,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/0/visuals/4/position",
           "recommendedActions": [
@@ -695,6 +701,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -704,8 +711,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionTrend:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/1/visuals/2/position",
           "recommendedActions": [
@@ -816,6 +823,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 400.0,
                 "width": 591.79,
@@ -825,8 +833,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By DimCustomer[Customer]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By DimCustomer[Customer]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
             "pointer": "/report/pages/2/visuals/0/position",
             "recommendedActions": [
@@ -839,6 +847,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -848,8 +857,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown1:VisualContainerRailDimCustomerCustomer",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
             "pointer": "/report/pages/2/visuals/2/position",
             "recommendedActions": [
@@ -862,6 +871,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 400.0,
                 "width": 591.79,
@@ -871,8 +881,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By DimCustomer[Region]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By DimCustomer[Region]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
             "pointer": "/report/pages/3/visuals/0/position",
             "recommendedActions": [
@@ -885,6 +895,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -894,8 +905,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionBreakdown2:VisualContainerRailDimCustomerCustomer",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
             "pointer": "/report/pages/3/visuals/2/position",
             "recommendedActions": [
@@ -922,6 +933,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -931,8 +943,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionDetail:VisualContainerRailDimCustomerCustomer",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
             "pointer": "/report/pages/4/visuals/2/position",
             "recommendedActions": [
@@ -945,6 +957,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -954,8 +967,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionOverview:VisualContainerRailDimCustomerCustomer",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
             "pointer": "/report/pages/0/visuals/4/position",
             "recommendedActions": [
@@ -982,6 +995,7 @@
           {
             "code": "design.visual_off_grid",
             "evidence": {
+              "columns": 12,
               "position": {
                 "height": 76.0,
                 "width": 192.0,
@@ -991,8 +1005,8 @@
               "rowUnit": 8.0
             },
             "handle": "visual:ReportSectionTrend:VisualContainerRailDimCustomerCustomer",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+            "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+            "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
             "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
             "pointer": "/report/pages/1/visuals/2/position",
             "recommendedActions": [
@@ -1032,6 +1046,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -1041,8 +1056,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/2/visuals/0/position",
           "recommendedActions": [
@@ -1055,6 +1070,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1064,8 +1080,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown1:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/2/visuals/2/position",
           "recommendedActions": [
@@ -1078,6 +1094,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 400.0,
               "width": 591.79,
@@ -1087,8 +1104,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By DimCustomer[Region]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): By DimCustomer[Region]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
           "pointer": "/report/pages/3/visuals/0/position",
           "recommendedActions": [
@@ -1101,6 +1118,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1110,8 +1128,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionBreakdown2:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/3/visuals/2/position",
           "recommendedActions": [
@@ -1138,6 +1156,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1147,8 +1166,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionDetail:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/4/visuals/2/position",
           "recommendedActions": [
@@ -1161,6 +1180,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1170,8 +1190,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionOverview:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/0/visuals/4/position",
           "recommendedActions": [
@@ -1198,6 +1218,7 @@
         {
           "code": "design.visual_off_grid",
           "evidence": {
+            "columns": 12,
             "position": {
               "height": 76.0,
               "width": 192.0,
@@ -1207,8 +1228,8 @@
             "rowUnit": 8.0
           },
           "handle": "visual:ReportSectionTrend:VisualContainerRailDimCustomerCustomer",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: DimCustomer[Customer]",
+          "hint": "Run `report layout auto --snap` to move edges onto the nearest column guides while keeping the arrangement, or re-run `report layout auto` with a named template when a slot layout fits.",
+          "message": "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on 8 px row-unit multiples): DimCustomer[Customer]",
           "path": "<root>/first/StarNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailDimCustomerCustomer/visual.json",
           "pointer": "/report/pages/1/visuals/2/position",
           "recommendedActions": [

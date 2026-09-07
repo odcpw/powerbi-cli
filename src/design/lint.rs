@@ -294,12 +294,13 @@ fn lint_page_geometry(context: &PageContext, findings: &mut Vec<Value>) -> CliRe
                     context.page_index, visual_index
                 ),
                 format!(
-                    "visual edges are not aligned to the {} px design grid: {}",
+                    "visual misses the twelve-column grid guides (left edge must sit on a column start guide, right edge on a column end guide, and top/bottom on {} px row-unit multiples): {}",
                     Grid::default().row_unit,
                     visual_title(visual).unwrap_or_else(|| "visual".to_string())
                 ),
                 json!({
                     "position": position_summary(visual),
+                    "columns": Grid::default().columns,
                     "rowUnit": Grid::default().row_unit
                 }),
             ));
@@ -752,22 +753,23 @@ fn outside_page(position: Rect, width: f64, height: f64) -> bool {
 }
 
 fn aligned_to_grid(position: Rect, page_width: f64, page_height: f64, grid: Grid) -> bool {
-    let scale_x = page_width / PageSize::STANDARD.width;
-    let scale_y = page_height / PageSize::STANDARD.height;
-    let margin_x = grid.margin * scale_x;
-    let gutter_x = grid.gutter * scale_x;
-    let row_unit = grid.row_unit * scale_y;
-    let column_width = (page_width - margin_x * 2.0 - gutter_x * (grid.columns as f64 - 1.0))
-        / grid.columns as f64;
-    let starts =
-        (0..grid.columns).map(|column| margin_x + column as f64 * (column_width + gutter_x));
-    let mut ends = (0..grid.columns)
-        .map(|column| margin_x + column as f64 * (column_width + gutter_x) + column_width);
-    let x_aligned = starts
-        .clone()
+    let guides = grid::grid_guides(
+        PageSize {
+            width: page_width,
+            height: page_height,
+        },
+        grid,
+    );
+    let x_aligned = guides
+        .column_starts
+        .iter()
         .any(|guide| (guide - position.x).abs() <= GRID_EPSILON);
     let right = position.x + position.width;
-    let right_aligned = ends.any(|guide| (guide - right).abs() <= GRID_EPSILON);
+    let right_aligned = guides
+        .column_ends
+        .iter()
+        .any(|guide| (guide - right).abs() <= GRID_EPSILON);
+    let row_unit = guides.row_unit;
     let vertical_aligned = [position.y, position.y + position.height]
         .iter()
         .all(|value| ((*value / row_unit).round() * row_unit - *value).abs() <= GRID_EPSILON);
