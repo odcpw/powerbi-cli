@@ -4,7 +4,11 @@
 //! empty pointer identifies the document root; it is intentionally used for
 //! filesystem/TMDL findings and malformed JSON, where a more specific JSON
 //! node cannot be resolved.
+//!
+//! `path` is rendered in the CLI's display form (canonical, without a Windows
+//! verbatim `\\?\` prefix), matching `projectDir` in every response.
 
+use crate::project_resolution::display_path;
 use serde::Serialize;
 use std::path::Path;
 
@@ -43,13 +47,7 @@ impl Finding {
         path: &Path,
         pointer: impl Into<String>,
     ) -> Self {
-        Self::new(
-            code,
-            "error",
-            message,
-            path.to_string_lossy().into_owned(),
-            pointer,
-        )
+        Self::new(code, "error", message, display_path(path), pointer)
     }
 
     pub(crate) fn warning(
@@ -58,13 +56,7 @@ impl Finding {
         path: &Path,
         pointer: impl Into<String>,
     ) -> Self {
-        Self::new(
-            code,
-            "warning",
-            message,
-            path.to_string_lossy().into_owned(),
-            pointer,
-        )
+        Self::new(code, "warning", message, display_path(path), pointer)
     }
 
     #[allow(dead_code)]
@@ -74,13 +66,7 @@ impl Finding {
         path: &Path,
         pointer: impl Into<String>,
     ) -> Self {
-        Self::new(
-            code,
-            "info",
-            message,
-            path.to_string_lossy().into_owned(),
-            pointer,
-        )
+        Self::new(code, "info", message, display_path(path), pointer)
     }
 }
 

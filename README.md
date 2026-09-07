@@ -1586,9 +1586,11 @@ This generated snapshot keeps status and proof claims aligned with
   later deep-inspection `file_not_found` failure.
 - Native validation errors and warnings are structured findings with a stable
   registry code, unchanged human message, source `path`, severity, and an RFC
-  6901 `pointer` (the empty pointer denotes a whole-file/TMDL finding). Every
-  emitted code is explainable with `lint --explain <code> --json` and listed by
-  the validation capability contract.
+  6901 `pointer` (the empty pointer denotes a whole-file/TMDL finding). Finding
+  `path` values use the same display form as `projectDir`: canonical, without
+  a Windows verbatim `\\?\` prefix. Every emitted code is explainable with
+  `lint --explain <code> --json` and listed by the validation capability
+  contract.
 - `diff` compares normalized semantic summaries with stable handles, so agents
   can verify measure, calculated-column, and relationship changes after CLI
   mutations or Desktop round-trips without reading raw TMDL.
