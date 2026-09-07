@@ -462,49 +462,55 @@
     }
   ],
   "proofPlan": {
-    "achievableHere": "schema-golden",
     "commands": [
       "powerbi-cli desktop open <root>/first --preflight strict --json",
       "powerbi-cli desktop close --json"
     ],
-    "requestedLevel": "desktop-golden-pending",
-    "unavailable": [
-      {
-        "what": "powerbi-cli desktop open <root>/first --preflight strict --json",
-        "whereItWorks": "Windows with Power BI Desktop installed and POWERBI_DESKTOP_ORACLE=1; run the command there.",
-        "why": "platform_non_windows"
-      },
-      {
-        "what": "powerbi-cli desktop close --json",
-        "whereItWorks": "Windows with Power BI Desktop installed and POWERBI_DESKTOP_ORACLE=1; run the command there.",
-        "why": "platform_non_windows"
-      },
-      {
-        "what": "desktop-golden-pending",
-        "whereItWorks": "Windows with Power BI Desktop installed and POWERBI_DESKTOP_ORACLE=1; run the command there.",
-        "why": "platform_non_windows"
-      },
-      {
-        "what": "desktop reference",
-        "whereItWorks": "Windows with a matching Desktop-authored proof record under testdata/desktop-proof/.",
-        "why": "missing_reference"
-      }
-    ]
+    "requestedLevel": "desktop-golden-pending"
   },
   "schema": "powerbi-cli.report.compose.v1",
   "scorecard": {
     "designLint": {
       "counts": {
         "errors": 0,
-        "findings": 10,
+        "findings": 11,
         "info": 0,
-        "warnings": 10
+        "warnings": 11
       },
-      "deferredRules": [],
+      "deferredRules": [
+        {
+          "owningBead": "pbi-t5-design-system-mlf.3",
+          "reason": "Resolved typography tokens and their minimum font-size policy are unavailable.",
+          "ruleId": "design.font_below_minimum",
+          "status": "not-evaluated"
+        },
+        {
+          "owningBead": "pbi-t5-design-system-mlf.3",
+          "reason": "Resolved foreground/background tokens, including theme inheritance, are unavailable.",
+          "ruleId": "design.contrast_below_aa",
+          "status": "not-evaluated"
+        },
+        {
+          "owningBead": "pbi-t5-design-system-mlf.3",
+          "reason": "Resolved palette and semantic-color tokens are unavailable.",
+          "ruleId": "design.palette_drift",
+          "status": "not-evaluated"
+        },
+        {
+          "owningBead": "pbi-t5-design-system-mlf.3",
+          "reason": "The active theme cannot resolve a full display-unit policy; offline metadata cannot establish data magnitude.",
+          "ruleId": "design.display_units_missing",
+          "status": "not-evaluated"
+        }
+      ],
       "evaluatedRules": [
-        "design.contrast_below_aa",
         "report.visual_outside_page",
         "design.visual_overlap",
+        "design.title_case_inconsistent",
+        "design.title_missing",
+        "design.title_duplicate",
+        "design.number_format_missing",
+        "design.ranking_not_sorted",
         "design.visual_off_grid",
         "design.row_height_inconsistent",
         "design.column_width_inconsistent",
@@ -745,6 +751,24 @@
           "ruleId": "design.visual_off_grid",
           "sanitizeAction": "relayout-template",
           "severity": "warning"
+        },
+        {
+          "code": "design.number_format_missing",
+          "evidence": {
+            "measure": "Total",
+            "table": "Events"
+          },
+          "handle": "measure:Events:Total",
+          "hint": "Set a deliberate static format string or dynamic format definition on the measure.",
+          "message": "A report-bound measure has no static or dynamic number format.",
+          "path": "<root>/first/FlatNarrative.SemanticModel/definition/tables/Events.tmdl",
+          "pointer": "/model/tables/0/measures/0/properties/formatString",
+          "recommendedActions": [
+            "apply-format"
+          ],
+          "ruleId": "design.number_format_missing",
+          "sanitizeAction": "apply-format",
+          "severity": "warning"
         }
       ],
       "grid": {
@@ -778,6 +802,14 @@
         "design.contrast_below_aa",
         "report.visual_outside_page",
         "design.visual_overlap",
+        "design.title_case_inconsistent",
+        "design.title_missing",
+        "design.title_duplicate",
+        "design.font_below_minimum",
+        "design.palette_drift",
+        "design.number_format_missing",
+        "design.display_units_missing",
+        "design.ranking_not_sorted",
         "design.visual_off_grid",
         "design.row_height_inconsistent",
         "design.column_width_inconsistent",
@@ -800,9 +832,9 @@
     "lint": {
       "counts": {
         "errors": 0,
-        "findings": 20,
+        "findings": 10,
         "info": 5,
-        "warnings": 15
+        "warnings": 5
       },
       "findings": {
         "error": [],
@@ -845,98 +877,6 @@
         ],
         "warning": [
           {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 400.0,
-                "width": 591.79,
-                "x": 232.0,
-                "y": 96.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
-            "pointer": "/report/pages/2/visuals/0/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 76.0,
-                "width": 192.0,
-                "x": 24.0,
-                "y": 80.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionBreakdown1:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailEventsCategory/visual.json",
-            "pointer": "/report/pages/2/visuals/2/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 400.0,
-                "width": 591.79,
-                "x": 232.0,
-                "y": 96.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By Events[Ticket]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
-            "pointer": "/report/pages/3/visuals/0/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 76.0,
-                "width": 192.0,
-                "x": 24.0,
-                "y": 80.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionBreakdown2:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailEventsCategory/visual.json",
-            "pointer": "/report/pages/3/visuals/2/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
             "code": "bpa.report.duplicate_visual_title",
             "handle": "visual:ReportSectionDetail:VisualContainerDetailTable",
             "message": "multiple visuals on page `Detail` share title: Detail",
@@ -948,121 +888,6 @@
             "handle": "visual:ReportSectionDetail:VisualContainerLayoutHeadingDetail",
             "message": "multiple visuals on page `Detail` share title: Detail",
             "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerLayoutHeadingDetail/visual.json",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 76.0,
-                "width": 192.0,
-                "x": 24.0,
-                "y": 80.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionDetail:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailEventsCategory/visual.json",
-            "pointer": "/report/pages/4/visuals/2/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 264.0,
-                "width": 418.91,
-                "x": 837.09,
-                "y": 208.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionOverview:VisualContainerBreakdown",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerBreakdown/visual.json",
-            "pointer": "/report/pages/0/visuals/0/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 264.0,
-                "width": 591.79,
-                "x": 232.0,
-                "y": 208.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionOverview:VisualContainerPlannerTimeSeries0",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Trend",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPlannerTimeSeries0/visual.json",
-            "pointer": "/report/pages/0/visuals/2/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 96.0,
-                "width": 246.03,
-                "x": 232.0,
-                "y": 96.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionOverview:VisualContainerPrimaryKpi",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Primary KPI",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPrimaryKpi/visual.json",
-            "pointer": "/report/pages/0/visuals/3/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 76.0,
-                "width": 192.0,
-                "x": 24.0,
-                "y": 80.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionOverview:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailEventsCategory/visual.json",
-            "pointer": "/report/pages/0/visuals/4/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
             "severity": "warning"
           },
           {
@@ -1080,29 +905,6 @@
             "severity": "warning"
           },
           {
-            "code": "design.visual_off_grid",
-            "evidence": {
-              "position": {
-                "height": 76.0,
-                "width": 192.0,
-                "x": 24.0,
-                "y": 80.0
-              },
-              "rowUnit": 8.0
-            },
-            "handle": "visual:ReportSectionTrend:VisualContainerRailEventsCategory",
-            "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-            "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-            "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailEventsCategory/visual.json",
-            "pointer": "/report/pages/1/visuals/2/position",
-            "recommendedActions": [
-              "relayout-template"
-            ],
-            "ruleId": "design.visual_off_grid",
-            "sanitizeAction": "relayout-template",
-            "severity": "warning"
-          },
-          {
             "code": "dax.format_missing",
             "handle": "measure:Events:Total",
             "hint": "Set a deliberate --format-string or --format-string-definition on the measure, then re-run DAX lint.",
@@ -1113,98 +915,6 @@
         ]
       },
       "findingsList": [
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 400.0,
-              "width": 591.79,
-              "x": 232.0,
-              "y": 96.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionBreakdown1:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerBreakdown/visual.json",
-          "pointer": "/report/pages/2/visuals/0/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 76.0,
-              "width": 192.0,
-              "x": 24.0,
-              "y": 80.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionBreakdown1:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown1/visuals/VisualContainerRailEventsCategory/visual.json",
-          "pointer": "/report/pages/2/visuals/2/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 400.0,
-              "width": 591.79,
-              "x": 232.0,
-              "y": 96.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionBreakdown2:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Ticket]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerBreakdown/visual.json",
-          "pointer": "/report/pages/3/visuals/0/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 76.0,
-              "width": 192.0,
-              "x": 24.0,
-              "y": 80.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionBreakdown2:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionBreakdown2/visuals/VisualContainerRailEventsCategory/visual.json",
-          "pointer": "/report/pages/3/visuals/2/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
         {
           "code": "bpa.report.duplicate_visual_title",
           "handle": "visual:ReportSectionDetail:VisualContainerDetailTable",
@@ -1220,121 +930,6 @@
           "severity": "warning"
         },
         {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 76.0,
-              "width": 192.0,
-              "x": 24.0,
-              "y": 80.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionDetail:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionDetail/visuals/VisualContainerRailEventsCategory/visual.json",
-          "pointer": "/report/pages/4/visuals/2/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 264.0,
-              "width": 418.91,
-              "x": 837.09,
-              "y": 208.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionOverview:VisualContainerBreakdown",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: By Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerBreakdown/visual.json",
-          "pointer": "/report/pages/0/visuals/0/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 264.0,
-              "width": 591.79,
-              "x": 232.0,
-              "y": 208.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionOverview:VisualContainerPlannerTimeSeries0",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Trend",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPlannerTimeSeries0/visual.json",
-          "pointer": "/report/pages/0/visuals/2/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 96.0,
-              "width": 246.03,
-              "x": 232.0,
-              "y": 96.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionOverview:VisualContainerPrimaryKpi",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Primary KPI",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerPrimaryKpi/visual.json",
-          "pointer": "/report/pages/0/visuals/3/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 76.0,
-              "width": 192.0,
-              "x": 24.0,
-              "y": 80.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionOverview:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionOverview/visuals/VisualContainerRailEventsCategory/visual.json",
-          "pointer": "/report/pages/0/visuals/4/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
-          "severity": "warning"
-        },
-        {
           "code": "bpa.report.duplicate_visual_title",
           "handle": "visual:ReportSectionTrend:VisualContainerLayoutHeadingTrend",
           "message": "multiple visuals on page `Trend` share title: Trend",
@@ -1346,29 +941,6 @@
           "handle": "visual:ReportSectionTrend:VisualContainerPlannerTimeSeries0",
           "message": "multiple visuals on page `Trend` share title: Trend",
           "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerPlannerTimeSeries0/visual.json",
-          "severity": "warning"
-        },
-        {
-          "code": "design.visual_off_grid",
-          "evidence": {
-            "position": {
-              "height": 76.0,
-              "width": 192.0,
-              "x": 24.0,
-              "y": 80.0
-            },
-            "rowUnit": 8.0
-          },
-          "handle": "visual:ReportSectionTrend:VisualContainerRailEventsCategory",
-          "hint": "Re-run `report layout auto` with the intended template, or set a position whose edges align to the grid row unit.",
-          "message": "visual edges are not aligned to the 8 px design grid: Events[Category]",
-          "path": "<root>/first/FlatNarrative.Report/definition/pages/ReportSectionTrend/visuals/VisualContainerRailEventsCategory/visual.json",
-          "pointer": "/report/pages/1/visuals/2/position",
-          "recommendedActions": [
-            "relayout-template"
-          ],
-          "ruleId": "design.visual_off_grid",
-          "sanitizeAction": "relayout-template",
           "severity": "warning"
         },
         {
@@ -1416,10 +988,6 @@
         }
       ],
       "ok": true
-    },
-    "microsoftValidator": {
-      "reason": "Microsoft Report Validator runs on Windows; local native validation remains available",
-      "status": "unsupported-platform"
     },
     "next": [
       "powerbi-cli inspect --deep <root>/first --json",

@@ -6,7 +6,7 @@
     "jsonFilesChecked": 17,
     "lintErrors": 0,
     "lintInfo": 0,
-    "lintWarnings": 10,
+    "lintWarnings": 4,
     "measures": 2,
     "pages": 2,
     "relationships": 2,
@@ -18,13 +18,13 @@
     "visuals": 7
   },
   "exitCode": 0,
-  "fingerprint": "9c11898a1405168b",
+  "fingerprint": "2289533a50ff634f",
   "lint": {
     "counts": {
       "errors": 0,
-      "findings": 10,
+      "findings": 4,
       "info": 0,
-      "warnings": 10
+      "warnings": 4
     },
     "findings": [
       {
@@ -45,36 +45,6 @@
       {
         "code": "model.column_unused",
         "handle": "column:DimDate:Month",
-        "severity": "warning"
-      },
-      {
-        "code": "design.visual_off_grid",
-        "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
-        "severity": "warning"
-      },
-      {
-        "code": "design.visual_off_grid",
-        "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
-        "severity": "warning"
-      },
-      {
-        "code": "design.visual_off_grid",
-        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
-        "severity": "warning"
-      },
-      {
-        "code": "design.visual_off_grid",
-        "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
-        "severity": "warning"
-      },
-      {
-        "code": "design.visual_off_grid",
-        "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
-        "severity": "warning"
-      },
-      {
-        "code": "design.visual_off_grid",
-        "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
         "severity": "warning"
       }
     ]
