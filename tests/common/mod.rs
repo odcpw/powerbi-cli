@@ -160,15 +160,25 @@ pub fn first_page_name(project: &Path) -> String {
         .to_string()
 }
 
+/// The lexicographically first visual container of the first page.
+///
+/// Directory order is filesystem-specific (NTFS enumerates sorted, ext4 does
+/// not), so the entries are sorted by name to keep goldens and snapshots that
+/// depend on "the first visual" identical on Windows and Linux.
 pub fn first_visual_json(project: &Path) -> PathBuf {
     let page_json = first_page_json(project);
     let visuals_dir = page_json.parent().expect("page dir").join("visuals");
-    fs::read_dir(visuals_dir)
+    let mut containers = fs::read_dir(visuals_dir)
         .expect("visuals dir")
         .filter_map(Result::ok)
-        .find(|entry| entry.file_type().expect("file type").is_dir())
+        .filter(|entry| entry.file_type().expect("file type").is_dir())
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
+    containers.sort_by(|left, right| left.file_name().cmp(&right.file_name()));
+    containers
+        .into_iter()
+        .next()
         .expect("first visual")
-        .path()
         .join("visual.json")
 }
 

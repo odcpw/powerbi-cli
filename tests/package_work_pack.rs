@@ -1,6 +1,6 @@
 mod common;
 
-use common::{run_powerbi, stderr_json, stdout_json};
+use common::{canonical_display, run_powerbi, stderr_json, stdout_json};
 use serde_json::json;
 use std::fs;
 use std::io::Read;
@@ -124,10 +124,9 @@ fn work_pack_is_deterministic_distinct_and_contains_only_safe_source_metadata() 
         dry_json["sourcePolicy"],
         "recognized-credential-free-materialized-live-partitions-only"
     );
-    assert_eq!(
-        dry_json["package"],
-        default_archive.to_str().expect("default archive path")
-    );
+    // The archive does not exist yet; the CLI still renders its canonical
+    // display path (parent resolved, 8.3 short names expanded).
+    assert_eq!(dry_json["package"], canonical_display(&default_archive));
     assert!(!default_archive.exists());
 
     let first = run_powerbi(&["package", "work-pack", "--project", project_arg, "--json"]);

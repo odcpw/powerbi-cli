@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{RunOutput, run_powerbi_owned, stderr_json, stdout_json};
+use common::{RunOutput, canonical_display, run_powerbi_owned, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -86,7 +86,7 @@ fn dashboard_v2_filter_fixture_compiles_every_supported_kind_and_is_deterministi
     assert_eq!(operations[2]["filterType"], "Advanced");
     assert_eq!(operations[3]["filterType"], "RelativeDate");
     assert_eq!(operations[4]["filterType"], "TopN");
-    let first_path = path_arg(&first_dir);
+    let first_path = canonical_display(&first_dir);
     assert!(
         first_json["operationOutcomes"]
             .as_array()

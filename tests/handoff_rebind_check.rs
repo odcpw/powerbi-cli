@@ -1,6 +1,8 @@
 mod common;
 
-use common::{assert_json_snapshot, run_powerbi, scaffold_sales, stderr_json, stdout_json};
+use common::{
+    assert_json_snapshot, canonical_display, run_powerbi, scaffold_sales, stderr_json, stdout_json,
+};
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -124,9 +126,11 @@ fn unmatched_selector_points_to_argument_and_recovers_against_the_actual_project
         assert!(error["error"]["hint"].is_string());
         assert_eq!(
             error["error"]["suggestedCommands"],
+            // The CLI renders the canonical display path (8.3 short names in
+            // the CI runner's temp directory are expanded).
             serde_json::json!([format!(
                 "powerbi-cli model partitions list --project '{}' --json",
-                project.display()
+                canonical_display(&project)
             )])
         );
         let recovery = run_powerbi(&[
