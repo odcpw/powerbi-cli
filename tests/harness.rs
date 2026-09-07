@@ -1,6 +1,9 @@
 mod common;
 
-use common::{archetype_names, assert_json_snapshot, load_archetype, run_powerbi, stdout_json};
+use common::{
+    archetype_names, assert_json_snapshot, canonical_display, load_archetype, run_powerbi,
+    stdout_json,
+};
 use serde_json::json;
 use std::collections::BTreeSet;
 
@@ -106,4 +109,18 @@ fn v2_spec_builder_starts_from_a_real_fixture_and_authors_sections() {
 #[should_panic(expected = "contains an absolute path")]
 fn snapshot_helper_refuses_machine_specific_paths() {
     assert_json_snapshot("never-written", &json!({"path": "/tmp/machine-specific"}));
+}
+
+#[test]
+fn canonical_display_matches_cli_path_rendering_for_missing_and_existing_paths() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = canonical_display(temp.path());
+    assert!(!root.starts_with(r"\\?\"), "{root}");
+    assert!(std::path::Path::new(&root).is_absolute(), "{root}");
+    let missing = temp.path().join("missing").join("file.json");
+    let separator = std::path::MAIN_SEPARATOR;
+    assert_eq!(
+        canonical_display(&missing),
+        format!("{root}{separator}missing{separator}file.json")
+    );
 }

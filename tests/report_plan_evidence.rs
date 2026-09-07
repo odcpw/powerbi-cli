@@ -1,6 +1,6 @@
 mod common;
 
-use common::{assert_json_snapshot, run_powerbi, stderr_json, stdout_json};
+use common::{assert_json_snapshot, replace_in_strings, run_powerbi, stderr_json, stdout_json};
 use serde_json::{Value, json};
 use std::fs;
 
@@ -77,13 +77,10 @@ fn weak_evidence_refuses_without_writing_and_reports_recovery_fields_determinist
                 assert!(command.as_str().unwrap().starts_with("powerbi-cli "));
                 assert!(command.as_str().unwrap().ends_with("--json"));
             }
-            // Keep the complete public error shape, normalizing only the fixture path.
-            error = serde_json::from_str(
-                &serde_json::to_string(&error)
-                    .unwrap()
-                    .replace(path.to_str().unwrap(), "<schema.json>"),
-            )
-            .unwrap();
+            // Keep the complete public error shape, normalizing only the fixture
+            // path inside string values (serialized JSON escapes Windows
+            // separators, so text replacement would miss them there).
+            replace_in_strings(&mut error, path.to_str().unwrap(), "<schema.json>");
             assert_json_snapshot(&format!("report-plan-missing-{case}"), &error);
             if force {
                 assert_eq!(fs::read(&out).unwrap(), b"preserve existing output");

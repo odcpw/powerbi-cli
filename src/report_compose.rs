@@ -461,7 +461,7 @@ mod tests {
         std::fs::create_dir(root.path().join("existing")).unwrap();
         assert_eq!(
             resolved_output_path(&root.path().join("existing/../new")).unwrap(),
-            root.path().join("new")
+            root.path().canonicalize().unwrap().join("new")
         );
     }
 }

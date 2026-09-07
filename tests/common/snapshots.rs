@@ -88,11 +88,14 @@ fn assert_path_free(value: &Value, pointer: &str) {
                 || field.ends_with("dir")
                 || field.ends_with("directory")
                 || field.ends_with("root");
+            // `Path::is_absolute` is platform-specific (a POSIX root is not
+            // absolute on Windows), so both spellings are checked explicitly.
+            let posix_absolute = text.starts_with('/');
             let manifest_root = env!("CARGO_MANIFEST_DIR");
             assert!(
                 !windows_absolute
                     && !text.contains(manifest_root)
-                    && !(path_field && Path::new(text).is_absolute()),
+                    && !(path_field && (posix_absolute || Path::new(text).is_absolute())),
                 "JSON snapshot contains an absolute path at {pointer}: {text:?}"
             );
         }

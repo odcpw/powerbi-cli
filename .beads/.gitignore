@@ -52,3 +52,7 @@ redirect
 *.db-wal-cert
 *.db-wal-cert-head
 *.fsqlite-migration-state
+
+# br 0.2.16 lock sidecars for the WAL certificate files (local, per-machine)
+*.db-wal-cert-lock-*
+*.db-wal-cert-head-lock-*

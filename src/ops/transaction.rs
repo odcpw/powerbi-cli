@@ -142,11 +142,30 @@ pub(crate) struct CommitReceipt {
     pub(crate) snapshot_dir: Option<PathBuf>,
 }
 
+/// Canonicalize a freshly created working-copy root in the spelling the rest
+/// of the crate emits for project paths: symlinks and Windows 8.3 short names
+/// resolved, verbatim prefix removed (see `canonical_display`). Kernels strip
+/// this root from resolved visual paths, and legacy kernels rewrite it back to
+/// the source root by string replacement, so the spelling must match exactly.
+fn canonical_work_root(path: &Path) -> CliResult<PathBuf> {
+    let canonical = fs::canonicalize(path).map_err(|error| {
+        CliError::unexpected(format!(
+            "resolve operation working copy {}: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(PathBuf::from(crate::project_resolution::display_path(
+        &canonical,
+    )))
+}
+
 /// A working-copy transaction. No mutation reaches `source` until one of the
 /// commit methods succeeds; dropping this value discards the temporary tree.
 #[derive(Debug)]
 pub(crate) struct Transaction {
     work: TempDir,
+    /// Canonical form of `work`; see `canonical_work_root`.
+    work_root: PathBuf,
     pub(crate) source: ResolvedProject,
     pub(crate) journal: Vec<Change>,
     aborted: bool,
@@ -162,20 +181,24 @@ impl Transaction {
         // the transaction's working copy.
         collect_files(&source.project_dir)?;
         copy_project_dir(&source.project_dir, work.path())?;
+        let work_root = canonical_work_root(work.path())?;
         Ok(Self {
             work,
+            work_root,
             source,
             journal: Vec::new(),
             aborted: false,
         })
     }
 
+    /// Canonical working-copy root. Kernels strip this prefix from paths
+    /// derived from `working_project()` to recover project-relative paths.
     pub(crate) fn work_dir(&self) -> &Path {
-        self.work.path()
+        &self.work_root
     }
 
     pub(crate) fn working_project(&self) -> CliResult<ResolvedProject> {
-        resolve_project(self.work.path())
+        resolve_project(&self.work_root)
     }
 
     pub(crate) fn validate_working_copy(&self) -> CliResult<ValidationReport> {
@@ -570,6 +593,7 @@ pub(crate) fn restore_snapshot(source_root: &Path, snapshot_dir: &Path) -> CliRe
 
     let source = resolve_project(&source_root)?;
     let mut transaction = Transaction {
+        work_root: canonical_work_root(work.path())?,
         work,
         source,
         journal: changes,
@@ -744,6 +768,10 @@ fn try_directory_swap(
     match fs::rename(transaction.work.path(), source_root) {
         Ok(()) => {
             let old_work = std::mem::replace(&mut transaction.work, replacement_work);
+            // The swap succeeded; keep the root consistent with the replacement
+            // directory for the receipt bookkeeping that follows.
+            transaction.work_root = canonical_work_root(transaction.work.path())
+                .unwrap_or_else(|_| transaction.work.path().to_path_buf());
             let _ = remove_exact_directory(&displaced);
             std::mem::forget(old_work);
             Ok(true)
@@ -1446,7 +1474,9 @@ mod tests {
         let snapshot = receipt.snapshot_dir.expect("snapshot");
         assert_eq!(
             snapshot,
-            temp.path().join("source-snapshot-2026-09-04T12-00-00Z")
+            fs::canonicalize(temp.path())
+                .expect("canonical temp")
+                .join("source-snapshot-2026-09-04T12-00-00Z")
         );
         assert!(snapshot.join("manifest.v1.json").is_file());
         assert_eq!(

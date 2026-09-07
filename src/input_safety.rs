@@ -1385,7 +1385,12 @@ mod tests {
         fs::create_dir(&project).expect("project");
         fs::write(project.join("one.json"), "{}").expect("project file");
         let destination = snapshot_destination(&project, None).expect("sibling snapshot");
-        assert_eq!(destination, temp.path().join("project.snapshot"));
+        assert_eq!(
+            destination,
+            fs::canonicalize(temp.path())
+                .expect("canonical temp")
+                .join("project.snapshot")
+        );
         let inside = project.join("snap");
         assert_eq!(
             snapshot_destination(&project, Some(&inside))

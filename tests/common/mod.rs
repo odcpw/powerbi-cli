@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 mod artifact_tree;
 mod fixtures;
 mod operations;
+mod paths;
 mod run;
 mod snapshots;
 
@@ -24,6 +25,7 @@ pub use operations::{
     OperationExecution, build_fixture_with_spec, run_direct_operation, run_metamorphic_cases,
     run_operation_equivalence, scaffold_fixture,
 };
+pub use paths::{canonical_display, forward_slashes_after, replace_in_strings};
 pub type ArchetypeFixture = fixtures::ArchetypeFixture;
 pub type DashboardSpecBuilder = fixtures::DashboardSpecBuilder;
 pub type CliCommand = run::CliCommand;

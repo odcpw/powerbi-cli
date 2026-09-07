@@ -2,7 +2,9 @@
 
 mod common;
 
-use common::{patch_json, report_pages_json, run_powerbi, scaffold_sales, stdout_json};
+use common::{
+    canonical_display, patch_json, report_pages_json, run_powerbi, scaffold_sales, stdout_json,
+};
 use serde_json::{Value, json};
 use std::fs;
 
@@ -83,7 +85,7 @@ fn native_validation_errors_are_structured_registered_and_deterministic() {
         .expect("duplicate page diagnostic");
     assert_eq!(duplicate["code"], "validation.page_order");
     assert_eq!(duplicate["pointer"], "/pageOrder/1");
-    assert_eq!(duplicate["path"], pages_path.to_string_lossy().as_ref());
+    assert_eq!(duplicate["path"], canonical_display(&pages_path));
 
     let second = run_powerbi(&["validate", project_arg, "--json"]);
     assert_eq!(second.code, 10, "stderr: {}", second.stderr);
@@ -120,7 +122,7 @@ fn missing_files_use_a_valid_root_pointer_and_preserve_the_message() {
     assert_finding_shape(finding);
     assert_eq!(finding["code"], "validation.missing_file");
     assert_eq!(finding["pointer"], "");
-    assert_eq!(finding["path"], report_json.to_string_lossy().as_ref());
+    assert_eq!(finding["path"], canonical_display(&report_json));
 }
 
 #[test]
@@ -139,11 +141,12 @@ fn malformed_json_is_reported_without_aborting_native_validation() {
     ]);
     assert_eq!(output.code, 10, "stderr: {}", output.stderr);
     let value = stdout_json(&output);
+    let expected_path = canonical_display(&report_json);
     let finding = value["errors"]
         .as_array()
         .expect("errors")
         .iter()
-        .find(|finding| finding["path"] == report_json.to_string_lossy().as_ref())
+        .find(|finding| finding["path"] == expected_path)
         .expect("malformed report JSON finding");
     assert_finding_shape(finding);
     assert_eq!(finding["code"], "validation.invalid_json");

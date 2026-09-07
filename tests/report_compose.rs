@@ -1,8 +1,25 @@
 mod common;
-use common::{assert_json_snapshot, assert_tree_equal, run_powerbi, stdout_json};
+use common::{
+    assert_json_snapshot, assert_tree_equal, canonical_display, forward_slashes_after,
+    replace_in_strings, run_powerbi, stdout_json,
+};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
+
+const PROOF_LADDER: [&str; 5] = [
+    "unit-smoke",
+    "schema-golden",
+    "desktop-golden-pending",
+    "manual-desktop-canvas-refresh",
+    "desktop-canvas-refresh",
+];
+const UNAVAILABLE_REASONS: [&str; 3] = [
+    "platform_non_windows",
+    "missing_desktop",
+    "missing_reference",
+];
+const VALIDATOR_STATUSES: [&str; 2] = ["not-installed", "unsupported-platform"];
 
 fn write(path: &Path, value: &Value) {
     fs::write(path, serde_json::to_vec_pretty(value).unwrap()).unwrap();
@@ -12,20 +29,34 @@ fn success(args: &[&str]) -> Value {
     assert_eq!(run.code, 0, "{}", run.stderr);
     stdout_json(&run)
 }
-fn normalize(value: &mut Value, root: &str) {
+/// Drop timing fields and redact the temporary root in its raw, canonical,
+/// and Windows verbatim spellings so the snapshot is identical on Linux and
+/// Windows.
+fn normalize(value: &mut Value, root: &Path) {
+    strip_timings(value);
+    let display = canonical_display(root);
+    for spelling in [
+        format!(r"\\?\{display}"),
+        display.clone(),
+        root.to_str().unwrap().to_string(),
+    ] {
+        replace_in_strings(value, &spelling, "<root>");
+    }
+    forward_slashes_after(value, "<root>");
+}
+fn strip_timings(value: &mut Value) {
     match value {
         Value::Object(items) => {
             items.remove("ms");
             for item in items.values_mut() {
-                normalize(item, root);
+                strip_timings(item);
             }
         }
         Value::Array(items) => {
             for item in items {
-                normalize(item, root);
+                strip_timings(item);
             }
         }
-        Value::String(text) => *text = text.replace(root, "<root>"),
         _ => {}
     }
 }
@@ -85,8 +116,50 @@ fn star_and_flat_compose_build_validate_and_export_deterministically() {
             "--json",
         ]);
         assert_tree_equal(&output, &second, "composed projects are deterministic");
-        let mut summary = json!({"schema":first["schema"],"stages":first["stages"],"scorecard":first["scorecard"],"decisions":first["decisions"],"proofPlan":first["proofPlan"]});
-        normalize(&mut summary, root.path().to_str().unwrap());
+        // `achievableHere` and `unavailable[]` depend on the platform and on
+        // Desktop being installed, so they are checked against the documented
+        // value sets here and only the platform-independent proof-plan fields
+        // enter the snapshot.
+        let proof = &first["proofPlan"];
+        assert!(
+            PROOF_LADDER.contains(&proof["achievableHere"].as_str().unwrap_or_default()),
+            "achievableHere: {}",
+            proof["achievableHere"]
+        );
+        for entry in proof["unavailable"].as_array().unwrap() {
+            assert!(
+                UNAVAILABLE_REASONS.contains(&entry["why"].as_str().unwrap_or_default()),
+                "unavailable entry: {entry}"
+            );
+        }
+        let mut summary = json!({
+            "schema": first["schema"],
+            "stages": first["stages"],
+            "scorecard": first["scorecard"],
+            "decisions": first["decisions"],
+            "proofPlan": {
+                "requestedLevel": proof["requestedLevel"],
+                "commands": proof["commands"]
+            }
+        });
+        // `scorecard.microsoftValidator` reports the host toolchain state
+        // (Linux: unsupported-platform; Windows: not-installed or ready), so
+        // it is checked against the documented statuses and left out of the
+        // platform-neutral snapshot.
+        let validator = summary["scorecard"]
+            .as_object_mut()
+            .unwrap()
+            .remove("microsoftValidator")
+            .expect("scorecard.microsoftValidator");
+        assert!(
+            VALIDATOR_STATUSES.contains(&validator["status"].as_str().unwrap_or_default()),
+            "microsoftValidator: {validator}"
+        );
+        assert!(
+            validator["reason"].is_string(),
+            "microsoftValidator: {validator}"
+        );
+        normalize(&mut summary, root.path());
         assert_json_snapshot(&format!("report-compose-{kind}"), &summary);
     }
 }
@@ -271,8 +344,8 @@ fn rows_are_profiled_without_values_and_preset_style_reaches_the_compiler() {
             .unwrap()
             .contains("Synthetic A")
     );
-    normalize(&mut first, root.path().to_str().unwrap());
-    normalize(&mut second, root.path().to_str().unwrap());
+    normalize(&mut first, root.path());
+    normalize(&mut second, root.path());
     assert_eq!(first, second, "only observational timings vary");
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
     let tokens = root.path().join("tokens.json");
