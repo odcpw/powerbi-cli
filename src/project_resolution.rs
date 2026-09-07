@@ -121,8 +121,32 @@ pub(crate) fn display_path(path: &Path) -> String {
 }
 
 pub(crate) fn canonical_display(path: &Path) -> String {
-    let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    display_path(&canonical)
+    display_path(&canonicalize_with_missing_tail(path))
+}
+
+/// Canonical form of `path` even when it does not exist yet: the deepest
+/// existing ancestor is canonicalized (symlinks and Windows 8.3 short names
+/// resolved) and the missing components are appended as given. Outputs that
+/// are about to be created therefore render in the same spelling as existing
+/// ones, so responses stay deterministic across runs and platforms. A path
+/// with no existing ancestor is returned unchanged.
+pub(crate) fn canonicalize_with_missing_tail(path: &Path) -> PathBuf {
+    let mut existing = path;
+    let mut missing = Vec::new();
+    while !existing.exists() {
+        let (Some(name), Some(parent)) = (existing.file_name(), existing.parent()) else {
+            return path.to_path_buf();
+        };
+        missing.push(name.to_os_string());
+        existing = parent;
+    }
+    let Ok(mut resolved) = fs::canonicalize(existing) else {
+        return path.to_path_buf();
+    };
+    for name in missing.into_iter().rev() {
+        resolved.push(name);
+    }
+    resolved
 }
 
 fn simplify_verbatim_path(value: &str) -> String {

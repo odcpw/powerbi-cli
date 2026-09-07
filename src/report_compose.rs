@@ -248,8 +248,13 @@ pub(crate) fn compose_command(args: &[String]) -> CliResult<Value> {
         .as_deref()
         .map(canonical_display)
         .unwrap_or("<project-dir>-compose".into());
+    // Artifacts render the canonical spelling while arguments may carry the
+    // raw one (Windows 8.3 short names, symlinked temp roots); redact both so
+    // dry-run responses never leak a scratch path.
     let replacements = [
         (canonical_display(&sidecar), display_artifacts.clone()),
+        (path(&sidecar), display_artifacts.clone()),
+        (canonical_display(&project), display_target.clone()),
         (path(&project), display_target.clone()),
     ];
     for (name, document) in &mut documents {

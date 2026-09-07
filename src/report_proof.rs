@@ -60,8 +60,14 @@ pub(crate) fn compile_proof_plan(
     } else {
         ProofLevel::SchemaGolden
     };
+    // Render the same spelling as the response's `projectDir` (canonical,
+    // even before the output directory exists) so agents can match them.
     let project = project_dir
-        .map(command_arg)
+        .map(|dir| {
+            command_arg(&crate::project_resolution::canonicalize_with_missing_tail(
+                dir,
+            ))
+        })
         .unwrap_or_else(|| "<project-dir>".to_string());
 
     let pages = desktop

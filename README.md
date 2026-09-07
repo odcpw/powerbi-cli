@@ -1588,7 +1588,10 @@ This generated snapshot keeps status and proof claims aligned with
   registry code, unchanged human message, source `path`, severity, and an RFC
   6901 `pointer` (the empty pointer denotes a whole-file/TMDL finding). Finding
   `path` values use the same display form as `projectDir`: canonical, without
-  a Windows verbatim `\\?\` prefix. Every emitted code is explainable with
+  a Windows verbatim `\\?\` prefix. Outputs that do not exist yet (dry runs,
+  `--out-dir` and `--out` targets, proof-plan commands) render in that same
+  spelling, so responses are byte-identical across runs even when the temp
+  root is a symlink or a Windows 8.3 short name. Every emitted code is explainable with
   `lint --explain <code> --json` and listed by the validation capability
   contract.
 - `diff` compares normalized semantic summaries with stable handles, so agents

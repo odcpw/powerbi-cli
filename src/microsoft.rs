@@ -515,8 +515,15 @@ fn normalize_official_diagnostics(
 }
 
 fn normalize_official_file(file: &str, report_dir: &Path) -> String {
-    let file_normalized = normalized_vendor_path(file);
-    let report_normalized = normalized_vendor_path(&report_dir.display().to_string());
+    // The validator echoes whatever spelling it was handed (Windows 8.3 short
+    // names, symlinked temp roots), so both sides are compared canonically.
+    let file_canonical = if Path::new(file).is_absolute() {
+        crate::canonical_display(Path::new(file))
+    } else {
+        file.to_string()
+    };
+    let file_normalized = normalized_vendor_path(&file_canonical);
+    let report_normalized = normalized_vendor_path(&crate::canonical_display(report_dir));
     let comparable_file = if cfg!(windows) {
         file_normalized.to_ascii_lowercase()
     } else {
