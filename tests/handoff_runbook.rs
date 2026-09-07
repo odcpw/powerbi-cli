@@ -1,8 +1,8 @@
 mod common;
 
 use common::{
-    assert_json_snapshot, first_page_json, first_visual_json, hash_tree, patch_json, run_powerbi,
-    scaffold_sales, stderr_json, stdout_json,
+    assert_json_snapshot, canonical_display, first_page_json, first_visual_json, hash_tree,
+    patch_json, run_powerbi, scaffold_sales, stderr_json, stdout_json,
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -64,7 +64,9 @@ fn runbook_embeds_live_scorecard_and_deterministic_unverified_proof_ladder() {
             &scorecard_json,
             "<live scorecard.v1 JSON; asserted against triage>",
         )
-        .replace(project.to_str().unwrap(), "<project-dir>");
+        .replace(&canonical_display(&project), "<project-dir>")
+        // The runbook renders native separators; the golden uses `/` everywhere.
+        .replace("<project-dir>\\", "<project-dir>/");
     let golden =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/golden/handoff-rebind-runbook.md");
     if std::env::var("UPDATE_SNAPSHOTS").as_deref() == Ok("1") {

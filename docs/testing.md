@@ -83,7 +83,10 @@ not imply that an unimplemented v2 compiler feature is supported.
 and validation, report planning, planned and fixture spec validation, report
 build, strict validation, handoff check, lint, triage, and golden fixture
 verification. It uses embedded dummy rows only, never invokes Desktop or an
-external service, and is suitable for Linux and Windows CI.
+external service, and is suitable for Linux and Windows CI. An archetype whose
+schema declares no date column asserts the planner's structured
+`plan.missing_input` refusal instead of a planned spec; every later step still
+runs against the checked-in spec.
 
 Run it alone with:
 
@@ -96,7 +99,11 @@ cargo test --test e2e
 `assert_json_snapshot(name, value)` recursively normalizes JSON object keys and
 compares against `tests/snapshots/<name>.json`. Absolute POSIX and Windows paths
 are rejected before comparison so machine-specific paths cannot enter contract
-snapshots.
+snapshots. Redact roots inside JSON values with `replace_in_strings` and, when
+a placeholder such as `<root>` remains, call `forward_slashes_after` so one
+snapshot serves Linux and Windows. `canonical_display(path)` renders a path
+exactly as the CLI reports it (canonical, no Windows verbatim prefix) for
+assertions against emitted `path` fields.
 
 To accept an intentional change:
 
