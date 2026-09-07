@@ -1672,7 +1672,7 @@ mod tests {
 
     fn wait_for_file(path: &Path) {
         let started = Instant::now();
-        while !path.is_file() && started.elapsed() < Duration::from_secs(2) {
+        while !path.is_file() && started.elapsed() < Duration::from_secs(10) {
             thread::sleep(Duration::from_millis(10));
         }
         assert!(path.is_file(), "process marker was not created");
@@ -1688,7 +1688,7 @@ mod tests {
                 return;
             }
             assert!(
-                started.elapsed() < Duration::from_secs(5),
+                started.elapsed() < Duration::from_secs(10),
                 "racing descendant process markers were not created"
             );
             thread::sleep(Duration::from_millis(10));

@@ -71,14 +71,10 @@ fn harvest_reference_refuses_persisted_filter_state_before_writing() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = scaffold_sales(temp.path());
     let handle = first_visual_handle(&project);
-    let visual_path = project
-        .join("SalesOperations.Report/definition/pages/ReportSectionOverview/visuals")
-        .read_dir()
-        .expect("visuals")
-        .find_map(Result::ok)
-        .expect("visual directory")
-        .path()
-        .join("visual.json");
+    // Patch the visual the handle refers to: `report visuals list` sorts by
+    // path, so the lexicographically first container is the target on every
+    // filesystem (ext4 enumerates directories in hash order).
+    let visual_path = first_visual_json(&project);
     patch_json(&visual_path, |value| {
         value["visual"]["objects"]["general"] = json!([{
             "properties": {
