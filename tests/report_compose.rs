@@ -1,7 +1,7 @@
 mod common;
 use common::{
     assert_json_snapshot, assert_tree_equal, canonical_display, forward_slashes_after,
-    replace_in_strings, run_powerbi, stdout_json,
+    replace_in_strings, run_powerbi, stderr_json, stdout_json,
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -93,7 +93,7 @@ fn star_and_flat_compose_build_validate_and_export_deterministically() {
             "spec.json",
             "validate.json",
             "explain.json",
-            "ops.json",
+            "explain-plan.json",
             "build.json",
             "triage.json",
             "scorecard.json",
@@ -101,6 +101,67 @@ fn star_and_flat_compose_build_validate_and_export_deterministically() {
         ] {
             assert!(sidecar.join(file).is_file(), "{file}");
         }
+        assert!(!sidecar.join("ops.json").exists());
+        assert_eq!(
+            first["artifacts"]["explain-plan.json"],
+            first["artifacts"]["explain.json"]["plan"]
+        );
+        assert_eq!(
+            first["artifacts"]["explain-plan.json"]["schema"],
+            "powerbi-cli.report.spec.explainPlan.v1"
+        );
+        let preview_path = sidecar.join("explain-plan.json");
+        let preview: Value = serde_json::from_slice(&fs::read(&preview_path).unwrap()).unwrap();
+        assert_eq!(preview, first["artifacts"]["explain-plan.json"]);
+        let ops = preview["ops"].as_array().expect("annotated operations");
+        assert!(!ops.is_empty());
+        for (index, entry) in ops.iter().enumerate() {
+            assert_eq!(entry["index"], index);
+            assert!(entry["stageName"].is_string());
+            assert!(entry["operation"]["op"].is_string());
+            assert_eq!(entry["op"], entry["operation"]["op"]);
+        }
+        let refused_target = root.path().join("refused");
+        let refusal = run_powerbi(&[
+            "ops",
+            "apply",
+            "--project",
+            output.to_str().unwrap(),
+            "--ops",
+            preview_path.to_str().unwrap(),
+            "--out-dir",
+            refused_target.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_ne!(refusal.exit, 0, "annotated previews must never replay");
+        let error = &stderr_json(&refusal)["error"];
+        assert_eq!(error["pointer"], "/schema");
+        assert!(
+            error["message"]
+                .as_str()
+                .unwrap()
+                .contains("powerbi-cli.ops.v1")
+        );
+        assert!(!refused_target.exists());
+        let rebuilt = root.path().join("rebuilt");
+        success(&[
+            "report",
+            "build",
+            "--schema",
+            schema.to_str().unwrap(),
+            "--profile",
+            sidecar.join("profile.json").to_str().unwrap(),
+            "--spec",
+            sidecar.join("spec.json").to_str().unwrap(),
+            "--out-dir",
+            rebuilt.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_tree_equal(
+            &output,
+            &rebuilt,
+            "saved compose spec and profile reproduce the project",
+        );
         assert!(fs::read_dir(sidecar.join("wireframes")).unwrap().count() >= 4);
         success(&["validate", output.to_str().unwrap(), "--json"]);
         let second = root.path().join("second");

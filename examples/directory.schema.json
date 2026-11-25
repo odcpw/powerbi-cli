@@ -1,0 +1,31 @@
+{
+  "name": "Directory",
+  "tables": [
+    {
+      "name": "Branch",
+      "columns": [
+        {"name": "ID", "dataType": "int64", "isKey": true},
+        {"name": "Label", "dataType": "string"},
+        {"name": "SortOrder", "dataType": "int64"}
+      ],
+      "rows": [
+        {"ID": 1, "Label": "West", "SortOrder": 1},
+        {"ID": 2, "Label": "East", "SortOrder": 2}
+      ]
+    },
+    {
+      "name": "Company",
+      "columns": [
+        {"name": "ID", "dataType": "int64", "isKey": true},
+        {"name": "BranchID", "dataType": "int64"},
+        {"name": "Label", "dataType": "string"}
+      ],
+      "measures": [{"name": "Count", "expression": "COUNTROWS('Company')"}],
+      "rows": [
+        {"ID": 11, "BranchID": 1, "Label": "Example A"},
+        {"ID": 12, "BranchID": 1, "Label": "Example B"},
+        {"ID": 13, "BranchID": 2, "Label": "Example C"}
+      ]
+    }
+  ]
+}

@@ -314,6 +314,8 @@ pub(crate) struct AddVisual {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) single_select: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) search_enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) position: Option<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) bindings: Vec<Value>,
@@ -1112,6 +1114,7 @@ mod tests {
                 name: Some("Revenue".into()),
                 title: Some("Revenue".into()),
                 mode: None,
+                search_enabled: None,
                 single_select: None,
                 position: Some(serde_json::json!({"x": 1})),
                 bindings: vec![serde_json::json!({"role": "Values"})],

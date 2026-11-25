@@ -121,8 +121,8 @@ pub(crate) fn render_robot_docs(args: &[String]) -> CliResult<Value> {
     let sections = options.sections;
     let mut file_results = Vec::new();
 
-    for relative in [README_RELATIVE, SKILL_RELATIVE] {
-        let (path, original) = read_document(&options.root, relative, "render")?;
+    {
+        let (path, original) = read_document(&options.root, README_RELATIVE, "render")?;
         let rendered = render_document(
             &original,
             &path,
@@ -211,39 +211,41 @@ pub(crate) fn verify_robot_docs(args: &[String]) -> CliResult<Value> {
 
     for relative in [README_RELATIVE, SKILL_RELATIVE] {
         let (path, original) = read_document(&root, relative, "verify")?;
-        match render_document(
-            &original,
-            &path,
-            &capabilities_value,
-            &features_value,
-            &sections,
-        ) {
-            Ok(rendered) if rendered != original => findings.push(VerifyFinding {
-                code: "docs_drift",
-                path: relative.to_string(),
-                line: 0,
-                message: "generated marker regions differ from live catalogs".to_string(),
-            }),
-            Ok(_) => {}
-            Err(error) => findings.push(VerifyFinding {
-                code: "docs_drift",
-                path: relative.to_string(),
-                line: 0,
-                message: error.message,
-            }),
-        }
-
-        let discovery = marked_region(&original, Section::Commands);
-        for catalog_path in &catalog_paths {
-            if !discovery.is_some_and(|region| region.contains(catalog_path)) {
-                findings.push(VerifyFinding {
-                    code: "docs.undocumented_command",
+        if relative == README_RELATIVE {
+            match render_document(
+                &original,
+                &path,
+                &capabilities_value,
+                &features_value,
+                &sections,
+            ) {
+                Ok(rendered) if rendered != original => findings.push(VerifyFinding {
+                    code: "docs_drift",
                     path: relative.to_string(),
                     line: 0,
-                    message: format!(
-                        "catalog command path `{catalog_path}` is missing from the generated Discovery region"
-                    ),
-                });
+                    message: "generated marker regions differ from live catalogs".to_string(),
+                }),
+                Ok(_) => {}
+                Err(error) => findings.push(VerifyFinding {
+                    code: "docs_drift",
+                    path: relative.to_string(),
+                    line: 0,
+                    message: error.message,
+                }),
+            }
+
+            let discovery = marked_region(&original, Section::Commands);
+            for catalog_path in &catalog_paths {
+                if !discovery.is_some_and(|region| region.contains(catalog_path)) {
+                    findings.push(VerifyFinding {
+                        code: "docs.undocumented_command",
+                        path: relative.to_string(),
+                        line: 0,
+                        message: format!(
+                            "catalog command path `{catalog_path}` is missing from the generated Discovery region"
+                        ),
+                    });
+                }
             }
         }
         for (line, candidate) in unknown_command_mentions(&original, &known_paths) {
@@ -649,7 +651,7 @@ fn replace_marked_region(
             "{} is missing generated-document marker {start}",
             path.display()
         ))
-        .with_hint("Add the marker pair to README.md and SKILL.md, then rerun the renderer.")
+        .with_hint("Add the marker pair to README.md and rerun the renderer.")
     })? + start.len();
     let end_start = original[start_end..]
         .find(&end)
@@ -659,7 +661,7 @@ fn replace_marked_region(
                 "{} is missing generated-document marker {end}",
                 path.display()
             ))
-            .with_hint("Add the marker pair to README.md and SKILL.md, then rerun the renderer.")
+            .with_hint("Add the marker pair to README.md and rerun the renderer.")
         })?;
     let newline = if original.contains("\r\n") {
         "\r\n"

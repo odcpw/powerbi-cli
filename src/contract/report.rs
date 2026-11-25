@@ -40,6 +40,7 @@ pub(super) fn commands() -> Vec<Value> {
                 "powerbi-cli report build --schema examples/sales.schema.json --profile build/sales.profile.json --spec examples/sales.dashboard.json --out-dir build/sales --force --json"
             ],
             "followUpFields": ["projectDir", "compiled.counts", "compiled.ops", "compiled.defaultsApplied", "compiled.styleTokens", "defaultsApplied", "changes", "changes[].kind", "changes[].action", "changes[].path", "changes[].before", "changes[].after", "readback", "readback.<stable-handle>[]", "scope", "scope.kind", "scope.mode", "scope.projectDir", "scope.operationCount", "scope.handles[]", "operationOutcomes", "operationOutcomes[].changed", "operationOutcomes[].changes[]", "operationOutcomes[].readback[]", "operationOutcomes[].warnings[]", "operationOutcomes[].createdHandles[]", "scorecard", "scorecard.validation", "scorecard.microsoftValidator", "scorecard.lint", "scorecard.designLint", "scorecard.handoff", "scorecard.proofLevel", "scorecard.styleTokens.allowContrastBelowAA", "scorecard.next[]", "styleTokens.id", "styleTokens.allowContrastBelowAA", "styleTokens.warningCount", "trace", "trace[].op", "trace[].ms", "executedPrimitives", "warnings[].code", "warnings[].message", "warnings[].pointer", "warnings[].owningBead", "inspectCommand", "validateCommand", "handoffCheckCommand", "fixtureNormalizeCommand", "desktopOpenCheckCommand", "proof", "proofPlan.requestedLevel", "proofPlan.achievableHere", "proofPlan.commands[]", "proofPlan.unavailable[].what", "proofPlan.unavailable[].why", "proofPlan.unavailable[].whereItWorks", "next"],
+            "modelAndSlicerCompilation": "Dashboard v2 model.relationships and model.sortBy use the same addRelationship and setSortBy mutations as ops apply. Page or rail categorical text slicers accept searchEnabled; singleSelect:false uses native multi-selection. Search is local to the visual, with no saved term or sync state. Interactive behavior requires Desktop verification.",
             "layoutCompilation": "Dashboard v2 pages[].template and visuals[].slot resolve through the shared grid; explicit layout wins. Heading/subtitle textboxes consume style.tokens.typography.family/scale. Unknown slots return spec.missing_input with available slots; duplicates fail and family mismatches warn. Section dividers are omitted with feature_pending.",
             "styleCompilation": "style.preset compiles to ApplyThemePreset and style.bundle to ApplyStyleBundle at the final operation stage. Literal-text bundles require style.allowLiteralText:true. style.tokens compile to registered themes and number formats; style.defaults compile catalog-backed per-visual formatting.",
             "diagnosticCodes": ["spec.missing_input", "spec.unknown_field", "design.contrast_below_aa", "unsupported_feature", "invalid_args", "feature_pending", "design.slot_family_mismatch"]
@@ -906,7 +907,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report themes show",
-            "aliases": ["report theme show", "report styles show", "report style show", "report themes get"],
+            "aliases": ["report theme show", "report themes get"],
             "usage": "powerbi-cli report themes show --project <project-dir-or.pbip> --json",
             "summary": "Show raw report-level theme state, fingerprint, themeCollection, and registered theme JSON resources",
             "tags": ["pbir", "report", "theme", "style", "raw-bundle", "agent"],
@@ -921,7 +922,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report themes extract",
-            "aliases": ["report theme extract", "report styles extract", "report style extract", "report themes export", "report themes clone"],
+            "aliases": ["report theme extract", "report themes export", "report themes clone"],
             "usage": "powerbi-cli report themes extract --project <source-project-or.pbip> [--out <theme-bundle.json>] --json",
             "summary": "Extract a deterministic raw report theme bundle from themeCollection and already-present registered theme JSON resources",
             "tags": ["pbir", "report", "theme", "style", "extract", "raw-bundle", "agent"],
@@ -938,7 +939,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report themes apply",
-            "aliases": ["report theme apply", "report styles apply", "report style apply", "report themes import"],
+            "aliases": ["report theme apply", "report themes import"],
             "usage": "powerbi-cli report themes apply --project <target-project-or.pbip> --bundle <theme-bundle.json> (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Apply a raw report theme bundle by replacing themeCollection and copied registered theme JSON resources; does not copy per-visual formatting",
             "tags": ["pbir", "report", "theme", "style", "mutation", "raw-bundle", "agent"],
@@ -955,7 +956,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report themes presets",
-            "aliases": ["report theme presets", "report styles presets", "report style presets", "report themes preset"],
+            "aliases": ["report theme presets", "report themes preset"],
             "usage": "powerbi-cli report themes presets list --json | powerbi-cli report themes presets show --preset <preset-id> [--include-bundle] --json",
             "summary": "List or show built-in report theme presets that apply as registered theme JSON resources",
             "tags": ["pbir", "report", "theme", "style", "preset", "readback", "agent"],
@@ -970,7 +971,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report themes apply-preset",
-            "aliases": ["report theme apply-preset", "report style apply-preset", "report styles apply-preset", "report themes applyPreset"],
+            "aliases": ["report theme apply-preset", "report themes applyPreset"],
             "usage": "powerbi-cli report themes apply-preset --project <target-project-or.pbip> [--preset risk-dashboard|neutral-ops] (--dry-run | --in-place | --out-dir <dir>) --json",
             "summary": "Apply a built-in registered-resource theme preset to a report with guarded output semantics",
             "tags": ["pbir", "report", "theme", "style", "preset", "mutation", "agent"],
@@ -987,7 +988,7 @@ pub(super) fn commands() -> Vec<Value> {
         }),
         json!({
             "path": "report style inspect",
-            "aliases": ["report style show", "report styles inspect"],
+            "aliases": ["report style show", "report styles show", "report styles inspect"],
             "usage": "powerbi-cli report style inspect --project <project-dir-or.pbip> --json",
             "summary": "Inspect a combined report style bundle: report themeCollection plus per-visual formatting payload summaries",
             "tags": ["pbir", "report", "style", "theme", "formatting", "readback", "agent"],

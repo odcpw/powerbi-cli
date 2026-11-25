@@ -64,12 +64,21 @@ pub(crate) fn lint_project(
     validation: &ValidationReport,
 ) -> CliResult<Value> {
     let deep = deep_inspect(resolved, validation)?;
+    lint_from_deep(resolved, validation, &deep)
+}
+
+/// Evaluate general lint against the already-read snapshot for this invocation.
+pub(crate) fn lint_from_deep(
+    resolved: &ResolvedProject,
+    validation: &ValidationReport,
+    deep: &Value,
+) -> CliResult<Value> {
     let mut findings = Vec::new();
     add_validation_findings(validation, &mut findings);
     add_pbir_metadata_findings(resolved, &mut findings)?;
-    add_report_findings(&deep, &mut findings);
-    add_model_findings(&deep, &mut findings);
-    add_dax_findings(resolved, &deep, &mut findings)?;
+    add_report_findings(deep, &mut findings);
+    add_model_findings(deep, &mut findings);
+    add_dax_findings(resolved, deep, &mut findings)?;
     findings.extend(m_lint::buffer_reuse_findings(resolved)?);
     add_desktop_compat_findings(resolved, &mut findings)?;
     findings.retain(|finding| {

@@ -1,5 +1,7 @@
 # Swarm handoff 2026-09-04
 
+> Historical handoff. Branch status and commands below are a record of this session, not current work instructions. See the [historical index](../historical-engineering.md).
+
 Nine Codex panes (ntm session powerbi-cli, worktrees under .ntm/worktrees/powerbi-cli/cod_N, branches ntm/powerbi-cli/cod_N) were wound down with WIP commits. Per-pane handoff notes are in this directory. Bead state is in .beads (each in-progress bead carries a comment naming its branch and commit).
 
 | pane | branch commits ahead of main | last commit |

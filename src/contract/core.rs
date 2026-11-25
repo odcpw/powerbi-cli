@@ -857,7 +857,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
         json!({
             "path": "robot-docs render",
             "usage": "powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]",
-            "summary": "Render marker-delimited README and SKILL sections from the live capabilities and feature catalogs, or check for documentation drift",
+            "summary": "Render marker-delimited README sections from the live capabilities and feature catalogs, or check for documentation drift",
             "tags": ["agent", "docs", "contract", "generated", "check"],
             "readOnly": false,
             "mutates": true,
@@ -870,7 +870,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "diagnosticCodes": ["invalid_args", "file_not_found", "validation_failed", "docs_drift"],
             "flags": ["--section commands|limits|features", "--check", "--root <repo-dir>", "--json", "--format json"],
             "examples": ["powerbi-cli robot-docs render --section commands --json", "powerbi-cli robot-docs render --check --json"],
-            "limitations": ["The command updates only marker-delimited regions in README.md and skills/powerbi-cli/SKILL.md; surrounding prose remains hand-owned.", "Run from the repository root or pass --root <repo-dir>."],
+            "limitations": ["The command updates only marker-delimited regions in README.md; SKILL.md and surrounding prose remains hand-owned.", "Run from the repository root or pass --root <repo-dir>."],
             "followUpFields": ["schema", "ok", "exitCode", "check", "sections", "root", "files[].path", "files[].changed", "files[].drift", "sources", "next"]
         }),
         json!({
@@ -889,7 +889,7 @@ pub(crate) fn command_catalog() -> Vec<Value> {
             "diagnosticCodes": ["invalid_args", "file_not_found", "docs_drift", "docs.unknown_command", "docs.undocumented_command"],
             "flags": ["--root <repo-dir>", "--json", "--format json"],
             "examples": ["powerbi-cli robot-docs verify --json", "powerbi-cli robot-docs verify --root <repo-dir> --json"],
-            "limitations": ["Verifies README.md and skills/powerbi-cli/SKILL.md without writing them; run robot-docs render to repair generated regions."],
+            "limitations": ["Verifies the generated README catalog and command mentions in README.md and SKILL.md without writing either file."],
             "followUpFields": ["schema", "ok", "exitCode", "root", "checkedFiles", "catalogCommandCount", "findings", "checks", "next"]
         }),
         json!({

@@ -8,6 +8,7 @@
 //! and refusal behavior that the owning command beads must call when those
 //! surfaces land.
 
+use crate::project_io::metadata_is_link_or_reparse;
 use crate::{CliError, CliResult, EXIT_VALIDATION_FAILED};
 use serde_json::{Value, json};
 use std::fs::{self, File, OpenOptions};
@@ -1036,6 +1037,7 @@ fn persisted_data_pointer(value: &Value, path: &str, in_filter: bool) -> Option<
                         | "selectedvalues"
                         | "selectionstate"
                         | "persistedselection"
+                        | "selffilter"
                 ) || (lower == "values" && child_in_filter)
                 {
                     return Some(pointer);
@@ -1065,22 +1067,6 @@ fn refusal(kind: InputKind, detail: impl Into<String>) -> CliError {
     )
     .with_hint("Inspect the documented input limits and supply a bounded ordinary file; limits are not silently raised.")
     .with_suggested_command("powerbi-cli --json capabilities")
-}
-
-fn metadata_is_link_or_reparse(metadata: &fs::Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    }
-    #[cfg(not(windows))]
-    {
-        false
-    }
 }
 
 #[cfg(test)]
@@ -1263,6 +1249,23 @@ mod tests {
             read_ops(&wrong_schema, &[])
                 .expect_err("wrong ops schema")
                 .code,
+            INPUT_SAFETY_ERROR_CODE
+        );
+    }
+
+    #[test]
+    fn harvested_slicer_search_format_is_safe_but_a_saved_search_is_not() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = temp.path().join("visual.json");
+        let mut visual = serde_json::json!({"visual":{"objects":{"general":[{"properties":{
+            "selfFilterEnabled":{"expr":{"Literal":{"Value":"true"}}}
+        }}]}}});
+        fs::write(&file, serde_json::to_vec(&visual).unwrap()).unwrap();
+        read_harvested_fragment(&file).expect("format alone contains no term");
+        visual["visual"]["objects"]["general"][0]["properties"]["selfFilter"] = serde_json::json!({"filter":{"Where":[{"Condition":{"Contains":{"Right":{"Literal":{"Value":"'example'"}}}}}]}});
+        fs::write(&file, serde_json::to_vec(&visual).unwrap()).unwrap();
+        assert_eq!(
+            read_harvested_fragment(&file).unwrap_err().code,
             INPUT_SAFETY_ERROR_CODE
         );
     }

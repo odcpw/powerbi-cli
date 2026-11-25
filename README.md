@@ -5,11 +5,21 @@ Power BI dashboard projects. It writes PBIP folders with PBIR report metadata
 and TMDL semantic model metadata from a schema manifest, without connecting to
 real data or writing imported data caches.
 
-Compose a first project through the existing planner and compiler in one call:
+### Quickstart
+
+From a fresh checkout, build and run the CLI against the bundled synthetic example:
 
 ```bash
-powerbi-cli report compose --schema examples/sales.schema.json --objective "Sales overview" --out-dir build/composed-sales --json
+git clone https://github.com/odcpw/powerbi-cli.git
+cd powerbi-cli
+cargo run --locked -- report compose --schema examples/sales.schema.json --objective "Sales overview" --out-dir build/composed-sales --json
+cargo run --locked -- validate --strict build/composed-sales --json
+cargo run --locked -- handoff check build/composed-sales --json
 ```
+
+Use a current Rust toolchain. The sample manifest is in the repository checkout.
+If the binary is already installed, run the same CLI arguments after `powerbi-cli`
+from the checkout instead.
 
 Optional `--rows` supplies bounded CSV/JSON for aggregate-only profiling;
 `--profile` reuses a profile instead. Add `--intent` and `--style <preset|tokens.json>`
@@ -28,16 +38,33 @@ are currently supported.
 The intended workflow is:
 
 ```text
-bring schema/dummy rows home
+start from a synthetic or authorized schema
 -> scaffold PBIP/PBIR/TMDL project
 -> author report/model metadata with agents
 -> validate and handoff-check no cache/credentials/real data are present
--> open at work in Power BI Desktop
--> replace dummy M partitions with corporate sources and refresh
+-> open in an authorized Power BI Desktop session
+-> configure approved sources in that environment and refresh
 ```
 
-Agent contract note: `report spec explain` returns an annotated
-`powerbi-cli.report.spec.explainPlan.v1` preview, not a replayable `ops.v1` file.
+Agent contract note: `report spec explain` returns a
+`powerbi-cli.report.spec.explainPlan.v1` preview, not a replayable operations
+file. Fresh compose outputs name this preview `explain-plan.json`; older
+compose outputs may call it `ops.json`. `ops apply` takes a
+`powerbi-cli.ops.v1` envelope, not either preview.
+For a synthetic example with searchable page-local multi-select dropdowns,
+a related branch/company model, and a custom sort order, build the directory
+fixture and inspect the two generated pages:
+
+```bash
+cargo run --locked -- report build --schema examples/directory.schema.json --spec examples/directory.dashboard.v2.json --out-dir build/directory --json
+cargo run --locked -- validate --strict build/directory --json
+```
+
+The fixture keeps the dropdowns on the Directory page and leaves Overview
+without those controls. Native validation checks the generated files.
+Observe search, multi-select, and filter interaction in Power BI Desktop
+before treating that behavior as proved on a specific Desktop version.
+
 Build/validation follow-ups preserve supplied profiles; robot-docs follow-ups
 preserve the selected repository root and sections. The scoped ergonomics audit
 and remaining contract gaps are in [the compiler-surface audit](agent_ergonomics_audit/compiler-surface-2026-09.md).
@@ -391,7 +418,7 @@ This list is generated; edit the live command catalog in `src/contract/` rather 
 - `powerbi-cli report visuals show --project <project-dir-or.pbip> (--handle <visual-handle> | --page <page-name-or-handle> --visual <visual-name-or-handle>) --json` — Show one PBIR visual with page context, geometry, type, and field bindings _(proof: `unit-smoke`)_
 - `powerbi-cli report wireframe export <project-dir-or.pbip> [--format json|svg|html] [--template <name>] [--page-size 1280x720|1920x1080] [--grid columns=12,gutter=16,margin=24,rowUnit=8] [--out <path> | --dry-run] --json` — Export report pages, deterministic grid slots, visual geometry, bindings, and lint markers as JSON, SVG, or HTML without Power BI Desktop _(proof: `unit-smoke`)_
 - `powerbi-cli robot-docs guide [--json]` — Print the in-tool agent guide so agents do not need external docs _(proof: `unit-smoke`)_
-- `powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]` — Render marker-delimited README and SKILL sections from the live capabilities and feature catalogs, or check for documentation drift _(proof: `unit-smoke`)_
+- `powerbi-cli robot-docs render [--section commands|limits|features] [--check] [--root <repo-dir>] [--json]` — Render marker-delimited README sections from the live capabilities and feature catalogs, or check for documentation drift _(proof: `unit-smoke`)_
 - `powerbi-cli robot-docs verify [--root <repo-dir>] --json` — Verify generated documentation, catalog discovery coverage, and command mentions against live catalogs _(proof: `unit-smoke`)_
 - `powerbi-cli robot-triage` — Alias for --robot-triage when an agent expects a normal command token _(proof: `unit-smoke`)_
 - `powerbi-cli --json scaffold --schema <schema.json> --out-dir <project-dir> [--force]` — Create an offline-safe PBIP project from a schema manifest _(proof: `unit-smoke`)_
@@ -753,7 +780,7 @@ cargo run --bin powerbi-cli -- source-template add --project .\build\sales --tab
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind generic-m --m-template 'let Source = Sql.Database("{{powerbi-cli.placeholder:server}}", "{{powerbi-cli.placeholder:database}}") in Source' --dry-run --json
 cargo run --bin powerbi-cli -- source-template add --project .\build\sales --table FactSales --kind sql --server "<server>" --database "<database>" --schema dbo --object FactSales --out-dir .\build\sales-rebind --json
 cargo run --bin powerbi-cli -- handoff rebind-plan .\build\sales-rebind --json
-cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server sql.example.internal --database Sales --out-dir .\build\sales-live --json
+cargo run --bin powerbi-cli -- source-template apply --project .\build\sales-rebind --handle source-template:FactSales:FactSales --server database.example.com --database ExampleSales --out-dir .\build\sales-live --json
 cargo run --bin powerbi-cli -- handoff rebind-check .\build\sales-live --partition partition:FactSales:FactSales --json
 cargo run --bin powerbi-cli -- fixture normalize .\build\sales --out .\testdata\golden\sales.summary.json --json
 cargo run --bin powerbi-cli -- fixture verify .\build\sales --expected .\testdata\golden\sales.summary.json --json
@@ -1679,7 +1706,8 @@ September sequencing and compiler work are tracked in
   dashboard authoring from arbitrary schema/profile/intent inputs.
 - [docs/roadmap.md](docs/roadmap.md): planned command surface, development
   phases, and Desktop-backed test strategy.
-- [docs/porting-analysis.md](docs/porting-analysis.md): clean-room analysis of
+- [Historical engineering notes](docs/historical-engineering.md): archived handoffs and porting study.
+- [docs/porting-analysis.md](docs/porting-analysis.md): historical clean-room analysis of
   adjacent Power BI tooling and what to port, reimplement, or defer.
 - [docs/pbir-desktop-oracle.md](docs/pbir-desktop-oracle.md): Desktop
   round-trip findings, source links, proof commands, and immediate backlog.

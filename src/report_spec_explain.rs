@@ -100,7 +100,11 @@ pub(crate) fn explain_command(args: &[String]) -> CliResult<Value> {
             .operations
             .into_iter()
             .map(|(operation, pointer)| OpEntry {
-                summary: format!("compile visual behavior as {}", operation.tag()),
+                summary: if pointer.starts_with("/model/") {
+                    format!("compile model metadata as {}", operation.tag())
+                } else {
+                    format!("compile visual behavior as {}", operation.tag())
+                },
                 operation,
                 pointer,
             }),
@@ -330,8 +334,16 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion, design_defaults: boo
             sanitize_pages(&mut sanitized, &[], &["drilldown"]);
         }
         SpecVersion::V2 => {
-            for field in ["layout", "filters", "proof"] {
+            for field in ["filters", "proof"] {
                 sanitized.remove(field);
+            }
+            // Rail slicers and page slicers are compiled features. Strip only
+            // future layout fields so explain describes the same visuals as build.
+            if let Some(layout) = sanitized.get_mut("layout").and_then(Value::as_object_mut) {
+                layout.retain(|key, _| key == "rail");
+                if layout.is_empty() {
+                    sanitized.remove("layout");
+                }
             }
             if sanitized
                 .get("style")
@@ -343,10 +355,8 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion, design_defaults: boo
                 for field in [
                     "measurePatterns",
                     "calculatedColumns",
-                    "relationships",
                     "staticTables",
                     "dateTable",
-                    "sortBy",
                     "formatStrings",
                 ] {
                     model.remove(field);
@@ -362,7 +372,7 @@ fn sanitize_for_compile(spec: &Value, version: SpecVersion, design_defaults: boo
             }
             sanitize_pages(
                 &mut sanitized,
-                &["filters", "slicers", "drillthrough", "tooltipFor"],
+                &["filters", "drillthrough", "tooltipFor"],
                 &["subtitle", "conditionalFormatting"],
             );
             if !design_defaults {
@@ -524,6 +534,9 @@ fn compile_operations(
                                 .get("mode")
                                 .and_then(Value::as_str)
                                 .map(ToOwned::to_owned),
+                            search_enabled: compiled_visual
+                                .get("searchEnabled")
+                                .and_then(Value::as_bool),
                             single_select: compiled_visual
                                 .get("singleSelect")
                                 .and_then(Value::as_bool),

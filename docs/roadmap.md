@@ -750,9 +750,9 @@ IDs and dependencies; this roadmap records what has already landed:
   counts and ranking measure choices. Optional project inspection reuses
   `m.unbuffered_reuse` for Table.Buffer recommendations without M rewrites.
 
-Remaining work—such as `report compose`, full v2 compilation, style-token lint,
-broader Desktop-authored visual fixtures, and automated canvas/refresh checks—
-is tracked only in [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
+`report compose` is shipped. Remaining work includes broader v2 compilation, style-token lint,
+broader Desktop-authored visual fixtures, and automated canvas/refresh checks.
+See [bridge-plan-2026-09.md](bridge-plan-2026-09.md) and the
 associated beads. Keep command and feature claims synchronized with the live
 `capabilities --json` and `features list --json` catalogs.
 

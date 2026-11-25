@@ -153,6 +153,7 @@ pub(crate) fn slicer_state_summary_from_bindings(bindings: &[Value], raw: Option
             &[
                 "selection",
                 "selected",
+                "selfFilter",
                 "selectedValue",
                 "selectedValues",
                 "filterExpressionMetadata",
@@ -167,7 +168,7 @@ pub(crate) fn slicer_state_summary_from_bindings(bindings: &[Value], raw: Option
             ],
         );
     }
-    json!({
+    let mut state = json!({
         "fieldCount": bindings.len(),
         "queryRoles": query_roles.into_iter().collect::<Vec<_>>(),
         "filterConfigFilters": filter_config_filters,
@@ -175,7 +176,17 @@ pub(crate) fn slicer_state_summary_from_bindings(bindings: &[Value], raw: Option
         "hasVisualObjects": has_visual_objects,
         "hasSelectionState": has_selection_state,
         "hasCachedDisplayState": has_cached_display_state
-    })
+    });
+    if let Some(enabled) = raw
+        .and_then(|r| {
+            r.pointer("/visual/objects/general/0/properties/selfFilterEnabled/expr/Literal/Value")
+        })
+        .and_then(Value::as_str)
+        .and_then(|s| s.parse::<bool>().ok())
+    {
+        state["searchEnabled"] = json!(enabled);
+    }
+    state
 }
 
 fn slicer_may_contain_data_values(raw: &Value) -> bool {
@@ -183,6 +194,7 @@ fn slicer_may_contain_data_values(raw: &Value) -> bool {
         raw,
         &[
             "filter",
+            "selfFilter",
             "filters",
             "selection",
             "selected",
@@ -300,6 +312,7 @@ fn count_sensitive_literals(value: &Value) -> usize {
                 if matches!(
                     key.to_ascii_lowercase().as_str(),
                     "filter"
+                        | "selffilter"
                         | "filters"
                         | "selection"
                         | "selected"

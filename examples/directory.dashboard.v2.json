@@ -1,0 +1,22 @@
+{
+  "schema": "powerbi-cli.dashboard.v2",
+  "report": {"name": "Directory", "displayName":"Example directory"},
+  "model": {
+    "relationships": [{"from":"Company[BranchID]", "to":"Branch[ID]", "cardinality":"manyToOne", "crossFilteringBehavior":"oneDirection","isActive":true}],
+    "sortBy": [{"column":"Branch[Label]", "by":"Branch[SortOrder]"}]
+  },
+  "pages": [
+    {
+      "id":"Directory","displayName":"Directory",
+      "slicers": [
+        {"field":"Branch[Label]","mode":"Dropdown","title":"Branch","searchEnabled":true,"singleSelect":false},
+        {"field":"Company[Label]","mode":"Dropdown","title":"Company","searchEnabled":true,"singleSelect":false}
+      ],
+      "visuals":[{"id":"Count","type":"card","title":"Companies","bindings":[{"role":"Values","field":"Company[Count]"}]}]
+    },
+    {
+      "id":"Overview","displayName":"All companies",
+      "visuals":[{"id":"Total","type":"card","title":"All companies","bindings":[{"role":"Values","field":"Company[Count]"}]}]
+    }
+  ]
+}

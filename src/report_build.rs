@@ -8,6 +8,7 @@ use crate::design::grid::{
 use crate::design::tokens::{CompiledTokens, apply_compiled_theme, compile_tokens};
 
 mod layout;
+mod model;
 use crate::input_safety::{InputKind, read_utf8};
 use crate::json_composition::normalize_spec_file;
 use crate::ops::{
@@ -33,7 +34,7 @@ use crate::report_spec_schema::{
 };
 use crate::report_spec_upgrade::upgrade_command;
 use crate::schema::{load_schema_value, merge_schema_and_spec, validate_schema_value};
-use crate::scorecard::{dry_run_scorecard, project_scorecard};
+use crate::scorecard::{dry_run_scorecard, project_scorecard, project_scorecard_with_validation};
 use crate::tmdl::{measure_handle, table_handle};
 use crate::visual_catalog::{canonical_visual_type, normalize_role};
 use crate::{
@@ -277,6 +278,9 @@ fn materialize_visual_operations_for_explain(schema: &mut Value, operations: &[O
             "singleSelect": visual.single_select,
             "bindings": visual.bindings.iter().filter(|binding| binding.get("__powerbiCli").is_none()).cloned().collect::<Vec<_>>()
         });
+        if let Some(search) = visual.search_enabled {
+            compiled_visual["searchEnabled"] = json!(search);
+        }
         if let Some(position) = visual.position.as_ref().and_then(Value::as_object) {
             for field in ["x", "y", "width", "height"] {
                 if let Some(value) = position.get(field) {
@@ -738,6 +742,20 @@ fn validate_slicer_fields(
                 json!({"field": "DimCustomer[Segment]"}),
             ));
         }
+        if let Some(search) = slicer.get("searchEnabled") {
+            let at = format!("{pointer}/{index}/searchEnabled");
+            let enabled = search.as_bool().ok_or_else(|| {
+                CliError::invalid_args("searchEnabled must be a boolean").with_pointer(at.clone())
+            })?;
+            let field = model.resolve_field(field)?;
+            if enabled
+                && !matches!(model.column_data_type(&field.table, &field.name), Some(ty) if ty.eq_ignore_ascii_case("string") || ty.eq_ignore_ascii_case("text"))
+            {
+                return Err(
+                    CliError::invalid_args("slicer search requires a text column").with_pointer(at),
+                );
+            }
+        }
         if let Some(mode) = slicer.get("mode") {
             let mode = mode.as_str().ok_or_else(|| {
                 CliError::invalid_args(format!("{pointer}/{index}/mode must be a string"))
@@ -1006,7 +1024,10 @@ fn compile_dashboard(
         .as_object()
         .ok_or_else(|| CliError::invalid_args("dashboard spec root must be an object"))?;
     let style_tokens = compile_style_tokens(spec_object)?;
-    if spec.get("report").is_none() && spec.get("pages").is_some() {
+    if spec.get("report").is_none()
+        && spec.get("pages").is_some()
+        && spec.get("schema").and_then(Value::as_str) != Some("powerbi-cli.dashboard.v2")
+    {
         let (mut schema, notes) = merge_schema_and_spec(schema.clone(), Some(spec))?;
         if defaults_enabled {
             schema
@@ -1096,6 +1117,10 @@ fn compile_dashboard(
     // Rail visuals must exist before behavior-stage filters and drillthrough.
     let (mut typed_operations, mut operation_pointers, slicer_warnings) =
         compile_slicer_operations(spec_object, profile)?;
+    for (operation, pointer) in model::compile(spec_object, &merged, &model)? {
+        typed_operations.push(operation);
+        operation_pointers.push(pointer);
+    }
     let (filter_operations, filter_pointers) = compile_filter_operations(spec_object, &model)?;
     typed_operations.extend(filter_operations);
     operation_pointers.extend(filter_pointers);
@@ -1467,7 +1492,9 @@ fn apply_model_extensions(
             add_measure_to_schema(schema, measure)?;
         }
     }
-    if model.get("relationships").is_some() {
+    if model.get("relationships").is_some()
+        && spec.get("schema").and_then(Value::as_str) != Some("powerbi-cli.dashboard.v2")
+    {
         return Err(CliError::unsupported_feature(
             "report build model.relationships in dashboard spec are planned; put relationships in --schema for this slice"
         )
@@ -1751,6 +1778,7 @@ fn compile_slicer_operations(
             })?;
             let field = required_slicer_field(slicer, &pointer)?;
             let mode = resolve_spec_slicer_mode(slicer, field, profile, &pointer, &mut warnings)?;
+            reject_range_search(slicer, mode, &pointer)?;
             let rail = rail_position.expect("rail position exists for rail slicers");
             let height = slicer_height(mode);
             let y = next_rail_y.expect("rail y exists for rail slicers");
@@ -1772,6 +1800,7 @@ fn compile_slicer_operations(
                 name: Some(name),
                 title: Some(slicer_title(slicer, field).to_string()),
                 mode: Some(mode.as_str().to_string()),
+                search_enabled: slicer.get("searchEnabled").and_then(Value::as_bool),
                 single_select: Some(
                     slicer
                         .get("singleSelect")
@@ -1808,6 +1837,7 @@ fn compile_slicer_operations(
             })?;
             let field = required_slicer_field(slicer, &pointer)?;
             let mode = resolve_spec_slicer_mode(slicer, field, profile, &pointer, &mut warnings)?;
+            reject_range_search(slicer, mode, &pointer)?;
             let name = unique_slicer_name(
                 &format!("VisualContainerSlicer{}", slug(slicer_title(slicer, field))),
                 &mut used_names,
@@ -1819,6 +1849,7 @@ fn compile_slicer_operations(
                 name: Some(name),
                 title: Some(slicer_title(slicer, field).to_string()),
                 mode: Some(mode.as_str().to_string()),
+                search_enabled: slicer.get("searchEnabled").and_then(Value::as_bool),
                 single_select: Some(
                     slicer
                         .get("singleSelect")
@@ -1931,6 +1962,20 @@ fn required_slicer_field<'a>(slicer: &'a Map<String, Value>, pointer: &str) -> C
             CliError::invalid_args(format!("{pointer}/field requires a non-empty model column"))
                 .with_pointer(format!("{pointer}/field"))
         })
+}
+
+fn reject_range_search(
+    slicer: &Map<String, Value>,
+    mode: SlicerMode,
+    pointer: &str,
+) -> CliResult<()> {
+    if mode == SlicerMode::Between && slicer.contains_key("searchEnabled") {
+        return Err(
+            CliError::invalid_args("range slicers do not support searchEnabled")
+                .with_pointer(format!("{pointer}/searchEnabled")),
+        );
+    }
+    Ok(())
 }
 
 fn slicer_bindings(field: &str, mode: SlicerMode) -> CliResult<Vec<Value>> {
@@ -3614,14 +3659,18 @@ fn build_response(response: BuildResponse<'_>) -> Value {
             handles.dedup();
         }
     }
-    let validation = response
+    let resolved = response
         .out_dir
-        .and_then(|path| crate::resolve_project(path).ok())
-        .and_then(|project| validate_project(&project).ok());
-    let mut scorecard = response
-        .out_dir
-        .and_then(|path| crate::resolve_project(path).ok())
-        .map(|project| project_scorecard(&project, "unit-smoke"))
+        .and_then(|path| crate::resolve_project(path).ok());
+    let validation = resolved
+        .as_ref()
+        .and_then(|project| validate_project(project).ok());
+    let mut scorecard = resolved
+        .as_ref()
+        .map(|project| match &validation {
+            Some(checked) => project_scorecard_with_validation(project, checked, "unit-smoke"),
+            None => project_scorecard(project, "unit-smoke"),
+        })
         .unwrap_or_else(|| {
             dry_run_scorecard(
                 "unit-smoke",
@@ -3720,12 +3769,17 @@ fn compiled_summary(compiled: &CompiledDashboard) -> Value {
         })
         .collect::<Vec<_>>();
     let generated_bindings = generated_visuals.len();
+    let generated_relationships = compiled
+        .typed_operations
+        .iter()
+        .filter(|op| matches!(op, Op::AddRelationship(_)))
+        .count();
     let mut output = json!({
         "counts": {
             "tables": validation.counts.tables,
             "columns": validation.counts.columns,
             "measures": validation.counts.measures,
-            "relationships": validation.counts.relationships,
+            "relationships": validation.counts.relationships + generated_relationships,
             "pages": validation.counts.pages,
             "visuals": validation.counts.visuals + generated_visuals.len(),
             "bindings": validation.counts.bindings + generated_bindings,

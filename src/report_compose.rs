@@ -179,7 +179,7 @@ pub(crate) fn compose_command(args: &[String]) -> CliResult<Value> {
     record(
         &sidecar,
         &mut documents,
-        "ops.json",
+        "explain-plan.json",
         explain["plan"].clone(),
     )?;
     record(&sidecar, &mut documents, "explain.json", explain)?;

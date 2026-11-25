@@ -1,5 +1,7 @@
 # Swarm handoff 2026-09-05
 
+> Historical handoff. Build status and next steps below describe that session, not current `main`. See the [historical index](../historical-engineering.md).
+
 Second Codex swarm session (gpt-6-astra medium). The tmux session died mid-run; the orchestrator
 stopped all processes and preserved pane work as WIP commits.
 

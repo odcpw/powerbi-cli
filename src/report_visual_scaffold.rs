@@ -305,6 +305,7 @@ fn parse_scaffold_operation_args(
         name: options.name,
         title: Some(title),
         mode: visual_mode,
+        search_enabled: None,
         single_select: (kind == ScaffoldKind::Slicer).then_some(single_select),
         position: Some(position),
         bindings,

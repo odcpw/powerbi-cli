@@ -1,5 +1,7 @@
 # Clean-Room Porting Analysis
 
+> Historical snapshot. Architecture descriptions here predate the current Rust CLI. See the [historical index](historical-engineering.md).
+
 Date: 2026-06-22
 
 This document turns the external Power BI tooling research into concrete

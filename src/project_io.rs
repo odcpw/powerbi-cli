@@ -376,7 +376,7 @@ fn reject_nested_output(source: &Path, out_dir: &Path) -> CliResult<()> {
         .map_err(|err| CliError::unexpected(format!("resolve {}: {err}", source.display())))?;
     match fs::symlink_metadata(out_dir) {
         Ok(metadata) => {
-            if output_metadata_is_link_or_reparse(&metadata) {
+            if metadata_is_link_or_reparse(&metadata) {
                 return Err(CliError::invalid_args(format!(
                     "--out-dir must not be a symlink, junction, or reparse point: {}",
                     out_dir.display()
@@ -620,20 +620,18 @@ mod tests {
     }
 }
 
-fn output_metadata_is_link_or_reparse(metadata: &fs::Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
-        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    }
-    #[cfg(not(windows))]
-    {
-        false
-    }
+/// Shared input and output guard: Windows reparse points need not be symlinks.
+#[cfg(windows)]
+pub(crate) fn metadata_is_link_or_reparse(metadata: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+    metadata.file_type().is_symlink()
+        || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+pub(crate) fn metadata_is_link_or_reparse(metadata: &fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
 }
 
 #[cfg(test)]

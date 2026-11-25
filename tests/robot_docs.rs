@@ -130,7 +130,7 @@ fn follow_up_commands_preserve_explicit_root_and_selected_sections() {
 }
 
 #[test]
-fn render_check_is_deterministic_and_regions_match_between_docs() {
+fn render_check_is_deterministic_and_catalog_is_only_in_readme() {
     let first = run_powerbi(&["robot-docs", "render", "--check", "--json"]);
     let second = run_powerbi(&["robot-docs", "render", "--check", "--json"]);
     assert_eq!(first.code, 0, "stderr: {}", first.stderr);
@@ -147,21 +147,22 @@ fn render_check_is_deterministic_and_regions_match_between_docs() {
         serde_json::json!(["commands", "limits", "features"])
     );
     assert!(value["files"].as_array().is_some_and(|files| {
-        files.len() == 2 && files.iter().all(|file| file["changed"] == false)
+        files.len() == 1 && files.iter().all(|file| file["changed"] == false)
     }));
 
     let readme = fs::read_to_string("README.md").expect("README");
     let skill = fs::read_to_string("skills/powerbi-cli/SKILL.md").expect("SKILL");
     for section in ["commands", "limits", "features"] {
         let readme_region = generated_region(&readme, section);
-        let skill_region = generated_region(&skill, section);
+        let marker = format!("<!-- powerbi-cli:{section}:start -->");
         assert!(
             !readme_region.trim().is_empty(),
             "empty README {section} region"
         );
         assert_eq!(
-            readme_region, skill_region,
-            "README and SKILL {section} regions must be identical"
+            skill.matches(&marker).count(),
+            0,
+            "SKILL must not duplicate the generated {section} region"
         );
     }
 }
@@ -179,8 +180,8 @@ fn render_check_reports_drift_and_render_rewrites_only_selected_regions() {
     let readme_path = root.join("README.md");
     let skill_path = root.join("skills/powerbi-cli/SKILL.md");
     let canonical_skill = fs::read_to_string(&skill_path).expect("rendered SKILL");
-    let canonical_limits = generated_region(&canonical_skill, "limits").to_string();
     let before_drift = fs::read_to_string(&readme_path).expect("rendered README");
+    let canonical_limits = generated_region(&before_drift, "limits").to_string();
     let mutated = before_drift.replacen(
         "### Commands (generated from `capabilities --json`)",
         "### Commands (drifted)",
@@ -214,7 +215,7 @@ fn render_check_reports_drift_and_render_rewrites_only_selected_regions() {
         "unselected section should remain clean"
     );
     assert_eq!(
-        generated_region(&canonical_skill, "limits"),
+        generated_region(&fs::read_to_string(&readme_path).expect("README"), "limits"),
         canonical_limits
     );
 
@@ -232,12 +233,12 @@ fn render_check_reports_drift_and_render_rewrites_only_selected_regions() {
     assert_eq!(repaired_check.code, 0, "repaired docs should pass check");
     assert_eq!(
         generated_region(&repaired, "commands"),
-        generated_region(&canonical_skill, "commands")
+        generated_region(&before_drift, "commands")
     );
 }
 
 #[test]
-fn render_rejects_unknown_sections_and_catalog_paths_are_in_skill_region() {
+fn render_rejects_unknown_sections_and_catalog_paths_are_in_readme_region() {
     let invalid = run_powerbi(&["robot-docs", "render", "--section", "unknown", "--json"]);
     assert_eq!(invalid.code, 2);
     let error = stderr_json(&invalid);
@@ -257,12 +258,12 @@ fn render_rejects_unknown_sections_and_catalog_paths_are_in_skill_region() {
         .iter()
         .map(|command| command["path"].as_str().expect("path"))
         .collect::<Vec<_>>();
-    let skill = fs::read_to_string("skills/powerbi-cli/SKILL.md").expect("SKILL");
-    let discovery = generated_region(&skill, "commands");
+    let readme = fs::read_to_string("README.md").expect("README");
+    let discovery = generated_region(&readme, "commands");
     for path in paths {
         assert!(
             discovery.contains(path),
-            "generated SKILL discovery is missing catalog path {path}"
+            "generated README discovery is missing catalog path {path}"
         );
     }
 }
@@ -297,26 +298,23 @@ fn verify_reports_unknown_and_undocumented_commands_with_paths() {
     let rendered = run_powerbi_owned(&render_args);
     assert_eq!(rendered.code, 0, "stderr: {}", rendered.stderr);
 
-    let readme_path = root.join("README.md");
-    let readme = fs::read_to_string(&readme_path).expect("README");
-    let marker = "<!-- powerbi-cli:commands:start -->";
-    let mutated = readme.replacen(
-        marker,
-        "`powerbi-cli docs-not-a-real-command --json`\n<!-- powerbi-cli:commands:start -->",
-        1,
-    );
-    assert_ne!(mutated, readme);
-    fs::write(&readme_path, mutated).expect("write unknown command mention");
-
     let skill_path = root.join("skills/powerbi-cli/SKILL.md");
     let skill = fs::read_to_string(&skill_path).expect("SKILL");
-    let verify_line = skill
+    fs::write(
+        &skill_path,
+        format!("{skill}\n`powerbi-cli docs-not-a-real-command --json`\n"),
+    )
+    .expect("write unknown command mention");
+
+    let readme_path = root.join("README.md");
+    let readme = fs::read_to_string(&readme_path).expect("README");
+    let verify_line = readme
         .lines()
         .find(|line| line.contains("powerbi-cli robot-docs verify [--root <repo-dir>]"))
         .expect("generated verify command");
-    let skill_without_verify = skill.replacen(&format!("{verify_line}\n"), "", 1);
-    assert_ne!(skill_without_verify, skill);
-    fs::write(&skill_path, skill_without_verify).expect("remove undocumented command");
+    let readme_without_verify = readme.replacen(&format!("{verify_line}\n"), "", 1);
+    assert_ne!(readme_without_verify, readme);
+    fs::write(&readme_path, readme_without_verify).expect("remove undocumented command");
 
     let verify_args = vec![
         "robot-docs".to_string(),

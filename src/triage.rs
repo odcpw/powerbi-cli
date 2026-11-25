@@ -1,5 +1,5 @@
 use crate::cli_support::shell_arg;
-use crate::lint::lint_project;
+use crate::lint::lint_from_deep;
 use crate::scorecard::scorecard_from_parts;
 use crate::{
     CliError, CliResult, EXIT_SUCCESS, EXIT_VALIDATION_FAILED, Finding, ResolvedProject,
@@ -33,12 +33,18 @@ pub(crate) fn triage_command(args: &[String]) -> CliResult<Value> {
         },
         Err(error) => return Err(error),
     };
-    let mut lint = match lint_project(&resolved, &validation) {
-        Ok(lint) => lint,
-        Err(_) if !validation.errors.is_empty() => {
-            json!({ "ok": false, "counts": { "findings": 0 }, "findings": [] })
-        }
-        Err(error) => return Err(error),
+    let deep = match crate::inspect::deep_inspect(&resolved, &validation) {
+        Err(error) if validation.errors.is_empty() => return Err(error),
+        result => result,
+    };
+    let unavailable_lint = || json!({ "ok": false, "counts": { "findings": 0 }, "findings": [] });
+    let mut lint = match &deep {
+        Ok(snapshot) => match lint_from_deep(&resolved, &validation, snapshot) {
+            Ok(lint) => lint,
+            Err(_) if !validation.errors.is_empty() => unavailable_lint(),
+            Err(error) => return Err(error),
+        },
+        Err(_) => unavailable_lint(),
     };
     if let Some(findings) = lint.get_mut("findings").and_then(Value::as_array_mut) {
         sort_findings(findings);
@@ -49,7 +55,13 @@ pub(crate) fn triage_command(args: &[String]) -> CliResult<Value> {
     let findings = lint["findings"].as_array().cloned().unwrap_or_default();
     let top_findings = top_findings(&findings);
     let next = next_commands(&resolved, &validation, &findings, ok);
-    let scorecard = scorecard_from_parts(&resolved, &validation, &lint, "unit-smoke");
+    let scorecard = scorecard_from_parts(
+        &resolved,
+        &validation,
+        &lint,
+        deep.as_ref().map_err(|e| e.message.as_str()),
+        "unit-smoke",
+    );
     Ok(json!({
         "schema": "triageResult.v1",
         "ok": ok,

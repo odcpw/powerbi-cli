@@ -272,6 +272,7 @@ pub(crate) fn parse_add_operation_args(
         name: options.name,
         title: Some(title),
         mode: options.slicer_mode,
+        search_enabled: None,
         single_select: None,
         position: (!position.is_empty()).then_some(Value::Object(position)),
         bindings,

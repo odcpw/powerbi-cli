@@ -34,7 +34,7 @@ jobs:
         run: cargo run --locked -- robot-docs verify
 
       - name: Verify catalog discovery coverage
-        run: cargo test --locked --test robot_docs render_rejects_unknown_sections_and_catalog_paths_are_in_skill_region
+        run: cargo test --locked --test robot_docs render_rejects_unknown_sections_and_catalog_paths_are_in_readme_region
 
       - name: Check
         run: cargo check --locked --all-targets

@@ -22,6 +22,69 @@
       {
         "defaulted": true,
         "defaultedFields": [
+          "text",
+          "textStyle",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "generated": true,
+        "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
+        "pointer": "/pages/0/generatedVisuals/0",
+        "position": {
+          "height": 76.0,
+          "width": 296.0,
+          "x": 960.0,
+          "y": 80.0
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": true,
+        "defaultedFields": [
+          "text",
+          "textStyle",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "generated": true,
+        "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+        "pointer": "/pages/0/generatedVisuals/1",
+        "position": {
+          "height": 76.0,
+          "width": 296.0,
+          "x": 960.0,
+          "y": 172.0
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": true,
+        "defaultedFields": [
+          "text",
+          "textStyle",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "generated": true,
+        "handle": "visual:ReportSectionOverview:VisualContainerRailDate",
+        "pointer": "/pages/0/generatedVisuals/2",
+        "position": {
+          "height": 104.0,
+          "width": 296.0,
+          "x": 960.0,
+          "y": 264.0
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": true,
+        "defaultedFields": [
           "x",
           "y",
           "width",
@@ -36,6 +99,48 @@
           "y": 32.0
         },
         "visualType": "card"
+      },
+      {
+        "defaulted": true,
+        "defaultedFields": [
+          "text",
+          "textStyle",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "generated": true,
+        "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
+        "pointer": "/pages/1/generatedVisuals/0",
+        "position": {
+          "height": 76.0,
+          "width": 296.0,
+          "x": 960.0,
+          "y": 80.0
+        },
+        "visualType": "slicer"
+      },
+      {
+        "defaulted": true,
+        "defaultedFields": [
+          "text",
+          "textStyle",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "generated": true,
+        "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+        "pointer": "/pages/1/generatedVisuals/1",
+        "position": {
+          "height": 76.0,
+          "width": 296.0,
+          "x": 960.0,
+          "y": 172.0
+        },
+        "visualType": "slicer"
       }
     ]
   },
@@ -48,10 +153,40 @@
         "pointer": "/pages/0/visuals/0"
       },
       {
-        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
         "kind": "visual",
         "opIndex": 1,
+        "pointer": "/layout/rail/slicers"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+        "kind": "visual",
+        "opIndex": 2,
+        "pointer": "/layout/rail/slicers"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRailDate",
+        "kind": "visual",
+        "opIndex": 3,
+        "pointer": "/layout/rail/slicers"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "kind": "visual",
+        "opIndex": 4,
         "pointer": "/pages/1/visuals/0"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
+        "kind": "visual",
+        "opIndex": 5,
+        "pointer": "/layout/rail/slicers"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+        "kind": "visual",
+        "opIndex": 6,
+        "pointer": "/layout/rail/slicers"
       }
     ],
     "references": [
@@ -63,9 +198,39 @@
       },
       {
         "field": "page",
-        "handle": "page:ReportSectionDetail",
+        "handle": "page:ReportSectionOverview",
         "opIndex": 1,
+        "pointer": "/layout/rail/slicers/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 2,
+        "pointer": "/layout/rail/slicers/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionOverview",
+        "opIndex": 3,
+        "pointer": "/layout/rail/slicers/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionDetail",
+        "opIndex": 4,
         "pointer": "/pages/1/visuals/0/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionDetail",
+        "opIndex": 5,
+        "pointer": "/layout/rail/slicers/page"
+      },
+      {
+        "field": "page",
+        "handle": "page:ReportSectionDetail",
+        "opIndex": 6,
+        "pointer": "/layout/rail/slicers/page"
       }
     ]
   },
@@ -89,6 +254,48 @@
             "width": 560.0,
             "x": 32.0,
             "y": 32.0
+          },
+          {
+            "coordinates": {
+              "height": 76.0,
+              "width": 296.0,
+              "x": 960.0,
+              "y": 80.0
+            },
+            "height": 76.0,
+            "pointer": "/layout/rail/slicers",
+            "visual": "visual:ReportSectionOverview:VisualContainerRailSegment",
+            "width": 296.0,
+            "x": 960.0,
+            "y": 80.0
+          },
+          {
+            "coordinates": {
+              "height": 76.0,
+              "width": 296.0,
+              "x": 960.0,
+              "y": 172.0
+            },
+            "height": 76.0,
+            "pointer": "/layout/rail/slicers",
+            "visual": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+            "width": 296.0,
+            "x": 960.0,
+            "y": 172.0
+          },
+          {
+            "coordinates": {
+              "height": 104.0,
+              "width": 296.0,
+              "x": 960.0,
+              "y": 264.0
+            },
+            "height": 104.0,
+            "pointer": "/layout/rail/slicers",
+            "visual": "visual:ReportSectionOverview:VisualContainerRailDate",
+            "width": 296.0,
+            "x": 960.0,
+            "y": 264.0
           }
         ]
       },
@@ -109,6 +316,34 @@
             "width": 560.0,
             "x": 32.0,
             "y": 32.0
+          },
+          {
+            "coordinates": {
+              "height": 76.0,
+              "width": 296.0,
+              "x": 960.0,
+              "y": 80.0
+            },
+            "height": 76.0,
+            "pointer": "/layout/rail/slicers",
+            "visual": "visual:ReportSectionDetail:VisualContainerRailSegment",
+            "width": 296.0,
+            "x": 960.0,
+            "y": 80.0
+          },
+          {
+            "coordinates": {
+              "height": 76.0,
+              "width": 296.0,
+              "x": 960.0,
+              "y": 172.0
+            },
+            "height": 76.0,
+            "pointer": "/layout/rail/slicers",
+            "visual": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+            "width": 296.0,
+            "x": 960.0,
+            "y": 172.0
           }
         ]
       }
@@ -116,7 +351,7 @@
     "unavailable": null
   },
   "plan": {
-    "operationCount": 2,
+    "operationCount": 7,
     "ops": [
       {
         "handle": "visual:ReportSectionOverview:VisualContainerRevenue",
@@ -149,8 +384,104 @@
         "summary": "declare compiled report visual"
       },
       {
-        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
         "index": 1,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Segment",
+              "role": "Values",
+              "table": "DimCustomer"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
+          "mode": "Basic",
+          "name": "VisualContainerRailSegment",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 76.0,
+            "width": 296.0,
+            "x": 960.0,
+            "y": 80.0
+          },
+          "singleSelect": false,
+          "title": "Segment",
+          "visualType": "slicer"
+        },
+        "pointer": "/layout/rail/slicers",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "compile v2 slicer visual VisualContainerRailSegment as AddVisual(slicer)"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+        "index": 2,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "CustomerName",
+              "role": "Values",
+              "table": "DimCustomer"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+          "mode": "Dropdown",
+          "name": "VisualContainerRailCustomer",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 76.0,
+            "width": 296.0,
+            "x": 960.0,
+            "y": 172.0
+          },
+          "singleSelect": true,
+          "title": "Customer",
+          "visualType": "slicer"
+        },
+        "pointer": "/layout/rail/slicers",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "compile v2 slicer visual VisualContainerRailCustomer as AddVisual(slicer)"
+      },
+      {
+        "handle": "visual:ReportSectionOverview:VisualContainerRailDate",
+        "index": 3,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Date",
+              "role": "Values",
+              "table": "DimDate"
+            }
+          ],
+          "handle": "visual:ReportSectionOverview:VisualContainerRailDate",
+          "mode": "Between",
+          "name": "VisualContainerRailDate",
+          "op": "addVisual",
+          "page": "page:ReportSectionOverview",
+          "position": {
+            "height": 104.0,
+            "width": 296.0,
+            "x": 960.0,
+            "y": 264.0
+          },
+          "singleSelect": false,
+          "title": "Date",
+          "visualType": "slicer"
+        },
+        "pointer": "/layout/rail/slicers",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "compile v2 slicer visual VisualContainerRailDate as AddVisual(slicer)"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+        "index": 4,
         "op": "addVisual",
         "operation": {
           "bindings": [
@@ -177,6 +508,70 @@
         "stage": 2,
         "stageName": "visual",
         "summary": "declare compiled report visual"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
+        "index": 5,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "Segment",
+              "role": "Values",
+              "table": "DimCustomer"
+            }
+          ],
+          "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
+          "mode": "Basic",
+          "name": "VisualContainerRailSegment",
+          "op": "addVisual",
+          "page": "page:ReportSectionDetail",
+          "position": {
+            "height": 76.0,
+            "width": 296.0,
+            "x": 960.0,
+            "y": 80.0
+          },
+          "singleSelect": false,
+          "title": "Segment",
+          "visualType": "slicer"
+        },
+        "pointer": "/layout/rail/slicers",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "compile v2 slicer visual VisualContainerRailSegment as AddVisual(slicer)"
+      },
+      {
+        "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+        "index": 6,
+        "op": "addVisual",
+        "operation": {
+          "bindings": [
+            {
+              "column": "CustomerName",
+              "role": "Values",
+              "table": "DimCustomer"
+            }
+          ],
+          "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+          "mode": "Dropdown",
+          "name": "VisualContainerRailCustomer",
+          "op": "addVisual",
+          "page": "page:ReportSectionDetail",
+          "position": {
+            "height": 76.0,
+            "width": 296.0,
+            "x": 960.0,
+            "y": 172.0
+          },
+          "singleSelect": true,
+          "title": "Customer",
+          "visualType": "slicer"
+        },
+        "pointer": "/layout/rail/slicers",
+        "stage": 2,
+        "stageName": "visual",
+        "summary": "compile v2 slicer visual VisualContainerRailCustomer as AddVisual(slicer)"
       }
     ],
     "schema": "powerbi-cli.report.spec.explainPlan.v1",
@@ -186,7 +581,12 @@
         "name": "visual",
         "operationIndexes": [
           0,
-          1
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
         ],
         "ops": [
           {
@@ -220,8 +620,104 @@
             "summary": "declare compiled report visual"
           },
           {
-            "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+            "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
             "index": 1,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Segment",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerRailSegment",
+              "mode": "Basic",
+              "name": "VisualContainerRailSegment",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 76.0,
+                "width": 296.0,
+                "x": 960.0,
+                "y": 80.0
+              },
+              "singleSelect": false,
+              "title": "Segment",
+              "visualType": "slicer"
+            },
+            "pointer": "/layout/rail/slicers",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "compile v2 slicer visual VisualContainerRailSegment as AddVisual(slicer)"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+            "index": 2,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "CustomerName",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerRailCustomer",
+              "mode": "Dropdown",
+              "name": "VisualContainerRailCustomer",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 76.0,
+                "width": 296.0,
+                "x": 960.0,
+                "y": 172.0
+              },
+              "singleSelect": true,
+              "title": "Customer",
+              "visualType": "slicer"
+            },
+            "pointer": "/layout/rail/slicers",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "compile v2 slicer visual VisualContainerRailCustomer as AddVisual(slicer)"
+          },
+          {
+            "handle": "visual:ReportSectionOverview:VisualContainerRailDate",
+            "index": 3,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Date",
+                  "role": "Values",
+                  "table": "DimDate"
+                }
+              ],
+              "handle": "visual:ReportSectionOverview:VisualContainerRailDate",
+              "mode": "Between",
+              "name": "VisualContainerRailDate",
+              "op": "addVisual",
+              "page": "page:ReportSectionOverview",
+              "position": {
+                "height": 104.0,
+                "width": 296.0,
+                "x": 960.0,
+                "y": 264.0
+              },
+              "singleSelect": false,
+              "title": "Date",
+              "visualType": "slicer"
+            },
+            "pointer": "/layout/rail/slicers",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "compile v2 slicer visual VisualContainerRailDate as AddVisual(slicer)"
+          },
+          {
+            "handle": "visual:ReportSectionDetail:VisualContainerUnits",
+            "index": 4,
             "op": "addVisual",
             "operation": {
               "bindings": [
@@ -248,6 +744,70 @@
             "stage": 2,
             "stageName": "visual",
             "summary": "declare compiled report visual"
+          },
+          {
+            "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
+            "index": 5,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "Segment",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                }
+              ],
+              "handle": "visual:ReportSectionDetail:VisualContainerRailSegment",
+              "mode": "Basic",
+              "name": "VisualContainerRailSegment",
+              "op": "addVisual",
+              "page": "page:ReportSectionDetail",
+              "position": {
+                "height": 76.0,
+                "width": 296.0,
+                "x": 960.0,
+                "y": 80.0
+              },
+              "singleSelect": false,
+              "title": "Segment",
+              "visualType": "slicer"
+            },
+            "pointer": "/layout/rail/slicers",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "compile v2 slicer visual VisualContainerRailSegment as AddVisual(slicer)"
+          },
+          {
+            "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+            "index": 6,
+            "op": "addVisual",
+            "operation": {
+              "bindings": [
+                {
+                  "column": "CustomerName",
+                  "role": "Values",
+                  "table": "DimCustomer"
+                }
+              ],
+              "handle": "visual:ReportSectionDetail:VisualContainerRailCustomer",
+              "mode": "Dropdown",
+              "name": "VisualContainerRailCustomer",
+              "op": "addVisual",
+              "page": "page:ReportSectionDetail",
+              "position": {
+                "height": 76.0,
+                "width": 296.0,
+                "x": 960.0,
+                "y": 172.0
+              },
+              "singleSelect": true,
+              "title": "Customer",
+              "visualType": "slicer"
+            },
+            "pointer": "/layout/rail/slicers",
+            "stage": 2,
+            "stageName": "visual",
+            "summary": "compile v2 slicer visual VisualContainerRailCustomer as AddVisual(slicer)"
           }
         ]
       }

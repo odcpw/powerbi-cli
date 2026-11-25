@@ -7,7 +7,7 @@
 //! later triage run without translating command-specific response shapes.
 
 use crate::handoff::handoff_command;
-use crate::lint::lint_project;
+use crate::lint::lint_from_deep;
 use crate::{
     Finding, ResolvedProject, ValidationReport, canonical_display, command_arg, validate_project,
 };
@@ -15,8 +15,7 @@ use serde_json::{Value, json};
 
 /// Build a scorecard from a project path.  The helper owns the read-only
 /// validation/lint/handoff calls so callers that do not already have those
-/// reports (for example report build after scaffolding) can still use the
-/// exact same projection as triage.
+/// reports can still use the exact same projection as triage.
 pub(crate) fn project_scorecard(resolved: &ResolvedProject, proof_level: &str) -> Value {
     let validation = match validate_project(resolved) {
         Ok(report) => report,
@@ -41,7 +40,21 @@ pub(crate) fn project_scorecard(resolved: &ResolvedProject, proof_level: &str) -
             );
         }
     };
-    let lint = match lint_project(resolved, &validation) {
+    project_scorecard_with_validation(resolved, &validation, proof_level)
+}
+
+/// Reuse caller-owned validation for this unchanged project; never cache across writes.
+pub(crate) fn project_scorecard_with_validation(
+    resolved: &ResolvedProject,
+    validation: &ValidationReport,
+    proof_level: &str,
+) -> Value {
+    let deep = crate::inspect::deep_inspect(resolved, validation);
+    let lint = match deep
+        .as_ref()
+        .map_err(|e| e.message.clone())
+        .and_then(|d| lint_from_deep(resolved, validation, d).map_err(|e| e.message))
+    {
         Ok(value) => value,
         Err(error) => json!({
             "ok": false,
@@ -49,13 +62,19 @@ pub(crate) fn project_scorecard(resolved: &ResolvedProject, proof_level: &str) -
             "findings": [json!({
                 "code": "lint.unavailable",
                 "severity": "error",
-                "message": error.message,
+                "message": error,
                 "handle": Value::Null,
                 "path": canonical_display(&resolved.project_dir)
             })]
         }),
     };
-    scorecard_from_parts(resolved, &validation, &lint, proof_level)
+    scorecard_from_parts(
+        resolved,
+        validation,
+        &lint,
+        deep.as_ref().map_err(|e| e.message.as_str()),
+        proof_level,
+    )
 }
 
 /// Project an already-computed validation and lint result into the shared
@@ -65,6 +84,7 @@ pub(crate) fn scorecard_from_parts(
     resolved: &ResolvedProject,
     validation: &ValidationReport,
     lint: &Value,
+    deep: Result<&Value, &str>,
     proof_level: &str,
 ) -> Value {
     let validation_value = json!({
@@ -74,13 +94,14 @@ pub(crate) fn scorecard_from_parts(
     });
     let lint_value = lint_scorecard(lint);
     let handoff = handoff_scorecard(resolved);
-    let design_lint = crate::inspect::deep_inspect(resolved, validation)
-        .and_then(|deep| crate::design::lint::lint_report(resolved, &deep))
+    let design_lint = deep
+        .map_err(str::to_owned)
+        .and_then(|deep| crate::design::lint::lint_report(resolved, deep).map_err(|e| e.message))
         .unwrap_or_else(|error| {
             json!({
                 "status": "unavailable",
                 "proofLevel": Value::Null,
-                "reason": error.message,
+                "reason": error,
                 "findings": []
             })
         });

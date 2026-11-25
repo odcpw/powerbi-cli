@@ -362,6 +362,7 @@ mod tests {
             name: None,
             title: None,
             mode: None,
+            search_enabled: None,
             single_select: None,
             position: None,
             bindings: Vec::new(),

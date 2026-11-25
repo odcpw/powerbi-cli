@@ -266,7 +266,7 @@ const LAYOUT_RAIL: NodeSchema = node("layout.rail", "layout.rail", &["side", "wi
 const RAIL_SLICER: NodeSchema = node(
     "layout.rail.slicers[]",
     "layout.rail.slicers",
-    &["field", "mode", "singleSelect", "title"],
+    &["field", "mode", "searchEnabled", "singleSelect", "title"],
 );
 const FILTER: NodeSchema = node(
     "filters[]",
@@ -315,7 +315,14 @@ const PAGE_V2: NodeSchema = node(
 const PAGE_SLICER: NodeSchema = node(
     "pages[].slicers[]",
     "pages.slicers",
-    &["field", "mode", "singleSelect", "title", "slot"],
+    &[
+        "field",
+        "mode",
+        "searchEnabled",
+        "singleSelect",
+        "title",
+        "slot",
+    ],
 );
 const DRILLTHROUGH: NodeSchema = node(
     "pages[].drillthrough",
@@ -633,7 +640,20 @@ fn version_schema(version: SpecVersion) -> Value {
         SpecVersion::V2 => {
             let measure_pattern = node_object(nodes, "model.measurePatterns[]", &[]);
             let calculated_column = node_object(nodes, "model.calculatedColumns[]", &[]);
-            let relationship = node_object(nodes, "model.relationships[]", &[]);
+            let relationship = node_object(
+                nodes,
+                "model.relationships[]",
+                &[
+                    ("from", string.clone()),
+                    ("to", string.clone()),
+                    (
+                        "cardinality",
+                        json!({"type":"string","enum":["manyToOne","oneToMany","oneToOne","manyToMany"]}),
+                    ),
+                    ("crossFilteringBehavior", string.clone()),
+                    ("isActive", json!({"type":"boolean"})),
+                ],
+            );
             let static_table = node_object(
                 nodes,
                 "model.staticTables[]",
@@ -646,7 +666,11 @@ fn version_schema(version: SpecVersion) -> Value {
                 ],
             );
             let date_table = node_object(nodes, "model.dateTable", &[]);
-            let sort_by = node_object(nodes, "model.sortBy[]", &[]);
+            let sort_by = node_object(
+                nodes,
+                "model.sortBy[]",
+                &[("column", string.clone()), ("by", string.clone())],
+            );
             let format_string = node_object(nodes, "model.formatStrings[]", &[]);
             node_object(
                 nodes,
@@ -746,7 +770,7 @@ fn version_schema(version: SpecVersion) -> Value {
             ],
         ),
         SpecVersion::V2 => {
-            let slicer = node_object(nodes, "pages[].slicers[]", &[]);
+            let slicer = slicer_schema(nodes, "pages[].slicers[]");
             let drillthrough = node_object(nodes, "pages[].drillthrough", &[]);
             let visual_sort = node_object(nodes, "pages[].visuals[].sort", &[]);
             let visual_drilldown = node_object(nodes, "pages[].visuals[].drilldown", &[]);
@@ -992,6 +1016,17 @@ fn format_schema(nodes: &[NodeSchema]) -> Value {
     node_object(nodes, "pages[].visuals[].format", &overrides)
 }
 
+fn slicer_schema(nodes: &[NodeSchema], node: &str) -> Value {
+    node_object(
+        nodes,
+        node,
+        &[
+            ("searchEnabled", json!({"type":"boolean"})),
+            ("singleSelect", json!({"type":"boolean"})),
+        ],
+    )
+}
+
 fn layout_schema(nodes: &[NodeSchema]) -> Value {
     let number = json!({"type": "number"});
     let grid = node_object(
@@ -1008,7 +1043,7 @@ fn layout_schema(nodes: &[NodeSchema]) -> Value {
         "layout.pageSize",
         &[("width", number.clone()), ("height", number.clone())],
     );
-    let slicer = node_object(nodes, "layout.rail.slicers[]", &[]);
+    let slicer = slicer_schema(nodes, "layout.rail.slicers[]");
     let rail = node_object(
         nodes,
         "layout.rail",
@@ -1295,10 +1330,8 @@ fn first_uncompiled_v2_section(
         for section in [
             "measurePatterns",
             "calculatedColumns",
-            "relationships",
             "staticTables",
             "dateTable",
-            "sortBy",
             "formatStrings",
         ] {
             if model.contains_key(section) {
@@ -1446,10 +1479,8 @@ pub(crate) fn uncompiled_v2_sections(
         for section in [
             "measurePatterns",
             "calculatedColumns",
-            "relationships",
             "staticTables",
             "dateTable",
-            "sortBy",
             "formatStrings",
         ] {
             if model.contains_key(section) {
@@ -1520,25 +1551,23 @@ pub(crate) fn uncompiled_v2_sections(
                         continue;
                     };
                     let visual_pointer = format!("{page_pointer}/visuals/{visual_index}");
-                    for field in ["subtitle"] {
-                        if visual.contains_key(field) {
-                            push(
-                                format!("pages[{page_index}].visuals[{visual_index}].{field}"),
-                                format!("{visual_pointer}/{field}"),
-                                LAYOUT_BEAD,
-                                "powerbi-cli report visuals set-position --project <project-dir> --handle <visual-handle> --x <x> --y <y> --width <width> --height <height> --dry-run --json",
-                            );
-                        }
+                    if visual.contains_key("subtitle") {
+                        push(
+                            format!("pages[{page_index}].visuals[{visual_index}].subtitle"),
+                            format!("{visual_pointer}/subtitle"),
+                            LAYOUT_BEAD,
+                            "powerbi-cli report visuals set-position --project <project-dir> --handle <visual-handle> --x <x> --y <y> --width <width> --height <height> --dry-run --json",
+                        );
                     }
-                    for field in ["conditionalFormatting"] {
-                        if visual.contains_key(field) {
-                            push(
-                                format!("pages[{page_index}].visuals[{visual_index}].{field}"),
-                                format!("{visual_pointer}/{field}"),
-                                FORMAT_BEAD,
-                                "powerbi-cli report visuals set-object --project <project-dir> --handle <visual-handle> --object <object> --property <property> --value <value> --dry-run --json",
-                            );
-                        }
+                    if visual.contains_key("conditionalFormatting") {
+                        push(
+                            format!(
+                                "pages[{page_index}].visuals[{visual_index}].conditionalFormatting"
+                            ),
+                            format!("{visual_pointer}/conditionalFormatting"),
+                            FORMAT_BEAD,
+                            "powerbi-cli report visuals set-object --project <project-dir> --handle <visual-handle> --object <object> --property <property> --value <value> --dry-run --json",
+                        );
                     }
                     if visual.contains_key("format") && !design_defaults {
                         push(
@@ -1666,6 +1695,7 @@ value_struct!(SlicerV2 {
     field,
     mode,
     single_select,
+    search_enabled,
     title,
     slot
 });
@@ -1673,6 +1703,7 @@ value_struct!(RailSlicerV2 {
     field,
     mode,
     single_select,
+    search_enabled,
     title
 });
 value_struct!(DrillthroughV2 {

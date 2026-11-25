@@ -116,7 +116,7 @@ pub(crate) fn apply(payload: &AddVisual, transaction: &mut Transaction) -> CliRe
         .iter()
         .map(|binding| binding_input_from_json(binding))
         .collect::<CliResult<Vec<VisualBindingInput>>>()?;
-    let (_resolved_bindings, visual_json) = if scaffold && payload.visual_type == "textbox" {
+    let (resolved_bindings, mut visual_json) = if scaffold && payload.visual_type == "textbox" {
         if !inputs.is_empty() {
             return Err(CliError::invalid_args(
                 "textbox scaffold does not accept field bindings",
@@ -157,6 +157,39 @@ pub(crate) fn apply(payload: &AddVisual, transaction: &mut Transaction) -> CliRe
         (resolved, visual_json)
     };
 
+    // Search toggles only the visual format; do not persist a search term or
+    // add any report-level filter or sync-group state.
+    if let Some(enabled) = payload.search_enabled {
+        if !payload.visual_type.eq_ignore_ascii_case("slicer")
+            || payload
+                .mode
+                .as_deref()
+                .is_some_and(|m| m.eq_ignore_ascii_case("between"))
+        {
+            return Err(CliError::invalid_args(
+                "searchEnabled applies only to categorical slicers",
+            )
+            .with_pointer("/searchEnabled"));
+        }
+        if enabled
+            && !resolved_bindings.iter().any(|b| {
+                b.data_type.as_deref().is_some_and(|t| {
+                    t.eq_ignore_ascii_case("string") || t.eq_ignore_ascii_case("text")
+                })
+            })
+        {
+            return Err(
+                CliError::invalid_args("slicer search requires a text column")
+                    .with_pointer("/searchEnabled"),
+            );
+        }
+        let general = &mut visual_json["visual"]["objects"]["general"];
+        if general.is_null() {
+            *general = json!([{"properties": {}}]);
+        }
+        general[0]["properties"]["selfFilterEnabled"] =
+            json!({"expr": {"Literal": {"Value": enabled.to_string()}}});
+    }
     let visuals_dir = crate::report_visual_mutations::operation_page_visuals_dir(&page)?;
     let visual_dir = visuals_dir.join(&visual_name);
     let visual_path = visual_dir.join("visual.json");
@@ -440,6 +473,7 @@ mod tests {
             name: Some("VisualContainerKernelCard".into()),
             title: Some("Kernel Card".into()),
             mode: None,
+            search_enabled: None,
             single_select: None,
             position: Some(json!({
                 "x": 40.0,

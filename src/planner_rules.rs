@@ -854,13 +854,8 @@ mod tests {
             }
         }
         let readme = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"));
-        let skill = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/skills/powerbi-cli/SKILL.md"
-        ));
         for rule in &catalog.rules {
             assert!(readme.contains(&rule.id), "README drifted for {}", rule.id);
-            assert!(skill.contains(&rule.id), "SKILL.md drifted for {}", rule.id);
         }
     }
 }
